@@ -1,0 +1,2069 @@
+import { sql } from "drizzle-orm";
+import {
+  bigint,
+  boolean,
+  char,
+  check,
+  date,
+  index,
+  jsonb,
+  numeric,
+  pgEnum,
+  pgTable,
+  primaryKey,
+  smallint,
+  text,
+  timestamp,
+  uniqueIndex,
+  uuid,
+  varchar,
+  type AnyPgColumn,
+} from "drizzle-orm/pg-core";
+
+const timestamps = {
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+};
+
+const softDelete = {
+  deletedAt: timestamp("deleted_at", { withTimezone: true }),
+  deletedBy: uuid("deleted_by"),
+  deleteReason: text("delete_reason"),
+};
+
+export const locationType = pgEnum("location_type", [
+  "warehouse",
+  "display_shop",
+  "transit",
+  "adjustment",
+  "customer",
+  "supplier",
+]);
+
+export const deviceStatus = pgEnum("device_status", ["active", "revoked", "replaced"]);
+export const userStatus = pgEnum("user_status", ["active", "disabled", "locked"]);
+export const employeeStatus = pgEnum("employee_status", ["active", "inactive"]);
+export const auditSeverity = pgEnum("audit_severity", ["info", "warning", "critical"]);
+export const productType = pgEnum("product_type", [
+  "machinery",
+  "spare_part",
+  "accessory",
+  "consumable",
+  "service",
+]);
+export const trackingMode = pgEnum("tracking_mode", ["none", "lot", "serial"]);
+export const serialStatus = pgEnum("serial_status", [
+  "available",
+  "reserved",
+  "in_transit",
+  "sold",
+  "returned",
+  "damaged",
+  "scrapped",
+]);
+export const compatibilityType = pgEnum("compatibility_type", [
+  "compatible",
+  "substitute",
+  "accessory",
+  "bundle",
+  "upsell",
+]);
+export const priceListType = pgEnum("price_list_type", [
+  "retail",
+  "wholesale",
+  "customer_specific",
+  "location_specific",
+]);
+export const partnerStatus = pgEnum("partner_status", ["active", "blocked", "inactive"]);
+export const addressType = pgEnum("address_type", ["billing", "delivery", "office", "warehouse"]);
+export const stockMovementType = pgEnum("stock_movement_type", [
+  "opening_balance",
+  "purchase_receipt",
+  "sale_issue",
+  "customer_return",
+  "supplier_return",
+  "transfer",
+  "adjustment",
+  "scrap",
+  "stock_count",
+]);
+export const stockMovementStatus = pgEnum("stock_movement_status", [
+  "draft",
+  "posted",
+  "void",
+]);
+export const stockReservationStatus = pgEnum("stock_reservation_status", [
+  "active",
+  "fulfilled",
+  "cancelled",
+  "expired",
+]);
+export const stockCountStatus = pgEnum("stock_count_status", [
+  "draft",
+  "in_progress",
+  "completed",
+  "posted",
+  "cancelled",
+]);
+export const stockCountLineStatus = pgEnum("stock_count_line_status", [
+  "pending",
+  "counted",
+  "recount_required",
+  "approved",
+]);
+export const purchaseOrderStatus = pgEnum("purchase_order_status", [
+  "draft",
+  "confirmed",
+  "partially_received",
+  "received",
+  "cancelled",
+]);
+export const goodsReceiptStatus = pgEnum("goods_receipt_status", [
+  "draft",
+  "posted",
+  "cancelled",
+]);
+export const landedCostStatus = pgEnum("landed_cost_status", [
+  "draft",
+  "allocated",
+  "posted",
+  "cancelled",
+]);
+export const landedCostType = pgEnum("landed_cost_type", [
+  "freight",
+  "customs",
+  "insurance",
+  "handling",
+  "other",
+]);
+export const landedCostAllocationMethod = pgEnum("landed_cost_allocation_method", [
+  "quantity",
+  "value",
+  "weight",
+  "manual",
+]);
+export const supplierBillStatus = pgEnum("supplier_bill_status", [
+  "placeholder",
+  "pending",
+  "matched",
+  "cancelled",
+]);
+export const taxScope = pgEnum("tax_scope", ["purchase", "sale", "both"]);
+export const taxComputation = pgEnum("tax_computation", ["percent", "fixed"]);
+export const vendorBillStatus = pgEnum("vendor_bill_status", [
+  "draft",
+  "posted",
+  "cancelled",
+]);
+export const vendorBillPaymentStatus = pgEnum("vendor_bill_payment_status", [
+  "not_paid",
+  "partial",
+  "paid",
+]);
+export const paymentMethodType = pgEnum("payment_method_type", [
+  "cash",
+  "bank_transfer",
+  "mobile_money",
+  "card",
+]);
+export const paymentType = pgEnum("payment_type", ["inbound", "outbound"]);
+export const paymentStatus = pgEnum("payment_status", ["draft", "posted", "cancelled"]);
+export const expenseStatus = pgEnum("expense_status", ["posted", "cancelled"]);
+export const expensePaymentStatus = pgEnum("expense_payment_status", ["unpaid", "paid"]);
+
+export const currencies = pgTable(
+  "currencies",
+  {
+    code: char("code", { length: 3 }).primaryKey(),
+    name: varchar("name", { length: 80 }).notNull(),
+    minorUnit: smallint("minor_unit").notNull().default(2),
+    isActive: boolean("is_active").notNull().default(true),
+    ...timestamps,
+  },
+  (table) => [check("currencies_minor_unit_chk", sql`${table.minorUnit} between 0 and 6`)],
+);
+
+export const companies = pgTable(
+  "companies",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    code: varchar("code", { length: 20 }).notNull(),
+    legalName: varchar("legal_name", { length: 200 }).notNull(),
+    tradeName: varchar("trade_name", { length: 200 }),
+    tin: varchar("tin", { length: 30 }),
+    baseCurrencyCode: char("base_currency_code", { length: 3 })
+      .notNull()
+      .references(() => currencies.code, { onDelete: "restrict", onUpdate: "cascade" }),
+    timezone: varchar("timezone", { length: 50 }).notNull().default("Africa/Addis_Ababa"),
+    fiscalYearStartMonth: smallint("fiscal_year_start_month").notNull().default(1),
+    logoObjectKey: text("logo_object_key"),
+    isActive: boolean("is_active").notNull().default(true),
+    ...softDelete,
+    ...timestamps,
+  },
+  (table) => [
+    check(
+      "companies_fiscal_year_start_month_chk",
+      sql`${table.fiscalYearStartMonth} between 1 and 12`,
+    ),
+    uniqueIndex("companies_code_active_uidx")
+      .on(table.code)
+      .where(sql`${table.deletedAt} is null`),
+    uniqueIndex("companies_tin_active_uidx")
+      .on(table.tin)
+      .where(sql`${table.tin} is not null and ${table.deletedAt} is null`),
+  ],
+);
+
+export const employees = pgTable(
+  "employees",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    companyId: uuid("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    employeeNo: varchar("employee_no", { length: 40 }),
+    fullName: varchar("full_name", { length: 160 }).notNull(),
+    phone: varchar("phone", { length: 40 }),
+    email: varchar("email", { length: 160 }),
+    status: employeeStatus("status").notNull().default("active"),
+    ...softDelete,
+    ...timestamps,
+  },
+  (table) => [
+    uniqueIndex("employees_no_active_uidx")
+      .on(table.companyId, table.employeeNo)
+      .where(sql`${table.employeeNo} is not null and ${table.deletedAt} is null`),
+    index("employees_company_status_idx").on(table.companyId, table.status),
+  ],
+);
+
+export const users = pgTable(
+  "users",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    companyId: uuid("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    employeeId: uuid("employee_id").references(() => employees.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
+    username: varchar("username", { length: 80 }).notNull(),
+    email: varchar("email", { length: 160 }),
+    passwordHash: text("password_hash").notNull(),
+    status: userStatus("status").notNull().default("active"),
+    lastLoginAt: timestamp("last_login_at", { withTimezone: true }),
+    ...softDelete,
+    ...timestamps,
+  },
+  (table) => [
+    uniqueIndex("users_username_active_uidx")
+      .on(table.companyId, table.username)
+      .where(sql`${table.deletedAt} is null`),
+    uniqueIndex("users_email_active_uidx")
+      .on(table.companyId, table.email)
+      .where(sql`${table.email} is not null and ${table.deletedAt} is null`),
+    index("users_company_status_idx").on(table.companyId, table.status),
+  ],
+);
+
+export const authSessions = pgTable(
+  "auth_sessions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade", onUpdate: "cascade" }),
+    tokenHash: char("token_hash", { length: 64 }).notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("auth_sessions_token_hash_uidx").on(table.tokenHash),
+    index("auth_sessions_user_active_idx").on(table.userId, table.expiresAt, table.revokedAt),
+  ],
+);
+
+export const roles = pgTable(
+  "roles",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    companyId: uuid("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    code: varchar("code", { length: 80 }).notNull(),
+    name: varchar("name", { length: 120 }).notNull(),
+    description: text("description"),
+    isSystem: boolean("is_system").notNull().default(false),
+    isActive: boolean("is_active").notNull().default(true),
+    ...softDelete,
+    ...timestamps,
+  },
+  (table) => [
+    uniqueIndex("roles_code_active_uidx")
+      .on(table.companyId, table.code)
+      .where(sql`${table.deletedAt} is null`),
+  ],
+);
+
+export const permissions = pgTable(
+  "permissions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    code: varchar("code", { length: 120 }).notNull(),
+    description: text("description"),
+    isActive: boolean("is_active").notNull().default(true),
+    ...softDelete,
+    ...timestamps,
+  },
+  (table) => [
+    uniqueIndex("permissions_code_active_uidx")
+      .on(table.code)
+      .where(sql`${table.deletedAt} is null`),
+  ],
+);
+
+export const rolePermissions = pgTable(
+  "role_permissions",
+  {
+    roleId: uuid("role_id")
+      .notNull()
+      .references(() => roles.id, { onDelete: "cascade", onUpdate: "cascade" }),
+    permissionId: uuid("permission_id")
+      .notNull()
+      .references(() => permissions.id, { onDelete: "cascade", onUpdate: "cascade" }),
+    grantedAt: timestamp("granted_at", { withTimezone: true }).notNull().defaultNow(),
+    grantedBy: uuid("granted_by").references(() => users.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
+  },
+  (table) => [primaryKey({ columns: [table.roleId, table.permissionId] })],
+);
+
+export const userRoles = pgTable(
+  "user_roles",
+  {
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade", onUpdate: "cascade" }),
+    roleId: uuid("role_id")
+      .notNull()
+      .references(() => roles.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    validFrom: timestamp("valid_from", { withTimezone: true }),
+    validTo: timestamp("valid_to", { withTimezone: true }),
+    assignedAt: timestamp("assigned_at", { withTimezone: true }).notNull().defaultNow(),
+    assignedBy: uuid("assigned_by").references(() => users.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
+  },
+  (table) => [
+    primaryKey({ columns: [table.userId, table.roleId] }),
+    index("user_roles_validity_idx").on(table.userId, table.validFrom, table.validTo),
+  ],
+);
+
+export const locations = pgTable(
+  "locations",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    companyId: uuid("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    parentLocationId: uuid("parent_location_id").references((): AnyPgColumn => locations.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
+    code: varchar("code", { length: 20 }).notNull(),
+    name: varchar("name", { length: 120 }).notNull(),
+    locationType: locationType("location_type").notNull(),
+    addressJson: jsonb("address_json"),
+    offlineSalesEnabled: boolean("offline_sales_enabled").notNull().default(false),
+    allowNegativeStock: boolean("allow_negative_stock").notNull().default(false),
+    isActive: boolean("is_active").notNull().default(true),
+    ...softDelete,
+    ...timestamps,
+  },
+  (table) => [
+    uniqueIndex("locations_code_active_uidx")
+      .on(table.companyId, table.code)
+      .where(sql`${table.deletedAt} is null`),
+    index("locations_type_active_idx").on(table.companyId, table.locationType, table.isActive),
+    index("locations_parent_idx").on(table.parentLocationId),
+  ],
+);
+
+export const userLocationAccess = pgTable(
+  "user_location_access",
+  {
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade", onUpdate: "cascade" }),
+    locationId: uuid("location_id")
+      .notNull()
+      .references(() => locations.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    canView: boolean("can_view").notNull().default(true),
+    canTransact: boolean("can_transact").notNull().default(false),
+    validFrom: timestamp("valid_from", { withTimezone: true }),
+    validTo: timestamp("valid_to", { withTimezone: true }),
+    assignedAt: timestamp("assigned_at", { withTimezone: true }).notNull().defaultNow(),
+    assignedBy: uuid("assigned_by").references(() => users.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
+  },
+  (table) => [
+    primaryKey({ columns: [table.userId, table.locationId] }),
+    index("user_location_access_validity_idx").on(table.userId, table.validFrom, table.validTo),
+  ],
+);
+
+export const devices = pgTable(
+  "devices",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    locationId: uuid("location_id")
+      .notNull()
+      .references(() => locations.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    deviceKeyHash: varchar("device_key_hash", { length: 128 }).notNull(),
+    name: varchar("name", { length: 100 }).notNull(),
+    platform: varchar("platform", { length: 80 }),
+    isPrimaryOfflineDevice: boolean("is_primary_offline_device").notNull().default(false),
+    status: deviceStatus("status").notNull().default("active"),
+    lastSeenAt: timestamp("last_seen_at", { withTimezone: true }),
+    lastSyncCursor: bigint("last_sync_cursor", { mode: "number" }).notNull().default(0),
+    storagePersistent: boolean("storage_persistent").notNull().default(false),
+    ...softDelete,
+    ...timestamps,
+  },
+  (table) => [
+    uniqueIndex("devices_key_hash_uidx").on(table.deviceKeyHash),
+    uniqueIndex("devices_primary_active_uidx")
+      .on(table.locationId)
+      .where(
+        sql`${table.isPrimaryOfflineDevice} = true and ${table.status} = 'active' and ${table.deletedAt} is null`,
+      ),
+    index("devices_location_status_idx").on(table.locationId, table.status),
+  ],
+);
+
+export const attachments = pgTable(
+  "attachments",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    companyId: uuid("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    entityType: varchar("entity_type", { length: 80 }).notNull(),
+    entityId: uuid("entity_id").notNull(),
+    objectKey: text("object_key").notNull(),
+    fileName: varchar("file_name", { length: 240 }).notNull(),
+    mimeType: varchar("mime_type", { length: 120 }).notNull(),
+    sizeBytes: bigint("size_bytes", { mode: "number" }).notNull(),
+    sha256Hash: char("sha256_hash", { length: 64 }).notNull(),
+    uploadedBy: uuid("uploaded_by").references(() => users.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
+    ...softDelete,
+    ...timestamps,
+  },
+  (table) => [
+    index("attachments_entity_idx").on(table.entityType, table.entityId),
+    index("attachments_company_idx").on(table.companyId),
+  ],
+);
+
+export const auditLogs = pgTable(
+  "audit_logs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    companyId: uuid("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    actorUserId: uuid("actor_user_id").references(() => users.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
+    deviceId: uuid("device_id").references(() => devices.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
+    locationId: uuid("location_id").references(() => locations.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
+    action: varchar("action", { length: 120 }).notNull(),
+    entityType: varchar("entity_type", { length: 80 }).notNull(),
+    entityId: uuid("entity_id"),
+    severity: auditSeverity("severity").notNull().default("info"),
+    beforeHash: char("before_hash", { length: 64 }),
+    afterHash: char("after_hash", { length: 64 }),
+    metadata: jsonb("metadata").notNull().default({}),
+    ipAddress: varchar("ip_address", { length: 64 }),
+    occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("audit_logs_entity_time_idx").on(table.entityType, table.entityId, table.occurredAt),
+    index("audit_logs_actor_time_idx").on(table.actorUserId, table.occurredAt),
+    index("audit_logs_company_time_idx").on(table.companyId, table.occurredAt),
+  ],
+);
+
+export const productCategories = pgTable(
+  "product_categories",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    companyId: uuid("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    parentCategoryId: uuid("parent_category_id").references(
+      (): AnyPgColumn => productCategories.id,
+      {
+        onDelete: "restrict",
+        onUpdate: "cascade",
+      },
+    ),
+    code: varchar("code", { length: 40 }).notNull(),
+    name: varchar("name", { length: 120 }).notNull(),
+    description: text("description"),
+    isActive: boolean("is_active").notNull().default(true),
+    ...softDelete,
+    ...timestamps,
+  },
+  (table) => [
+    uniqueIndex("product_categories_code_active_uidx")
+      .on(table.companyId, table.code)
+      .where(sql`${table.deletedAt} is null`),
+    uniqueIndex("product_categories_name_active_uidx")
+      .on(
+        table.companyId,
+        sql`coalesce(${table.parentCategoryId}, '00000000-0000-0000-0000-000000000000'::uuid)`,
+        table.name,
+      )
+      .where(sql`${table.deletedAt} is null`),
+    index("product_categories_company_name_idx").on(table.companyId, table.name),
+    index("product_categories_parent_idx").on(table.parentCategoryId),
+  ],
+);
+
+export const brands = pgTable(
+  "brands",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    companyId: uuid("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    code: varchar("code", { length: 40 }).notNull(),
+    name: varchar("name", { length: 120 }).notNull(),
+    description: text("description"),
+    isActive: boolean("is_active").notNull().default(true),
+    ...softDelete,
+    ...timestamps,
+  },
+  (table) => [
+    uniqueIndex("brands_code_active_uidx")
+      .on(table.companyId, table.code)
+      .where(sql`${table.deletedAt} is null`),
+    uniqueIndex("brands_name_active_uidx")
+      .on(table.companyId, table.name)
+      .where(sql`${table.deletedAt} is null`),
+  ],
+);
+
+export const unitsOfMeasure = pgTable(
+  "units_of_measure",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    companyId: uuid("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    code: varchar("code", { length: 20 }).notNull(),
+    name: varchar("name", { length: 80 }).notNull(),
+    precision: smallint("precision").notNull().default(0),
+    isActive: boolean("is_active").notNull().default(true),
+    ...softDelete,
+    ...timestamps,
+  },
+  (table) => [
+    check("units_of_measure_precision_chk", sql`${table.precision} between 0 and 6`),
+    uniqueIndex("units_of_measure_code_active_uidx")
+      .on(table.companyId, table.code)
+      .where(sql`${table.deletedAt} is null`),
+  ],
+);
+
+export const products = pgTable(
+  "products",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    companyId: uuid("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    sku: varchar("sku", { length: 60 }).notNull(),
+    barcode: varchar("barcode", { length: 80 }),
+    name: varchar("name", { length: 200 }).notNull(),
+    categoryId: uuid("category_id").references(() => productCategories.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
+    brandId: uuid("brand_id").references(() => brands.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
+    model: varchar("model", { length: 100 }),
+    description: text("description"),
+    unitId: uuid("unit_id")
+      .notNull()
+      .references(() => unitsOfMeasure.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    productType: productType("product_type").notNull(),
+    trackingMode: trackingMode("tracking_mode").notNull().default("none"),
+    standardCostMinor: bigint("standard_cost_minor", { mode: "number" }).notNull().default(0),
+    listPriceMinor: bigint("list_price_minor", { mode: "number" }).notNull().default(0),
+    currencyCode: char("currency_code", { length: 3 })
+      .notNull()
+      .references(() => currencies.code, { onDelete: "restrict", onUpdate: "cascade" }),
+    isActive: boolean("is_active").notNull().default(true),
+    ...softDelete,
+    ...timestamps,
+  },
+  (table) => [
+    check("products_standard_cost_minor_chk", sql`${table.standardCostMinor} >= 0`),
+    check("products_list_price_minor_chk", sql`${table.listPriceMinor} >= 0`),
+    uniqueIndex("products_sku_active_uidx")
+      .on(table.companyId, table.sku)
+      .where(sql`${table.deletedAt} is null`),
+    uniqueIndex("products_barcode_active_uidx")
+      .on(table.companyId, table.barcode)
+      .where(sql`${table.barcode} is not null and ${table.deletedAt} is null`),
+    index("products_company_name_idx").on(table.companyId, table.name),
+    index("products_category_active_idx").on(table.categoryId, table.isActive),
+  ],
+);
+
+export const productAttributes = pgTable(
+  "product_attributes",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    productId: uuid("product_id")
+      .notNull()
+      .references(() => products.id, { onDelete: "cascade", onUpdate: "cascade" }),
+    attributeName: varchar("attribute_name", { length: 80 }).notNull(),
+    attributeValue: varchar("attribute_value", { length: 200 }).notNull(),
+    sortOrder: smallint("sort_order").notNull().default(0),
+    ...softDelete,
+    ...timestamps,
+  },
+  (table) => [
+    uniqueIndex("product_attributes_name_active_uidx")
+      .on(table.productId, table.attributeName)
+      .where(sql`${table.deletedAt} is null`),
+  ],
+);
+
+export const productCompatibilities = pgTable(
+  "product_compatibilities",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    productId: uuid("product_id")
+      .notNull()
+      .references(() => products.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    relatedProductId: uuid("related_product_id")
+      .notNull()
+      .references(() => products.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    compatibilityType: compatibilityType("compatibility_type").notNull().default("compatible"),
+    notes: text("notes"),
+    effectiveFrom: date("effective_from"),
+    effectiveTo: date("effective_to"),
+    isActive: boolean("is_active").notNull().default(true),
+    ...softDelete,
+    ...timestamps,
+  },
+  (table) => [
+    check("product_compatibilities_not_self_chk", sql`${table.productId} <> ${table.relatedProductId}`),
+    check(
+      "product_compatibilities_date_range_chk",
+      sql`${table.effectiveTo} is null or ${table.effectiveFrom} is null or ${table.effectiveTo} >= ${table.effectiveFrom}`,
+    ),
+    uniqueIndex("product_compatibilities_active_uidx")
+      .on(table.productId, table.relatedProductId, table.compatibilityType)
+      .where(sql`${table.deletedAt} is null`),
+  ],
+);
+
+export const priceLists = pgTable(
+  "price_lists",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    companyId: uuid("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    locationId: uuid("location_id").references(() => locations.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
+    code: varchar("code", { length: 40 }).notNull(),
+    name: varchar("name", { length: 120 }).notNull(),
+    priceListType: priceListType("price_list_type").notNull().default("retail"),
+    currencyCode: char("currency_code", { length: 3 })
+      .notNull()
+      .references(() => currencies.code, { onDelete: "restrict", onUpdate: "cascade" }),
+    validFrom: date("valid_from"),
+    validTo: date("valid_to"),
+    isActive: boolean("is_active").notNull().default(true),
+    ...softDelete,
+    ...timestamps,
+  },
+  (table) => [
+    check(
+      "price_lists_date_range_chk",
+      sql`${table.validTo} is null or ${table.validFrom} is null or ${table.validTo} >= ${table.validFrom}`,
+    ),
+    uniqueIndex("price_lists_code_active_uidx")
+      .on(table.companyId, table.code)
+      .where(sql`${table.deletedAt} is null`),
+    index("price_lists_location_active_idx").on(table.locationId, table.isActive),
+  ],
+);
+
+export const priceListItems = pgTable(
+  "price_list_items",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    priceListId: uuid("price_list_id")
+      .notNull()
+      .references(() => priceLists.id, { onDelete: "cascade", onUpdate: "cascade" }),
+    productId: uuid("product_id")
+      .notNull()
+      .references(() => products.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    minimumQuantity: numeric("minimum_quantity", { precision: 20, scale: 6 })
+      .notNull()
+      .default("1"),
+    unitPriceMinor: bigint("unit_price_minor", { mode: "number" }).notNull(),
+    discountMinor: bigint("discount_minor", { mode: "number" }).notNull().default(0),
+    validFrom: date("valid_from").notNull(),
+    validTo: date("valid_to"),
+    isActive: boolean("is_active").notNull().default(true),
+    ...softDelete,
+    ...timestamps,
+  },
+  (table) => [
+    check("price_list_items_minimum_quantity_chk", sql`${table.minimumQuantity} > 0`),
+    check("price_list_items_unit_price_minor_chk", sql`${table.unitPriceMinor} >= 0`),
+    check("price_list_items_discount_minor_chk", sql`${table.discountMinor} >= 0`),
+    check(
+      "price_list_items_date_range_chk",
+      sql`${table.validTo} is null or ${table.validTo} >= ${table.validFrom}`,
+    ),
+    uniqueIndex("price_list_items_product_date_active_uidx")
+      .on(table.priceListId, table.productId, table.minimumQuantity, table.validFrom)
+      .where(sql`${table.deletedAt} is null`),
+    index("price_list_items_product_idx").on(table.productId),
+  ],
+);
+
+export const productSerials = pgTable(
+  "product_serials",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    productId: uuid("product_id")
+      .notNull()
+      .references(() => products.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    serialNo: varchar("serial_no", { length: 120 }).notNull(),
+    engineNo: varchar("engine_no", { length: 120 }),
+    chassisNo: varchar("chassis_no", { length: 120 }),
+    status: serialStatus("status").notNull().default("available"),
+    currentLocationId: uuid("current_location_id").references(() => locations.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
+    landedUnitCostMinor: bigint("landed_unit_cost_minor", { mode: "number" }),
+    warrantyStartDate: date("warranty_start_date"),
+    warrantyEndDate: date("warranty_end_date"),
+    ...softDelete,
+    ...timestamps,
+  },
+  (table) => [
+    uniqueIndex("product_serials_serial_no_uidx").on(table.serialNo),
+    uniqueIndex("product_serials_engine_no_uidx")
+      .on(table.engineNo)
+      .where(sql`${table.engineNo} is not null`),
+    uniqueIndex("product_serials_chassis_no_uidx")
+      .on(table.chassisNo)
+      .where(sql`${table.chassisNo} is not null`),
+    index("product_serials_product_status_location_idx").on(
+      table.productId,
+      table.status,
+      table.currentLocationId,
+    ),
+  ],
+);
+
+export const productLots = pgTable(
+  "product_lots",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    productId: uuid("product_id")
+      .notNull()
+      .references(() => products.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    lotNo: varchar("lot_no", { length: 120 }).notNull(),
+    status: serialStatus("status").notNull().default("available"),
+    currentLocationId: uuid("current_location_id").references(() => locations.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
+    landedUnitCostMinor: bigint("landed_unit_cost_minor", { mode: "number" }),
+    expiryDate: date("expiry_date"),
+    ...softDelete,
+    ...timestamps,
+  },
+  (table) => [
+    uniqueIndex("product_lots_product_lot_no_active_uidx")
+      .on(table.productId, table.lotNo)
+      .where(sql`${table.deletedAt} is null`),
+    index("product_lots_product_status_location_idx").on(
+      table.productId,
+      table.status,
+      table.currentLocationId,
+    ),
+  ],
+);
+
+export const stockMovements = pgTable(
+  "stock_movements",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    companyId: uuid("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    movementNo: varchar("movement_no", { length: 60 }).notNull(),
+    movementType: stockMovementType("movement_type").notNull(),
+    status: stockMovementStatus("status").notNull().default("draft"),
+    movementDate: timestamp("movement_date", { withTimezone: true }).notNull().defaultNow(),
+    fromLocationId: uuid("from_location_id").references(() => locations.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
+    toLocationId: uuid("to_location_id").references(() => locations.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
+    sourceType: varchar("source_type", { length: 80 }),
+    sourceId: uuid("source_id"),
+    sourceNo: varchar("source_no", { length: 80 }),
+    postedAt: timestamp("posted_at", { withTimezone: true }),
+    postedBy: uuid("posted_by").references(() => users.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
+    deviceId: uuid("device_id").references(() => devices.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
+    notes: text("notes"),
+    metadata: jsonb("metadata").notNull().default({}),
+    ...softDelete,
+    ...timestamps,
+  },
+  (table) => [
+    check(
+      "stock_movements_location_direction_chk",
+      sql`
+        (
+          ${table.movementType} in ('purchase_receipt', 'customer_return', 'opening_balance')
+          and ${table.toLocationId} is not null
+        )
+        or (
+          ${table.movementType} in ('sale_issue', 'supplier_return')
+          and ${table.fromLocationId} is not null
+        )
+        or (
+          ${table.movementType} = 'transfer'
+          and ${table.fromLocationId} is not null
+          and ${table.toLocationId} is not null
+          and ${table.fromLocationId} <> ${table.toLocationId}
+        )
+        or ${table.movementType} in ('adjustment', 'stock_count')
+      `,
+    ),
+    check(
+      "stock_movements_posted_state_chk",
+      sql`
+        (${table.status} = 'posted' and ${table.postedAt} is not null)
+        or (${table.status} <> 'posted' and ${table.postedAt} is null)
+      `,
+    ),
+    uniqueIndex("stock_movements_no_active_uidx")
+      .on(table.companyId, table.movementNo)
+      .where(sql`${table.deletedAt} is null`),
+    index("stock_movements_company_date_idx").on(table.companyId, table.movementDate),
+    index("stock_movements_status_idx").on(table.companyId, table.status),
+    index("stock_movements_source_idx").on(table.sourceType, table.sourceId),
+    index("stock_movements_from_location_idx").on(table.fromLocationId),
+    index("stock_movements_to_location_idx").on(table.toLocationId),
+  ],
+);
+
+export const stockMovementLines = pgTable(
+  "stock_movement_lines",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    stockMovementId: uuid("stock_movement_id")
+      .notNull()
+      .references(() => stockMovements.id, { onDelete: "cascade", onUpdate: "cascade" }),
+    lineNo: smallint("line_no").notNull(),
+    productId: uuid("product_id")
+      .notNull()
+      .references(() => products.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    productSerialId: uuid("product_serial_id").references(() => productSerials.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
+    productLotId: uuid("product_lot_id").references(() => productLots.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
+    fromLocationId: uuid("from_location_id").references(() => locations.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
+    toLocationId: uuid("to_location_id").references(() => locations.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
+    unitId: uuid("unit_id")
+      .notNull()
+      .references(() => unitsOfMeasure.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    quantity: numeric("quantity", { precision: 20, scale: 6 }).notNull(),
+    unitCostMinor: bigint("unit_cost_minor", { mode: "number" }).notNull().default(0),
+    totalCostMinor: bigint("total_cost_minor", { mode: "number" }).notNull().default(0),
+    currencyCode: char("currency_code", { length: 3 })
+      .notNull()
+      .references(() => currencies.code, { onDelete: "restrict", onUpdate: "cascade" }),
+    notes: text("notes"),
+    metadata: jsonb("metadata").notNull().default({}),
+    ...softDelete,
+    ...timestamps,
+  },
+  (table) => [
+    check("stock_movement_lines_line_no_chk", sql`${table.lineNo} > 0`),
+    check("stock_movement_lines_quantity_chk", sql`${table.quantity} <> 0`),
+    check("stock_movement_lines_unit_cost_chk", sql`${table.unitCostMinor} >= 0`),
+    check("stock_movement_lines_total_cost_chk", sql`${table.totalCostMinor} >= 0`),
+    uniqueIndex("stock_movement_lines_no_active_uidx")
+      .on(table.stockMovementId, table.lineNo)
+      .where(sql`${table.deletedAt} is null`),
+    index("stock_movement_lines_product_idx").on(table.productId),
+    index("stock_movement_lines_serial_idx").on(table.productSerialId),
+    index("stock_movement_lines_lot_idx").on(table.productLotId),
+    index("stock_movement_lines_from_location_idx").on(table.fromLocationId),
+    index("stock_movement_lines_to_location_idx").on(table.toLocationId),
+  ],
+);
+
+export const stockBalances = pgTable(
+  "stock_balances",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    companyId: uuid("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    locationId: uuid("location_id")
+      .notNull()
+      .references(() => locations.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    productId: uuid("product_id")
+      .notNull()
+      .references(() => products.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    productSerialId: uuid("product_serial_id").references(() => productSerials.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
+    productLotId: uuid("product_lot_id").references(() => productLots.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
+    quantityOnHand: numeric("quantity_on_hand", { precision: 20, scale: 6 })
+      .notNull()
+      .default("0"),
+    quantityReserved: numeric("quantity_reserved", { precision: 20, scale: 6 })
+      .notNull()
+      .default("0"),
+    quantityAvailable: numeric("quantity_available", { precision: 20, scale: 6 })
+      .notNull()
+      .default("0"),
+    averageCostMinor: bigint("average_cost_minor", { mode: "number" }).notNull().default(0),
+    currencyCode: char("currency_code", { length: 3 })
+      .notNull()
+      .references(() => currencies.code, { onDelete: "restrict", onUpdate: "cascade" }),
+    lastMovementAt: timestamp("last_movement_at", { withTimezone: true }),
+    ...softDelete,
+    ...timestamps,
+  },
+  (table) => [
+    check("stock_balances_reserved_chk", sql`${table.quantityReserved} >= 0`),
+    check("stock_balances_average_cost_chk", sql`${table.averageCostMinor} >= 0`),
+    check(
+      "stock_balances_available_chk",
+      sql`${table.quantityAvailable} = ${table.quantityOnHand} - ${table.quantityReserved}`,
+    ),
+    uniqueIndex("stock_balances_location_product_active_uidx")
+      .on(
+        table.companyId,
+        table.locationId,
+        table.productId,
+        sql`coalesce(${table.productSerialId}, '00000000-0000-0000-0000-000000000000'::uuid)`,
+        sql`coalesce(${table.productLotId}, '00000000-0000-0000-0000-000000000000'::uuid)`,
+      )
+      .where(sql`${table.deletedAt} is null`),
+    index("stock_balances_product_idx").on(table.companyId, table.productId),
+    index("stock_balances_location_idx").on(table.companyId, table.locationId),
+    index("stock_balances_serial_idx").on(table.productSerialId),
+    index("stock_balances_lot_idx").on(table.productLotId),
+  ],
+);
+
+export const stockReservations = pgTable(
+  "stock_reservations",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    companyId: uuid("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    reservationNo: varchar("reservation_no", { length: 60 }).notNull(),
+    locationId: uuid("location_id")
+      .notNull()
+      .references(() => locations.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    productId: uuid("product_id")
+      .notNull()
+      .references(() => products.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    productSerialId: uuid("product_serial_id").references(() => productSerials.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
+    productLotId: uuid("product_lot_id").references(() => productLots.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
+    partnerId: uuid("partner_id").references(() => partners.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
+    sourceType: varchar("source_type", { length: 80 }),
+    sourceId: uuid("source_id"),
+    sourceNo: varchar("source_no", { length: 80 }),
+    quantity: numeric("quantity", { precision: 20, scale: 6 }).notNull(),
+    status: stockReservationStatus("status").notNull().default("active"),
+    reservedAt: timestamp("reserved_at", { withTimezone: true }).notNull().defaultNow(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }),
+    fulfilledAt: timestamp("fulfilled_at", { withTimezone: true }),
+    cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
+    notes: text("notes"),
+    metadata: jsonb("metadata").notNull().default({}),
+    ...softDelete,
+    ...timestamps,
+  },
+  (table) => [
+    check("stock_reservations_quantity_chk", sql`${table.quantity} > 0`),
+    check(
+      "stock_reservations_expiry_chk",
+      sql`${table.expiresAt} is null or ${table.expiresAt} > ${table.reservedAt}`,
+    ),
+    uniqueIndex("stock_reservations_no_active_uidx")
+      .on(table.companyId, table.reservationNo)
+      .where(sql`${table.deletedAt} is null`),
+    index("stock_reservations_status_idx").on(table.companyId, table.status),
+    index("stock_reservations_product_location_idx").on(table.productId, table.locationId),
+    index("stock_reservations_lot_idx").on(table.productLotId),
+    index("stock_reservations_source_idx").on(table.sourceType, table.sourceId),
+  ],
+);
+
+export const stockCounts = pgTable(
+  "stock_counts",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    companyId: uuid("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    locationId: uuid("location_id")
+      .notNull()
+      .references(() => locations.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    countNo: varchar("count_no", { length: 60 }).notNull(),
+    status: stockCountStatus("status").notNull().default("draft"),
+    countDate: date("count_date").notNull().defaultNow(),
+    startedAt: timestamp("started_at", { withTimezone: true }),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    postedAt: timestamp("posted_at", { withTimezone: true }),
+    postedBy: uuid("posted_by").references(() => users.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
+    notes: text("notes"),
+    metadata: jsonb("metadata").notNull().default({}),
+    ...softDelete,
+    ...timestamps,
+  },
+  (table) => [
+    check(
+      "stock_counts_completed_range_chk",
+      sql`${table.completedAt} is null or ${table.startedAt} is null or ${table.completedAt} >= ${table.startedAt}`,
+    ),
+    uniqueIndex("stock_counts_no_active_uidx")
+      .on(table.companyId, table.countNo)
+      .where(sql`${table.deletedAt} is null`),
+    index("stock_counts_location_date_idx").on(table.locationId, table.countDate),
+    index("stock_counts_status_idx").on(table.companyId, table.status),
+  ],
+);
+
+export const stockCountLines = pgTable(
+  "stock_count_lines",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    stockCountId: uuid("stock_count_id")
+      .notNull()
+      .references(() => stockCounts.id, { onDelete: "cascade", onUpdate: "cascade" }),
+    lineNo: smallint("line_no").notNull(),
+    productId: uuid("product_id")
+      .notNull()
+      .references(() => products.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    productSerialId: uuid("product_serial_id").references(() => productSerials.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
+    productLotId: uuid("product_lot_id").references(() => productLots.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
+    expectedQuantity: numeric("expected_quantity", { precision: 20, scale: 6 })
+      .notNull()
+      .default("0"),
+    countedQuantity: numeric("counted_quantity", { precision: 20, scale: 6 }),
+    varianceQuantity: numeric("variance_quantity", { precision: 20, scale: 6 })
+      .notNull()
+      .default("0"),
+    status: stockCountLineStatus("status").notNull().default("pending"),
+    countedAt: timestamp("counted_at", { withTimezone: true }),
+    countedBy: uuid("counted_by").references(() => users.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
+    notes: text("notes"),
+    ...softDelete,
+    ...timestamps,
+  },
+  (table) => [
+    check("stock_count_lines_line_no_chk", sql`${table.lineNo} > 0`),
+    check("stock_count_lines_expected_quantity_chk", sql`${table.expectedQuantity} >= 0`),
+    check(
+      "stock_count_lines_counted_quantity_chk",
+      sql`${table.countedQuantity} is null or ${table.countedQuantity} >= 0`,
+    ),
+    check(
+      "stock_count_lines_variance_chk",
+      sql`${table.countedQuantity} is null or ${table.varianceQuantity} = ${table.countedQuantity} - ${table.expectedQuantity}`,
+    ),
+    uniqueIndex("stock_count_lines_no_active_uidx")
+      .on(table.stockCountId, table.lineNo)
+      .where(sql`${table.deletedAt} is null`),
+    uniqueIndex("stock_count_lines_product_active_uidx")
+      .on(
+        table.stockCountId,
+        table.productId,
+        sql`coalesce(${table.productSerialId}, '00000000-0000-0000-0000-000000000000'::uuid)`,
+      )
+      .where(sql`${table.deletedAt} is null`),
+    index("stock_count_lines_product_idx").on(table.productId),
+    index("stock_count_lines_serial_idx").on(table.productSerialId),
+  ],
+);
+
+export const paymentTerms = pgTable(
+  "payment_terms",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    companyId: uuid("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    code: varchar("code", { length: 40 }).notNull(),
+    name: varchar("name", { length: 120 }).notNull(),
+    dueDays: smallint("due_days").notNull().default(0),
+    description: text("description"),
+    isActive: boolean("is_active").notNull().default(true),
+    ...softDelete,
+    ...timestamps,
+  },
+  (table) => [
+    check("payment_terms_due_days_chk", sql`${table.dueDays} >= 0`),
+    uniqueIndex("payment_terms_code_active_uidx")
+      .on(table.companyId, table.code)
+      .where(sql`${table.deletedAt} is null`),
+  ],
+);
+
+export const paymentMethods = pgTable(
+  "payment_methods",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    companyId: uuid("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    code: varchar("code", { length: 40 }).notNull(),
+    name: varchar("name", { length: 120 }).notNull(),
+    methodType: paymentMethodType("method_type").notNull(),
+    allowInbound: boolean("allow_inbound").notNull().default(true),
+    allowOutbound: boolean("allow_outbound").notNull().default(false),
+    requiresReference: boolean("requires_reference").notNull().default(false),
+    isActive: boolean("is_active").notNull().default(true),
+    notes: text("notes"),
+    ...softDelete,
+    ...timestamps,
+  },
+  (table) => [
+    check(
+      "payment_methods_direction_chk",
+      sql`${table.allowInbound} = true or ${table.allowOutbound} = true`,
+    ),
+    uniqueIndex("payment_methods_code_active_uidx")
+      .on(table.companyId, table.code)
+      .where(sql`${table.deletedAt} is null and ${table.isActive} = true`),
+    index("payment_methods_type_idx").on(table.companyId, table.methodType),
+  ],
+);
+
+export const paymentAccounts = pgTable(
+  "payment_accounts",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    companyId: uuid("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    paymentMethodId: uuid("payment_method_id")
+      .notNull()
+      .references(() => paymentMethods.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    code: varchar("code", { length: 40 }).notNull(),
+    name: varchar("name", { length: 120 }).notNull(),
+    institutionName: varchar("institution_name", { length: 120 }),
+    accountNumber: varchar("account_number", { length: 80 }),
+    openingBalanceMinor: bigint("opening_balance_minor", { mode: "number" }).notNull().default(0),
+    currencyCode: char("currency_code", { length: 3 })
+      .notNull()
+      .references(() => currencies.code, { onDelete: "restrict", onUpdate: "cascade" }),
+    isActive: boolean("is_active").notNull().default(true),
+    notes: text("notes"),
+    ...softDelete,
+    ...timestamps,
+  },
+  (table) => [
+    uniqueIndex("payment_accounts_code_active_uidx")
+      .on(table.companyId, table.code)
+      .where(sql`${table.deletedAt} is null and ${table.isActive} = true`),
+    index("payment_accounts_method_idx").on(table.paymentMethodId),
+  ],
+);
+
+export const partners = pgTable(
+  "partners",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    companyId: uuid("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    code: varchar("code", { length: 40 }).notNull(),
+    displayName: varchar("display_name", { length: 200 }).notNull(),
+    legalName: varchar("legal_name", { length: 200 }),
+    tin: varchar("tin", { length: 30 }),
+    isCustomer: boolean("is_customer").notNull().default(false),
+    isSupplier: boolean("is_supplier").notNull().default(false),
+    paymentTermId: uuid("payment_term_id").references(() => paymentTerms.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
+    creditLimitMinor: bigint("credit_limit_minor", { mode: "number" }).notNull().default(0),
+    currencyCode: char("currency_code", { length: 3 })
+      .notNull()
+      .references(() => currencies.code, { onDelete: "restrict", onUpdate: "cascade" }),
+    status: partnerStatus("status").notNull().default("active"),
+    notes: text("notes"),
+    ...softDelete,
+    ...timestamps,
+  },
+  (table) => [
+    check("partners_role_chk", sql`${table.isCustomer} = true or ${table.isSupplier} = true`),
+    check("partners_credit_limit_minor_chk", sql`${table.creditLimitMinor} >= 0`),
+    uniqueIndex("partners_code_active_uidx")
+      .on(table.companyId, table.code)
+      .where(sql`${table.deletedAt} is null`),
+    uniqueIndex("partners_tin_active_uidx")
+      .on(table.companyId, table.tin)
+      .where(sql`${table.tin} is not null and ${table.deletedAt} is null`),
+    index("partners_company_display_name_idx").on(table.companyId, table.displayName),
+    index("partners_status_idx").on(table.companyId, table.status),
+  ],
+);
+
+export const partnerContacts = pgTable(
+  "partner_contacts",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    partnerId: uuid("partner_id")
+      .notNull()
+      .references(() => partners.id, { onDelete: "cascade", onUpdate: "cascade" }),
+    fullName: varchar("full_name", { length: 160 }).notNull(),
+    roleTitle: varchar("role_title", { length: 100 }),
+    phone: varchar("phone", { length: 40 }),
+    email: varchar("email", { length: 160 }),
+    isPrimary: boolean("is_primary").notNull().default(false),
+    ...softDelete,
+    ...timestamps,
+  },
+  (table) => [
+    uniqueIndex("partner_contacts_primary_active_uidx")
+      .on(table.partnerId)
+      .where(sql`${table.isPrimary} = true and ${table.deletedAt} is null`),
+    index("partner_contacts_partner_idx").on(table.partnerId),
+  ],
+);
+
+export const partnerAddresses = pgTable(
+  "partner_addresses",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    partnerId: uuid("partner_id")
+      .notNull()
+      .references(() => partners.id, { onDelete: "cascade", onUpdate: "cascade" }),
+    addressType: addressType("address_type").notNull().default("office"),
+    label: varchar("label", { length: 100 }),
+    line1: varchar("line1", { length: 200 }).notNull(),
+    line2: varchar("line2", { length: 200 }),
+    city: varchar("city", { length: 120 }),
+    region: varchar("region", { length: 120 }),
+    country: varchar("country", { length: 120 }).notNull().default("Ethiopia"),
+    isPrimary: boolean("is_primary").notNull().default(false),
+    ...softDelete,
+    ...timestamps,
+  },
+  (table) => [
+    uniqueIndex("partner_addresses_primary_type_active_uidx")
+      .on(table.partnerId, table.addressType)
+      .where(sql`${table.isPrimary} = true and ${table.deletedAt} is null`),
+    index("partner_addresses_partner_idx").on(table.partnerId),
+  ],
+);
+
+export const taxGroups = pgTable(
+  "tax_groups",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    companyId: uuid("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    code: varchar("code", { length: 40 }).notNull(),
+    name: varchar("name", { length: 120 }).notNull(),
+    sortOrder: smallint("sort_order").notNull().default(0),
+    isActive: boolean("is_active").notNull().default(true),
+    ...softDelete,
+    ...timestamps,
+  },
+  (table) => [
+    uniqueIndex("tax_groups_code_active_uidx")
+      .on(table.companyId, table.code)
+      .where(sql`${table.deletedAt} is null`),
+    uniqueIndex("tax_groups_name_active_uidx")
+      .on(table.companyId, table.name)
+      .where(sql`${table.deletedAt} is null`),
+  ],
+);
+
+export const taxes = pgTable(
+  "taxes",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    companyId: uuid("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    taxGroupId: uuid("tax_group_id").references(() => taxGroups.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
+    code: varchar("code", { length: 40 }).notNull(),
+    name: varchar("name", { length: 120 }).notNull(),
+    scope: taxScope("scope").notNull().default("purchase"),
+    computation: taxComputation("computation").notNull().default("percent"),
+    rate: numeric("rate", { precision: 9, scale: 4 }).notNull().default("0"),
+    amountMinor: bigint("amount_minor", { mode: "number" }).notNull().default(0),
+    priceIncluded: boolean("price_included").notNull().default(false),
+    description: text("description"),
+    isActive: boolean("is_active").notNull().default(true),
+    ...softDelete,
+    ...timestamps,
+  },
+  (table) => [
+    check("taxes_rate_chk", sql`${table.rate} >= 0`),
+    check("taxes_amount_chk", sql`${table.amountMinor} >= 0`),
+    uniqueIndex("taxes_code_active_uidx")
+      .on(table.companyId, table.code)
+      .where(sql`${table.deletedAt} is null`),
+    index("taxes_group_idx").on(table.taxGroupId),
+    index("taxes_scope_active_idx").on(table.companyId, table.scope, table.isActive),
+  ],
+);
+
+export const purchaseOrders = pgTable(
+  "purchase_orders",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    companyId: uuid("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    supplierId: uuid("supplier_id")
+      .notNull()
+      .references(() => partners.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    deliverToLocationId: uuid("deliver_to_location_id").references(() => locations.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
+    orderNo: varchar("order_no", { length: 60 }).notNull(),
+    vendorReference: varchar("vendor_reference", { length: 80 }),
+    status: purchaseOrderStatus("status").notNull().default("draft"),
+    orderDate: date("order_date").notNull().defaultNow(),
+    orderDeadline: date("order_deadline"),
+    expectedDate: date("expected_date"),
+    currencyCode: char("currency_code", { length: 3 })
+      .notNull()
+      .references(() => currencies.code, { onDelete: "restrict", onUpdate: "cascade" }),
+    subtotalMinor: bigint("subtotal_minor", { mode: "number" }).notNull().default(0),
+    landedCostEstimateMinor: bigint("landed_cost_estimate_minor", { mode: "number" }).notNull().default(0),
+    taxAmountMinor: bigint("tax_amount_minor", { mode: "number" }).notNull().default(0),
+    totalMinor: bigint("total_minor", { mode: "number" }).notNull().default(0),
+    notes: text("notes"),
+    createdBy: uuid("created_by").references(() => users.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
+    confirmedAt: timestamp("confirmed_at", { withTimezone: true }),
+    confirmedBy: uuid("confirmed_by").references(() => users.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
+    ...softDelete,
+    ...timestamps,
+  },
+  (table) => [
+    check("purchase_orders_subtotal_chk", sql`${table.subtotalMinor} >= 0`),
+    check("purchase_orders_landed_estimate_chk", sql`${table.landedCostEstimateMinor} >= 0`),
+    check("purchase_orders_tax_amount_chk", sql`${table.taxAmountMinor} >= 0`),
+    check("purchase_orders_total_chk", sql`${table.totalMinor} >= 0`),
+    uniqueIndex("purchase_orders_no_active_uidx")
+      .on(table.companyId, table.orderNo)
+      .where(sql`${table.deletedAt} is null`),
+    index("purchase_orders_supplier_idx").on(table.supplierId),
+    index("purchase_orders_deliver_to_idx").on(table.deliverToLocationId),
+    index("purchase_orders_status_idx").on(table.companyId, table.status),
+    index("purchase_orders_date_idx").on(table.companyId, table.orderDate),
+  ],
+);
+
+export const purchaseOrderLines = pgTable(
+  "purchase_order_lines",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    purchaseOrderId: uuid("purchase_order_id")
+      .notNull()
+      .references(() => purchaseOrders.id, { onDelete: "cascade", onUpdate: "cascade" }),
+    lineNo: smallint("line_no").notNull(),
+    productId: uuid("product_id")
+      .notNull()
+      .references(() => products.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    description: text("description"),
+    unitId: uuid("unit_id")
+      .notNull()
+      .references(() => unitsOfMeasure.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    quantityOrdered: numeric("quantity_ordered", { precision: 20, scale: 6 }).notNull(),
+    quantityReceived: numeric("quantity_received", { precision: 20, scale: 6 })
+      .notNull()
+      .default("0"),
+    unitCostMinor: bigint("unit_cost_minor", { mode: "number" }).notNull().default(0),
+    taxAmountMinor: bigint("tax_amount_minor", { mode: "number" }).notNull().default(0),
+    lineTotalMinor: bigint("line_total_minor", { mode: "number" }).notNull().default(0),
+    currencyCode: char("currency_code", { length: 3 })
+      .notNull()
+      .references(() => currencies.code, { onDelete: "restrict", onUpdate: "cascade" }),
+    notes: text("notes"),
+    ...softDelete,
+    ...timestamps,
+  },
+  (table) => [
+    check("purchase_order_lines_line_no_chk", sql`${table.lineNo} > 0`),
+    check("purchase_order_lines_quantity_ordered_chk", sql`${table.quantityOrdered} > 0`),
+    check("purchase_order_lines_quantity_received_chk", sql`${table.quantityReceived} >= 0`),
+    check("purchase_order_lines_unit_cost_chk", sql`${table.unitCostMinor} >= 0`),
+    check("purchase_order_lines_tax_amount_chk", sql`${table.taxAmountMinor} >= 0`),
+    check("purchase_order_lines_total_chk", sql`${table.lineTotalMinor} >= 0`),
+    uniqueIndex("purchase_order_lines_no_active_uidx")
+      .on(table.purchaseOrderId, table.lineNo)
+      .where(sql`${table.deletedAt} is null`),
+    index("purchase_order_lines_product_idx").on(table.productId),
+  ],
+);
+
+export const purchaseOrderLineTaxes = pgTable(
+  "purchase_order_line_taxes",
+  {
+    purchaseOrderLineId: uuid("purchase_order_line_id")
+      .notNull()
+      .references(() => purchaseOrderLines.id, { onDelete: "cascade", onUpdate: "cascade" }),
+    taxId: uuid("tax_id")
+      .notNull()
+      .references(() => taxes.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    taxAmountMinor: bigint("tax_amount_minor", { mode: "number" }).notNull().default(0),
+    ...timestamps,
+  },
+  (table) => [
+    primaryKey({
+      name: "purchase_order_line_taxes_pk",
+      columns: [table.purchaseOrderLineId, table.taxId],
+    }),
+    check("purchase_order_line_taxes_amount_chk", sql`${table.taxAmountMinor} >= 0`),
+    index("purchase_order_line_taxes_tax_idx").on(table.taxId),
+  ],
+);
+
+export const supplierBillPlaceholders = pgTable(
+  "supplier_bill_placeholders",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    companyId: uuid("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    supplierId: uuid("supplier_id")
+      .notNull()
+      .references(() => partners.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    purchaseOrderId: uuid("purchase_order_id").references(() => purchaseOrders.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
+    billNo: varchar("bill_no", { length: 80 }).notNull(),
+    status: supplierBillStatus("status").notNull().default("placeholder"),
+    billDate: date("bill_date").notNull().defaultNow(),
+    amountMinor: bigint("amount_minor", { mode: "number" }).notNull().default(0),
+    currencyCode: char("currency_code", { length: 3 })
+      .notNull()
+      .references(() => currencies.code, { onDelete: "restrict", onUpdate: "cascade" }),
+    notes: text("notes"),
+    ...softDelete,
+    ...timestamps,
+  },
+  (table) => [
+    check("supplier_bill_placeholders_amount_chk", sql`${table.amountMinor} >= 0`),
+    uniqueIndex("supplier_bill_placeholders_no_active_uidx")
+      .on(table.companyId, table.billNo)
+      .where(sql`${table.deletedAt} is null`),
+    index("supplier_bill_placeholders_supplier_idx").on(table.supplierId),
+  ],
+);
+
+export const vendorBills = pgTable(
+  "vendor_bills",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    companyId: uuid("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    supplierId: uuid("supplier_id")
+      .notNull()
+      .references(() => partners.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    purchaseOrderId: uuid("purchase_order_id").references(() => purchaseOrders.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
+    goodsReceiptId: uuid("goods_receipt_id").references((): AnyPgColumn => goodsReceipts.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
+    billNo: varchar("bill_no", { length: 80 }).notNull(),
+    vendorReference: varchar("vendor_reference", { length: 120 }),
+    status: vendorBillStatus("status").notNull().default("draft"),
+    paymentStatus: vendorBillPaymentStatus("payment_status").notNull().default("not_paid"),
+    billDate: date("bill_date").notNull().defaultNow(),
+    accountingDate: date("accounting_date"),
+    dueDate: date("due_date"),
+    untaxedAmountMinor: bigint("untaxed_amount_minor", { mode: "number" }).notNull().default(0),
+    taxAmountMinor: bigint("tax_amount_minor", { mode: "number" }).notNull().default(0),
+    totalMinor: bigint("total_minor", { mode: "number" }).notNull().default(0),
+    currencyCode: char("currency_code", { length: 3 })
+      .notNull()
+      .references(() => currencies.code, { onDelete: "restrict", onUpdate: "cascade" }),
+    notes: text("notes"),
+    postedAt: timestamp("posted_at", { withTimezone: true }),
+    postedBy: uuid("posted_by").references(() => users.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
+    ...softDelete,
+    ...timestamps,
+  },
+  (table) => [
+    check("vendor_bills_untaxed_chk", sql`${table.untaxedAmountMinor} >= 0`),
+    check("vendor_bills_tax_chk", sql`${table.taxAmountMinor} >= 0`),
+    check("vendor_bills_total_chk", sql`${table.totalMinor} >= 0`),
+    check(
+      "vendor_bills_posted_state_chk",
+      sql`
+        (${table.status} = 'posted' and ${table.postedAt} is not null)
+        or (${table.status} <> 'posted' and ${table.postedAt} is null)
+      `,
+    ),
+    uniqueIndex("vendor_bills_no_active_uidx")
+      .on(table.companyId, table.billNo)
+      .where(sql`${table.deletedAt} is null`),
+    uniqueIndex("vendor_bills_vendor_reference_active_uidx")
+      .on(table.companyId, table.supplierId, table.vendorReference)
+      .where(sql`${table.vendorReference} is not null and ${table.deletedAt} is null`),
+    index("vendor_bills_supplier_idx").on(table.supplierId),
+    index("vendor_bills_po_idx").on(table.purchaseOrderId),
+    index("vendor_bills_receipt_idx").on(table.goodsReceiptId),
+    index("vendor_bills_status_idx").on(table.companyId, table.status),
+    index("vendor_bills_date_idx").on(table.companyId, table.billDate),
+  ],
+);
+
+export const vendorBillLines = pgTable(
+  "vendor_bill_lines",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    vendorBillId: uuid("vendor_bill_id")
+      .notNull()
+      .references(() => vendorBills.id, { onDelete: "cascade", onUpdate: "cascade" }),
+    purchaseOrderLineId: uuid("purchase_order_line_id").references(() => purchaseOrderLines.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
+    goodsReceiptLineId: uuid("goods_receipt_line_id").references(
+      (): AnyPgColumn => goodsReceiptLines.id,
+      {
+        onDelete: "restrict",
+        onUpdate: "cascade",
+      },
+    ),
+    lineNo: smallint("line_no").notNull(),
+    productId: uuid("product_id").references(() => products.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
+    description: text("description").notNull(),
+    unitId: uuid("unit_id").references(() => unitsOfMeasure.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
+    quantity: numeric("quantity", { precision: 20, scale: 6 }).notNull(),
+    unitPriceMinor: bigint("unit_price_minor", { mode: "number" }).notNull().default(0),
+    subtotalMinor: bigint("subtotal_minor", { mode: "number" }).notNull().default(0),
+    taxAmountMinor: bigint("tax_amount_minor", { mode: "number" }).notNull().default(0),
+    totalMinor: bigint("total_minor", { mode: "number" }).notNull().default(0),
+    currencyCode: char("currency_code", { length: 3 })
+      .notNull()
+      .references(() => currencies.code, { onDelete: "restrict", onUpdate: "cascade" }),
+    notes: text("notes"),
+    ...softDelete,
+    ...timestamps,
+  },
+  (table) => [
+    check("vendor_bill_lines_line_no_chk", sql`${table.lineNo} > 0`),
+    check("vendor_bill_lines_quantity_chk", sql`${table.quantity} > 0`),
+    check("vendor_bill_lines_unit_price_chk", sql`${table.unitPriceMinor} >= 0`),
+    check("vendor_bill_lines_subtotal_chk", sql`${table.subtotalMinor} >= 0`),
+    check("vendor_bill_lines_tax_chk", sql`${table.taxAmountMinor} >= 0`),
+    check("vendor_bill_lines_total_chk", sql`${table.totalMinor} >= 0`),
+    uniqueIndex("vendor_bill_lines_no_active_uidx")
+      .on(table.vendorBillId, table.lineNo)
+      .where(sql`${table.deletedAt} is null`),
+    index("vendor_bill_lines_po_line_idx").on(table.purchaseOrderLineId),
+    index("vendor_bill_lines_receipt_line_idx").on(table.goodsReceiptLineId),
+    index("vendor_bill_lines_product_idx").on(table.productId),
+  ],
+);
+
+export const vendorBillLineTaxes = pgTable(
+  "vendor_bill_line_taxes",
+  {
+    vendorBillLineId: uuid("vendor_bill_line_id")
+      .notNull()
+      .references(() => vendorBillLines.id, { onDelete: "cascade", onUpdate: "cascade" }),
+    taxId: uuid("tax_id")
+      .notNull()
+      .references(() => taxes.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    taxAmountMinor: bigint("tax_amount_minor", { mode: "number" }).notNull().default(0),
+    ...timestamps,
+  },
+  (table) => [
+    primaryKey({
+      name: "vendor_bill_line_taxes_pk",
+      columns: [table.vendorBillLineId, table.taxId],
+    }),
+    check("vendor_bill_line_taxes_amount_chk", sql`${table.taxAmountMinor} >= 0`),
+    index("vendor_bill_line_taxes_tax_idx").on(table.taxId),
+  ],
+);
+
+export const payments = pgTable(
+  "payments",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    companyId: uuid("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    partnerId: uuid("partner_id").references(() => partners.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
+    paymentNo: varchar("payment_no", { length: 60 }).notNull(),
+    paymentType: paymentType("payment_type").notNull(),
+    status: paymentStatus("status").notNull().default("draft"),
+    paymentDate: timestamp("payment_date", { withTimezone: true }).notNull().defaultNow(),
+    paymentMethodId: uuid("payment_method_id")
+      .notNull()
+      .references(() => paymentMethods.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    paymentAccountId: uuid("payment_account_id")
+      .notNull()
+      .references(() => paymentAccounts.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    amountMinor: bigint("amount_minor", { mode: "number" }).notNull().default(0),
+    currencyCode: char("currency_code", { length: 3 })
+      .notNull()
+      .references(() => currencies.code, { onDelete: "restrict", onUpdate: "cascade" }),
+    reference: varchar("reference", { length: 120 }),
+    notes: text("notes"),
+    postedAt: timestamp("posted_at", { withTimezone: true }),
+    postedBy: uuid("posted_by").references(() => users.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
+    cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
+    cancelledBy: uuid("cancelled_by").references(() => users.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
+    ...softDelete,
+    ...timestamps,
+  },
+  (table) => [
+    check("payments_amount_chk", sql`${table.amountMinor} > 0`),
+    check(
+      "payments_posted_state_chk",
+      sql`
+        (${table.status} = 'posted' and ${table.postedAt} is not null and ${table.cancelledAt} is null)
+        or (${table.status} = 'cancelled' and ${table.cancelledAt} is not null)
+        or (${table.status} = 'draft' and ${table.postedAt} is null and ${table.cancelledAt} is null)
+      `,
+    ),
+    uniqueIndex("payments_no_active_uidx")
+      .on(table.companyId, table.paymentNo)
+      .where(sql`${table.deletedAt} is null`),
+    index("payments_partner_idx").on(table.partnerId),
+    index("payments_status_idx").on(table.companyId, table.status),
+    index("payments_date_idx").on(table.companyId, table.paymentDate),
+  ],
+);
+
+export const expenseCategories = pgTable(
+  "expense_categories",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    companyId: uuid("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    code: varchar("code", { length: 40 }).notNull(),
+    name: varchar("name", { length: 120 }).notNull(),
+    description: text("description"),
+    isActive: boolean("is_active").notNull().default(true),
+    ...softDelete,
+    ...timestamps,
+  },
+  (table) => [
+    uniqueIndex("expense_categories_code_active_uidx")
+      .on(table.companyId, table.code)
+      .where(sql`${table.deletedAt} is null`),
+  ],
+);
+
+export const expenses = pgTable(
+  "expenses",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    companyId: uuid("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    categoryId: uuid("category_id")
+      .notNull()
+      .references(() => expenseCategories.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    employeeId: uuid("employee_id").references(() => employees.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
+    vendorId: uuid("vendor_id").references(() => partners.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
+    locationId: uuid("location_id").references(() => locations.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
+    expenseNo: varchar("expense_no", { length: 60 }).notNull(),
+    status: expenseStatus("status").notNull().default("posted"),
+    paymentStatus: expensePaymentStatus("payment_status").notNull().default("unpaid"),
+    expenseDate: date("expense_date").notNull().defaultNow(),
+    amountMinor: bigint("amount_minor", { mode: "number" }).notNull().default(0),
+    currencyCode: char("currency_code", { length: 3 })
+      .notNull()
+      .references(() => currencies.code, { onDelete: "restrict", onUpdate: "cascade" }),
+    description: text("description"),
+    cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
+    cancelledBy: uuid("cancelled_by").references(() => users.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
+    ...softDelete,
+    ...timestamps,
+  },
+  (table) => [
+    check("expenses_amount_chk", sql`${table.amountMinor} > 0`),
+    check(
+      "expenses_cancelled_state_chk",
+      sql`
+        (${table.status} = 'cancelled' and ${table.cancelledAt} is not null)
+        or (${table.status} <> 'cancelled' and ${table.cancelledAt} is null)
+      `,
+    ),
+    uniqueIndex("expenses_no_active_uidx")
+      .on(table.companyId, table.expenseNo)
+      .where(sql`${table.deletedAt} is null`),
+    index("expenses_category_idx").on(table.categoryId),
+    index("expenses_vendor_idx").on(table.vendorId),
+    index("expenses_employee_idx").on(table.employeeId),
+    index("expenses_location_idx").on(table.locationId),
+    index("expenses_status_idx").on(table.companyId, table.status),
+    index("expenses_date_idx").on(table.companyId, table.expenseDate),
+  ],
+);
+
+export const paymentAllocations = pgTable(
+  "payment_allocations",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    paymentId: uuid("payment_id")
+      .notNull()
+      .references(() => payments.id, { onDelete: "cascade", onUpdate: "cascade" }),
+    vendorBillId: uuid("vendor_bill_id").references(() => vendorBills.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
+    expenseId: uuid("expense_id").references(() => expenses.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
+    amountMinor: bigint("amount_minor", { mode: "number" }).notNull().default(0),
+    notes: text("notes"),
+    ...softDelete,
+    ...timestamps,
+  },
+  (table) => [
+    check("payment_allocations_amount_chk", sql`${table.amountMinor} > 0`),
+    check(
+      "payment_allocations_target_chk",
+      sql`
+        (case when ${table.vendorBillId} is not null then 1 else 0 end)
+        + (case when ${table.expenseId} is not null then 1 else 0 end)
+        = 1
+      `,
+    ),
+    uniqueIndex("payment_allocations_vendor_bill_active_uidx")
+      .on(table.paymentId, table.vendorBillId)
+      .where(sql`${table.deletedAt} is null and ${table.vendorBillId} is not null`),
+    uniqueIndex("payment_allocations_expense_active_uidx")
+      .on(table.paymentId, table.expenseId)
+      .where(sql`${table.deletedAt} is null and ${table.expenseId} is not null`),
+    index("payment_allocations_payment_idx").on(table.paymentId),
+    index("payment_allocations_vendor_bill_idx").on(table.vendorBillId),
+    index("payment_allocations_expense_idx").on(table.expenseId),
+  ],
+);
+
+export const goodsReceipts = pgTable(
+  "goods_receipts",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    companyId: uuid("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    purchaseOrderId: uuid("purchase_order_id")
+      .notNull()
+      .references(() => purchaseOrders.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    supplierId: uuid("supplier_id")
+      .notNull()
+      .references(() => partners.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    locationId: uuid("location_id")
+      .notNull()
+      .references(() => locations.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    receiptNo: varchar("receipt_no", { length: 60 }).notNull(),
+    status: goodsReceiptStatus("status").notNull().default("draft"),
+    receiptDate: timestamp("receipt_date", { withTimezone: true }).notNull().defaultNow(),
+    postedAt: timestamp("posted_at", { withTimezone: true }),
+    postedBy: uuid("posted_by").references(() => users.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
+    stockMovementId: uuid("stock_movement_id").references(() => stockMovements.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
+    supplierBillPlaceholderId: uuid("supplier_bill_placeholder_id").references(
+      () => supplierBillPlaceholders.id,
+      {
+        onDelete: "restrict",
+        onUpdate: "cascade",
+      },
+    ),
+    supplierInvoiceNo: varchar("supplier_invoice_no", { length: 80 }),
+    notes: text("notes"),
+    ...softDelete,
+    ...timestamps,
+  },
+  (table) => [
+    check(
+      "goods_receipts_posted_state_chk",
+      sql`
+        (${table.status} = 'posted' and ${table.postedAt} is not null)
+        or (${table.status} <> 'posted' and ${table.postedAt} is null)
+      `,
+    ),
+    uniqueIndex("goods_receipts_no_active_uidx")
+      .on(table.companyId, table.receiptNo)
+      .where(sql`${table.deletedAt} is null`),
+    index("goods_receipts_po_idx").on(table.purchaseOrderId),
+    index("goods_receipts_status_idx").on(table.companyId, table.status),
+    index("goods_receipts_location_date_idx").on(table.locationId, table.receiptDate),
+  ],
+);
+
+export const goodsReceiptLines = pgTable(
+  "goods_receipt_lines",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    goodsReceiptId: uuid("goods_receipt_id")
+      .notNull()
+      .references(() => goodsReceipts.id, { onDelete: "cascade", onUpdate: "cascade" }),
+    purchaseOrderLineId: uuid("purchase_order_line_id").references(() => purchaseOrderLines.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
+    lineNo: smallint("line_no").notNull(),
+    productId: uuid("product_id")
+      .notNull()
+      .references(() => products.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    productSerialId: uuid("product_serial_id").references(() => productSerials.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
+    productLotId: uuid("product_lot_id").references(() => productLots.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
+    unitId: uuid("unit_id")
+      .notNull()
+      .references(() => unitsOfMeasure.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    quantityReceived: numeric("quantity_received", { precision: 20, scale: 6 }).notNull(),
+    unitCostMinor: bigint("unit_cost_minor", { mode: "number" }).notNull().default(0),
+    landedUnitCostMinor: bigint("landed_unit_cost_minor", { mode: "number" }).notNull().default(0),
+    lineTotalMinor: bigint("line_total_minor", { mode: "number" }).notNull().default(0),
+    currencyCode: char("currency_code", { length: 3 })
+      .notNull()
+      .references(() => currencies.code, { onDelete: "restrict", onUpdate: "cascade" }),
+    serialNo: varchar("serial_no", { length: 120 }),
+    lotNo: varchar("lot_no", { length: 120 }),
+    notes: text("notes"),
+    ...softDelete,
+    ...timestamps,
+  },
+  (table) => [
+    check("goods_receipt_lines_line_no_chk", sql`${table.lineNo} > 0`),
+    check("goods_receipt_lines_quantity_chk", sql`${table.quantityReceived} > 0`),
+    check("goods_receipt_lines_unit_cost_chk", sql`${table.unitCostMinor} >= 0`),
+    check("goods_receipt_lines_landed_cost_chk", sql`${table.landedUnitCostMinor} >= 0`),
+    check("goods_receipt_lines_total_chk", sql`${table.lineTotalMinor} >= 0`),
+    uniqueIndex("goods_receipt_lines_no_active_uidx")
+      .on(table.goodsReceiptId, table.lineNo)
+      .where(sql`${table.deletedAt} is null`),
+    index("goods_receipt_lines_po_line_idx").on(table.purchaseOrderLineId),
+    index("goods_receipt_lines_product_idx").on(table.productId),
+    index("goods_receipt_lines_lot_idx").on(table.productLotId),
+  ],
+);
+
+export const landedCosts = pgTable(
+  "landed_costs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    companyId: uuid("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    purchaseOrderId: uuid("purchase_order_id").references(() => purchaseOrders.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
+    goodsReceiptId: uuid("goods_receipt_id").references(() => goodsReceipts.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
+    costNo: varchar("cost_no", { length: 60 }).notNull(),
+    costType: landedCostType("cost_type").notNull().default("other"),
+    status: landedCostStatus("status").notNull().default("draft"),
+    allocationMethod: landedCostAllocationMethod("allocation_method").notNull().default("value"),
+    amountMinor: bigint("amount_minor", { mode: "number" }).notNull().default(0),
+    currencyCode: char("currency_code", { length: 3 })
+      .notNull()
+      .references(() => currencies.code, { onDelete: "restrict", onUpdate: "cascade" }),
+    vendorId: uuid("vendor_id").references(() => partners.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
+    notes: text("notes"),
+    ...softDelete,
+    ...timestamps,
+  },
+  (table) => [
+    check("landed_costs_amount_chk", sql`${table.amountMinor} >= 0`),
+    uniqueIndex("landed_costs_no_active_uidx")
+      .on(table.companyId, table.costNo)
+      .where(sql`${table.deletedAt} is null`),
+    index("landed_costs_po_idx").on(table.purchaseOrderId),
+    index("landed_costs_receipt_idx").on(table.goodsReceiptId),
+  ],
+);
+
+export const landedCostAllocations = pgTable(
+  "landed_cost_allocations",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    landedCostId: uuid("landed_cost_id")
+      .notNull()
+      .references(() => landedCosts.id, { onDelete: "cascade", onUpdate: "cascade" }),
+    goodsReceiptLineId: uuid("goods_receipt_line_id")
+      .notNull()
+      .references(() => goodsReceiptLines.id, { onDelete: "cascade", onUpdate: "cascade" }),
+    allocatedAmountMinor: bigint("allocated_amount_minor", { mode: "number" }).notNull().default(0),
+    allocationBasis: numeric("allocation_basis", { precision: 20, scale: 6 }),
+    notes: text("notes"),
+    ...softDelete,
+    ...timestamps,
+  },
+  (table) => [
+    check("landed_cost_allocations_amount_chk", sql`${table.allocatedAmountMinor} >= 0`),
+    uniqueIndex("landed_cost_allocations_line_active_uidx")
+      .on(table.landedCostId, table.goodsReceiptLineId)
+      .where(sql`${table.deletedAt} is null`),
+  ],
+);

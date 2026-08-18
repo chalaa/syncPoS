@@ -1,69 +1,87 @@
-import Image from "next/image";
+import Link from "next/link";
 
 export default function Home() {
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <main className="min-h-screen bg-[#f5f7f8] text-[#172026]">
+      <section className="mx-auto flex min-h-screen w-full max-w-7xl flex-col px-6 py-8">
+        <header className="flex items-center justify-between border-b border-[#d7dcdf] pb-5">
+          <div>
+            <p className="text-sm font-medium uppercase tracking-wide text-[#58706f]">
+              Machinery Retail Management
+            </p>
+            <h1 className="mt-1 text-2xl font-semibold">syncPoS</h1>
+          </div>
+          <div className="rounded-md border border-[#c9d1d4] bg-white px-3 py-2 text-sm font-medium text-[#2f4a49]">
+            Foundation ready
+          </div>
+        </header>
+
+        <div className="grid flex-1 gap-6 py-8 lg:grid-cols-[1.2fr_0.8fr]">
+          <section className="rounded-lg border border-[#d7dcdf] bg-white p-6">
+            <h2 className="text-xl font-semibold">Implementation Roadmap</h2>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-[#5c696e]">
+              The first milestone is proving offline sales durability and sync
+              idempotency before expanding into inventory, purchasing,
+              transfers, expenses, and analytics.
+            </p>
+
+            <div className="mt-6 grid gap-3 sm:grid-cols-2">
+              {[
+                "Offline sync proof",
+                "Master data",
+                "Inventory ledger",
+                "Purchasing",
+                "Sales and POS",
+                "Transfers",
+                "Expenses and accounting",
+                "Analytics",
+              ].map((item, index) => (
+                <div
+                  key={item}
+                  className="rounded-md border border-[#e1e6e8] bg-[#fbfcfc] p-4"
+                >
+                  <span className="text-xs font-semibold text-[#58706f]">
+                    Phase {index + 1}
+                  </span>
+                  <p className="mt-1 font-medium">{item}</p>
+                </div>
+              ))}
+            </div>
+            <div className="mt-6">
+              <Link
+                href="/admin/products"
+                className="mr-3 inline-flex rounded-md bg-[#1f6b5c] px-4 py-2 text-sm font-semibold text-white"
+              >
+                Open products
+              </Link>
+              <Link
+                href="/admin/partners"
+                className="inline-flex rounded-md border border-[#c9d1d4] bg-white px-4 py-2 text-sm font-semibold text-[#1f4f46]"
+              >
+                Open partners
+              </Link>
+            </div>
+          </section>
+
+          <aside className="rounded-lg border border-[#d7dcdf] bg-white p-6">
+            <h2 className="text-xl font-semibold">Selected Stack</h2>
+            <dl className="mt-5 space-y-4 text-sm">
+              {[
+                ["App", "Next.js + TypeScript + src directory"],
+                ["Database", "PostgreSQL"],
+                ["ORM", "Drizzle ORM"],
+                ["Offline POS", "IndexedDB with Dexie"],
+                ["Validation", "Zod"],
+              ].map(([label, value]) => (
+                <div key={label}>
+                  <dt className="font-semibold text-[#58706f]">{label}</dt>
+                  <dd className="mt-1 text-[#172026]">{value}</dd>
+                </div>
+              ))}
+            </dl>
+          </aside>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+      </section>
+    </main>
   );
 }

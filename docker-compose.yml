@@ -1,0 +1,21 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: syncpos-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: syncpos
+      POSTGRES_USER: syncpos
+      POSTGRES_PASSWORD: syncpos
+    ports:
+      - "5433:5432"
+    volumes:
+      - syncpos-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U syncpos -d syncpos"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  syncpos-postgres-data:

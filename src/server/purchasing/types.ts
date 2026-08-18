@@ -1,0 +1,252 @@
+export type PurchaseFormOption = {
+  id: string;
+  code: string;
+  name: string;
+};
+
+export type PurchaseTaxOption = PurchaseFormOption & {
+  computation: "percent" | "fixed";
+  rate: string;
+  amountMinor: number;
+  priceIncluded: boolean;
+};
+
+export type PurchaseOrderListRow = {
+  id: string;
+  orderNo: string;
+  vendorReference: string | null;
+  supplierName: string;
+  status: string;
+  orderDate: string;
+  orderDeadline: string | null;
+  expectedDate: string | null;
+  deliverToLocationId: string | null;
+  deliverToLocationCode: string | null;
+  currencyCode: string;
+  totalMinor: number;
+  lineCount: number;
+  quantityOrdered: string;
+  quantityReceived: string;
+};
+
+export type PurchaseReceiptListRow = {
+  id: string;
+  receiptNo: string;
+  status: string;
+  receiptDate: string;
+  purchaseOrderId: string;
+  orderNo: string;
+  supplierName: string;
+  locationCode: string | null;
+  supplierInvoiceNo: string | null;
+  currencyCode: string;
+  lineCount: number;
+  quantityReceived: string;
+  totalMinor: number;
+};
+
+export type PurchaseVendorBillListRow = {
+  id: string;
+  billNo: string;
+  vendorReference: string | null;
+  status: string;
+  billDate: string;
+  dueDate: string | null;
+  purchaseOrderId: string | null;
+  orderNo: string | null;
+  supplierName: string;
+  productSummary: string | null;
+  source: "vendor_bill" | "placeholder";
+  paymentStatus: string;
+  currencyCode: string;
+  untaxedAmountMinor: number;
+  taxAmountMinor: number;
+  totalMinor: number;
+  residualAmountMinor: number;
+  lineCount: number;
+};
+
+export type PurchaseLandedCostListRow = {
+  id: string;
+  costNo: string;
+  costType: string;
+  status: string;
+  allocationMethod: string;
+  purchaseOrderId: string | null;
+  orderNo: string | null;
+  receiptNo: string | null;
+  vendorName: string | null;
+  amountMinor: number;
+  currencyCode: string;
+  allocationCount: number;
+};
+
+export type PurchaseOrderReceiptLine = {
+  id: string;
+  productId: string;
+  productName: string;
+  sku: string;
+  trackingMode: string;
+  unitId: string;
+  currencyCode: string;
+  quantityOrdered: string;
+  quantityReceived: string;
+  unitCostMinor: number;
+};
+
+export type PurchaseOrderDetailLine = {
+  id: string;
+  lineNo: number;
+  productId: string;
+  productName: string;
+  sku: string;
+  trackingMode: "none" | "lot" | "serial";
+  quantityOrdered: string;
+  quantityReceived: string;
+  unitCostMinor: number;
+  taxAmountMinor: number;
+  lineTotalMinor: number;
+  currencyCode: string;
+  taxIds: string[];
+  taxNames: string | null;
+};
+
+export type PurchaseOrderReceiptDocument = {
+  id: string;
+  receiptNo: string;
+  status: string;
+  receiptDate: string;
+  locationCode: string | null;
+  lines: PurchaseOrderReceiptDocumentLine[];
+};
+
+export type PurchaseReceiptDetail = PurchaseOrderReceiptDocument & {
+  purchaseOrderId: string;
+  orderNo: string;
+  supplierName: string;
+  supplierInvoiceNo: string | null;
+  existingVendorBillId: string | null;
+  currencyCode: string;
+  totalMinor: number;
+};
+
+export type PurchaseOrderReceiptDocumentLine = {
+  id: string;
+  receiptId: string;
+  lineNo: number;
+  productName: string;
+  sku: string;
+  quantityReceived: string;
+  unitCostMinor: number;
+  lineTotalMinor: number;
+  currencyCode: string;
+  serialNo: string | null;
+  lotNo: string | null;
+};
+
+export type PurchaseOrderVendorBillDocument = {
+  id: string;
+  billNo: string;
+  vendorReference: string | null;
+  status: string;
+  billDate: string;
+  dueDate: string | null;
+  untaxedAmountMinor: number;
+  taxAmountMinor: number;
+  totalMinor: number;
+  residualAmountMinor: number;
+  paymentStatus: string;
+  currencyCode: string;
+  source: "vendor_bill" | "placeholder";
+  lines: PurchaseOrderVendorBillDocumentLine[];
+};
+
+export type PurchaseVendorBillDetail = PurchaseOrderVendorBillDocument & {
+  purchaseOrderId: string | null;
+  orderNo: string | null;
+  goodsReceiptId: string | null;
+  receiptNo: string | null;
+  supplierName: string;
+  paymentCount: number;
+};
+
+export type PurchaseOrderVendorBillDocumentLine = {
+  id: string;
+  billId: string;
+  lineNo: number;
+  productName: string | null;
+  sku: string | null;
+  description: string;
+  quantity: string;
+  unitPriceMinor: number;
+  taxAmountMinor: number;
+  taxNames: string | null;
+  totalMinor: number;
+  currencyCode: string;
+};
+
+export type PurchaseOrderDetail = {
+  id: string;
+  orderNo: string;
+  supplierId: string;
+  supplierName: string;
+  deliverToLocationId: string | null;
+  vendorReference: string | null;
+  status: string;
+  orderDate: string;
+  orderDeadline: string | null;
+  expectedDate: string | null;
+  currencyCode: string;
+  subtotalMinor: number;
+  taxAmountMinor: number;
+  totalMinor: number;
+  notes: string | null;
+  receiptCount: number;
+  vendorBillCount: number;
+  landedCostCount: number;
+  paymentCount: number;
+  lines: PurchaseOrderDetailLine[];
+  receipts: PurchaseOrderReceiptDocument[];
+  vendorBills: PurchaseOrderVendorBillDocument[];
+};
+
+export type PurchaseLandedCostFormOptions = {
+  receipts: {
+    id: string;
+    receiptNo: string;
+    orderNo: string;
+    supplierName: string;
+    currencyCode: string;
+  }[];
+  vendors: PurchaseFormOption[];
+};
+
+export type PurchaseLandedCostDetail = {
+  id: string;
+  costNo: string;
+  costType: string;
+  status: string;
+  allocationMethod: string;
+  purchaseOrderId: string | null;
+  orderNo: string | null;
+  goodsReceiptId: string | null;
+  receiptNo: string | null;
+  vendorName: string | null;
+  amountMinor: number;
+  currencyCode: string;
+  notes: string | null;
+  allocations: PurchaseLandedCostAllocationDetail[];
+};
+
+export type PurchaseLandedCostAllocationDetail = {
+  id: string;
+  lineNo: number;
+  productName: string;
+  sku: string;
+  quantityReceived: string;
+  unitCostMinor: number;
+  landedUnitCostMinor: number;
+  allocatedAmountMinor: number;
+  allocationBasis: string | null;
+  currencyCode: string;
+};

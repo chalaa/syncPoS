@@ -1,0 +1,123 @@
+import {
+  BoxesIcon,
+  ClipboardListIcon,
+  GaugeIcon,
+  PackageCheckIcon,
+  SettingsIcon,
+  ShoppingBagIcon,
+  ShoppingCartIcon,
+  UsersIcon,
+} from "lucide-react";
+
+import type { AdminMenuItem } from "@/components/app/types";
+
+export const adminMenuItems: AdminMenuItem[] = [
+  {
+    key: "dashboard",
+    label: "Dashboard",
+    href: "/admin",
+    icon: GaugeIcon,
+    submenus: [
+      { label: "Overview", href: "/admin" },
+      { label: "Daily Activity", href: "/admin?view=daily" },
+      { label: "Sync Status", href: "/admin?view=sync" },
+    ],
+  },
+  {
+    key: "products",
+    label: "Products",
+    href: "/admin/products",
+    icon: BoxesIcon,
+    submenus: [
+      { label: "Products", href: "/admin/products" },
+      { label: "Categories", href: "/admin/products/categories" },
+      { label: "Brands", href: "/admin/products/brands" },
+      { label: "Units", href: "/admin/products/units" },
+      { label: "Taxes", href: "/admin/products/taxes" },
+      { label: "Price Lists", href: "/admin/products/price-lists" },
+      { label: "Lots / Serials", href: "/admin/products/tracking" },
+    ],
+  },
+  {
+    key: "partners",
+    label: "Partners",
+    href: "/admin/partners",
+    icon: UsersIcon,
+    submenus: [
+      { label: "All Partners", href: "/admin/partners" },
+      { label: "Customers", href: "/admin/partners?role=customer" },
+      { label: "Suppliers", href: "/admin/partners?role=supplier" },
+      { label: "Payment Terms", href: "/admin/partners/payment-terms" },
+    ],
+  },
+  {
+    key: "purchasing",
+    label: "Purchasing",
+    href: "/admin/purchasing",
+    icon: ShoppingBagIcon,
+    submenus: [
+      { label: "RFQs / Orders", href: "/admin/purchasing" },
+      { label: "Receipts", href: "/admin/purchasing?view=receipts" },
+      { label: "Landed Costs", href: "/admin/purchasing?view=landed-costs" },
+      { label: "Vendor Bills", href: "/admin/purchasing?view=supplier-bills" },
+      { label: "Payments", href: "/admin/purchasing?view=payments" },
+    ],
+  },
+  {
+    key: "sales",
+    label: "Sales",
+    href: "/admin/sales",
+    icon: ShoppingCartIcon,
+    submenus: [
+      { label: "POS", href: "/admin/sales" },
+      { label: "Orders", href: "/admin/sales?view=orders" },
+      { label: "Invoices", href: "/admin/sales?view=invoices" },
+    ],
+  },
+  {
+    key: "inventory",
+    label: "Inventory",
+    href: "/admin/inventory",
+    icon: PackageCheckIcon,
+    submenus: [
+      { label: "Stock", href: "/admin/inventory" },
+      { label: "Operations", href: "/admin/inventory/operations" },
+      { label: "Receipts", href: "/admin/inventory/operations?view=receipts" },
+      { label: "Transfers", href: "/admin/inventory/operations?view=transfers" },
+      { label: "Adjustments", href: "/admin/inventory/operations?view=adjustments" },
+      { label: "Scrap", href: "/admin/inventory/operations?view=scrap" },
+      { label: "Returns", href: "/admin/inventory/operations?view=returns" },
+      { label: "Stock Card", href: "/admin/inventory/stock-card" },
+      { label: "Serial History", href: "/admin/inventory/serial-history" },
+      { label: "Locations", href: "/admin/inventory/locations" },
+      { label: "Opening Stock", href: "/admin/inventory/opening-stock" },
+    ],
+  },
+  {
+    key: "settings",
+    label: "Settings",
+    href: "/admin/settings",
+    icon: SettingsIcon,
+    submenus: [
+      { label: "Company", href: "/admin/settings" },
+      { label: "Users", href: "/admin/settings?view=users" },
+      { label: "Roles", href: "/admin/settings?view=roles" },
+      { label: "Locations", href: "/admin/settings?view=locations" },
+      { label: "Payments", href: "/admin/settings/payments" },
+      { label: "Devices", href: "/admin/settings?view=devices" },
+      { label: "Audit Logs", href: "/admin/settings?view=audit-logs" },
+    ],
+  },
+  {
+    key: "operations",
+    label: "Operations",
+    href: "/admin/operations",
+    icon: ClipboardListIcon,
+    submenus: [
+      { label: "Tasks", href: "/admin/operations" },
+      { label: "Approvals", href: "/admin/operations?view=approvals" },
+      { label: "Expenses", href: "/admin/operations/expenses" },
+      { label: "Expense Categories", href: "/admin/operations/expenses/categories" },
+    ],
+  },
+];

@@ -1,0 +1,1 @@
+ALTER TYPE "public"."stock_movement_type" ADD VALUE 'scrap' BEFORE 'stock_count';

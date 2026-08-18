@@ -1,36 +1,93 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# syncPoS
+
+Machinery retail POS and management system built with Next.js, TypeScript, PostgreSQL, Drizzle ORM, and IndexedDB/Dexie for offline sales.
 
 ## Getting Started
 
-First, run the development server:
+Install dependencies:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+pnpm install
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Create local environment config:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+cp .env.example .env
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Start the local PostgreSQL database:
 
-## Learn More
+```bash
+pnpm db:up
+```
 
-To learn more about Next.js, take a look at the following resources:
+If Docker requires sudo on your machine:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```bash
+sudo docker compose up -d postgres
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Run database migrations:
 
-## Deploy on Vercel
+```bash
+pnpm db:migrate
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Seed foundation data:
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```bash
+pnpm db:seed
+```
+
+Start the app:
+
+```bash
+pnpm dev
+```
+
+Open http://localhost:3000.
+
+## Database
+
+Local PostgreSQL settings:
+
+```text
+Database: syncpos
+User: syncpos
+Password: syncpos
+Host port: 5433
+Container port: 5432
+URL: postgres://syncpos:syncpos@localhost:5433/syncpos
+```
+
+Useful commands:
+
+```bash
+pnpm db:up        # start PostgreSQL
+pnpm db:down      # stop PostgreSQL
+pnpm db:logs      # follow PostgreSQL logs
+pnpm db:generate  # generate Drizzle migrations
+pnpm db:migrate   # apply Drizzle migrations
+pnpm db:seed      # seed company, users, roles, locations and device
+pnpm db:studio    # open Drizzle Studio
+```
+
+## Project Plan
+
+See [docs/implementation-plan.md](docs/implementation-plan.md) for the phased build plan.
+
+## Stack
+
+- Next.js + TypeScript
+- PostgreSQL
+- Drizzle ORM
+- IndexedDB/Dexie
+- Zod
+
+## Validation
+
+```bash
+pnpm lint
+pnpm build
+```
