@@ -16,6 +16,7 @@ import {
   displayPaymentMoney,
   getPaymentList,
 } from "@/server/payments/payments";
+import { displayReturnMoney, getSupplierReturnList } from "@/server/returns/returns";
 import type {
   PurchaseLandedCostListRow,
   PurchaseOrderListRow,
@@ -23,6 +24,7 @@ import type {
   PurchaseVendorBillListRow,
 } from "@/server/purchasing/types";
 import type { PaymentListRow } from "@/server/payments/types";
+import type { SupplierReturnListRow } from "@/server/returns/types";
 
 export const dynamic = "force-dynamic";
 
@@ -91,6 +93,21 @@ export default async function PurchasingPage({ searchParams }: PurchasingPagePro
     );
   }
 
+  if (view === "returns") {
+    const returns = await getSupplierReturnList(params.purchaseOrderId);
+
+    return (
+      <PurchasingLayout
+        title="Supplier Returns"
+        notice={params.notice}
+        error={params.error}
+        actions={<ButtonLink href="/admin/purchasing/returns/new">New Supplier Return</ButtonLink>}
+      >
+        <SupplierReturnList returns={returns} />
+      </PurchasingLayout>
+    );
+  }
+
   const orders = await getPurchaseOrderList();
 
   return (
@@ -102,6 +119,56 @@ export default async function PurchasingPage({ searchParams }: PurchasingPagePro
     >
       <PurchaseOrderList orders={orders} />
     </PurchasingLayout>
+  );
+}
+
+function SupplierReturnList({ returns }: { returns: SupplierReturnListRow[] }) {
+  return (
+    <section className="rounded-lg border border-border bg-card">
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[900px] text-left text-sm">
+          <thead className="bg-muted text-xs uppercase tracking-wide text-muted-foreground">
+            <tr>
+              <th className="px-4 py-3">Return</th>
+              <th className="px-4 py-3">Receipt</th>
+              <th className="px-4 py-3">Supplier</th>
+              <th className="px-4 py-3">Status</th>
+              <th className="px-4 py-3">Date</th>
+              <th className="px-4 py-3 text-right">Lines</th>
+              <th className="px-4 py-3 text-right">Vendor Refund</th>
+              <th className="px-4 py-3 text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {returns.map((record) => (
+              <tr key={record.id} className="border-t border-border">
+                <td className="px-4 py-3">
+                  <Link href={`/admin/purchasing/returns/${record.id}`} className="font-medium text-primary underline-offset-4 hover:underline">
+                    {record.returnNo}
+                  </Link>
+                </td>
+                <td className="px-4 py-3">{record.receiptNo}</td>
+                <td className="px-4 py-3">{record.supplierName}</td>
+                <td className="px-4 py-3 capitalize">{record.status.replace(/_/g, " ")}</td>
+                <td className="px-4 py-3">{record.returnDate}</td>
+                <td className="px-4 py-3 text-right">{record.lineCount}</td>
+                <td className="px-4 py-3 text-right">{displayReturnMoney(record.refundAmountMinor, record.currencyCode)}</td>
+                <td className="px-4 py-3 text-right">
+                  <ButtonLink href={`/admin/purchasing/returns/${record.id}`} size="sm">Details</ButtonLink>
+                </td>
+              </tr>
+            ))}
+            {returns.length === 0 ? (
+              <tr>
+                <td colSpan={8} className="px-4 py-10 text-center text-muted-foreground">
+                  No supplier returns found.
+                </td>
+              </tr>
+            ) : null}
+          </tbody>
+        </table>
+      </div>
+    </section>
   );
 }
 

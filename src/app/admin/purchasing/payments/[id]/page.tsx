@@ -34,6 +34,7 @@ export default async function PaymentDetailPage({ params, searchParams }: Paymen
 
   const vendorBillId = payment.allocations.find((allocation) => allocation.vendorBillId)?.vendorBillId;
   const expenseId = payment.allocations.find((allocation) => allocation.expenseId)?.expenseId;
+  const customerInvoiceId = payment.allocations.find((allocation) => allocation.customerInvoiceId)?.customerInvoiceId;
   const isSupplierPayment = Boolean(vendorBillId);
 
   return (
@@ -119,6 +120,10 @@ export default async function PaymentDetailPage({ params, searchParams }: Paymen
               <Link href={`/admin/operations/expenses/${expenseId}`} className="mt-1 block text-sm font-medium text-primary underline-offset-4 hover:underline">
                 Open expense
               </Link>
+            ) : customerInvoiceId ? (
+              <Link href={`/admin/sales?view=invoices&customerInvoiceId=${customerInvoiceId}`} className="mt-1 block text-sm font-medium text-primary underline-offset-4 hover:underline">
+                Open customer invoice
+              </Link>
             ) : (
               <p className="mt-1 text-sm font-medium">-</p>
             )}
@@ -144,6 +149,10 @@ export default async function PaymentDetailPage({ params, searchParams }: Paymen
                     ) : allocation.expenseId ? (
                       <Link href={`/admin/operations/expenses/${allocation.expenseId}`} className="font-medium text-primary underline-offset-4 hover:underline">
                         {allocation.expenseNo}
+                      </Link>
+                    ) : allocation.customerInvoiceId ? (
+                      <Link href={`/admin/sales?view=invoices&customerInvoiceId=${allocation.customerInvoiceId}`} className="font-medium text-primary underline-offset-4 hover:underline">
+                        {allocation.invoiceNo}
                       </Link>
                     ) : (
                       "-"

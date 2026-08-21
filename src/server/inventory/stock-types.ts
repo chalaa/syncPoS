@@ -58,6 +58,7 @@ export type SerialHistoryRow = ProductStockCardRow & {
 export const inventoryOperationViewOptions = [
   "all",
   "receipts",
+  "deliveries",
   "transfers",
   "adjustments",
   "scrap",
@@ -118,4 +119,23 @@ export type InventoryOperationDetail = {
   totalCostMinor: number;
   currencyCode: string | null;
   lines: InventoryOperationDetailLine[];
+};
+
+export type InventoryOperationFormOption = {
+  id: string;
+  code: string;
+  name: string;
+};
+
+export type InventoryOperationProductOption = InventoryOperationFormOption & {
+  trackingMode: "none" | "lot" | "serial";
+};
+
+export type InventoryOperationFormOptions = {
+  company: {
+    id: string;
+    baseCurrencyCode: string;
+  };
+  locations: InventoryOperationFormOption[];
+  products: InventoryOperationProductOption[];
 };

@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { ButtonLink } from "@/components/ui/button";
+import { cancelInventoryOperation, postInventoryOperation } from "@/app/admin/inventory/operations/actions";
+import { Alert } from "@/components/ui/alert";
+import { Button, ButtonLink } from "@/components/ui/button";
 import { Notebook } from "@/components/ui/notebook";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
 import { requirePermission } from "@/server/auth/session";
@@ -15,16 +17,49 @@ export const dynamic = "force-dynamic";
 
 type InventoryOperationDetailPageProps = {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ notice?: string; error?: string }>;
 };
 
 function label(value: string) {
   return value.replace(/_/g, " ");
 }
 
-export default async function InventoryOperationDetailPage({ params }: InventoryOperationDetailPageProps) {
+function sourceHref(operation: {
+  movementType: string;
+  sourceType: string | null;
+  sourceId: string | null;
+}) {
+  if (!operation.sourceId) {
+    return null;
+  }
+
+  if (operation.sourceType === "goods_receipt") {
+    return `/admin/purchasing/receipts/${operation.sourceId}`;
+  }
+
+  if (operation.sourceType === "delivery") {
+    return `/admin/sales/deliveries/${operation.sourceId}`;
+  }
+
+  if (operation.sourceType === "sales_return") {
+    return `/admin/sales?view=returns`;
+  }
+
+  if (operation.sourceType === "supplier_return") {
+    return `/admin/purchasing?view=returns`;
+  }
+
+  if (operation.sourceType === "transfer_dispatch" || operation.sourceType === "transfer_receipt") {
+    return `/admin/inventory/transfers/${operation.sourceId}`;
+  }
+
+  return null;
+}
+
+export default async function InventoryOperationDetailPage({ params, searchParams }: InventoryOperationDetailPageProps) {
   await requirePermission("inventory.view");
 
-  const { id } = await params;
+  const [{ id }, query] = await Promise.all([params, searchParams]);
   const operation = await getInventoryOperationDetail(id);
 
   if (!operation) {
@@ -36,8 +71,27 @@ export default async function InventoryOperationDetailPage({ params }: Inventory
       <PageHeader
         eyebrow="Inventory Operation"
         title={operation.movementNo}
-        actions={<ButtonLink href="/admin/inventory/operations" variant="outline">Back to operations</ButtonLink>}
+        actions={
+          <div className="flex flex-wrap gap-2">
+            <ButtonLink href="/admin/inventory/operations" variant="outline">Back to operations</ButtonLink>
+            {operation.status === "draft" ? (
+              <>
+                <form action={postInventoryOperation}>
+                  <input type="hidden" name="movementId" value={operation.id} />
+                  <Button type="submit">Post</Button>
+                </form>
+                <form action={cancelInventoryOperation}>
+                  <input type="hidden" name="movementId" value={operation.id} />
+                  <Button type="submit" variant="danger">Cancel</Button>
+                </form>
+              </>
+            ) : null}
+          </div>
+        }
       />
+
+      {query.notice ? <Alert kind="success">{query.notice}</Alert> : null}
+      {query.error ? <Alert kind="error">{query.error}</Alert> : null}
 
       <div className="mb-5 flex flex-wrap items-start justify-between gap-4">
         <div className="grid gap-2 text-sm">
@@ -48,6 +102,16 @@ export default async function InventoryOperationDetailPage({ params }: Inventory
           <div className="text-muted-foreground">
             Source {operation.sourceNo ?? operation.sourceType ?? "-"} / Date {operation.movementDate.toLocaleDateString()}
           </div>
+          {sourceHref(operation) ? (
+            <Link href={sourceHref(operation) ?? "#"} className="w-fit text-sm font-medium text-primary underline-offset-4 hover:underline">
+              Open source document
+            </Link>
+          ) : null}
+          {operation.status === "posted" ? (
+            <div className="text-xs text-muted-foreground">
+              Posted operations are locked. Create an explicit reversal operation for corrections.
+            </div>
+          ) : null}
         </div>
         <div className="flex flex-wrap gap-2">
           <Metric label="Lines" value={String(operation.lineCount)} />

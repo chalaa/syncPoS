@@ -92,6 +92,41 @@
       "when": 1787044995144,
       "tag": "0012_familiar_sersi",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1787224395026,
+      "tag": "0013_chunky_revanche",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1787227078466,
+      "tag": "0014_nostalgic_leader",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1787229564366,
+      "tag": "0015_silky_terror",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1787230327729,
+      "tag": "0016_foamy_zombie",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1787231038711,
+      "tag": "0017_furry_elektra",
+      "breakpoints": true
     }
   ]
 }

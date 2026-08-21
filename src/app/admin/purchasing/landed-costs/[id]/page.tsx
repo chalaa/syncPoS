@@ -31,6 +31,7 @@ export default async function LandedCostDetailPage({ params, searchParams }: Lan
   if (!cost) {
     notFound();
   }
+  const allocationTotalMinor = cost.allocations.reduce((sum, allocation) => sum + allocation.allocatedAmountMinor, 0);
 
   return (
     <PageShell>
@@ -40,6 +41,9 @@ export default async function LandedCostDetailPage({ params, searchParams }: Lan
         actions={
           <div className="flex flex-wrap gap-2">
             <ButtonLink href="/admin/purchasing?view=landed-costs" variant="outline">Back to landed costs</ButtonLink>
+            {cost.status !== "posted" && cost.status !== "cancelled" ? (
+              <ButtonLink href={`/admin/purchasing/landed-costs/${cost.id}/edit`} variant="outline">Edit</ButtonLink>
+            ) : null}
             {cost.status === "allocated" ? (
               <form action={postLandedCost}>
                 <input type="hidden" name="landedCostId" value={cost.id} />
@@ -127,6 +131,17 @@ export default async function LandedCostDetailPage({ params, searchParams }: Lan
                   <td className="px-3 py-3 text-right">{displayPurchaseMoney(allocation.allocatedAmountMinor, allocation.currencyCode)}</td>
                 </tr>
               ))}
+              <tr className="border-t border-border bg-muted/40 font-semibold">
+                <td colSpan={5} className="px-3 py-3 text-right">Allocation Total</td>
+                <td className="px-3 py-3 text-right">{displayPurchaseMoney(allocationTotalMinor, cost.currencyCode)}</td>
+              </tr>
+              {cost.allocations.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="px-3 py-8 text-center text-muted-foreground">
+                    No receipt lines allocated.
+                  </td>
+                </tr>
+              ) : null}
             </tbody>
           </table>
         </div>

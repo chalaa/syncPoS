@@ -61,6 +61,7 @@ export const adminMenuItems: AdminMenuItem[] = [
       { label: "Landed Costs", href: "/admin/purchasing?view=landed-costs" },
       { label: "Vendor Bills", href: "/admin/purchasing?view=supplier-bills" },
       { label: "Payments", href: "/admin/purchasing?view=payments" },
+      { label: "Returns", href: "/admin/purchasing?view=returns" },
     ],
   },
   {
@@ -69,9 +70,11 @@ export const adminMenuItems: AdminMenuItem[] = [
     href: "/admin/sales",
     icon: ShoppingCartIcon,
     submenus: [
-      { label: "POS", href: "/admin/sales" },
-      { label: "Orders", href: "/admin/sales?view=orders" },
+      { label: "Quotations / Orders", href: "/admin/sales" },
+      { label: "Deliveries", href: "/admin/sales?view=deliveries" },
       { label: "Invoices", href: "/admin/sales?view=invoices" },
+      { label: "Payments", href: "/admin/sales?view=payments" },
+      { label: "Returns", href: "/admin/sales?view=returns" },
     ],
   },
   {
@@ -83,7 +86,8 @@ export const adminMenuItems: AdminMenuItem[] = [
       { label: "Stock", href: "/admin/inventory" },
       { label: "Operations", href: "/admin/inventory/operations" },
       { label: "Receipts", href: "/admin/inventory/operations?view=receipts" },
-      { label: "Transfers", href: "/admin/inventory/operations?view=transfers" },
+      { label: "Deliveries", href: "/admin/inventory/operations?view=deliveries" },
+      { label: "Transfers", href: "/admin/inventory/transfers" },
       { label: "Adjustments", href: "/admin/inventory/operations?view=adjustments" },
       { label: "Scrap", href: "/admin/inventory/operations?view=scrap" },
       { label: "Returns", href: "/admin/inventory/operations?view=returns" },

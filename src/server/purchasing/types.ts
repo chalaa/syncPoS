@@ -126,6 +126,7 @@ export type PurchaseReceiptDetail = PurchaseOrderReceiptDocument & {
   supplierName: string;
   supplierInvoiceNo: string | null;
   existingVendorBillId: string | null;
+  landedCostCount: number;
   currencyCode: string;
   totalMinor: number;
 };
@@ -138,6 +139,7 @@ export type PurchaseOrderReceiptDocumentLine = {
   sku: string;
   quantityReceived: string;
   unitCostMinor: number;
+  landedUnitCostMinor: number;
   lineTotalMinor: number;
   currencyCode: string;
   serialNo: string | null;
@@ -215,10 +217,22 @@ export type PurchaseLandedCostFormOptions = {
     id: string;
     receiptNo: string;
     orderNo: string;
+    purchaseOrderId: string;
     supplierName: string;
     currencyCode: string;
+    lines: PurchaseLandedCostFormReceiptLine[];
   }[];
   vendors: PurchaseFormOption[];
+};
+
+export type PurchaseLandedCostFormReceiptLine = {
+  id: string;
+  lineNo: number;
+  productName: string;
+  sku: string;
+  quantityReceived: string;
+  lineTotalMinor: number;
+  currencyCode: string;
 };
 
 export type PurchaseLandedCostDetail = {
@@ -231,6 +245,7 @@ export type PurchaseLandedCostDetail = {
   orderNo: string | null;
   goodsReceiptId: string | null;
   receiptNo: string | null;
+  vendorId: string | null;
   vendorName: string | null;
   amountMinor: number;
   currencyCode: string;
@@ -240,6 +255,7 @@ export type PurchaseLandedCostDetail = {
 
 export type PurchaseLandedCostAllocationDetail = {
   id: string;
+  goodsReceiptLineId: string;
   lineNo: number;
   productName: string;
   sku: string;

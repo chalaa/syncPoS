@@ -77,6 +77,8 @@ pnpm db:studio    # open Drizzle Studio
 
 See [docs/implementation-plan.md](docs/implementation-plan.md) for the phased build plan.
 
+For real-user testing through Step 22, see [docs/user-acceptance-testing-steps-1-22.md](docs/user-acceptance-testing-steps-1-22.md).
+
 ## Stack
 
 - Next.js + TypeScript

@@ -23,6 +23,7 @@ type InventoryOperationsPageProps = {
 const viewLabels: Record<InventoryOperationView, string> = {
   all: "Operations",
   receipts: "Receipts",
+  deliveries: "Deliveries",
   transfers: "Internal Transfers",
   adjustments: "Adjustments",
   scrap: "Scrap",
@@ -42,7 +43,12 @@ export default async function InventoryOperationsPage({ searchParams }: Inventor
       <PageHeader
         eyebrow="Inventory"
         title={viewLabels[view]}
-        actions={<ButtonLink href="/admin/inventory" variant="outline">Stock</ButtonLink>}
+        actions={
+          <div className="flex flex-wrap gap-2">
+            <ButtonLink href="/admin/inventory" variant="outline">Stock</ButtonLink>
+            <ButtonLink href="/admin/inventory/operations/new">New Operation</ButtonLink>
+          </div>
+        }
       />
 
       <section className="rounded-lg border border-border bg-card">
@@ -61,6 +67,7 @@ export default async function InventoryOperationsPage({ searchParams }: Inventor
             <select name="view" defaultValue={view} className="h-10 rounded-md border border-input bg-background px-3 text-sm">
               <option value="all">All</option>
               <option value="receipts">Receipts</option>
+              <option value="deliveries">Deliveries</option>
               <option value="transfers">Internal Transfers</option>
               <option value="adjustments">Adjustments</option>
               <option value="scrap">Scrap</option>

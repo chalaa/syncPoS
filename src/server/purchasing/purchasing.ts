@@ -26,6 +26,7 @@ import type {
   PurchaseFormOption,
   PurchaseLandedCostDetail,
   PurchaseLandedCostFormOptions,
+  PurchaseLandedCostFormReceiptLine,
   PurchaseLandedCostListRow,
   PurchaseOrderListRow,
   PurchaseOrderReceiptDocument,
@@ -280,11 +281,17 @@ export async function getPurchaseReceiptDetail(id: string): Promise<PurchaseRece
     return null;
   }
 
-  const [existingVendorBill] = await db
-    .select({ id: vendorBills.id })
-    .from(vendorBills)
-    .where(and(eq(vendorBills.goodsReceiptId, id), eq(vendorBills.companyId, company.id), isNull(vendorBills.deletedAt)))
-    .limit(1);
+  const [[existingVendorBill], [landedCostCount]] = await Promise.all([
+    db
+      .select({ id: vendorBills.id })
+      .from(vendorBills)
+      .where(and(eq(vendorBills.goodsReceiptId, id), eq(vendorBills.companyId, company.id), isNull(vendorBills.deletedAt)))
+      .limit(1),
+    db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(landedCosts)
+      .where(and(eq(landedCosts.goodsReceiptId, id), eq(landedCosts.companyId, company.id), isNull(landedCosts.deletedAt))),
+  ]);
 
   const lines = await db
     .select({
@@ -295,6 +302,7 @@ export async function getPurchaseReceiptDetail(id: string): Promise<PurchaseRece
       sku: products.sku,
       quantityReceived: goodsReceiptLines.quantityReceived,
       unitCostMinor: goodsReceiptLines.unitCostMinor,
+      landedUnitCostMinor: goodsReceiptLines.landedUnitCostMinor,
       lineTotalMinor: goodsReceiptLines.lineTotalMinor,
       currencyCode: goodsReceiptLines.currencyCode,
       serialNo: productSerials.serialNo,
@@ -307,7 +315,7 @@ export async function getPurchaseReceiptDetail(id: string): Promise<PurchaseRece
     .where(and(eq(goodsReceiptLines.goodsReceiptId, id), isNull(goodsReceiptLines.deletedAt)))
     .orderBy(asc(goodsReceiptLines.lineNo));
 
-  return { ...receipt, existingVendorBillId: existingVendorBill?.id ?? null, lines };
+  return { ...receipt, existingVendorBillId: existingVendorBill?.id ?? null, landedCostCount: landedCostCount?.count ?? 0, lines };
 }
 
 export async function getPurchaseVendorBillDetail(
@@ -490,12 +498,13 @@ export async function getPurchaseLandedCostList(purchaseOrderId?: string): Promi
 export async function getPurchaseLandedCostFormOptions(): Promise<PurchaseLandedCostFormOptions> {
   const company = await getDefaultCompany();
 
-  const [receiptRows, vendorRows] = await Promise.all([
+  const [receiptRows, receiptLineRows, vendorRows] = await Promise.all([
     db
       .select({
         id: goodsReceipts.id,
         receiptNo: goodsReceipts.receiptNo,
         orderNo: purchaseOrders.orderNo,
+        purchaseOrderId: purchaseOrders.id,
         supplierName: partners.displayName,
         currencyCode: purchaseOrders.currencyCode,
       })
@@ -504,6 +513,22 @@ export async function getPurchaseLandedCostFormOptions(): Promise<PurchaseLanded
       .innerJoin(partners, eq(goodsReceipts.supplierId, partners.id))
       .where(and(eq(goodsReceipts.companyId, company.id), eq(goodsReceipts.status, "posted"), isNull(goodsReceipts.deletedAt)))
       .orderBy(asc(goodsReceipts.receiptDate)),
+    db
+      .select({
+        id: goodsReceiptLines.id,
+        receiptId: goodsReceiptLines.goodsReceiptId,
+        lineNo: goodsReceiptLines.lineNo,
+        productName: products.name,
+        sku: products.sku,
+        quantityReceived: goodsReceiptLines.quantityReceived,
+        lineTotalMinor: goodsReceiptLines.lineTotalMinor,
+        currencyCode: goodsReceiptLines.currencyCode,
+      })
+      .from(goodsReceiptLines)
+      .innerJoin(goodsReceipts, eq(goodsReceiptLines.goodsReceiptId, goodsReceipts.id))
+      .innerJoin(products, eq(goodsReceiptLines.productId, products.id))
+      .where(and(eq(goodsReceipts.companyId, company.id), eq(goodsReceipts.status, "posted"), isNull(goodsReceipts.deletedAt), isNull(goodsReceiptLines.deletedAt)))
+      .orderBy(asc(goodsReceiptLines.lineNo)),
     db
       .select({
         id: partners.id,
@@ -515,7 +540,28 @@ export async function getPurchaseLandedCostFormOptions(): Promise<PurchaseLanded
       .orderBy(asc(partners.displayName)),
   ]);
 
-  return { receipts: receiptRows, vendors: vendorRows };
+  const linesByReceiptId = new Map<string, PurchaseLandedCostFormReceiptLine[]>();
+  for (const line of receiptLineRows) {
+    const current = linesByReceiptId.get(line.receiptId) ?? [];
+    current.push({
+      id: line.id,
+      lineNo: line.lineNo,
+      productName: line.productName,
+      sku: line.sku,
+      quantityReceived: line.quantityReceived,
+      lineTotalMinor: line.lineTotalMinor,
+      currencyCode: line.currencyCode,
+    });
+    linesByReceiptId.set(line.receiptId, current);
+  }
+
+  return {
+    receipts: receiptRows.map((receipt) => ({
+      ...receipt,
+      lines: linesByReceiptId.get(receipt.id) ?? [],
+    })),
+    vendors: vendorRows,
+  };
 }
 
 export async function getPurchaseLandedCostDetail(id: string): Promise<PurchaseLandedCostDetail | null> {
@@ -532,6 +578,7 @@ export async function getPurchaseLandedCostDetail(id: string): Promise<PurchaseL
       orderNo: purchaseOrders.orderNo,
       goodsReceiptId: goodsReceipts.id,
       receiptNo: goodsReceipts.receiptNo,
+      vendorId: landedCosts.vendorId,
       vendorName: partners.displayName,
       amountMinor: landedCosts.amountMinor,
       currencyCode: landedCosts.currencyCode,
@@ -551,6 +598,7 @@ export async function getPurchaseLandedCostDetail(id: string): Promise<PurchaseL
   const allocations = await db
     .select({
       id: landedCostAllocations.id,
+      goodsReceiptLineId: goodsReceiptLines.id,
       lineNo: goodsReceiptLines.lineNo,
       productName: products.name,
       sku: products.sku,
@@ -659,6 +707,7 @@ export async function getPurchaseOrderDetail(id: string): Promise<PurchaseOrderD
         sku: products.sku,
         quantityReceived: goodsReceiptLines.quantityReceived,
         unitCostMinor: goodsReceiptLines.unitCostMinor,
+        landedUnitCostMinor: goodsReceiptLines.landedUnitCostMinor,
         lineTotalMinor: goodsReceiptLines.lineTotalMinor,
         currencyCode: goodsReceiptLines.currencyCode,
         serialNo: productSerials.serialNo,

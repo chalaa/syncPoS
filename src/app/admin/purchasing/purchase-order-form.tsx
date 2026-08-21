@@ -4,6 +4,7 @@ import { PlusIcon, Trash2Icon } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { ManyToManyTags } from "@/components/ui/many-to-many-tags";
 import { Notebook } from "@/components/ui/notebook";
 import { cn } from "@/lib/utils";
 import type { PurchaseFormOption, PurchaseOrderDetail, PurchaseTaxOption } from "@/server/purchasing/types";
@@ -114,6 +115,10 @@ export function PurchaseOrderForm({
       : [newLine()],
   );
   const taxById = useMemo(() => new Map(taxes.map((tax) => [tax.id, tax])), [taxes]);
+  const taxTagOptions = useMemo(
+    () => taxes.map((tax) => ({ id: tax.id, label: taxLabel(tax) })),
+    [taxes],
+  );
 
   const lineTotals = useMemo(
     () =>
@@ -258,23 +263,13 @@ export function PurchaseOrderForm({
                             />
                           </td>
                           <td className="px-2 py-3">
-                            <input type="hidden" name="taxIds" value={line.taxIds.join(",")} />
-                            <select
-                              multiple
+                            <ManyToManyTags
+                              name="taxIds"
+                              options={taxTagOptions}
                               value={line.taxIds}
-                              className={cn(tableInputClass, "h-24")}
-                              onChange={(event) =>
-                                updateLine(line.key, {
-                                  taxIds: Array.from(event.target.selectedOptions).map((option) => option.value),
-                                })
-                              }
-                            >
-                              {taxes.map((tax) => (
-                                <option key={tax.id} value={tax.id}>
-                                  {taxLabel(tax)}
-                                </option>
-                              ))}
-                            </select>
+                              onChange={(taxIds) => updateLine(line.key, { taxIds })}
+                              placeholder="Select tax"
+                            />
                           </td>
                           <td className="px-2 py-3 text-right">{money(lineTotals[index]?.subtotal ?? 0)}</td>
                           <td className="px-2 py-3 text-right">{money(lineTotals[index]?.total ?? 0)}</td>

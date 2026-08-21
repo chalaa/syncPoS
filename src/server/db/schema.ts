@@ -80,6 +80,7 @@ export const stockMovementType = pgEnum("stock_movement_type", [
   "opening_balance",
   "purchase_receipt",
   "sale_issue",
+  "sale_delivery",
   "customer_return",
   "supplier_return",
   "transfer",
@@ -170,6 +171,67 @@ export const paymentType = pgEnum("payment_type", ["inbound", "outbound"]);
 export const paymentStatus = pgEnum("payment_status", ["draft", "posted", "cancelled"]);
 export const expenseStatus = pgEnum("expense_status", ["posted", "cancelled"]);
 export const expensePaymentStatus = pgEnum("expense_payment_status", ["unpaid", "paid"]);
+export const salesOrderStatus = pgEnum("sales_order_status", [
+  "quotation",
+  "confirmed",
+  "partially_delivered",
+  "delivered",
+  "invoiced",
+  "cancelled",
+]);
+export const deliveryStatus = pgEnum("delivery_status", ["draft", "posted", "cancelled"]);
+export const customerInvoiceStatus = pgEnum("customer_invoice_status", [
+  "draft",
+  "posted",
+  "cancelled",
+]);
+export const customerInvoicePaymentStatus = pgEnum("customer_invoice_payment_status", [
+  "not_paid",
+  "partial",
+  "paid",
+]);
+export const returnDocumentStatus = pgEnum("return_document_status", [
+  "draft",
+  "posted",
+  "cancelled",
+]);
+export const returnLineCondition = pgEnum("return_line_condition", [
+  "available",
+  "returned",
+  "damaged",
+  "scrapped",
+]);
+export const refundPlaceholderStatus = pgEnum("refund_placeholder_status", [
+  "pending",
+  "approved",
+  "paid",
+  "cancelled",
+]);
+export const warrantyStatus = pgEnum("warranty_status", [
+  "active",
+  "expired",
+  "void",
+]);
+export const serialOwnershipType = pgEnum("serial_ownership_type", [
+  "sale",
+  "customer_return",
+  "warranty_registration",
+  "supplier_return",
+]);
+export const transferStatus = pgEnum("transfer_status", [
+  "draft",
+  "approved",
+  "dispatched",
+  "partially_received",
+  "received",
+  "cancelled",
+]);
+export const transferLineDiscrepancy = pgEnum("transfer_line_discrepancy", [
+  "none",
+  "shortage",
+  "overage",
+  "damaged",
+]);
 
 export const currencies = pgTable(
   "currencies",
@@ -878,7 +940,7 @@ export const stockMovements = pgTable(
           and ${table.toLocationId} is not null
         )
         or (
-          ${table.movementType} in ('sale_issue', 'supplier_return')
+          ${table.movementType} in ('sale_issue', 'sale_delivery', 'supplier_return', 'scrap')
           and ${table.fromLocationId} is not null
         )
         or (
@@ -1850,6 +1912,386 @@ export const expenses = pgTable(
   ],
 );
 
+export const salesOrders = pgTable(
+  "sales_orders",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    companyId: uuid("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    customerId: uuid("customer_id")
+      .notNull()
+      .references(() => partners.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    invoiceAddressId: uuid("invoice_address_id").references(() => partnerAddresses.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
+    deliveryAddressId: uuid("delivery_address_id").references(() => partnerAddresses.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
+    sourceLocationId: uuid("source_location_id").references(() => locations.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
+    priceListId: uuid("price_list_id").references(() => priceLists.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
+    orderNo: varchar("order_no", { length: 60 }).notNull(),
+    customerReference: varchar("customer_reference", { length: 80 }),
+    status: salesOrderStatus("status").notNull().default("quotation"),
+    orderDate: date("order_date").notNull().defaultNow(),
+    validUntil: date("valid_until"),
+    expectedDeliveryDate: date("expected_delivery_date"),
+    currencyCode: char("currency_code", { length: 3 })
+      .notNull()
+      .references(() => currencies.code, { onDelete: "restrict", onUpdate: "cascade" }),
+    subtotalMinor: bigint("subtotal_minor", { mode: "number" }).notNull().default(0),
+    taxAmountMinor: bigint("tax_amount_minor", { mode: "number" }).notNull().default(0),
+    totalMinor: bigint("total_minor", { mode: "number" }).notNull().default(0),
+    reserveOnConfirm: boolean("reserve_on_confirm").notNull().default(false),
+    notes: text("notes"),
+    createdBy: uuid("created_by").references(() => users.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
+    confirmedAt: timestamp("confirmed_at", { withTimezone: true }),
+    confirmedBy: uuid("confirmed_by").references(() => users.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
+    ...softDelete,
+    ...timestamps,
+  },
+  (table) => [
+    check("sales_orders_subtotal_chk", sql`${table.subtotalMinor} >= 0`),
+    check("sales_orders_tax_amount_chk", sql`${table.taxAmountMinor} >= 0`),
+    check("sales_orders_total_chk", sql`${table.totalMinor} >= 0`),
+    check(
+      "sales_orders_confirmed_state_chk",
+      sql`
+        (${table.status} in ('confirmed', 'partially_delivered', 'delivered', 'invoiced') and ${table.confirmedAt} is not null)
+        or (${table.status} in ('quotation', 'cancelled') and ${table.confirmedAt} is null)
+      `,
+    ),
+    uniqueIndex("sales_orders_no_active_uidx")
+      .on(table.companyId, table.orderNo)
+      .where(sql`${table.deletedAt} is null`),
+    index("sales_orders_customer_idx").on(table.customerId),
+    index("sales_orders_source_location_idx").on(table.sourceLocationId),
+    index("sales_orders_status_idx").on(table.companyId, table.status),
+    index("sales_orders_date_idx").on(table.companyId, table.orderDate),
+  ],
+);
+
+export const salesOrderLines = pgTable(
+  "sales_order_lines",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    salesOrderId: uuid("sales_order_id")
+      .notNull()
+      .references(() => salesOrders.id, { onDelete: "cascade", onUpdate: "cascade" }),
+    lineNo: smallint("line_no").notNull(),
+    productId: uuid("product_id")
+      .notNull()
+      .references(() => products.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    description: text("description"),
+    unitId: uuid("unit_id")
+      .notNull()
+      .references(() => unitsOfMeasure.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    quantityOrdered: numeric("quantity_ordered", { precision: 20, scale: 6 }).notNull(),
+    quantityReserved: numeric("quantity_reserved", { precision: 20, scale: 6 }).notNull().default("0"),
+    quantityDelivered: numeric("quantity_delivered", { precision: 20, scale: 6 }).notNull().default("0"),
+    quantityInvoiced: numeric("quantity_invoiced", { precision: 20, scale: 6 }).notNull().default("0"),
+    unitPriceMinor: bigint("unit_price_minor", { mode: "number" }).notNull().default(0),
+    discountMinor: bigint("discount_minor", { mode: "number" }).notNull().default(0),
+    taxAmountMinor: bigint("tax_amount_minor", { mode: "number" }).notNull().default(0),
+    lineTotalMinor: bigint("line_total_minor", { mode: "number" }).notNull().default(0),
+    currencyCode: char("currency_code", { length: 3 })
+      .notNull()
+      .references(() => currencies.code, { onDelete: "restrict", onUpdate: "cascade" }),
+    notes: text("notes"),
+    ...softDelete,
+    ...timestamps,
+  },
+  (table) => [
+    check("sales_order_lines_line_no_chk", sql`${table.lineNo} > 0`),
+    check("sales_order_lines_quantity_ordered_chk", sql`${table.quantityOrdered} > 0`),
+    check("sales_order_lines_quantity_reserved_chk", sql`${table.quantityReserved} >= 0`),
+    check("sales_order_lines_quantity_delivered_chk", sql`${table.quantityDelivered} >= 0`),
+    check("sales_order_lines_quantity_invoiced_chk", sql`${table.quantityInvoiced} >= 0`),
+    check("sales_order_lines_unit_price_chk", sql`${table.unitPriceMinor} >= 0`),
+    check("sales_order_lines_discount_chk", sql`${table.discountMinor} >= 0`),
+    check("sales_order_lines_tax_amount_chk", sql`${table.taxAmountMinor} >= 0`),
+    check("sales_order_lines_total_chk", sql`${table.lineTotalMinor} >= 0`),
+    uniqueIndex("sales_order_lines_no_active_uidx")
+      .on(table.salesOrderId, table.lineNo)
+      .where(sql`${table.deletedAt} is null`),
+    index("sales_order_lines_product_idx").on(table.productId),
+  ],
+);
+
+export const salesOrderLineTaxes = pgTable(
+  "sales_order_line_taxes",
+  {
+    salesOrderLineId: uuid("sales_order_line_id")
+      .notNull()
+      .references(() => salesOrderLines.id, { onDelete: "cascade", onUpdate: "cascade" }),
+    taxId: uuid("tax_id")
+      .notNull()
+      .references(() => taxes.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    taxAmountMinor: bigint("tax_amount_minor", { mode: "number" }).notNull().default(0),
+    ...timestamps,
+  },
+  (table) => [
+    primaryKey({ columns: [table.salesOrderLineId, table.taxId] }),
+    check("sales_order_line_taxes_amount_chk", sql`${table.taxAmountMinor} >= 0`),
+    index("sales_order_line_taxes_tax_idx").on(table.taxId),
+  ],
+);
+
+export const deliveries = pgTable(
+  "deliveries",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    companyId: uuid("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    salesOrderId: uuid("sales_order_id")
+      .notNull()
+      .references(() => salesOrders.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    customerId: uuid("customer_id")
+      .notNull()
+      .references(() => partners.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    sourceLocationId: uuid("source_location_id")
+      .notNull()
+      .references(() => locations.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    deliveryAddressId: uuid("delivery_address_id").references(() => partnerAddresses.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
+    deliveryNo: varchar("delivery_no", { length: 60 }).notNull(),
+    status: deliveryStatus("status").notNull().default("draft"),
+    deliveryDate: timestamp("delivery_date", { withTimezone: true }).notNull().defaultNow(),
+    postedAt: timestamp("posted_at", { withTimezone: true }),
+    postedBy: uuid("posted_by").references(() => users.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
+    stockMovementId: uuid("stock_movement_id").references(() => stockMovements.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
+    notes: text("notes"),
+    ...softDelete,
+    ...timestamps,
+  },
+  (table) => [
+    check(
+      "deliveries_posted_state_chk",
+      sql`
+        (${table.status} = 'posted' and ${table.postedAt} is not null and ${table.stockMovementId} is not null)
+        or (${table.status} <> 'posted' and ${table.postedAt} is null)
+      `,
+    ),
+    uniqueIndex("deliveries_no_active_uidx")
+      .on(table.companyId, table.deliveryNo)
+      .where(sql`${table.deletedAt} is null`),
+    index("deliveries_sales_order_idx").on(table.salesOrderId),
+    index("deliveries_customer_idx").on(table.customerId),
+    index("deliveries_status_idx").on(table.companyId, table.status),
+    index("deliveries_location_date_idx").on(table.sourceLocationId, table.deliveryDate),
+  ],
+);
+
+export const deliveryLines = pgTable(
+  "delivery_lines",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    deliveryId: uuid("delivery_id")
+      .notNull()
+      .references(() => deliveries.id, { onDelete: "cascade", onUpdate: "cascade" }),
+    salesOrderLineId: uuid("sales_order_line_id").references(() => salesOrderLines.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
+    lineNo: smallint("line_no").notNull(),
+    productId: uuid("product_id")
+      .notNull()
+      .references(() => products.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    productSerialId: uuid("product_serial_id").references(() => productSerials.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
+    productLotId: uuid("product_lot_id").references(() => productLots.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
+    unitId: uuid("unit_id")
+      .notNull()
+      .references(() => unitsOfMeasure.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    quantityDelivered: numeric("quantity_delivered", { precision: 20, scale: 6 }).notNull(),
+    unitCostMinor: bigint("unit_cost_minor", { mode: "number" }).notNull().default(0),
+    totalCostMinor: bigint("total_cost_minor", { mode: "number" }).notNull().default(0),
+    currencyCode: char("currency_code", { length: 3 })
+      .notNull()
+      .references(() => currencies.code, { onDelete: "restrict", onUpdate: "cascade" }),
+    serialNo: varchar("serial_no", { length: 120 }),
+    lotNo: varchar("lot_no", { length: 120 }),
+    notes: text("notes"),
+    ...softDelete,
+    ...timestamps,
+  },
+  (table) => [
+    check("delivery_lines_line_no_chk", sql`${table.lineNo} > 0`),
+    check("delivery_lines_quantity_chk", sql`${table.quantityDelivered} > 0`),
+    check("delivery_lines_unit_cost_chk", sql`${table.unitCostMinor} >= 0`),
+    check("delivery_lines_total_cost_chk", sql`${table.totalCostMinor} >= 0`),
+    uniqueIndex("delivery_lines_no_active_uidx")
+      .on(table.deliveryId, table.lineNo)
+      .where(sql`${table.deletedAt} is null`),
+    index("delivery_lines_sales_order_line_idx").on(table.salesOrderLineId),
+    index("delivery_lines_product_idx").on(table.productId),
+    index("delivery_lines_serial_idx").on(table.productSerialId),
+    index("delivery_lines_lot_idx").on(table.productLotId),
+  ],
+);
+
+export const customerInvoices = pgTable(
+  "customer_invoices",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    companyId: uuid("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    salesOrderId: uuid("sales_order_id").references(() => salesOrders.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
+    deliveryId: uuid("delivery_id").references(() => deliveries.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
+    customerId: uuid("customer_id")
+      .notNull()
+      .references(() => partners.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    invoiceAddressId: uuid("invoice_address_id").references(() => partnerAddresses.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
+    invoiceNo: varchar("invoice_no", { length: 60 }).notNull(),
+    customerReference: varchar("customer_reference", { length: 80 }),
+    status: customerInvoiceStatus("status").notNull().default("draft"),
+    paymentStatus: customerInvoicePaymentStatus("payment_status").notNull().default("not_paid"),
+    invoiceDate: date("invoice_date").notNull().defaultNow(),
+    dueDate: date("due_date"),
+    postedAt: timestamp("posted_at", { withTimezone: true }),
+    postedBy: uuid("posted_by").references(() => users.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
+    currencyCode: char("currency_code", { length: 3 })
+      .notNull()
+      .references(() => currencies.code, { onDelete: "restrict", onUpdate: "cascade" }),
+    untaxedAmountMinor: bigint("untaxed_amount_minor", { mode: "number" }).notNull().default(0),
+    taxAmountMinor: bigint("tax_amount_minor", { mode: "number" }).notNull().default(0),
+    totalMinor: bigint("total_minor", { mode: "number" }).notNull().default(0),
+    notes: text("notes"),
+    ...softDelete,
+    ...timestamps,
+  },
+  (table) => [
+    check("customer_invoices_untaxed_chk", sql`${table.untaxedAmountMinor} >= 0`),
+    check("customer_invoices_tax_amount_chk", sql`${table.taxAmountMinor} >= 0`),
+    check("customer_invoices_total_chk", sql`${table.totalMinor} >= 0`),
+    check(
+      "customer_invoices_posted_state_chk",
+      sql`
+        (${table.status} = 'posted' and ${table.postedAt} is not null)
+        or (${table.status} <> 'posted' and ${table.postedAt} is null)
+      `,
+    ),
+    uniqueIndex("customer_invoices_no_active_uidx")
+      .on(table.companyId, table.invoiceNo)
+      .where(sql`${table.deletedAt} is null`),
+    index("customer_invoices_sales_order_idx").on(table.salesOrderId),
+    index("customer_invoices_delivery_idx").on(table.deliveryId),
+    index("customer_invoices_customer_idx").on(table.customerId),
+    index("customer_invoices_status_idx").on(table.companyId, table.status),
+    index("customer_invoices_payment_status_idx").on(table.companyId, table.paymentStatus),
+    index("customer_invoices_date_idx").on(table.companyId, table.invoiceDate),
+  ],
+);
+
+export const customerInvoiceLines = pgTable(
+  "customer_invoice_lines",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    customerInvoiceId: uuid("customer_invoice_id")
+      .notNull()
+      .references(() => customerInvoices.id, { onDelete: "cascade", onUpdate: "cascade" }),
+    salesOrderLineId: uuid("sales_order_line_id").references(() => salesOrderLines.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
+    deliveryLineId: uuid("delivery_line_id").references(() => deliveryLines.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
+    lineNo: smallint("line_no").notNull(),
+    productId: uuid("product_id").references(() => products.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
+    description: text("description").notNull(),
+    quantity: numeric("quantity", { precision: 20, scale: 6 }).notNull(),
+    unitPriceMinor: bigint("unit_price_minor", { mode: "number" }).notNull().default(0),
+    discountMinor: bigint("discount_minor", { mode: "number" }).notNull().default(0),
+    taxAmountMinor: bigint("tax_amount_minor", { mode: "number" }).notNull().default(0),
+    lineTotalMinor: bigint("line_total_minor", { mode: "number" }).notNull().default(0),
+    currencyCode: char("currency_code", { length: 3 })
+      .notNull()
+      .references(() => currencies.code, { onDelete: "restrict", onUpdate: "cascade" }),
+    notes: text("notes"),
+    ...softDelete,
+    ...timestamps,
+  },
+  (table) => [
+    check("customer_invoice_lines_line_no_chk", sql`${table.lineNo} > 0`),
+    check("customer_invoice_lines_quantity_chk", sql`${table.quantity} > 0`),
+    check("customer_invoice_lines_unit_price_chk", sql`${table.unitPriceMinor} >= 0`),
+    check("customer_invoice_lines_discount_chk", sql`${table.discountMinor} >= 0`),
+    check("customer_invoice_lines_tax_amount_chk", sql`${table.taxAmountMinor} >= 0`),
+    check("customer_invoice_lines_total_chk", sql`${table.lineTotalMinor} >= 0`),
+    uniqueIndex("customer_invoice_lines_no_active_uidx")
+      .on(table.customerInvoiceId, table.lineNo)
+      .where(sql`${table.deletedAt} is null`),
+    index("customer_invoice_lines_order_line_idx").on(table.salesOrderLineId),
+    index("customer_invoice_lines_delivery_line_idx").on(table.deliveryLineId),
+    index("customer_invoice_lines_product_idx").on(table.productId),
+  ],
+);
+
+export const customerInvoiceLineTaxes = pgTable(
+  "customer_invoice_line_taxes",
+  {
+    customerInvoiceLineId: uuid("customer_invoice_line_id")
+      .notNull()
+      .references(() => customerInvoiceLines.id, { onDelete: "cascade", onUpdate: "cascade" }),
+    taxId: uuid("tax_id")
+      .notNull()
+      .references(() => taxes.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    taxAmountMinor: bigint("tax_amount_minor", { mode: "number" }).notNull().default(0),
+    ...timestamps,
+  },
+  (table) => [
+    primaryKey({ columns: [table.customerInvoiceLineId, table.taxId] }),
+    check("customer_invoice_line_taxes_amount_chk", sql`${table.taxAmountMinor} >= 0`),
+    index("customer_invoice_line_taxes_tax_idx").on(table.taxId),
+  ],
+);
+
 export const paymentAllocations = pgTable(
   "payment_allocations",
   {
@@ -1865,6 +2307,10 @@ export const paymentAllocations = pgTable(
       onDelete: "restrict",
       onUpdate: "cascade",
     }),
+    customerInvoiceId: uuid("customer_invoice_id").references(() => customerInvoices.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
     amountMinor: bigint("amount_minor", { mode: "number" }).notNull().default(0),
     notes: text("notes"),
     ...softDelete,
@@ -1877,6 +2323,7 @@ export const paymentAllocations = pgTable(
       sql`
         (case when ${table.vendorBillId} is not null then 1 else 0 end)
         + (case when ${table.expenseId} is not null then 1 else 0 end)
+        + (case when ${table.customerInvoiceId} is not null then 1 else 0 end)
         = 1
       `,
     ),
@@ -1886,9 +2333,521 @@ export const paymentAllocations = pgTable(
     uniqueIndex("payment_allocations_expense_active_uidx")
       .on(table.paymentId, table.expenseId)
       .where(sql`${table.deletedAt} is null and ${table.expenseId} is not null`),
+    uniqueIndex("payment_allocations_customer_invoice_active_uidx")
+      .on(table.paymentId, table.customerInvoiceId)
+      .where(sql`${table.deletedAt} is null and ${table.customerInvoiceId} is not null`),
     index("payment_allocations_payment_idx").on(table.paymentId),
     index("payment_allocations_vendor_bill_idx").on(table.vendorBillId),
     index("payment_allocations_expense_idx").on(table.expenseId),
+    index("payment_allocations_customer_invoice_idx").on(table.customerInvoiceId),
+  ],
+);
+
+export const customerReturns = pgTable(
+  "customer_returns",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    companyId: uuid("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    salesOrderId: uuid("sales_order_id")
+      .notNull()
+      .references(() => salesOrders.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    deliveryId: uuid("delivery_id").references(() => deliveries.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
+    customerInvoiceId: uuid("customer_invoice_id").references(() => customerInvoices.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
+    customerId: uuid("customer_id")
+      .notNull()
+      .references(() => partners.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    returnNo: varchar("return_no", { length: 60 }).notNull(),
+    status: returnDocumentStatus("status").notNull().default("draft"),
+    returnDate: date("return_date").notNull().defaultNow(),
+    refundAmountMinor: bigint("refund_amount_minor", { mode: "number" }).notNull().default(0),
+    currencyCode: char("currency_code", { length: 3 })
+      .notNull()
+      .references(() => currencies.code, { onDelete: "restrict", onUpdate: "cascade" }),
+    destinationLocationId: uuid("destination_location_id")
+      .notNull()
+      .references(() => locations.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    postedAt: timestamp("posted_at", { withTimezone: true }),
+    postedBy: uuid("posted_by").references(() => users.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
+    stockMovementId: uuid("stock_movement_id").references(() => stockMovements.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
+    notes: text("notes"),
+    ...softDelete,
+    ...timestamps,
+  },
+  (table) => [
+    check("customer_returns_refund_chk", sql`${table.refundAmountMinor} >= 0`),
+    check(
+      "customer_returns_posted_state_chk",
+      sql`
+        (${table.status} = 'posted' and ${table.postedAt} is not null and ${table.stockMovementId} is not null)
+        or (${table.status} <> 'posted' and ${table.postedAt} is null)
+      `,
+    ),
+    uniqueIndex("customer_returns_no_active_uidx")
+      .on(table.companyId, table.returnNo)
+      .where(sql`${table.deletedAt} is null`),
+    index("customer_returns_sales_order_idx").on(table.salesOrderId),
+    index("customer_returns_delivery_idx").on(table.deliveryId),
+    index("customer_returns_invoice_idx").on(table.customerInvoiceId),
+    index("customer_returns_customer_idx").on(table.customerId),
+    index("customer_returns_status_idx").on(table.companyId, table.status),
+  ],
+);
+
+export const customerReturnLines = pgTable(
+  "customer_return_lines",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    customerReturnId: uuid("customer_return_id")
+      .notNull()
+      .references(() => customerReturns.id, { onDelete: "cascade", onUpdate: "cascade" }),
+    salesOrderLineId: uuid("sales_order_line_id").references(() => salesOrderLines.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
+    deliveryLineId: uuid("delivery_line_id").references(() => deliveryLines.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
+    lineNo: smallint("line_no").notNull(),
+    productId: uuid("product_id")
+      .notNull()
+      .references(() => products.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    productSerialId: uuid("product_serial_id").references(() => productSerials.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
+    productLotId: uuid("product_lot_id").references(() => productLots.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
+    unitId: uuid("unit_id")
+      .notNull()
+      .references(() => unitsOfMeasure.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    quantityReturned: numeric("quantity_returned", { precision: 20, scale: 6 }).notNull(),
+    condition: returnLineCondition("condition").notNull().default("returned"),
+    refundAmountMinor: bigint("refund_amount_minor", { mode: "number" }).notNull().default(0),
+    currencyCode: char("currency_code", { length: 3 })
+      .notNull()
+      .references(() => currencies.code, { onDelete: "restrict", onUpdate: "cascade" }),
+    serialNo: varchar("serial_no", { length: 120 }),
+    lotNo: varchar("lot_no", { length: 120 }),
+    notes: text("notes"),
+    ...softDelete,
+    ...timestamps,
+  },
+  (table) => [
+    check("customer_return_lines_line_no_chk", sql`${table.lineNo} > 0`),
+    check("customer_return_lines_quantity_chk", sql`${table.quantityReturned} > 0`),
+    check("customer_return_lines_refund_chk", sql`${table.refundAmountMinor} >= 0`),
+    uniqueIndex("customer_return_lines_no_active_uidx")
+      .on(table.customerReturnId, table.lineNo)
+      .where(sql`${table.deletedAt} is null`),
+    index("customer_return_lines_sales_order_line_idx").on(table.salesOrderLineId),
+    index("customer_return_lines_delivery_line_idx").on(table.deliveryLineId),
+    index("customer_return_lines_product_idx").on(table.productId),
+    index("customer_return_lines_serial_idx").on(table.productSerialId),
+  ],
+);
+
+export const customerRefundPlaceholders = pgTable(
+  "customer_refund_placeholders",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    companyId: uuid("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    customerReturnId: uuid("customer_return_id")
+      .notNull()
+      .references(() => customerReturns.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    customerId: uuid("customer_id")
+      .notNull()
+      .references(() => partners.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    refundNo: varchar("refund_no", { length: 60 }).notNull(),
+    status: refundPlaceholderStatus("status").notNull().default("pending"),
+    refundDate: date("refund_date").notNull().defaultNow(),
+    amountMinor: bigint("amount_minor", { mode: "number" }).notNull().default(0),
+    currencyCode: char("currency_code", { length: 3 })
+      .notNull()
+      .references(() => currencies.code, { onDelete: "restrict", onUpdate: "cascade" }),
+    notes: text("notes"),
+    ...softDelete,
+    ...timestamps,
+  },
+  (table) => [
+    check("customer_refund_placeholders_amount_chk", sql`${table.amountMinor} >= 0`),
+    uniqueIndex("customer_refund_placeholders_no_active_uidx")
+      .on(table.companyId, table.refundNo)
+      .where(sql`${table.deletedAt} is null`),
+    index("customer_refund_placeholders_return_idx").on(table.customerReturnId),
+    index("customer_refund_placeholders_customer_idx").on(table.customerId),
+  ],
+);
+
+export const supplierReturns = pgTable(
+  "supplier_returns",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    companyId: uuid("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    purchaseOrderId: uuid("purchase_order_id").references(() => purchaseOrders.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
+    goodsReceiptId: uuid("goods_receipt_id")
+      .notNull()
+      .references(() => goodsReceipts.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    vendorBillId: uuid("vendor_bill_id").references(() => vendorBills.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
+    supplierId: uuid("supplier_id")
+      .notNull()
+      .references(() => partners.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    returnNo: varchar("return_no", { length: 60 }).notNull(),
+    status: returnDocumentStatus("status").notNull().default("draft"),
+    returnDate: date("return_date").notNull().defaultNow(),
+    refundAmountMinor: bigint("refund_amount_minor", { mode: "number" }).notNull().default(0),
+    currencyCode: char("currency_code", { length: 3 })
+      .notNull()
+      .references(() => currencies.code, { onDelete: "restrict", onUpdate: "cascade" }),
+    sourceLocationId: uuid("source_location_id")
+      .notNull()
+      .references(() => locations.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    postedAt: timestamp("posted_at", { withTimezone: true }),
+    postedBy: uuid("posted_by").references(() => users.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
+    stockMovementId: uuid("stock_movement_id").references(() => stockMovements.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
+    notes: text("notes"),
+    ...softDelete,
+    ...timestamps,
+  },
+  (table) => [
+    check("supplier_returns_refund_chk", sql`${table.refundAmountMinor} >= 0`),
+    check(
+      "supplier_returns_posted_state_chk",
+      sql`
+        (${table.status} = 'posted' and ${table.postedAt} is not null and ${table.stockMovementId} is not null)
+        or (${table.status} <> 'posted' and ${table.postedAt} is null)
+      `,
+    ),
+    uniqueIndex("supplier_returns_no_active_uidx")
+      .on(table.companyId, table.returnNo)
+      .where(sql`${table.deletedAt} is null`),
+    index("supplier_returns_purchase_order_idx").on(table.purchaseOrderId),
+    index("supplier_returns_receipt_idx").on(table.goodsReceiptId),
+    index("supplier_returns_vendor_bill_idx").on(table.vendorBillId),
+    index("supplier_returns_supplier_idx").on(table.supplierId),
+  ],
+);
+
+export const supplierReturnLines = pgTable(
+  "supplier_return_lines",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    supplierReturnId: uuid("supplier_return_id")
+      .notNull()
+      .references(() => supplierReturns.id, { onDelete: "cascade", onUpdate: "cascade" }),
+    goodsReceiptLineId: uuid("goods_receipt_line_id").references(() => goodsReceiptLines.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
+    purchaseOrderLineId: uuid("purchase_order_line_id").references(() => purchaseOrderLines.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
+    lineNo: smallint("line_no").notNull(),
+    productId: uuid("product_id")
+      .notNull()
+      .references(() => products.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    productSerialId: uuid("product_serial_id").references(() => productSerials.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
+    productLotId: uuid("product_lot_id").references(() => productLots.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
+    unitId: uuid("unit_id")
+      .notNull()
+      .references(() => unitsOfMeasure.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    quantityReturned: numeric("quantity_returned", { precision: 20, scale: 6 }).notNull(),
+    condition: returnLineCondition("condition").notNull().default("returned"),
+    refundAmountMinor: bigint("refund_amount_minor", { mode: "number" }).notNull().default(0),
+    currencyCode: char("currency_code", { length: 3 })
+      .notNull()
+      .references(() => currencies.code, { onDelete: "restrict", onUpdate: "cascade" }),
+    serialNo: varchar("serial_no", { length: 120 }),
+    lotNo: varchar("lot_no", { length: 120 }),
+    notes: text("notes"),
+    ...softDelete,
+    ...timestamps,
+  },
+  (table) => [
+    check("supplier_return_lines_line_no_chk", sql`${table.lineNo} > 0`),
+    check("supplier_return_lines_quantity_chk", sql`${table.quantityReturned} > 0`),
+    check("supplier_return_lines_refund_chk", sql`${table.refundAmountMinor} >= 0`),
+    uniqueIndex("supplier_return_lines_no_active_uidx")
+      .on(table.supplierReturnId, table.lineNo)
+      .where(sql`${table.deletedAt} is null`),
+    index("supplier_return_lines_receipt_line_idx").on(table.goodsReceiptLineId),
+    index("supplier_return_lines_purchase_order_line_idx").on(table.purchaseOrderLineId),
+    index("supplier_return_lines_product_idx").on(table.productId),
+    index("supplier_return_lines_serial_idx").on(table.productSerialId),
+  ],
+);
+
+export const vendorRefundPlaceholders = pgTable(
+  "vendor_refund_placeholders",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    companyId: uuid("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    supplierReturnId: uuid("supplier_return_id")
+      .notNull()
+      .references(() => supplierReturns.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    supplierId: uuid("supplier_id")
+      .notNull()
+      .references(() => partners.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    refundNo: varchar("refund_no", { length: 60 }).notNull(),
+    status: refundPlaceholderStatus("status").notNull().default("pending"),
+    refundDate: date("refund_date").notNull().defaultNow(),
+    amountMinor: bigint("amount_minor", { mode: "number" }).notNull().default(0),
+    currencyCode: char("currency_code", { length: 3 })
+      .notNull()
+      .references(() => currencies.code, { onDelete: "restrict", onUpdate: "cascade" }),
+    notes: text("notes"),
+    ...softDelete,
+    ...timestamps,
+  },
+  (table) => [
+    check("vendor_refund_placeholders_amount_chk", sql`${table.amountMinor} >= 0`),
+    uniqueIndex("vendor_refund_placeholders_no_active_uidx")
+      .on(table.companyId, table.refundNo)
+      .where(sql`${table.deletedAt} is null`),
+    index("vendor_refund_placeholders_return_idx").on(table.supplierReturnId),
+    index("vendor_refund_placeholders_supplier_idx").on(table.supplierId),
+  ],
+);
+
+export const warrantyRegistrations = pgTable(
+  "warranty_registrations",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    companyId: uuid("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    productSerialId: uuid("product_serial_id")
+      .notNull()
+      .references(() => productSerials.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    customerId: uuid("customer_id")
+      .notNull()
+      .references(() => partners.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    salesOrderId: uuid("sales_order_id").references(() => salesOrders.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
+    deliveryId: uuid("delivery_id").references(() => deliveries.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
+    customerInvoiceId: uuid("customer_invoice_id").references(() => customerInvoices.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
+    warrantyNo: varchar("warranty_no", { length: 60 }).notNull(),
+    status: warrantyStatus("status").notNull().default("active"),
+    startDate: date("start_date").notNull(),
+    endDate: date("end_date").notNull(),
+    notes: text("notes"),
+    ...softDelete,
+    ...timestamps,
+  },
+  (table) => [
+    check("warranty_registrations_date_chk", sql`${table.endDate} >= ${table.startDate}`),
+    uniqueIndex("warranty_registrations_no_active_uidx")
+      .on(table.companyId, table.warrantyNo)
+      .where(sql`${table.deletedAt} is null`),
+    uniqueIndex("warranty_registrations_serial_active_uidx")
+      .on(table.productSerialId)
+      .where(sql`${table.deletedAt} is null and ${table.status} = 'active'`),
+    index("warranty_registrations_customer_idx").on(table.customerId),
+    index("warranty_registrations_sales_order_idx").on(table.salesOrderId),
+  ],
+);
+
+export const serialOwnershipHistory = pgTable(
+  "serial_ownership_history",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    companyId: uuid("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    productSerialId: uuid("product_serial_id")
+      .notNull()
+      .references(() => productSerials.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    partnerId: uuid("partner_id").references(() => partners.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
+    ownershipType: serialOwnershipType("ownership_type").notNull(),
+    sourceType: varchar("source_type", { length: 80 }).notNull(),
+    sourceId: uuid("source_id").notNull(),
+    sourceNo: varchar("source_no", { length: 80 }).notNull(),
+    effectiveAt: timestamp("effective_at", { withTimezone: true }).notNull().defaultNow(),
+    notes: text("notes"),
+    ...timestamps,
+  },
+  (table) => [
+    index("serial_ownership_history_serial_idx").on(table.productSerialId, table.effectiveAt),
+    index("serial_ownership_history_partner_idx").on(table.partnerId),
+    index("serial_ownership_history_source_idx").on(table.sourceType, table.sourceId),
+  ],
+);
+
+export const transfers = pgTable(
+  "transfers",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    companyId: uuid("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    transferNo: varchar("transfer_no", { length: 60 }).notNull(),
+    status: transferStatus("status").notNull().default("draft"),
+    fromLocationId: uuid("from_location_id")
+      .notNull()
+      .references(() => locations.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    transitLocationId: uuid("transit_location_id")
+      .notNull()
+      .references(() => locations.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    toLocationId: uuid("to_location_id")
+      .notNull()
+      .references(() => locations.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    transferDate: date("transfer_date").notNull().defaultNow(),
+    approvedAt: timestamp("approved_at", { withTimezone: true }),
+    approvedBy: uuid("approved_by").references(() => users.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
+    dispatchedAt: timestamp("dispatched_at", { withTimezone: true }),
+    dispatchedBy: uuid("dispatched_by").references(() => users.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
+    receivedAt: timestamp("received_at", { withTimezone: true }),
+    receivedBy: uuid("received_by").references(() => users.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
+    dispatchMovementId: uuid("dispatch_movement_id").references(() => stockMovements.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
+    receiptMovementId: uuid("receipt_movement_id").references(() => stockMovements.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
+    notes: text("notes"),
+    ...softDelete,
+    ...timestamps,
+  },
+  (table) => [
+    check(
+      "transfers_location_chk",
+      sql`${table.fromLocationId} <> ${table.toLocationId} and ${table.fromLocationId} <> ${table.transitLocationId} and ${table.toLocationId} <> ${table.transitLocationId}`,
+    ),
+    check(
+      "transfers_approved_state_chk",
+      sql`
+        (${table.status} in ('approved', 'dispatched', 'partially_received', 'received') and ${table.approvedAt} is not null)
+        or (${table.status} = 'draft' and ${table.approvedAt} is null)
+        or (${table.status} = 'cancelled')
+      `,
+    ),
+    check(
+      "transfers_dispatched_state_chk",
+      sql`
+        (${table.status} in ('dispatched', 'partially_received', 'received') and ${table.dispatchedAt} is not null and ${table.dispatchMovementId} is not null)
+        or (${table.status} in ('draft', 'approved', 'cancelled') and ${table.dispatchedAt} is null)
+      `,
+    ),
+    uniqueIndex("transfers_no_active_uidx")
+      .on(table.companyId, table.transferNo)
+      .where(sql`${table.deletedAt} is null`),
+    index("transfers_status_idx").on(table.companyId, table.status),
+    index("transfers_from_location_idx").on(table.fromLocationId),
+    index("transfers_to_location_idx").on(table.toLocationId),
+  ],
+);
+
+export const transferLines = pgTable(
+  "transfer_lines",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    transferId: uuid("transfer_id")
+      .notNull()
+      .references(() => transfers.id, { onDelete: "cascade", onUpdate: "cascade" }),
+    lineNo: smallint("line_no").notNull(),
+    productId: uuid("product_id")
+      .notNull()
+      .references(() => products.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    productSerialId: uuid("product_serial_id").references(() => productSerials.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
+    productLotId: uuid("product_lot_id").references(() => productLots.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
+    unitId: uuid("unit_id")
+      .notNull()
+      .references(() => unitsOfMeasure.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    quantityRequested: numeric("quantity_requested", { precision: 20, scale: 6 }).notNull(),
+    quantityDispatched: numeric("quantity_dispatched", { precision: 20, scale: 6 }).notNull().default("0"),
+    quantityReceived: numeric("quantity_received", { precision: 20, scale: 6 }).notNull().default("0"),
+    discrepancy: transferLineDiscrepancy("discrepancy").notNull().default("none"),
+    unitCostMinor: bigint("unit_cost_minor", { mode: "number" }).notNull().default(0),
+    currencyCode: char("currency_code", { length: 3 })
+      .notNull()
+      .references(() => currencies.code, { onDelete: "restrict", onUpdate: "cascade" }),
+    serialNo: varchar("serial_no", { length: 120 }),
+    lotNo: varchar("lot_no", { length: 120 }),
+    notes: text("notes"),
+    ...softDelete,
+    ...timestamps,
+  },
+  (table) => [
+    check("transfer_lines_line_no_chk", sql`${table.lineNo} > 0`),
+    check("transfer_lines_requested_chk", sql`${table.quantityRequested} > 0`),
+    check("transfer_lines_dispatched_chk", sql`${table.quantityDispatched} >= 0`),
+    check("transfer_lines_received_chk", sql`${table.quantityReceived} >= 0`),
+    check("transfer_lines_cost_chk", sql`${table.unitCostMinor} >= 0`),
+    uniqueIndex("transfer_lines_no_active_uidx")
+      .on(table.transferId, table.lineNo)
+      .where(sql`${table.deletedAt} is null`),
+    index("transfer_lines_product_idx").on(table.productId),
+    index("transfer_lines_serial_idx").on(table.productSerialId),
+    index("transfer_lines_lot_idx").on(table.productLotId),
   ],
 );
 

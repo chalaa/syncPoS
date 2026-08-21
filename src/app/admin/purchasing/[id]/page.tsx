@@ -98,6 +98,11 @@ export default async function PurchaseOrderDetailPage({ params, searchParams }: 
               <Button variant="outline">Create Vendor Bill</Button>
             </form>
           ) : null}
+          {order.receiptCount > 0 ? (
+            <ButtonLink href={`/admin/purchasing/landed-costs/new?purchaseOrderId=${order.id}`} variant="outline">
+              Add Landed Cost
+            </ButtonLink>
+          ) : null}
         </div>
       </div>
 

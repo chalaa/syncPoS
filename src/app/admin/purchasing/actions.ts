@@ -81,9 +81,10 @@ const vendorBillStatusSchema = z.object({
 });
 
 const landedCostSchema = z.object({
+  landedCostId: z.string().uuid().optional(),
   goodsReceiptId: z.string().uuid(),
   costType: z.enum(["freight", "customs", "insurance", "handling", "other"]),
-  allocationMethod: z.enum(["quantity", "value", "weight", "manual"]),
+  allocationMethod: z.enum(["quantity", "value", "manual"]),
   amount: z.string().trim(),
   vendorId: z.string().uuid().or(z.literal("")).transform((value) => value || null),
   notes: z.string().trim().optional(),
@@ -1412,10 +1413,10 @@ export async function cancelVendorBill(formData: FormData) {
 function allocateLandedCost(
   amountMinor: number,
   lines: { id: string; quantityReceived: string; lineTotalMinor: number }[],
-  method: "quantity" | "value" | "weight" | "manual",
+  method: "quantity" | "value",
 ) {
   const basisValues = lines.map((line) => {
-    if (method === "quantity" || method === "weight") {
+    if (method === "quantity") {
       return Number(line.quantityReceived);
     }
 
@@ -1445,6 +1446,54 @@ function allocateLandedCost(
   return allocations;
 }
 
+function parseManualLandedCostAllocations(formData: FormData) {
+  const lineIds = formValues(formData, "manualGoodsReceiptLineId");
+  const amounts = formValues(formData, "manualAllocationAmount");
+
+  return lineIds.map((lineId, index) => ({
+    goodsReceiptLineId: lineId,
+    allocatedAmountMinor: majorToMinor(amounts[index] ?? "0"),
+  }));
+}
+
+function allocateManualLandedCost(
+  amountMinor: number,
+  lines: { id: string }[],
+  manualAllocations: { goodsReceiptLineId: string; allocatedAmountMinor: number }[],
+) {
+  if (manualAllocations.length === 0) {
+    throw new Error("Manual allocation requires receipt line amounts.");
+  }
+
+  const validLineIds = new Set(lines.map((line) => line.id));
+  const allocations = manualAllocations.map((allocation) => {
+    if (!validLineIds.has(allocation.goodsReceiptLineId)) {
+      throw new Error("Manual allocation contains a line outside the selected receipt.");
+    }
+
+    if (allocation.allocatedAmountMinor < 0) {
+      throw new Error("Manual allocation amounts cannot be negative.");
+    }
+
+    return {
+      goodsReceiptLineId: allocation.goodsReceiptLineId,
+      allocatedAmountMinor: allocation.allocatedAmountMinor,
+      allocationBasis: allocation.allocatedAmountMinor.toFixed(6),
+    };
+  });
+  const allocatedTotal = allocations.reduce((sum, allocation) => sum + allocation.allocatedAmountMinor, 0);
+
+  if (allocatedTotal !== amountMinor) {
+    throw new Error("Manual allocation total must equal landed cost amount.");
+  }
+
+  if (allocatedTotal <= 0) {
+    throw new Error("Manual allocation must allocate a positive amount.");
+  }
+
+  return allocations;
+}
+
 export async function createLandedCost(formData: FormData) {
   const user = await requirePermission("inventory.receive");
   const parsed = landedCostSchema.safeParse({
@@ -1455,6 +1504,7 @@ export async function createLandedCost(formData: FormData) {
     vendorId: formValue(formData, "vendorId"),
     notes: formValue(formData, "notes"),
   });
+  const manualAllocations = parseManualLandedCostAllocations(formData);
 
   if (!parsed.success) {
     redirectWithError("/admin/purchasing/landed-costs/new", parsed.error.issues[0]?.message ?? "Invalid landed cost.");
@@ -1500,7 +1550,10 @@ export async function createLandedCost(formData: FormData) {
         throw new Error("Receipt has no lines to allocate.");
       }
 
-      const allocations = allocateLandedCost(amountMinor, receiptLines, parsed.data.allocationMethod);
+      const allocations =
+        parsed.data.allocationMethod === "manual"
+          ? allocateManualLandedCost(amountMinor, receiptLines, manualAllocations)
+          : allocateLandedCost(amountMinor, receiptLines, parsed.data.allocationMethod);
       const [cost] = await tx
         .insert(landedCosts)
         .values({
@@ -1541,6 +1594,133 @@ export async function createLandedCost(formData: FormData) {
   redirect(`/admin/purchasing/landed-costs/${landedCostId}?notice=${encodeURIComponent("Landed cost allocated")}`);
 }
 
+export async function updateLandedCost(formData: FormData) {
+  const user = await requirePermission("inventory.receive");
+  const parsed = landedCostSchema.safeParse({
+    landedCostId: formValue(formData, "landedCostId") || undefined,
+    goodsReceiptId: formValue(formData, "goodsReceiptId"),
+    costType: formValue(formData, "costType"),
+    allocationMethod: formValue(formData, "allocationMethod"),
+    amount: formValue(formData, "amount"),
+    vendorId: formValue(formData, "vendorId"),
+    notes: formValue(formData, "notes"),
+  });
+  const manualAllocations = parseManualLandedCostAllocations(formData);
+
+  if (!parsed.success) {
+    redirectWithError("/admin/purchasing?view=landed-costs", parsed.error.issues[0]?.message ?? "Invalid landed cost.");
+  }
+
+  const landedCostId = parsed.data.landedCostId;
+  if (!landedCostId) {
+    redirectWithError("/admin/purchasing?view=landed-costs", "Landed cost ID is required.");
+  }
+
+  const amountMinor = majorToMinor(parsed.data.amount);
+  if (amountMinor <= 0) {
+    redirectWithError(`/admin/purchasing/landed-costs/${landedCostId}/edit`, "Landed cost amount must be greater than zero.");
+  }
+
+  const company = await getDefaultCompany();
+
+  try {
+    await db.transaction(async (tx) => {
+      const [existingCost] = await tx
+        .select({
+          id: landedCosts.id,
+          status: landedCosts.status,
+          costNo: landedCosts.costNo,
+        })
+        .from(landedCosts)
+        .where(and(eq(landedCosts.id, landedCostId), eq(landedCosts.companyId, company.id), isNull(landedCosts.deletedAt)))
+        .limit(1);
+
+      if (!existingCost) {
+        throw new Error("Landed cost does not exist.");
+      }
+
+      if (existingCost.status === "posted") {
+        throw new Error("Posted landed costs cannot be edited.");
+      }
+
+      const [receipt] = await tx
+        .select({
+          id: goodsReceipts.id,
+          purchaseOrderId: goodsReceipts.purchaseOrderId,
+          status: goodsReceipts.status,
+          currencyCode: purchaseOrders.currencyCode,
+        })
+        .from(goodsReceipts)
+        .innerJoin(purchaseOrders, eq(goodsReceipts.purchaseOrderId, purchaseOrders.id))
+        .where(and(eq(goodsReceipts.id, parsed.data.goodsReceiptId), eq(goodsReceipts.companyId, company.id), isNull(goodsReceipts.deletedAt)))
+        .limit(1);
+
+      if (!receipt || receipt.status !== "posted") {
+        throw new Error("Select a posted goods receipt.");
+      }
+
+      const receiptLines = await tx
+        .select({
+          id: goodsReceiptLines.id,
+          quantityReceived: goodsReceiptLines.quantityReceived,
+          lineTotalMinor: goodsReceiptLines.lineTotalMinor,
+        })
+        .from(goodsReceiptLines)
+        .where(and(eq(goodsReceiptLines.goodsReceiptId, receipt.id), isNull(goodsReceiptLines.deletedAt)));
+
+      if (receiptLines.length === 0) {
+        throw new Error("Receipt has no lines to allocate.");
+      }
+
+      const allocations =
+        parsed.data.allocationMethod === "manual"
+          ? allocateManualLandedCost(amountMinor, receiptLines, manualAllocations)
+          : allocateLandedCost(amountMinor, receiptLines, parsed.data.allocationMethod);
+
+      await tx
+        .update(landedCosts)
+        .set({
+          purchaseOrderId: receipt.purchaseOrderId,
+          goodsReceiptId: receipt.id,
+          costType: parsed.data.costType,
+          status: "allocated",
+          allocationMethod: parsed.data.allocationMethod,
+          amountMinor,
+          currencyCode: receipt.currencyCode,
+          vendorId: parsed.data.vendorId,
+          notes: parsed.data.notes || null,
+          updatedAt: sql`now()`,
+        })
+        .where(eq(landedCosts.id, existingCost.id));
+
+      await tx
+        .update(landedCostAllocations)
+        .set({ deletedAt: sql`now()`, deleteReason: "Reallocated landed cost.", updatedAt: sql`now()` })
+        .where(and(eq(landedCostAllocations.landedCostId, existingCost.id), isNull(landedCostAllocations.deletedAt)));
+
+      await tx
+        .insert(landedCostAllocations)
+        .values(allocations.map((allocation) => ({ landedCostId: existingCost.id, ...allocation })));
+
+      await tx.insert(auditLogs).values({
+        companyId: company.id,
+        actorUserId: user.id,
+        action: "landed_cost.update",
+        entityType: "landed_cost",
+        entityId: existingCost.id,
+        severity: "info",
+        metadata: { costNo: existingCost.costNo, goodsReceiptId: receipt.id },
+      });
+    });
+  } catch (error) {
+    redirectWithError(`/admin/purchasing/landed-costs/${landedCostId}/edit`, error instanceof Error ? error.message : "Could not update landed cost.");
+  }
+
+  revalidatePath("/admin/purchasing");
+  revalidatePath(`/admin/purchasing/landed-costs/${landedCostId}`);
+  redirect(`/admin/purchasing/landed-costs/${landedCostId}?notice=${encodeURIComponent("Landed cost updated")}`);
+}
+
 export async function postLandedCost(formData: FormData) {
   const user = await requirePermission("inventory.receive");
   const parsed = landedCostStatusSchema.safeParse({ landedCostId: formValue(formData, "landedCostId") });
@@ -1554,7 +1734,7 @@ export async function postLandedCost(formData: FormData) {
   try {
     await db.transaction(async (tx) => {
       const [cost] = await tx
-        .select({ id: landedCosts.id, status: landedCosts.status })
+        .select({ id: landedCosts.id, status: landedCosts.status, amountMinor: landedCosts.amountMinor })
         .from(landedCosts)
         .where(and(eq(landedCosts.id, parsed.data.landedCostId), eq(landedCosts.companyId, company.id), isNull(landedCosts.deletedAt)))
         .limit(1);
@@ -1590,6 +1770,11 @@ export async function postLandedCost(formData: FormData) {
 
       if (allocationRows.length === 0) {
         throw new Error("Landed cost has no allocations.");
+      }
+
+      const allocatedTotal = allocationRows.reduce((sum, row) => sum + row.allocatedAmountMinor, 0);
+      if (allocatedTotal !== cost.amountMinor) {
+        throw new Error("Landed cost allocation total must equal the landed cost amount.");
       }
 
       for (const row of allocationRows) {

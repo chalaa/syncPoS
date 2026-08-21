@@ -69,6 +69,8 @@ export type PaymentAllocationRow = {
   billNo: string | null;
   expenseId: string | null;
   expenseNo: string | null;
+  customerInvoiceId: string | null;
+  invoiceNo: string | null;
   amountMinor: number;
   currencyCode: string;
 };
@@ -86,3 +88,5 @@ export type VendorBillPaymentSummary = {
   residualAmountMinor: number;
   paymentStatus: "not_paid" | "partial" | "paid";
 };
+
+export type CustomerInvoicePaymentSummary = VendorBillPaymentSummary;

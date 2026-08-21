@@ -6,6 +6,7 @@ import { minorToDisplay } from "@/server/catalog/products";
 import { getDefaultCompany } from "@/server/catalog/products";
 import { db } from "@/server/db/client";
 import {
+  customerInvoices,
   expenses,
   paymentAccounts,
   paymentAllocations,
@@ -22,6 +23,7 @@ import type {
   PaymentMethodOption,
   PaymentMethodRow,
   VendorBillPaymentSummary,
+  CustomerInvoicePaymentSummary,
 } from "@/server/payments/types";
 
 export function displayPaymentMoney(value: number, currencyCode: string) {
@@ -180,6 +182,8 @@ export async function getPaymentList(params: {
   purchaseOrderId?: string;
   vendorBillId?: string;
   expenseId?: string;
+  customerInvoiceId?: string;
+  salesOrderId?: string;
 }): Promise<PaymentListRow[]> {
   const company = await getDefaultCompany();
 
@@ -223,6 +227,28 @@ export async function getPaymentList(params: {
           where expense_pal.payment_id = p.id
             and expense_pal.expense_id = ${params.expenseId ?? null}::uuid
             and expense_pal.deleted_at is null
+        )
+      )
+      and (
+        ${params.customerInvoiceId ?? null}::uuid is null
+        or exists (
+          select 1
+          from payment_allocations invoice_pal
+          where invoice_pal.payment_id = p.id
+            and invoice_pal.customer_invoice_id = ${params.customerInvoiceId ?? null}::uuid
+            and invoice_pal.deleted_at is null
+        )
+      )
+      and (
+        ${params.salesOrderId ?? null}::uuid is null
+        or exists (
+          select 1
+          from payment_allocations so_pal
+          inner join customer_invoices so_ci on so_ci.id = so_pal.customer_invoice_id
+          where so_pal.payment_id = p.id
+            and so_ci.sales_order_id = ${params.salesOrderId ?? null}::uuid
+            and so_pal.deleted_at is null
+            and so_ci.deleted_at is null
         )
       )
       and (
@@ -285,6 +311,8 @@ export async function getPaymentDetail(id: string): Promise<PaymentDetail | null
       billNo: vendorBills.billNo,
       expenseId: paymentAllocations.expenseId,
       expenseNo: expenses.expenseNo,
+      customerInvoiceId: paymentAllocations.customerInvoiceId,
+      invoiceNo: customerInvoices.invoiceNo,
       amountMinor: paymentAllocations.amountMinor,
       currencyCode: payments.currencyCode,
     })
@@ -292,8 +320,9 @@ export async function getPaymentDetail(id: string): Promise<PaymentDetail | null
     .innerJoin(payments, eq(paymentAllocations.paymentId, payments.id))
     .leftJoin(vendorBills, eq(paymentAllocations.vendorBillId, vendorBills.id))
     .leftJoin(expenses, eq(paymentAllocations.expenseId, expenses.id))
+    .leftJoin(customerInvoices, eq(paymentAllocations.customerInvoiceId, customerInvoices.id))
     .where(and(eq(paymentAllocations.paymentId, id), isNull(paymentAllocations.deletedAt)))
-    .orderBy(asc(vendorBills.billNo), asc(expenses.expenseNo));
+    .orderBy(asc(vendorBills.billNo), asc(expenses.expenseNo), asc(customerInvoices.invoiceNo));
 
   return { ...payment, allocations };
 }
@@ -321,6 +350,46 @@ export async function getVendorBillPaymentSummary(vendorBillId: string): Promise
     where vb.id = ${vendorBillId}
       and vb.deleted_at is null
     group by vb.id
+    limit 1
+  `);
+
+  const totalMinor = summary?.totalMinor ?? 0;
+  const postedPaidMinor = summary?.paidMinor ?? 0;
+  const residualAmountMinor = Math.max(totalMinor - postedPaidMinor, 0);
+  const paymentStatus =
+    postedPaidMinor <= 0 ? "not_paid" : residualAmountMinor <= 0 ? "paid" : "partial";
+
+  return {
+    paymentCount: summary?.paymentCount ?? 0,
+    postedPaidMinor,
+    residualAmountMinor,
+    paymentStatus,
+  };
+}
+
+export async function getCustomerInvoicePaymentSummary(customerInvoiceId: string): Promise<CustomerInvoicePaymentSummary> {
+  const [summary] = await db.execute<{
+    totalMinor: number;
+    paidMinor: number;
+    paymentCount: number;
+  }>(sql`
+    select
+      ci.total_minor as "totalMinor",
+      coalesce(sum(pa.amount_minor) filter (
+        where p.status = 'posted'
+          and p.deleted_at is null
+          and pa.deleted_at is null
+      ), 0)::bigint as "paidMinor",
+      count(distinct p.id) filter (
+        where p.deleted_at is null
+          and pa.deleted_at is null
+      )::int as "paymentCount"
+    from customer_invoices ci
+    left join payment_allocations pa on pa.customer_invoice_id = ci.id
+    left join payments p on p.id = pa.payment_id
+    where ci.id = ${customerInvoiceId}
+      and ci.deleted_at is null
+    group by ci.id
     limit 1
   `);
 

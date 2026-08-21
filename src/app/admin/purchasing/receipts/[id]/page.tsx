@@ -40,6 +40,9 @@ export default async function ReceiptDetailPage({ params, searchParams }: Receip
         actions={
           <div className="flex flex-wrap gap-2">
             <ButtonLink href="/admin/purchasing?view=receipts" variant="outline">Back to receipts</ButtonLink>
+            <ButtonLink href={`/admin/purchasing?view=landed-costs&purchaseOrderId=${receipt.purchaseOrderId}`} variant="outline">
+              Landed Costs {receipt.landedCostCount}
+            </ButtonLink>
             <ButtonLink href={`/admin/purchasing/landed-costs/new?receiptId=${receipt.id}`} variant="outline">Add Landed Cost</ButtonLink>
             {receipt.existingVendorBillId ? (
               <ButtonLink href={`/admin/purchasing/vendor-bills/vendor_bill/${receipt.existingVendorBillId}`}>Open Vendor Bill</ButtonLink>
@@ -97,6 +100,7 @@ export default async function ReceiptDetailPage({ params, searchParams }: Receip
                 <th className="px-3 py-2 text-right">Quantity</th>
                 <th className="px-3 py-2">Tracking</th>
                 <th className="px-3 py-2 text-right">Unit Cost</th>
+                <th className="px-3 py-2 text-right">Landed Cost</th>
                 <th className="px-3 py-2 text-right">Total</th>
               </tr>
             </thead>
@@ -110,6 +114,7 @@ export default async function ReceiptDetailPage({ params, searchParams }: Receip
                   <td className="px-3 py-3 text-right">{line.quantityReceived}</td>
                   <td className="px-3 py-3">{line.serialNo ?? line.lotNo ?? "-"}</td>
                   <td className="px-3 py-3 text-right">{displayPurchaseMoney(line.unitCostMinor, line.currencyCode)}</td>
+                  <td className="px-3 py-3 text-right">{displayPurchaseMoney(line.landedUnitCostMinor, line.currencyCode)}</td>
                   <td className="px-3 py-3 text-right">{displayPurchaseMoney(line.lineTotalMinor, line.currencyCode)}</td>
                 </tr>
               ))}

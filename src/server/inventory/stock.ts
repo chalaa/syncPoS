@@ -20,6 +20,7 @@ import {
   inventoryOperationViewOptions,
   type InventoryOperationDetail,
   type InventoryOperationDetailLine,
+  type InventoryOperationFormOptions,
   type InventoryOperationListRow,
   type InventoryOperationView,
   type ProductStockCardRow,
@@ -124,6 +125,44 @@ export async function getInventoryFilterOptions() {
   };
 }
 
+export async function getInventoryOperationFormOptions(): Promise<InventoryOperationFormOptions> {
+  const company = await getDefaultCompany();
+  const [locationRows, productRows] = await Promise.all([
+    db
+      .select({
+        id: locations.id,
+        code: locations.code,
+        name: locations.name,
+      })
+      .from(locations)
+      .where(
+        and(
+          eq(locations.companyId, company.id),
+          inArray(locations.locationType, [...stockLocationTypeOptions]),
+          isNull(locations.deletedAt),
+          eq(locations.isActive, true),
+        ),
+      )
+      .orderBy(asc(locations.name)),
+    db
+      .select({
+        id: products.id,
+        code: products.sku,
+        name: products.name,
+        trackingMode: products.trackingMode,
+      })
+      .from(products)
+      .where(and(eq(products.companyId, company.id), isNull(products.deletedAt), eq(products.isActive, true)))
+      .orderBy(asc(products.name)),
+  ]);
+
+  return {
+    company,
+    locations: locationRows,
+    products: productRows,
+  };
+}
+
 export async function getInventoryOperationList(params: {
   view?: InventoryOperationView;
   query?: string;
@@ -155,6 +194,7 @@ export async function getInventoryOperationList(params: {
       and (${query} = '' or sm.movement_no ilike ${`%${query}%`} or sm.source_no ilike ${`%${query}%`} or sm.notes ilike ${`%${query}%`})
       and (${view} = 'all'
         or (${view} = 'receipts' and sm.movement_type = 'purchase_receipt')
+        or (${view} = 'deliveries' and sm.movement_type in ('sale_delivery', 'sale_issue'))
         or (${view} = 'transfers' and sm.movement_type = 'transfer')
         or (${view} = 'adjustments' and sm.movement_type in ('adjustment', 'stock_count', 'opening_balance'))
         or (${view} = 'scrap' and sm.movement_type = 'scrap')
