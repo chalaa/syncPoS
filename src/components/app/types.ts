@@ -7,12 +7,15 @@ export type AdminMenuKey =
   | "purchasing"
   | "sales"
   | "inventory"
+  | "reports"
   | "operations"
   | "settings";
 
 export type AdminSubMenuItem = {
   label: string;
   href: string;
+  permission?: string;
+  children?: AdminSubMenuItem[];
 };
 
 export type AdminMenuItem = {
@@ -20,5 +23,6 @@ export type AdminMenuItem = {
   label: string;
   href: string;
   icon: LucideIcon;
+  permission?: string;
   submenus: AdminSubMenuItem[];
 };

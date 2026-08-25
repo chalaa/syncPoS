@@ -1,12 +1,13 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { cancelCustomerPayment, postCustomerPayment } from "@/app/admin/sales/actions";
+import { cancelCustomerPayment, postCustomerPayment, updateCustomerPayment } from "@/app/admin/sales/actions";
+import { PaymentFormDialog } from "@/components/app/payment-form-dialog";
 import { Alert } from "@/components/ui/alert";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
-import { requireUser } from "@/server/auth/session";
-import { displayPaymentMoney, getPaymentDetail } from "@/server/payments/payments";
+import { requirePermission } from "@/server/auth/session";
+import { displayPaymentMoney, getActivePaymentAccounts, getPaymentDetail } from "@/server/payments/payments";
 
 export const dynamic = "force-dynamic";
 
@@ -20,9 +21,13 @@ function statusLabel(value: string) {
 }
 
 export default async function CustomerPaymentPage({ params, searchParams }: CustomerPaymentPageProps) {
-  await requireUser();
+  await requirePermission("sales:orders:create");
 
-  const [{ id }, query] = await Promise.all([params, searchParams]);
+  const [{ id }, query, paymentAccounts] = await Promise.all([
+    params,
+    searchParams,
+    getActivePaymentAccounts("inbound"),
+  ]);
   const payment = await getPaymentDetail(id);
 
   if (!payment || payment.paymentType !== "inbound") {
@@ -39,6 +44,23 @@ export default async function CustomerPaymentPage({ params, searchParams }: Cust
         actions={
           <div className="flex flex-wrap gap-2">
             <ButtonLink href="/admin/sales?view=payments" variant="outline">Back to payments</ButtonLink>
+            {payment.status === "draft" ? (
+              <PaymentFormDialog
+                title="Edit Customer Payment"
+                description={`Update draft payment ${payment.paymentNo}.`}
+                triggerLabel="Edit Payment"
+                submitLabel="Save Payment"
+                action={updateCustomerPayment}
+                hiddenFieldName="paymentId"
+                hiddenFieldValue={payment.id}
+                paymentAccounts={paymentAccounts}
+                currencyCode={payment.currencyCode}
+                amountMinor={payment.amountMinor}
+                paymentAccountId={payment.paymentAccountId}
+                reference={payment.reference}
+                notes={payment.notes}
+              />
+            ) : null}
             {payment.status === "draft" ? (
               <form action={postCustomerPayment}>
                 <input type="hidden" name="paymentId" value={payment.id} />

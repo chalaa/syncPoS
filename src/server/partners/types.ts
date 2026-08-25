@@ -42,3 +42,19 @@ export type PartnerFormRecord = {
     country: string;
   };
 };
+
+export type PartnerFinancialSummary = {
+  invoiceCount: number;
+  billCount: number;
+  receivableResidualMinor: number;
+  payableResidualMinor: number;
+  remainingCreditMinor: number;
+  netBalanceMinor: number;
+};
+
+export type PartnerDetailRecord = PartnerFormRecord & {
+  currencyCode: string;
+  paymentTermName: string | null;
+  paymentTermDueDays: number | null;
+  financial: PartnerFinancialSummary;
+};

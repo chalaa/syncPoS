@@ -1,11 +1,11 @@
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
 import { ButtonLink } from "@/components/ui/button";
-import { requireUser } from "@/server/auth/session";
+import { requirePermission } from "@/server/auth/session";
 
 export const dynamic = "force-dynamic";
 
 export default async function OperationsPage() {
-  await requireUser();
+  await requirePermission("company:settings:manage");
 
   return (
     <PageShell>

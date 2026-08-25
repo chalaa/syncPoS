@@ -14,6 +14,7 @@ import {
   productSerials,
   partners,
   products,
+  productPurchaseTaxes,
   purchaseOrderLines,
   purchaseOrders,
   supplierBillPlaceholders,
@@ -68,9 +69,14 @@ export async function getPurchaseFormOptions() {
         id: products.id,
         code: products.sku,
         name: products.name,
+        listPriceMinor: products.listPriceMinor,
+        standardCostMinor: products.standardCostMinor,
+        purchaseTaxIds: sql<string[]>`coalesce(array_agg(${productPurchaseTaxes.taxId}) filter (where ${productPurchaseTaxes.taxId} is not null), '{}')`,
       })
       .from(products)
+      .leftJoin(productPurchaseTaxes, eq(productPurchaseTaxes.productId, products.id))
       .where(and(eq(products.companyId, company.id), isNull(products.deletedAt), eq(products.isActive, true)))
+      .groupBy(products.id)
       .orderBy(asc(products.name)),
     db
       .select({
@@ -178,8 +184,12 @@ export async function getPurchaseReceiptList(purchaseOrderId?: string): Promise<
   return rows;
 }
 
-export async function getPurchaseVendorBillList(purchaseOrderId?: string): Promise<PurchaseVendorBillListRow[]> {
+export async function getPurchaseVendorBillList(
+  params: string | { purchaseOrderId?: string; supplierId?: string } = {},
+): Promise<PurchaseVendorBillListRow[]> {
   const company = await getDefaultCompany();
+  const purchaseOrderId = typeof params === "string" ? params : params.purchaseOrderId;
+  const supplierId = typeof params === "string" ? undefined : params.supplierId;
 
   const rows = await db.execute<PurchaseVendorBillListRow>(sql`
     select
@@ -218,6 +228,7 @@ export async function getPurchaseVendorBillList(purchaseOrderId?: string): Promi
     where vb.company_id = ${company.id}
       and vb.deleted_at is null
       and (${purchaseOrderId ?? null}::uuid is null or vb.purchase_order_id = ${purchaseOrderId ?? null}::uuid)
+      and (${supplierId ?? null}::uuid is null or vb.supplier_id = ${supplierId ?? null}::uuid)
     group by vb.id, po.id, partner.display_name
     union all
     select
@@ -245,6 +256,7 @@ export async function getPurchaseVendorBillList(purchaseOrderId?: string): Promi
     where sbp.company_id = ${company.id}
       and sbp.deleted_at is null
       and (${purchaseOrderId ?? null}::uuid is null or sbp.purchase_order_id = ${purchaseOrderId ?? null}::uuid)
+      and (${supplierId ?? null}::uuid is null or sbp.supplier_id = ${supplierId ?? null}::uuid)
     order by "billDate" desc
   `);
 
@@ -264,6 +276,12 @@ export async function getPurchaseReceiptDetail(id: string): Promise<PurchaseRece
       orderNo: purchaseOrders.orderNo,
       supplierName: partners.displayName,
       supplierInvoiceNo: goodsReceipts.supplierInvoiceNo,
+      sourceLocationCode: sql<string | null>`(
+        select l.code
+        from stock_movements sm
+        left join locations l on l.id = sm.from_location_id
+        where sm.id = ${goodsReceipts.stockMovementId}
+      )`,
       locationCode: locations.code,
       currencyCode: purchaseOrders.currencyCode,
       totalMinor: sql<number>`coalesce(sum(${goodsReceiptLines.lineTotalMinor}), 0)::bigint`,

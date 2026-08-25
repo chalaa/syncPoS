@@ -7,8 +7,17 @@ import {
   updatePurchaseOrder,
 } from "@/app/admin/purchasing/actions";
 import { PurchaseOrderForm } from "@/app/admin/purchasing/purchase-order-form";
+import { ReceiptLinesEditor } from "@/app/admin/purchasing/receipt-lines-editor";
 import { Alert } from "@/components/ui/alert";
 import { Button, ButtonLink } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { Notebook } from "@/components/ui/notebook";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
 import { requirePermission } from "@/server/auth/session";
@@ -28,10 +37,37 @@ type PurchaseOrderDetailPageProps = {
   }>;
 };
 
-const inputClass = "h-9 rounded-md border border-input bg-background px-2 text-sm";
-
 function statusLabel(value: string) {
   return value.replace(/_/g, " ");
+}
+
+function CreateReceiptDialog({
+  order,
+  locations,
+}: {
+  order: NonNullable<Awaited<ReturnType<typeof getPurchaseOrderDetail>>>;
+  locations: Awaited<ReturnType<typeof getPurchaseFormOptions>>["locations"];
+}) {
+  return (
+    <Dialog>
+      <DialogTrigger asChild>
+        <Button>Create Receipt</Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-5xl">
+        <DialogHeader>
+          <DialogTitle>Create Receipt</DialogTitle>
+          <DialogDescription>Receive products against {order.orderNo}.</DialogDescription>
+        </DialogHeader>
+        <ReceiptLinesEditor
+          action={postGoodsReceipt}
+          purchaseOrderId={order.id}
+          defaultLocationId={order.deliverToLocationId}
+          locations={locations}
+          lines={order.lines}
+        />
+      </DialogContent>
+    </Dialog>
+  );
 }
 
 export default async function PurchaseOrderDetailPage({ params, searchParams }: PurchaseOrderDetailPageProps) {
@@ -91,6 +127,9 @@ export default async function PurchaseOrderDetailPage({ params, searchParams }: 
               <input type="hidden" name="returnPath" value={`/admin/purchasing/${order.id}`} />
               <Button>Confirm Order</Button>
             </form>
+          ) : null}
+          {canReceive ? (
+            <CreateReceiptDialog order={order} locations={options.locations} />
           ) : null}
           {!isDraft ? (
             <form action={createVendorBillFromPurchaseOrder}>
@@ -183,91 +222,6 @@ export default async function PurchaseOrderDetailPage({ params, searchParams }: 
           />
         </section>
       )}
-
-      {canReceive ? (
-        <section className="mt-5 rounded-lg border border-border bg-card p-5">
-          <h2 className="mb-4 text-lg font-semibold">Receive Products</h2>
-          <form action={postGoodsReceipt} className="grid gap-4">
-            <input type="hidden" name="purchaseOrderId" value={order.id} />
-            <div className="grid gap-4 md:grid-cols-2">
-              <label className="flex flex-col gap-1 text-sm font-medium">
-                Receive To
-                <select name="locationId" required defaultValue={order.deliverToLocationId ?? ""} className={inputClass}>
-                  <option value="">Select location</option>
-                  {options.locations.map((location) => (
-                    <option key={location.id} value={location.id}>
-                      {location.code} / {location.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="flex flex-col gap-1 text-sm font-medium">
-                Supplier Invoice
-                <input name="supplierInvoiceNo" className={inputClass} />
-              </label>
-            </div>
-
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[980px] text-left text-sm">
-                <thead className="text-xs uppercase text-muted-foreground">
-                  <tr className="border-b border-border">
-                    <th className="px-2 py-2">Product</th>
-                    <th className="px-2 py-2 text-right">Remaining</th>
-                    <th className="w-32 px-2 py-2 text-right">Receive</th>
-                    <th className="w-44 px-2 py-2">Serial Number</th>
-                    <th className="w-44 px-2 py-2">Lot Number</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {order.lines.map((line) => {
-                    const remaining = Math.max(Number(line.quantityOrdered) - Number(line.quantityReceived), 0);
-
-                    return (
-                      <tr key={line.id} className="border-b border-border/70">
-                        <td className="px-2 py-3">
-                          <input type="hidden" name="purchaseOrderLineId" value={line.id} />
-                          <div className="font-medium">{line.productName}</div>
-                          <div className="text-xs text-muted-foreground">{line.sku} / {line.trackingMode}</div>
-                        </td>
-                        <td className="px-2 py-3 text-right">{remaining}</td>
-                        <td className="px-2 py-3">
-                          <input
-                            name="receiveQuantity"
-                            type="number"
-                            min="0"
-                            max={remaining}
-                            step="0.000001"
-                            defaultValue={remaining}
-                            className={`${inputClass} w-full text-right`}
-                          />
-                        </td>
-                        <td className="px-2 py-3">
-                          <input
-                            name="serialNo"
-                            disabled={line.trackingMode !== "serial"}
-                            className={`${inputClass} w-full disabled:bg-muted disabled:text-muted-foreground`}
-                          />
-                        </td>
-                        <td className="px-2 py-3">
-                          <input
-                            name="lotNo"
-                            disabled={line.trackingMode !== "lot"}
-                            className={`${inputClass} w-full disabled:bg-muted disabled:text-muted-foreground`}
-                          />
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-
-            <div className="flex justify-end">
-              <Button>Post Receipt</Button>
-            </div>
-          </form>
-        </section>
-      ) : null}
 
     </PageShell>
   );

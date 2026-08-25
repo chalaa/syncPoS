@@ -14,7 +14,11 @@
     "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio",
     "db:seed": "tsx scripts/seed.ts",
-    "db:reset": "docker compose down -v && docker compose up -d postgres && drizzle-kit migrate"
+    "db:reset": "docker compose down -v && docker compose up -d postgres && drizzle-kit migrate",
+    "test:e2e:logic": "tsx scripts/e2e-logic-smoke.ts",
+    "test:e2e:sales": "tsx scripts/e2e-sales-flow.ts",
+    "test:e2e:purchase": "tsx scripts/e2e-purchase-flow.ts",
+    "test:e2e:ui": "node scripts/e2e-ui-navigation.mjs"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.23",

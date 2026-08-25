@@ -108,13 +108,31 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
                   <InfoRow label="Status" value={product.isActive ? "Active" : "Inactive"} />
                 </section>
                 <section className="grid gap-3 text-sm">
-                  <InfoRow label="Cost" value={`${product.currencyCode} ${minorToDisplay(product.standardCostMinor)}`} />
-                  <InfoRow label="Sales Price" value={`${product.currencyCode} ${minorToDisplay(product.listPriceMinor)}`} />
                   <InfoRow label="Tracking" value={trackingLabel(product.trackingMode)} />
                   <InfoRow label="Model" value={product.model ?? "-"} />
                   <InfoRow label="Description" value={product.description ?? "-"} />
                 </section>
               </div>
+            ),
+          },
+          {
+            value: "sales",
+            label: "Sales",
+            content: (
+              <section className="grid gap-3 text-sm md:grid-cols-2">
+                <InfoRow label="Sales Unit Price" value={`${product.currencyCode} ${minorToDisplay(product.listPriceMinor)}`} />
+                <InfoRow label="Customer Taxes" value={product.saleTaxNames || "-"} />
+              </section>
+            ),
+          },
+          {
+            value: "purchase",
+            label: "Purchase",
+            content: (
+              <section className="grid gap-3 text-sm md:grid-cols-2">
+                <InfoRow label="Purchase Unit Cost" value={`${product.currencyCode} ${minorToDisplay(product.standardCostMinor)}`} />
+                <InfoRow label="Vendor Taxes" value={product.purchaseTaxNames || "-"} />
+              </section>
             ),
           },
           {

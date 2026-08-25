@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 
 import { cancelVendorBill, postVendorBill } from "@/app/admin/purchasing/actions";
 import { registerSupplierPayment } from "@/app/admin/purchasing/payments/actions";
+import { PaymentFormDialog } from "@/components/app/payment-form-dialog";
 import { Alert } from "@/components/ui/alert";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
@@ -25,10 +26,6 @@ type VendorBillDetailPageProps = {
 
 function statusLabel(value: string) {
   return value.replace(/_/g, " ");
-}
-
-function minorToInputValue(value: number) {
-  return (value / 100).toFixed(2);
 }
 
 export default async function VendorBillDetailPage({ params, searchParams }: VendorBillDetailPageProps) {
@@ -62,6 +59,20 @@ export default async function VendorBillDetailPage({ params, searchParams }: Ven
               <ButtonLink href={`/admin/purchasing?view=payments&vendorBillId=${bill.id}`} variant="outline">
                 Payments {bill.paymentCount}
               </ButtonLink>
+            ) : null}
+            {bill.source === "vendor_bill" && bill.status === "posted" && bill.residualAmountMinor > 0 ? (
+              <PaymentFormDialog
+                title="Register Supplier Payment"
+                description={`Create a draft outbound payment for ${bill.billNo}.`}
+                triggerLabel="Register Payment"
+                submitLabel="Register Draft Payment"
+                action={registerSupplierPayment}
+                hiddenFieldName="vendorBillId"
+                hiddenFieldValue={bill.id}
+                paymentAccounts={outboundAccounts}
+                currencyCode={bill.currencyCode}
+                amountMinor={bill.residualAmountMinor}
+              />
             ) : null}
             {bill.source === "vendor_bill" && bill.status === "draft" ? (
               <form action={postVendorBill}>
@@ -190,50 +201,6 @@ export default async function VendorBillDetailPage({ params, searchParams }: Ven
         )}
       </section>
 
-      {bill.source === "vendor_bill" && bill.status === "posted" && bill.residualAmountMinor > 0 ? (
-        <section className="mt-5 rounded-lg border border-border bg-card p-5">
-          <h2 className="mb-4 text-lg font-semibold">Register Supplier Payment</h2>
-          <form action={registerSupplierPayment} className="grid gap-4">
-            <input type="hidden" name="vendorBillId" value={bill.id} />
-            <div className="grid gap-4 md:grid-cols-4">
-              <label className="flex flex-col gap-1 text-sm font-medium">
-                Payment Account
-                <select name="paymentAccountId" required className="h-10 rounded-md border border-input bg-background px-3 text-sm">
-                  <option value="">Select account</option>
-                  {outboundAccounts.map((account) => (
-                    <option key={account.id} value={account.id}>
-                      {account.code} / {account.name} / {account.currencyCode}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="flex flex-col gap-1 text-sm font-medium">
-                Amount
-                <input
-                  name="amount"
-                  type="number"
-                  min="0.01"
-                  step="0.01"
-                  required
-                  defaultValue={minorToInputValue(bill.residualAmountMinor)}
-                  className="h-10 rounded-md border border-input bg-background px-3 text-sm"
-                />
-              </label>
-              <label className="flex flex-col gap-1 text-sm font-medium">
-                Reference
-                <input name="reference" className="h-10 rounded-md border border-input bg-background px-3 text-sm" />
-              </label>
-              <label className="flex flex-col gap-1 text-sm font-medium">
-                Notes
-                <input name="notes" className="h-10 rounded-md border border-input bg-background px-3 text-sm" />
-              </label>
-            </div>
-            <div className="flex justify-end">
-              <Button>Register Draft Payment</Button>
-            </div>
-          </form>
-        </section>
-      ) : null}
     </PageShell>
   );
 }

@@ -28,6 +28,10 @@ const registerSupplierPaymentSchema = z.object({
   notes: z.string().trim().optional(),
 });
 
+const updateSupplierPaymentSchema = registerSupplierPaymentSchema.omit({ vendorBillId: true }).extend({
+  paymentId: z.string().uuid(),
+});
+
 const paymentStatusSchema = z.object({
   paymentId: z.string().uuid(),
 });
@@ -327,6 +331,175 @@ export async function postSupplierPayment(formData: FormData) {
     revalidatePath(`/admin/purchasing/vendor-bills/vendor_bill/${vendorBillId}`);
   }
   redirect(`/admin/purchasing/payments/${parsed.data.paymentId}?notice=${encodeURIComponent("Supplier payment posted")}`);
+}
+
+export async function updateSupplierPayment(formData: FormData) {
+  const user = await requirePermission("inventory.receive");
+  const parsed = updateSupplierPaymentSchema.safeParse({
+    paymentId: formValue(formData, "paymentId"),
+    paymentAccountId: formValue(formData, "paymentAccountId"),
+    amount: formValue(formData, "amount"),
+    reference: formValue(formData, "reference"),
+    notes: formValue(formData, "notes"),
+  });
+
+  if (!parsed.success) {
+    redirectWithError("/admin/purchasing?view=payments", parsed.error.issues[0]?.message ?? "Invalid supplier payment.");
+  }
+
+  const amountMinor = majorToMinor(parsed.data.amount);
+  if (amountMinor <= 0) {
+    redirectWithError(`/admin/purchasing/payments/${parsed.data.paymentId}`, "Payment amount must be greater than zero.");
+  }
+
+  const company = await getDefaultCompany();
+  let vendorBillId: string | undefined;
+
+  try {
+    await db.transaction(async (tx) => {
+      const [payment] = await tx
+        .select({
+          id: payments.id,
+          paymentNo: payments.paymentNo,
+          status: payments.status,
+          paymentType: payments.paymentType,
+        })
+        .from(payments)
+        .where(and(eq(payments.id, parsed.data.paymentId), eq(payments.companyId, company.id), isNull(payments.deletedAt)))
+        .limit(1);
+
+      if (!payment) {
+        throw new Error("Payment does not exist.");
+      }
+
+      if (payment.status !== "draft") {
+        throw new Error("Only draft payments can be edited.");
+      }
+
+      if (payment.paymentType !== "outbound") {
+        throw new Error("Only outbound supplier payments can be edited here.");
+      }
+
+      const [allocation] = await tx
+        .select({ id: paymentAllocations.id, vendorBillId: paymentAllocations.vendorBillId })
+        .from(paymentAllocations)
+        .where(and(eq(paymentAllocations.paymentId, payment.id), isNull(paymentAllocations.deletedAt)))
+        .limit(1);
+
+      if (!allocation?.vendorBillId) {
+        throw new Error("Supplier payment allocation is missing.");
+      }
+      vendorBillId = allocation.vendorBillId;
+
+      const [bill] = await tx
+        .select({
+          id: vendorBills.id,
+          status: vendorBills.status,
+          totalMinor: vendorBills.totalMinor,
+          currencyCode: vendorBills.currencyCode,
+        })
+        .from(vendorBills)
+        .where(and(eq(vendorBills.id, allocation.vendorBillId), eq(vendorBills.companyId, company.id), isNull(vendorBills.deletedAt)))
+        .limit(1);
+
+      if (!bill || bill.status !== "posted") {
+        throw new Error("Vendor bill must be posted before editing payment.");
+      }
+
+      const [account] = await tx
+        .select({
+          id: paymentAccounts.id,
+          currencyCode: paymentAccounts.currencyCode,
+          methodId: paymentMethods.id,
+          requiresReference: paymentMethods.requiresReference,
+          allowOutbound: paymentMethods.allowOutbound,
+        })
+        .from(paymentAccounts)
+        .innerJoin(paymentMethods, eq(paymentAccounts.paymentMethodId, paymentMethods.id))
+        .where(
+          and(
+            eq(paymentAccounts.id, parsed.data.paymentAccountId),
+            eq(paymentAccounts.companyId, company.id),
+            eq(paymentAccounts.isActive, true),
+            eq(paymentMethods.isActive, true),
+            isNull(paymentAccounts.deletedAt),
+            isNull(paymentMethods.deletedAt),
+          ),
+        )
+        .limit(1);
+
+      if (!account || !account.allowOutbound) {
+        throw new Error("Select an active outbound payment account.");
+      }
+
+      if (account.currencyCode !== bill.currencyCode) {
+        throw new Error("Payment account currency must match the vendor bill.");
+      }
+
+      if (account.requiresReference && !parsed.data.reference) {
+        throw new Error("This payment method requires a reference.");
+      }
+
+      const [summary] = await tx.execute<{ residualAmountMinor: number }>(sql`
+        select greatest(
+          ${bill.totalMinor} - coalesce(sum(pa.amount_minor) filter (
+            where p.status = 'posted'
+              and p.deleted_at is null
+              and pa.deleted_at is null
+          ), 0),
+          0
+        )::bigint as "residualAmountMinor"
+        from vendor_bills vb
+        left join payment_allocations pa on pa.vendor_bill_id = vb.id
+        left join payments p on p.id = pa.payment_id
+        where vb.id = ${bill.id}
+        group by vb.id
+      `);
+
+      if (amountMinor > (summary?.residualAmountMinor ?? 0)) {
+        throw new Error("Payment amount cannot exceed the vendor bill residual.");
+      }
+
+      await tx
+        .update(payments)
+        .set({
+          paymentMethodId: account.methodId,
+          paymentAccountId: account.id,
+          amountMinor,
+          reference: parsed.data.reference || null,
+          notes: parsed.data.notes || null,
+          updatedAt: sql`now()`,
+        })
+        .where(eq(payments.id, payment.id));
+
+      await tx
+        .update(paymentAllocations)
+        .set({
+          amountMinor,
+          updatedAt: sql`now()`,
+        })
+        .where(eq(paymentAllocations.id, allocation.id));
+
+      await tx.insert(auditLogs).values({
+        companyId: company.id,
+        actorUserId: user.id,
+        action: "supplier_payment.update",
+        entityType: "payment",
+        entityId: payment.id,
+        severity: "info",
+        metadata: { paymentNo: payment.paymentNo, vendorBillId },
+      });
+    });
+  } catch (error) {
+    redirectWithError(`/admin/purchasing/payments/${parsed.data.paymentId}`, error instanceof Error ? error.message : "Could not update supplier payment.");
+  }
+
+  revalidatePath("/admin/purchasing");
+  revalidatePath(`/admin/purchasing/payments/${parsed.data.paymentId}`);
+  if (vendorBillId) {
+    revalidatePath(`/admin/purchasing/vendor-bills/vendor_bill/${vendorBillId}`);
+  }
+  redirect(`/admin/purchasing/payments/${parsed.data.paymentId}?notice=${encodeURIComponent("Supplier payment updated")}`);
 }
 
 export async function cancelSupplierPayment(formData: FormData) {

@@ -2,6 +2,10 @@ export type PurchaseFormOption = {
   id: string;
   code: string;
   name: string;
+  listPriceMinor?: number;
+  standardCostMinor?: number;
+  saleTaxIds?: string[];
+  purchaseTaxIds?: string[];
 };
 
 export type PurchaseTaxOption = PurchaseFormOption & {
@@ -125,6 +129,7 @@ export type PurchaseReceiptDetail = PurchaseOrderReceiptDocument & {
   orderNo: string;
   supplierName: string;
   supplierInvoiceNo: string | null;
+  sourceLocationCode: string | null;
   existingVendorBillId: string | null;
   landedCostCount: number;
   currencyCode: string;

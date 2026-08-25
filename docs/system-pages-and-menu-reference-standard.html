@@ -1,0 +1,473 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>syncPoS System Pages and Menu Reference</title>
+  <style>
+    @page {
+      size: A4;
+      margin: 18mm 16mm;
+    }
+
+    body {
+      color: #172026;
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 10.5pt;
+      line-height: 1.48;
+      margin: 0;
+    }
+
+    .cover {
+      border-bottom: 4px solid #0f766e;
+      margin-bottom: 28px;
+      padding: 46px 0 34px;
+    }
+
+    .eyebrow {
+      color: #0f766e;
+      font-size: 9pt;
+      font-weight: 700;
+      letter-spacing: 1.4px;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      color: #111827;
+      font-size: 28pt;
+      line-height: 1.1;
+      margin: 10px 0 12px;
+    }
+
+    .subtitle {
+      color: #4b5563;
+      font-size: 12pt;
+      max-width: 680px;
+    }
+
+    .meta {
+      color: #4b5563;
+      font-size: 9.5pt;
+      margin-top: 24px;
+    }
+
+    h2 {
+      border-bottom: 1px solid #cbd5e1;
+      color: #0f172a;
+      font-size: 17pt;
+      margin: 30px 0 12px;
+      padding-bottom: 6px;
+    }
+
+    h3 {
+      color: #0f766e;
+      font-size: 12.5pt;
+      margin: 18px 0 8px;
+    }
+
+    p {
+      margin: 7px 0;
+    }
+
+    .note {
+      background: #f8fafc;
+      border-left: 4px solid #0f766e;
+      margin: 12px 0 18px;
+      padding: 10px 12px;
+    }
+
+    table {
+      border-collapse: collapse;
+      margin: 10px 0 18px;
+      width: 100%;
+    }
+
+    th {
+      background: #e2e8f0;
+      color: #0f172a;
+      font-weight: 700;
+      text-align: left;
+    }
+
+    th,
+    td {
+      border: 1px solid #cbd5e1;
+      padding: 7px 8px;
+      vertical-align: top;
+    }
+
+    tr:nth-child(even) td {
+      background: #f8fafc;
+    }
+
+    code {
+      background: #f1f5f9;
+      border: 1px solid #e2e8f0;
+      border-radius: 3px;
+      color: #0f172a;
+      font-family: Consolas, "Liberation Mono", monospace;
+      font-size: 9pt;
+      padding: 1px 4px;
+    }
+
+    ul {
+      margin: 8px 0 16px 20px;
+      padding: 0;
+    }
+
+    li {
+      margin: 5px 0;
+    }
+
+    .page-break {
+      break-before: page;
+      page-break-before: always;
+    }
+  </style>
+</head>
+<body>
+  <section class="cover">
+    <div class="eyebrow">syncPoS Documentation</div>
+    <h1>System Pages and Menu Reference</h1>
+    <p class="subtitle">
+      Standard reference for the visible pages, admin menus, submenus, routes, business purpose, and access permissions currently implemented in syncPoS.
+    </p>
+    <p class="meta">Prepared for user acceptance testing and system administration.</p>
+  </section>
+
+  <h2>1. Access Model</h2>
+  <p>
+    The admin interface uses role-based permissions. A user sees only the modules and submenus allowed by assigned role permissions. Important protected pages and server actions also check permissions on the server.
+  </p>
+  <table>
+    <thead><tr><th>Permission</th><th>Purpose</th></tr></thead>
+    <tbody>
+      <tr><td><code>all:all:all</code></td><td>Full access to every module.</td></tr>
+      <tr><td><code>catalog:products:view</code></td><td>View product catalog pages.</td></tr>
+      <tr><td><code>catalog:products:manage</code></td><td>Create, update, delete, and restore product catalog records.</td></tr>
+      <tr><td><code>partners:partners:view</code></td><td>View customers, suppliers, and payment terms.</td></tr>
+      <tr><td><code>partners:partners:manage</code></td><td>Create, update, delete, and restore partner records.</td></tr>
+      <tr><td><code>inventory:stock:view</code></td><td>View inventory, stock cards, serial history, transfers, and operations.</td></tr>
+      <tr><td><code>inventory:stock:receive</code></td><td>Post stock operations, purchases, receipts, adjustments, opening stock, and returns.</td></tr>
+      <tr><td><code>inventory:locations:manage</code></td><td>Manage warehouse and shop locations.</td></tr>
+      <tr><td><code>sales:orders:create</code></td><td>Access sales order, delivery, invoice, payment, and return flows.</td></tr>
+      <tr><td><code>reports:profit:view</code></td><td>View dashboard and detailed reports.</td></tr>
+      <tr><td><code>company:settings:manage</code></td><td>Manage payment configuration, expenses, and company-level operational settings.</td></tr>
+      <tr><td><code>iam:users:view</code></td><td>View users.</td></tr>
+      <tr><td><code>iam:users:manage</code></td><td>Create, edit, disable, and unlock users.</td></tr>
+      <tr><td><code>iam:roles:view</code></td><td>View roles and permissions.</td></tr>
+      <tr><td><code>iam:roles:manage</code></td><td>Create, edit, and delete roles.</td></tr>
+    </tbody>
+  </table>
+
+  <h2>2. Public and Auth Pages</h2>
+  <table>
+    <thead><tr><th>Page</th><th>Route</th><th>Purpose</th></tr></thead>
+    <tbody>
+      <tr><td>Landing page</td><td><code>/</code></td><td>Public professional landing page for syncPoS.</td></tr>
+      <tr><td>Login</td><td><code>/login</code></td><td>User sign-in page with failed login tracking and temporary lockout.</td></tr>
+      <tr><td>Unauthorized</td><td><code>/unauthorized</code></td><td>Access denied page shown when a signed-in user lacks permission.</td></tr>
+    </tbody>
+  </table>
+
+  <h2>3. Admin Shell</h2>
+  <table>
+    <thead><tr><th>Area</th><th>Purpose</th></tr></thead>
+    <tbody>
+      <tr><td>Left sidebar</td><td>Main module navigation. Items are hidden when the user lacks permission.</td></tr>
+      <tr><td>Top submenu</td><td>Shows submenus for the active module, similar to Odoo. Submenus are permission-filtered.</td></tr>
+      <tr><td>Sign out area</td><td>Shows sync status, current username, and the sign out button.</td></tr>
+    </tbody>
+  </table>
+
+  <h2>4. Dashboard</h2>
+  <p><strong>Required permission:</strong> <code>reports:profit:view</code></p>
+  <table>
+    <thead><tr><th>Menu</th><th>Route</th><th>Purpose</th></tr></thead>
+    <tbody>
+      <tr><td>Overview</td><td><code>/admin</code></td><td>Main operations dashboard with sales, payments, expenses, receivables, payables, stock value, low stock, payment accounts, and recent activity.</td></tr>
+      <tr><td>Daily Activity</td><td><code>/admin?view=daily</code></td><td>Reserved dashboard view for daily operational activity.</td></tr>
+      <tr><td>Sync Status</td><td><code>/admin?view=sync</code></td><td>Reserved dashboard view for sync/offline status.</td></tr>
+    </tbody>
+  </table>
+
+  <h2>5. Products</h2>
+  <p><strong>View permission:</strong> <code>catalog:products:view</code>. <strong>Manage permission:</strong> <code>catalog:products:manage</code>.</p>
+  <table>
+    <thead><tr><th>Page/Menu</th><th>Route</th><th>Purpose</th></tr></thead>
+    <tbody>
+      <tr><td>Products</td><td><code>/admin/products</code></td><td>Product list with filters and product detail access.</td></tr>
+      <tr><td>New Product</td><td><code>/admin/products/new</code></td><td>Create product with Odoo-like tabs for catalog data, pricing, tracking, attributes, compatibility, and taxes.</td></tr>
+      <tr><td>Product Detail</td><td><code>/admin/products/[id]</code></td><td>View product detail, stock/tracking context, and related information.</td></tr>
+      <tr><td>Edit Product</td><td><code>/admin/products/[id]/edit</code></td><td>Edit the same product form used for create.</td></tr>
+      <tr><td>Categories</td><td><code>/admin/products/categories</code></td><td>Manage product categories in popup forms.</td></tr>
+      <tr><td>Brands</td><td><code>/admin/products/brands</code></td><td>Manage product brands in popup forms.</td></tr>
+      <tr><td>Units</td><td><code>/admin/products/units</code></td><td>Manage units of measure in popup forms.</td></tr>
+      <tr><td>Taxes</td><td><code>/admin/products/taxes</code></td><td>Configure reusable taxes for purchase and sales lines.</td></tr>
+      <tr><td>Price Lists</td><td><code>/admin/products/price-lists</code></td><td>View and manage price lists and product prices.</td></tr>
+      <tr><td>Lots / Serials</td><td><code>/admin/products/tracking</code></td><td>View serial/lot tracking information for tracked products.</td></tr>
+    </tbody>
+  </table>
+
+  <h2>6. Partners</h2>
+  <p><strong>View permission:</strong> <code>partners:partners:view</code>. <strong>Manage permission:</strong> <code>partners:partners:manage</code>.</p>
+  <table>
+    <thead><tr><th>Page/Menu</th><th>Route</th><th>Purpose</th></tr></thead>
+    <tbody>
+      <tr><td>All Partners</td><td><code>/admin/partners</code></td><td>Partner list for customers, suppliers, or both.</td></tr>
+      <tr><td>Customers</td><td><code>/admin/partners?role=customer</code></td><td>Customer-filtered partner list.</td></tr>
+      <tr><td>Suppliers</td><td><code>/admin/partners?role=supplier</code></td><td>Supplier-filtered partner list.</td></tr>
+      <tr><td>New Partner</td><td><code>/admin/partners/new</code></td><td>Create customer/supplier partner.</td></tr>
+      <tr><td>Edit Partner</td><td><code>/admin/partners/[id]/edit</code></td><td>Edit partner profile, contact, address, and customer/supplier flags.</td></tr>
+      <tr><td>Payment Terms</td><td><code>/admin/partners/payment-terms</code></td><td>Manage text-based payment term records.</td></tr>
+    </tbody>
+  </table>
+
+  <h2>7. Purchasing</h2>
+  <p><strong>Required permission:</strong> <code>inventory:stock:receive</code></p>
+  <table>
+    <thead><tr><th>Page/Menu</th><th>Route</th><th>Purpose</th></tr></thead>
+    <tbody>
+      <tr><td>RFQs / Orders</td><td><code>/admin/purchasing</code></td><td>Purchase order list with status and related document counts.</td></tr>
+      <tr><td>New RFQ</td><td><code>/admin/purchasing/new</code></td><td>Create purchase order with notebook order lines and many taxes per line.</td></tr>
+      <tr><td>Purchase Detail</td><td><code>/admin/purchasing/[id]</code></td><td>Edit draft orders, confirm orders, receive products, and use smart buttons for related documents.</td></tr>
+      <tr><td>Receipts</td><td><code>/admin/purchasing?view=receipts</code></td><td>List purchase receipts separately from purchase orders.</td></tr>
+      <tr><td>Receipt Detail</td><td><code>/admin/purchasing/receipts/[id]</code></td><td>View/post receipt details and assign serial or lot during receipt.</td></tr>
+      <tr><td>Landed Costs</td><td><code>/admin/purchasing?view=landed-costs</code></td><td>List landed cost documents.</td></tr>
+      <tr><td>New Landed Cost</td><td><code>/admin/purchasing/landed-costs/new</code></td><td>Create landed cost linked to receipt or purchase order.</td></tr>
+      <tr><td>Landed Cost Detail</td><td><code>/admin/purchasing/landed-costs/[id]</code></td><td>View allocation preview and posted landed cost result.</td></tr>
+      <tr><td>Vendor Bills</td><td><code>/admin/purchasing?view=supplier-bills</code></td><td>List vendor bills with products, taxes, totals, residual amount, and payment status.</td></tr>
+      <tr><td>Vendor Bill Detail</td><td><code>/admin/purchasing/vendor-bills/[source]/[id]</code></td><td>View vendor bill details and register supplier payment.</td></tr>
+      <tr><td>Payments</td><td><code>/admin/purchasing?view=payments</code></td><td>List outbound supplier payments.</td></tr>
+      <tr><td>Supplier Payment Detail</td><td><code>/admin/purchasing/payments/[id]</code></td><td>View, post, or cancel supplier payment document.</td></tr>
+      <tr><td>Returns</td><td><code>/admin/purchasing?view=returns</code></td><td>List supplier return documents.</td></tr>
+      <tr><td>New Supplier Return</td><td><code>/admin/purchasing/returns/new</code></td><td>Start supplier return from a posted purchase receipt.</td></tr>
+      <tr><td>Supplier Return Detail</td><td><code>/admin/purchasing/returns/[id]</code></td><td>View/post supplier return document.</td></tr>
+    </tbody>
+  </table>
+
+  <h2>8. Sales</h2>
+  <p><strong>Required permission:</strong> <code>sales:orders:create</code></p>
+  <table>
+    <thead><tr><th>Page/Menu</th><th>Route</th><th>Purpose</th></tr></thead>
+    <tbody>
+      <tr><td>Quotations / Orders</td><td><code>/admin/sales</code></td><td>Sales quotation/order list with customer, status, delivery/invoice/payment progress, products, and totals.</td></tr>
+      <tr><td>New Quotation</td><td><code>/admin/sales/new</code></td><td>Create sales quotation with shared Odoo-like order form and notebook lines.</td></tr>
+      <tr><td>Sales Order Detail</td><td><code>/admin/sales/[id]</code></td><td>Edit draft quotation, confirm quotation, create delivery, create invoice, and use smart buttons.</td></tr>
+      <tr><td>Deliveries</td><td><code>/admin/sales?view=deliveries</code></td><td>List customer delivery documents.</td></tr>
+      <tr><td>Delivery Detail</td><td><code>/admin/sales/deliveries/[id]</code></td><td>View/post/cancel delivery. Delivery reduces stock and updates serial status.</td></tr>
+      <tr><td>Invoices</td><td><code>/admin/sales?view=invoices</code></td><td>List customer invoices with residual and payment status.</td></tr>
+      <tr><td>Customer Invoice Detail</td><td><code>/admin/sales/invoices/[id]</code></td><td>View/post invoice and register inbound customer payment.</td></tr>
+      <tr><td>Payments</td><td><code>/admin/sales?view=payments</code></td><td>List inbound customer payments.</td></tr>
+      <tr><td>Customer Payment Detail</td><td><code>/admin/sales/payments/[id]</code></td><td>View/post/cancel customer payment document.</td></tr>
+      <tr><td>Returns</td><td><code>/admin/sales?view=returns</code></td><td>List customer returns.</td></tr>
+      <tr><td>New Customer Return</td><td><code>/admin/sales/returns/new</code></td><td>Start customer return from original sales order.</td></tr>
+      <tr><td>Customer Return Detail</td><td><code>/admin/sales/returns/[id]</code></td><td>View/post customer return and refund placeholder data.</td></tr>
+    </tbody>
+  </table>
+
+  <h2>9. Inventory</h2>
+  <p><strong>View permission:</strong> <code>inventory:stock:view</code>. <strong>Posting permission:</strong> <code>inventory:stock:receive</code>. <strong>Location permission:</strong> <code>inventory:locations:manage</code>.</p>
+  <table>
+    <thead><tr><th>Page/Menu</th><th>Route</th><th>Purpose</th></tr></thead>
+    <tbody>
+      <tr><td>Stock</td><td><code>/admin/inventory</code></td><td>Stock by location summary with product, location, quantity, serial/lot, and cost context.</td></tr>
+      <tr><td>Operations</td><td><code>/admin/inventory/operations</code></td><td>Inventory operation list covering receipts, deliveries, adjustments, scrap, and returns.</td></tr>
+      <tr><td>New Operation</td><td><code>/admin/inventory/operations/new</code></td><td>Create document-based inventory operation.</td></tr>
+      <tr><td>Operation Detail</td><td><code>/admin/inventory/operations/[id]</code></td><td>View/post inventory operation and movement lines.</td></tr>
+      <tr><td>Transfers</td><td><code>/admin/inventory/transfers</code></td><td>Transfer list for moving stock between locations.</td></tr>
+      <tr><td>New Transfer</td><td><code>/admin/inventory/transfers/new</code></td><td>Create transfer with source, transit, and destination locations.</td></tr>
+      <tr><td>Transfer Detail</td><td><code>/admin/inventory/transfers/[id]</code></td><td>Approve, dispatch, receive, and handle transfer discrepancies.</td></tr>
+      <tr><td>Stock Card</td><td><code>/admin/inventory/stock-card</code></td><td>Product ledger report showing stock movement history.</td></tr>
+      <tr><td>Serial History</td><td><code>/admin/inventory/serial-history</code></td><td>Serial/lot history and current status/location.</td></tr>
+      <tr><td>Locations</td><td><code>/admin/inventory/locations</code></td><td>Manage warehouses, shops, transit, supplier, customer, and scrap locations.</td></tr>
+      <tr><td>Opening Stock</td><td><code>/admin/inventory/opening-stock</code></td><td>Opening stock import with validation preview and audit trail.</td></tr>
+    </tbody>
+  </table>
+
+  <h2>10. Reports</h2>
+  <p><strong>Required permission:</strong> <code>reports:profit:view</code></p>
+  <table>
+    <thead><tr><th>Page/Menu</th><th>Route</th><th>Purpose</th></tr></thead>
+    <tbody>
+      <tr><td>Report Hub</td><td><code>/admin/reports</code></td><td>Central page for detailed report links.</td></tr>
+      <tr><td>Sales</td><td><code>/admin/reports/sales</code></td><td>Sales report by date, customer, document, and totals.</td></tr>
+      <tr><td>Expenses</td><td><code>/admin/reports/expenses</code></td><td>Expense report by category, date, payment account, and status.</td></tr>
+      <tr><td>Payment Accounts</td><td><code>/admin/reports/payment-accounts</code></td><td>Bank/cash/mobile/card transaction summary and account movement detail.</td></tr>
+      <tr><td>Stock</td><td><code>/admin/reports/stock</code></td><td>Stock valuation and stock availability report.</td></tr>
+      <tr><td>Receivables</td><td><code>/admin/reports/receivables</code></td><td>Customer invoice residual balances and payment status.</td></tr>
+      <tr><td>Payables</td><td><code>/admin/reports/payables</code></td><td>Vendor bill residual balances and payment status.</td></tr>
+    </tbody>
+  </table>
+
+  <h2>11. Settings</h2>
+  <p>Settings menus are permission-filtered. Users and Roles separate viewing from management.</p>
+  <table>
+    <thead><tr><th>Page/Menu</th><th>Route</th><th>Purpose</th><th>Permission</th></tr></thead>
+    <tbody>
+      <tr><td>Users</td><td><code>/admin/settings?view=users</code></td><td>View users, employee links, roles, login status, failed attempts, lock state, and last login.</td><td><code>iam:users:view</code></td></tr>
+      <tr><td>New/Edit User</td><td>Popup on Users page</td><td>Create/update username, email, employee link, password, status, email verified flag, and roles.</td><td><code>iam:users:manage</code></td></tr>
+      <tr><td>Disable/Unlock User</td><td>Actions on Users page</td><td>Disable user login or unlock/reset failed login status.</td><td><code>iam:users:manage</code></td></tr>
+      <tr><td>Roles</td><td><code>/admin/settings?view=roles</code></td><td>View role code, name, flags, user count, permission count, and active status.</td><td><code>iam:roles:view</code></td></tr>
+      <tr><td>New/Edit Role</td><td>Popup on Roles page</td><td>Create/update role metadata and assign permissions using many-to-many tags.</td><td><code>iam:roles:manage</code></td></tr>
+      <tr><td>Permissions</td><td><code>/admin/settings?view=permissions</code></td><td>View permission catalog with application, feature, action, status, and description.</td><td><code>iam:roles:view</code></td></tr>
+      <tr><td>Payments</td><td><code>/admin/settings/payments</code></td><td>Configure payment methods and accounts for cash, bank transfer, mobile money, and card usage.</td><td><code>company:settings:manage</code></td></tr>
+    </tbody>
+  </table>
+
+  <h2>12. Operations</h2>
+  <p><strong>Required permission:</strong> <code>company:settings:manage</code></p>
+  <table>
+    <thead><tr><th>Page/Menu</th><th>Route</th><th>Purpose</th></tr></thead>
+    <tbody>
+      <tr><td>Tasks</td><td><code>/admin/operations</code></td><td>Operations workspace with links to expense registration and future approval queues.</td></tr>
+      <tr><td>Approvals</td><td><code>/admin/operations?view=approvals</code></td><td>Reserved approval queue view.</td></tr>
+      <tr><td>Expenses</td><td><code>/admin/operations/expenses</code></td><td>List business expenses that do not increase inventory value.</td></tr>
+      <tr><td>New Expense</td><td><code>/admin/operations/expenses/new</code></td><td>Register paid or unpaid expense with category, payment status, optional employee/vendor/location, and notes.</td></tr>
+      <tr><td>Expense Detail</td><td><code>/admin/operations/expenses/[id]</code></td><td>View expense, register payment later, and track status.</td></tr>
+      <tr><td>Expense Categories</td><td><code>/admin/operations/expenses/categories</code></td><td>Manage reusable expense categories.</td></tr>
+    </tbody>
+  </table>
+
+  <h2>13. Important Notes</h2>
+  <ul>
+    <li>The left sidebar and top submenu both use the active user's permissions.</li>
+    <li>Hidden menu items are not the only protection. Important pages and server actions also check permissions.</li>
+    <li>Some planned views are menu routes but not full independent pages yet: dashboard daily activity, dashboard sync status, and operations approvals.</li>
+    <li>Settings Users and Roles support view-only access separately from management access.</li>
+  </ul>
+
+  <h2>14. Suggested Future Permission Improvements</h2>
+  <table>
+    <thead><tr><th>Future Permission</th><th>Purpose</th></tr></thead>
+    <tbody>
+      <tr><td><code>sales:orders:view</code></td><td>View sales without creating or editing.</td></tr>
+      <tr><td><code>sales:deliveries:manage</code></td><td>Post/cancel customer deliveries separately from sales order creation.</td></tr>
+      <tr><td><code>sales:invoices:manage</code></td><td>Create/post customer invoices.</td></tr>
+      <tr><td><code>sales:payments:manage</code></td><td>Register/post customer payments.</td></tr>
+      <tr><td><code>purchasing:orders:view</code></td><td>View purchasing without receiving or posting.</td></tr>
+      <tr><td><code>purchasing:orders:manage</code></td><td>Create/confirm purchase orders.</td></tr>
+      <tr><td><code>expenses:view</code></td><td>View expenses without managing company settings.</td></tr>
+      <tr><td><code>expenses:manage</code></td><td>Create, edit, cancel, and pay expenses.</td></tr>
+      <tr><td><code>inventory:valuation:view</code></td><td>View stock cost/value fields separately from physical quantities.</td></tr>
+    </tbody>
+  </table>
+
+  <h2>15. Page Use Cases</h2>
+  <p>
+    This section explains when each page should be used in daily business operations.
+  </p>
+
+  <h3>15.1 Dashboard Use Cases</h3>
+  <table>
+    <thead><tr><th>Page/Menu</th><th>Main Use Case</th><th>Example</th></tr></thead>
+    <tbody>
+      <tr><td>Overview</td><td>Monitor business health from one screen.</td><td>A manager checks today's sales, payments received, unpaid customer invoices, unpaid vendor bills, and low stock before opening the shop.</td></tr>
+      <tr><td>Daily Activity</td><td>Review operational activity for a specific day.</td><td>A supervisor checks what was sold, paid, received, or adjusted during the current business day.</td></tr>
+      <tr><td>Sync Status</td><td>Monitor offline device sync readiness and pending activity.</td><td>A shop manager checks if a display-shop POS device has pending offline sales waiting to sync.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>15.2 Product Use Cases</h3>
+  <table>
+    <thead><tr><th>Page/Menu</th><th>Main Use Case</th><th>Example</th></tr></thead>
+    <tbody>
+      <tr><td>Products</td><td>Maintain the master product list used by purchasing, inventory, and sales.</td><td>Add a tractor, spare part, accessory, or consumable so it can be purchased, stocked, sold, and reported.</td></tr>
+      <tr><td>New/Edit Product</td><td>Create or update product identity, tracking, pricing, taxes, and attributes.</td><td>Create a serial-tracked machine product with SKU, barcode, brand, unit, sales price, purchase tax, and compatibility notes.</td></tr>
+      <tr><td>Categories</td><td>Group products for filtering, reporting, and cleaner catalog management.</td><td>Create categories such as Tractors, Engines, Tires, Attachments, Filters, or Spare Parts.</td></tr>
+      <tr><td>Brands</td><td>Track product manufacturer or brand identity.</td><td>Add brands such as Massey Ferguson, John Deere, Kubota, or local suppliers.</td></tr>
+      <tr><td>Units</td><td>Define how product quantity is measured.</td><td>Use Piece for machines, Liter for oil, Meter for hose, or Set for grouped spare parts.</td></tr>
+      <tr><td>Taxes</td><td>Configure reusable tax rates used on purchase and sales document lines.</td><td>Create VAT 15%, withholding tax, or tax-exempt configuration and select it on order lines.</td></tr>
+      <tr><td>Price Lists</td><td>Control selling prices for different customer groups, shops, or promotions.</td><td>Use a Retail Price List for walk-in customers and a Wholesale Price List for dealers, with different prices for the same product.</td></tr>
+      <tr><td>Lots / Serials</td><td>Trace unique machines or batches through purchase, stock, sale, return, and warranty.</td><td>Find the current owner and movement history of a machine using its serial number.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>15.3 Partner Use Cases</h3>
+  <table>
+    <thead><tr><th>Page/Menu</th><th>Main Use Case</th><th>Example</th></tr></thead>
+    <tbody>
+      <tr><td>All Partners</td><td>Maintain all external parties in one place.</td><td>Register a company that buys spare parts and also supplies used machinery.</td></tr>
+      <tr><td>Customers</td><td>Manage people or organizations that buy products.</td><td>Select customer-only partners during sales order and invoice creation.</td></tr>
+      <tr><td>Suppliers</td><td>Manage vendors that supply stock or services.</td><td>Select supplier-only partners during RFQ, purchase order, vendor bill, and supplier payment workflows.</td></tr>
+      <tr><td>Payment Terms</td><td>Define readable payment agreements.</td><td>Create terms like Cash on Delivery, 30 Days Credit, or 50% Advance and 50% on Delivery.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>15.4 Purchasing Use Cases</h3>
+  <table>
+    <thead><tr><th>Page/Menu</th><th>Main Use Case</th><th>Example</th></tr></thead>
+    <tbody>
+      <tr><td>RFQs / Orders</td><td>Control products being requested or purchased from suppliers.</td><td>Create an RFQ for spare parts, confirm it as a purchase order, then track receipt and billing.</td></tr>
+      <tr><td>Receipts</td><td>Record stock physically received from a supplier.</td><td>Receive 10 engines from a supplier and assign serial numbers before stock becomes available.</td></tr>
+      <tr><td>Landed Costs</td><td>Add freight, customs, handling, or other capitalized costs to inventory value.</td><td>Allocate import freight across received machines by value so each machine has a more accurate total cost.</td></tr>
+      <tr><td>Vendor Bills</td><td>Track supplier invoices and payable balances.</td><td>Record the supplier bill for a purchase order and see remaining balance after partial payment.</td></tr>
+      <tr><td>Payments</td><td>Track money paid to suppliers.</td><td>Register a bank transfer against a vendor bill and reduce the payable balance.</td></tr>
+      <tr><td>Returns</td><td>Send purchased stock back to a supplier with traceability.</td><td>Return a damaged serial-tracked machine to the supplier and keep the receipt/return history auditable.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>15.5 Sales Use Cases</h3>
+  <table>
+    <thead><tr><th>Page/Menu</th><th>Main Use Case</th><th>Example</th></tr></thead>
+    <tbody>
+      <tr><td>Quotations / Orders</td><td>Prepare offers and convert approved offers into sales orders.</td><td>Create a quotation for a customer, confirm it when accepted, then deliver and invoice.</td></tr>
+      <tr><td>Deliveries</td><td>Move sold stock out of inventory through a controlled document.</td><td>Select the exact serial number of a sold machine and post delivery to reduce stock.</td></tr>
+      <tr><td>Invoices</td><td>Track customer receivables.</td><td>Create a customer invoice from a sales order and follow unpaid, partial, or paid status.</td></tr>
+      <tr><td>Payments</td><td>Track money received from customers and the account used.</td><td>Register cash, bank transfer, mobile money, or card payment against a customer invoice.</td></tr>
+      <tr><td>Returns</td><td>Receive sold goods back from customers and preserve the original sale link.</td><td>Accept a returned spare part or machine and prepare refund/credit handling.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>15.6 Inventory Use Cases</h3>
+  <table>
+    <thead><tr><th>Page/Menu</th><th>Main Use Case</th><th>Example</th></tr></thead>
+    <tbody>
+      <tr><td>Stock</td><td>Check current stock by product and location.</td><td>Confirm if a product is available in the main warehouse or a display shop before selling.</td></tr>
+      <tr><td>Operations</td><td>Review document-based stock movements.</td><td>Audit why stock increased or decreased by checking receipts, deliveries, adjustments, scrap, and returns.</td></tr>
+      <tr><td>Transfers</td><td>Move stock between warehouses and shops.</td><td>Transfer a machine from the main warehouse to a display shop with dispatch and receipt control.</td></tr>
+      <tr><td>Adjustments</td><td>Correct stock differences discovered during counting.</td><td>Adjust quantity after physical stock count finds one missing spare part.</td></tr>
+      <tr><td>Scrap</td><td>Remove unusable stock from available inventory.</td><td>Scrap a damaged component so it cannot be sold.</td></tr>
+      <tr><td>Stock Card</td><td>Trace a product's quantity changes over time.</td><td>Investigate all movements for a specific SKU from opening stock through purchases, sales, and returns.</td></tr>
+      <tr><td>Serial History</td><td>Trace one serial or lot across its lifecycle.</td><td>Check where a machine came from, where it was delivered, whether it was returned, and warranty ownership.</td></tr>
+      <tr><td>Locations</td><td>Maintain warehouses, display shops, transit locations, and special locations.</td><td>Create a new shop location and control whether offline sales or negative stock are allowed there.</td></tr>
+      <tr><td>Opening Stock</td><td>Load existing stock before normal purchase/sale workflows begin.</td><td>Import current warehouse stock from Excel during system go-live.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>15.7 Report Use Cases</h3>
+  <table>
+    <thead><tr><th>Page/Menu</th><th>Main Use Case</th><th>Example</th></tr></thead>
+    <tbody>
+      <tr><td>Report Hub</td><td>Navigate to all detailed reports.</td><td>A manager opens the hub to choose sales, stock, payment, receivable, or payable reports.</td></tr>
+      <tr><td>Sales</td><td>Analyze sales performance.</td><td>Check total sales for this month by customer or document.</td></tr>
+      <tr><td>Expenses</td><td>Analyze non-inventory operating costs.</td><td>Review fuel, rent, salary advance, repair, or office expenses by category and date.</td></tr>
+      <tr><td>Payment Accounts</td><td>See which cash/bank/mobile/card account handled each transaction.</td><td>Reconcile bank transfer payments against the bank statement.</td></tr>
+      <tr><td>Stock</td><td>Review stock quantity and valuation.</td><td>Find high-value stock, low stock, and product availability by location.</td></tr>
+      <tr><td>Receivables</td><td>Track customer debt.</td><td>Find customers with unpaid or partially paid invoices.</td></tr>
+      <tr><td>Payables</td><td>Track supplier debt.</td><td>Find vendor bills that still need payment.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>15.8 Settings Use Cases</h3>
+  <table>
+    <thead><tr><th>Page/Menu</th><th>Main Use Case</th><th>Example</th></tr></thead>
+    <tbody>
+      <tr><td>Users</td><td>Create and control login accounts.</td><td>Create a salesperson user, assign the Salesperson role, or disable a user who left the company.</td></tr>
+      <tr><td>Roles</td><td>Group permissions into reusable access profiles.</td><td>Create a Branch Manager role that can view inventory, sell products, and view reports.</td></tr>
+      <tr><td>Permissions</td><td>Review the available permission catalog.</td><td>Check which permission is needed before granting a user access to reports or settings.</td></tr>
+      <tr><td>Payments</td><td>Configure how money is received and paid.</td><td>Create Cash Register, CBE Bank, Telebirr, or Card Terminal accounts and decide inbound/outbound usage.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>15.9 Operations Use Cases</h3>
+  <table>
+    <thead><tr><th>Page/Menu</th><th>Main Use Case</th><th>Example</th></tr></thead>
+    <tbody>
+      <tr><td>Tasks</td><td>Provide an operational workspace for non-sales/non-purchase work.</td><td>A supervisor opens operations to review expense or approval-related tasks.</td></tr>
+      <tr><td>Approvals</td><td>Future workspace for approval queues.</td><td>Approve an over-receipt, discount exception, or stock adjustment once approval rules are added.</td></tr>
+      <tr><td>Expenses</td><td>Record business expenses that should not increase inventory cost.</td><td>Register rent, transport, utilities, maintenance, or office supplies as expenses.</td></tr>
+      <tr><td>Expense Categories</td><td>Classify expenses for reporting.</td><td>Create categories such as Rent, Fuel, Transport, Maintenance, Salary, or Utilities.</td></tr>
+    </tbody>
+  </table>
+</body>
+</html>

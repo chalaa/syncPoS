@@ -7,7 +7,7 @@ import { redirect } from "next/navigation";
 import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
 
-import { requireUser } from "@/server/auth/session";
+import { requirePermission } from "@/server/auth/session";
 import { getDefaultCompany, majorToMinor, uniqueViolationMessage } from "@/server/catalog/products";
 import { db } from "@/server/db/client";
 import {
@@ -22,6 +22,7 @@ import {
   paymentMethods,
   payments,
   partners,
+  locations,
   productLots,
   productSerials,
   products,
@@ -36,6 +37,7 @@ import {
   taxes,
   warrantyRegistrations,
 } from "@/server/db/schema";
+import { getOrCreatePartnerStockLocation } from "@/server/inventory/partner-locations";
 import { getCustomerInvoicePaymentSummary } from "@/server/payments/payments";
 
 const salesOrderHeaderSchema = z.object({
@@ -91,6 +93,10 @@ const registerCustomerPaymentSchema = z.object({
   notes: z.string().trim().optional(),
 });
 
+const updateCustomerPaymentSchema = registerCustomerPaymentSchema.omit({ customerInvoiceId: true }).extend({
+  paymentId: z.string().uuid(),
+});
+
 const paymentStatusSchema = z.object({
   paymentId: z.string().uuid(),
 });
@@ -136,18 +142,38 @@ function parseTaxIds(value: string) {
 
 function parseDeliveryLines(formData: FormData) {
   const deliveryLineIds = formValues(formData, "deliveryLineId");
+  const salesOrderLineIds = formValues(formData, "salesOrderLineId");
   const quantities = formValues(formData, "quantityDelivered");
   const serialNumbers = formValues(formData, "serialNo");
   const lotNumbers = formValues(formData, "lotNo");
 
-  return deliveryLineIds
-    .map((deliveryLineId, index) => ({
-      deliveryLineId,
+  const rowCount = Math.max(deliveryLineIds.length, salesOrderLineIds.length, quantities.length);
+
+  return Array.from({ length: rowCount })
+    .map((_, index) => ({
+      deliveryLineId: deliveryLineIds[index] || null,
+      salesOrderLineId: salesOrderLineIds[index] || null,
       quantity: Number(quantities[index] ?? 0),
       serialNo: serialNumbers[index]?.trim() || null,
       lotNo: lotNumbers[index]?.trim() || null,
     }))
-    .filter((line) => line.deliveryLineId);
+    .filter((line) => line.deliveryLineId || line.salesOrderLineId);
+}
+
+function parseCreateDeliveryLines(formData: FormData) {
+  const salesOrderLineIds = formValues(formData, "salesOrderLineId");
+  const quantities = formValues(formData, "deliveryQuantity");
+  const serialNumbers = formValues(formData, "serialNo");
+  const lotNumbers = formValues(formData, "lotNo");
+
+  return salesOrderLineIds
+    .map((salesOrderLineId, index) => ({
+      salesOrderLineId,
+      quantity: Number(quantities[index] ?? 0),
+      serialNo: serialNumbers[index]?.trim() || null,
+      lotNo: lotNumbers[index]?.trim() || null,
+    }))
+    .filter((line) => line.salesOrderLineId && line.quantity > 0);
 }
 
 function parseSalesOrderForm(formData: FormData, errorPath: string) {
@@ -344,7 +370,7 @@ async function prepareSalesLines(
 }
 
 export async function createSalesOrder(formData: FormData) {
-  const user = await requireUser();
+  const user = await requirePermission("sales:orders:create");
   const { header, lines } = parseSalesOrderForm(formData, "/admin/sales/new");
   const company = await getDefaultCompany();
   const orderNo = documentNo("SO");
@@ -438,7 +464,7 @@ export async function createSalesOrder(formData: FormData) {
 }
 
 export async function updateSalesOrder(formData: FormData) {
-  const user = await requireUser();
+  const user = await requirePermission("sales:orders:create");
   const salesOrderId = formValue(formData, "salesOrderId");
   const errorPath = salesOrderId ? `/admin/sales/${salesOrderId}` : "/admin/sales";
   const { header, lines } = parseSalesOrderForm(formData, errorPath);
@@ -564,7 +590,7 @@ export async function updateSalesOrder(formData: FormData) {
 }
 
 export async function confirmSalesOrder(formData: FormData) {
-  const user = await requireUser();
+  const user = await requirePermission("sales:orders:create");
   const parsed = confirmSalesOrderSchema.safeParse({
     salesOrderId: formValue(formData, "salesOrderId"),
     returnPath: formValue(formData, "returnPath") || undefined,
@@ -603,9 +629,12 @@ export async function confirmSalesOrder(formData: FormData) {
         .select({
           id: salesOrderLines.id,
           productId: salesOrderLines.productId,
+          productName: products.name,
+          sku: products.sku,
           quantityOrdered: salesOrderLines.quantityOrdered,
         })
         .from(salesOrderLines)
+        .innerJoin(products, eq(salesOrderLines.productId, products.id))
         .where(and(eq(salesOrderLines.salesOrderId, order.id), isNull(salesOrderLines.deletedAt)));
 
       if (lines.length === 0) {
@@ -616,6 +645,18 @@ export async function confirmSalesOrder(formData: FormData) {
         if (!order.sourceLocationId) {
           throw new Error("A source location is required to reserve stock.");
         }
+
+        const [sourceLocation] = await tx
+          .select({
+            code: locations.code,
+            name: locations.name,
+          })
+          .from(locations)
+          .where(eq(locations.id, order.sourceLocationId))
+          .limit(1);
+        const sourceLocationName = sourceLocation
+          ? `${sourceLocation.code} / ${sourceLocation.name}`
+          : "the selected source location";
 
         for (const line of lines) {
           const [balance] = await tx
@@ -639,7 +680,9 @@ export async function confirmSalesOrder(formData: FormData) {
           const available = Number(balance?.quantityAvailable ?? 0);
 
           if (!balance || available < quantity) {
-            throw new Error("Insufficient stock available for reservation.");
+            throw new Error(
+              `Insufficient stock available for ${line.sku} / ${line.productName} in ${sourceLocationName}. Required ${quantity}, available ${available}.`,
+            );
           }
 
           const reservationNo = documentNo("RSV");
@@ -705,7 +748,7 @@ export async function confirmSalesOrder(formData: FormData) {
 }
 
 export async function createDeliveryFromSalesOrder(formData: FormData) {
-  const user = await requireUser();
+  const user = await requirePermission("sales:orders:create");
   const parsed = createDeliverySchema.safeParse({
     salesOrderId: formValue(formData, "salesOrderId"),
   });
@@ -716,6 +759,7 @@ export async function createDeliveryFromSalesOrder(formData: FormData) {
 
   const company = await getDefaultCompany();
   const deliveryNo = documentNo("DO");
+  const inputLines = parseCreateDeliveryLines(formData);
   let createdDeliveryId: string | undefined;
 
   try {
@@ -737,8 +781,8 @@ export async function createDeliveryFromSalesOrder(formData: FormData) {
         throw new Error("Sales order does not exist.");
       }
 
-      if (order.status !== "confirmed" && order.status !== "partially_delivered") {
-        throw new Error("Only confirmed or partially delivered sales orders can create deliveries.");
+      if (!["confirmed", "partially_delivered", "invoiced"].includes(order.status)) {
+        throw new Error("Only confirmed, partially delivered, or invoiced sales orders can create deliveries.");
       }
 
       if (!order.sourceLocationId) {
@@ -769,6 +813,32 @@ export async function createDeliveryFromSalesOrder(formData: FormData) {
         throw new Error("This sales order has no remaining quantity to deliver.");
       }
 
+      const remainingByLineId = new Map(remainingLines.map((line) => [line.id, line]));
+      const selectedLines = inputLines.length > 0
+        ? inputLines.map((input) => {
+            const line = remainingByLineId.get(input.salesOrderLineId);
+
+            if (!line) {
+              throw new Error("One or more delivery lines are invalid.");
+            }
+
+            if (input.quantity > line.remainingQuantity) {
+              throw new Error("Delivery quantity cannot exceed the remaining order quantity.");
+            }
+
+            return { ...line, selectedQuantity: input.quantity, serialNo: input.serialNo, lotNo: input.lotNo };
+          })
+        : remainingLines.map((line) => ({
+            ...line,
+            selectedQuantity: line.remainingQuantity,
+            serialNo: null,
+            lotNo: null,
+          }));
+
+      if (selectedLines.length === 0) {
+        throw new Error("At least one delivery quantity is required.");
+      }
+
       const [delivery] = await tx
         .insert(deliveries)
         .values({
@@ -784,14 +854,16 @@ export async function createDeliveryFromSalesOrder(formData: FormData) {
       createdDeliveryId = delivery.id;
 
       await tx.insert(deliveryLines).values(
-        remainingLines.map((line, index) => ({
+        selectedLines.map((line, index) => ({
           deliveryId: delivery.id,
           salesOrderLineId: line.id,
           lineNo: index + 1,
           productId: line.productId,
           unitId: line.unitId,
-          quantityDelivered: String(line.remainingQuantity),
+          quantityDelivered: String(line.selectedQuantity),
           currencyCode: line.currencyCode,
+          serialNo: line.serialNo,
+          lotNo: line.lotNo,
         })),
       );
 
@@ -815,7 +887,7 @@ export async function createDeliveryFromSalesOrder(formData: FormData) {
 }
 
 export async function postDelivery(formData: FormData) {
-  const user = await requireUser();
+  const user = await requirePermission("sales:orders:create");
   const parsed = postDeliverySchema.safeParse({
     deliveryId: formValue(formData, "deliveryId"),
   });
@@ -830,6 +902,7 @@ export async function postDelivery(formData: FormData) {
   }
 
   const company = await getDefaultCompany();
+  const customerLocation = await getOrCreatePartnerStockLocation(company.id, "customer");
   const movementNo = documentNo("SD");
   let salesOrderId: string | undefined;
 
@@ -858,6 +931,98 @@ export async function postDelivery(formData: FormData) {
         throw new Error("Only draft deliveries can be posted.");
       }
 
+      const submittedRows = inputLines.filter((line) => line.salesOrderLineId && line.quantity > 0);
+      if (submittedRows.length > 0) {
+        const submittedSalesOrderLineIds = [...new Set(submittedRows.map((line) => line.salesOrderLineId).filter((id): id is string => Boolean(id)))];
+        const salesLines = await tx
+          .select({
+            id: salesOrderLines.id,
+            lineNo: salesOrderLines.lineNo,
+            productId: salesOrderLines.productId,
+            unitId: salesOrderLines.unitId,
+            quantityOrdered: salesOrderLines.quantityOrdered,
+            quantityDelivered: salesOrderLines.quantityDelivered,
+            currencyCode: salesOrderLines.currencyCode,
+            trackingMode: products.trackingMode,
+            sku: products.sku,
+          })
+          .from(salesOrderLines)
+          .innerJoin(products, eq(salesOrderLines.productId, products.id))
+          .where(
+            and(
+              inArray(salesOrderLines.id, submittedSalesOrderLineIds),
+              eq(salesOrderLines.salesOrderId, delivery.salesOrderId),
+              isNull(salesOrderLines.deletedAt),
+            ),
+          );
+
+        if (salesLines.length !== submittedSalesOrderLineIds.length) {
+          throw new Error("One or more delivery lines are invalid.");
+        }
+
+        const salesLineById = new Map(salesLines.map((line) => [line.id, line]));
+        const quantityBySalesLineId = new Map<string, number>();
+        for (const row of submittedRows) {
+          if (!row.salesOrderLineId) {
+            continue;
+          }
+
+          const salesLine = salesLineById.get(row.salesOrderLineId);
+          if (!salesLine) {
+            throw new Error("One or more delivery lines are invalid.");
+          }
+
+          if (salesLine.trackingMode === "serial" && (row.quantity !== 1 || !row.serialNo)) {
+            throw new Error(`Serialized product ${salesLine.sku} requires quantity 1 and a serial selection.`);
+          }
+
+          if (salesLine.trackingMode === "lot" && !row.lotNo) {
+            throw new Error(`Lot tracked product ${salesLine.sku} requires a lot selection.`);
+          }
+
+          quantityBySalesLineId.set(
+            row.salesOrderLineId,
+            (quantityBySalesLineId.get(row.salesOrderLineId) ?? 0) + row.quantity,
+          );
+        }
+
+        for (const [salesOrderLineId, quantity] of quantityBySalesLineId) {
+          const salesLine = salesLineById.get(salesOrderLineId);
+          const remaining = Number(salesLine?.quantityOrdered ?? 0) - Number(salesLine?.quantityDelivered ?? 0);
+
+          if (quantity > remaining) {
+            throw new Error(`Delivery quantity for ${salesLine?.sku ?? "line"} is greater than the remaining sales order quantity.`);
+          }
+        }
+
+        await tx
+          .update(deliveryLines)
+          .set({ deletedAt: new Date(), updatedAt: sql`now()` })
+          .where(and(eq(deliveryLines.deliveryId, delivery.id), isNull(deliveryLines.deletedAt)));
+
+        await tx.insert(deliveryLines).values(
+          submittedRows.map((row, index) => {
+            const salesLine = salesLineById.get(row.salesOrderLineId ?? "");
+
+            if (!salesLine) {
+              throw new Error("One or more delivery lines are invalid.");
+            }
+
+            return {
+              deliveryId: delivery.id,
+              salesOrderLineId: salesLine.id,
+              lineNo: index + 1,
+              productId: salesLine.productId,
+              unitId: salesLine.unitId,
+              quantityDelivered: String(row.quantity),
+              currencyCode: salesLine.currencyCode,
+              serialNo: row.serialNo,
+              lotNo: row.lotNo,
+            };
+          }),
+        );
+      }
+
       const lines = await tx
         .select({
           id: deliveryLines.id,
@@ -872,17 +1037,18 @@ export async function postDelivery(formData: FormData) {
           salesQuantityReserved: salesOrderLines.quantityReserved,
           trackingMode: products.trackingMode,
           sku: products.sku,
+          serialNo: deliveryLines.serialNo,
+          lotNo: deliveryLines.lotNo,
         })
         .from(deliveryLines)
         .innerJoin(products, eq(deliveryLines.productId, products.id))
         .leftJoin(salesOrderLines, eq(deliveryLines.salesOrderLineId, salesOrderLines.id))
         .where(and(eq(deliveryLines.deliveryId, delivery.id), isNull(deliveryLines.deletedAt)))
         .orderBy(sql`${deliveryLines.lineNo} asc`);
-      const inputByLineId = new Map(inputLines.map((line) => [line.deliveryLineId, line]));
-      const selectedLines = lines.filter((line) => inputByLineId.has(line.id));
+      const selectedLines = lines.filter((line) => Number(line.quantityDelivered) > 0);
 
-      if (selectedLines.length !== inputLines.length) {
-        throw new Error("One or more delivery lines are invalid.");
+      if (selectedLines.length === 0) {
+        throw new Error("At least one delivery quantity is required.");
       }
 
       const [movement] = await tx
@@ -893,6 +1059,7 @@ export async function postDelivery(formData: FormData) {
           movementType: "sale_delivery",
           status: "posted",
           fromLocationId: delivery.sourceLocationId,
+          toLocationId: customerLocation.id,
           sourceType: "delivery",
           sourceId: delivery.id,
           sourceNo: delivery.deliveryNo,
@@ -903,8 +1070,7 @@ export async function postDelivery(formData: FormData) {
         .returning({ id: stockMovements.id });
 
       for (const line of selectedLines) {
-        const input = inputByLineId.get(line.id);
-        const deliverQuantity = input?.quantity ?? 0;
+        const deliverQuantity = Number(line.quantityDelivered);
         const remaining = Number(line.quantityOrdered ?? 0) - Number(line.salesQuantityDelivered ?? 0);
 
         if (deliverQuantity <= 0) {
@@ -915,18 +1081,18 @@ export async function postDelivery(formData: FormData) {
           throw new Error(`Delivery quantity for ${line.sku} is greater than the remaining sales order quantity.`);
         }
 
-        if (line.trackingMode === "serial" && (!input?.serialNo || deliverQuantity !== 1)) {
+        if (line.trackingMode === "serial" && (!line.serialNo || deliverQuantity !== 1)) {
           throw new Error(`Serialized product ${line.sku} requires quantity 1 and a serial number.`);
         }
 
-        if (line.trackingMode === "lot" && !input?.lotNo) {
+        if (line.trackingMode === "lot" && !line.lotNo) {
           throw new Error(`Lot tracked product ${line.sku} requires a lot number.`);
         }
 
         let productSerialId: string | null = null;
         let productLotId: string | null = null;
 
-        if (line.trackingMode === "serial" && input?.serialNo) {
+        if (line.trackingMode === "serial" && line.serialNo) {
           const [serial] = await tx
             .select({
               id: productSerials.id,
@@ -935,11 +1101,11 @@ export async function postDelivery(formData: FormData) {
               landedUnitCostMinor: productSerials.landedUnitCostMinor,
             })
             .from(productSerials)
-            .where(and(eq(productSerials.productId, line.productId), eq(productSerials.serialNo, input.serialNo), isNull(productSerials.deletedAt)))
+            .where(and(eq(productSerials.productId, line.productId), eq(productSerials.serialNo, line.serialNo), isNull(productSerials.deletedAt)))
             .limit(1);
 
           if (!serial || serial.currentLocationId !== delivery.sourceLocationId || !["available", "reserved"].includes(serial.status)) {
-            throw new Error(`Serial ${input.serialNo} is not available in the delivery location.`);
+            throw new Error(`Serial ${line.serialNo} is not available in the delivery location.`);
           }
 
           const [postedSerialDelivery] = await tx.execute<{ id: string }>(sql`
@@ -954,25 +1120,30 @@ export async function postDelivery(formData: FormData) {
           `);
 
           if (postedSerialDelivery) {
-            throw new Error(`Serial ${input.serialNo} has already been delivered.`);
+            throw new Error(`Serial ${line.serialNo} has already been delivered.`);
           }
 
           productSerialId = serial.id;
         }
 
-        if (line.trackingMode === "lot" && input?.lotNo) {
+        if (line.trackingMode === "lot" && line.lotNo) {
           const [lot] = await tx
             .select({
               id: productLots.id,
+              status: productLots.status,
               currentLocationId: productLots.currentLocationId,
               landedUnitCostMinor: productLots.landedUnitCostMinor,
             })
             .from(productLots)
-            .where(and(eq(productLots.productId, line.productId), eq(productLots.lotNo, input.lotNo), isNull(productLots.deletedAt)))
+            .where(and(eq(productLots.productId, line.productId), eq(productLots.lotNo, line.lotNo), isNull(productLots.deletedAt)))
             .limit(1);
 
           if (!lot) {
-            throw new Error(`Lot ${input.lotNo} does not exist.`);
+            throw new Error(`Lot ${line.lotNo} does not exist.`);
+          }
+
+          if (lot.currentLocationId !== delivery.sourceLocationId || !["available", "reserved"].includes(lot.status)) {
+            throw new Error(`Lot ${line.lotNo} is not available in the delivery location.`);
           }
 
           productLotId = lot.id;
@@ -1035,6 +1206,7 @@ export async function postDelivery(formData: FormData) {
           productSerialId,
           productLotId,
           fromLocationId: delivery.sourceLocationId,
+          toLocationId: customerLocation.id,
           unitId: line.unitId,
           quantity: String(deliverQuantity),
           unitCostMinor: balance.averageCostMinor,
@@ -1151,8 +1323,8 @@ export async function postDelivery(formData: FormData) {
             quantityDelivered: String(deliverQuantity),
             unitCostMinor: balance.averageCostMinor,
             totalCostMinor,
-            serialNo: input?.serialNo ?? null,
-            lotNo: input?.lotNo ?? null,
+            serialNo: line.serialNo ?? null,
+            lotNo: line.lotNo ?? null,
             updatedAt: sql`now()`,
           })
           .where(eq(deliveryLines.id, line.id));
@@ -1239,7 +1411,7 @@ export async function postDelivery(formData: FormData) {
 }
 
 export async function cancelDelivery(formData: FormData) {
-  const user = await requireUser();
+  const user = await requirePermission("sales:orders:create");
   const parsed = cancelDeliverySchema.safeParse({
     deliveryId: formValue(formData, "deliveryId"),
   });
@@ -1319,7 +1491,7 @@ async function updateCustomerInvoicePaymentStatus(customerInvoiceId: string) {
 }
 
 export async function createCustomerInvoiceFromSalesOrder(formData: FormData) {
-  const user = await requireUser();
+  const user = await requirePermission("sales:orders:create");
   const parsed = createInvoiceSchema.safeParse({
     salesOrderId: formValue(formData, "salesOrderId") || undefined,
   });
@@ -1523,7 +1695,7 @@ export async function createCustomerInvoiceFromSalesOrder(formData: FormData) {
 }
 
 export async function createCustomerInvoiceFromDelivery(formData: FormData) {
-  const user = await requireUser();
+  const user = await requirePermission("sales:orders:create");
   const parsed = createInvoiceSchema.safeParse({
     deliveryId: formValue(formData, "deliveryId") || undefined,
   });
@@ -1745,7 +1917,7 @@ export async function createCustomerInvoiceFromDelivery(formData: FormData) {
 }
 
 export async function postCustomerInvoice(formData: FormData) {
-  const user = await requireUser();
+  const user = await requirePermission("sales:orders:create");
   const parsed = invoiceStatusSchema.safeParse({
     customerInvoiceId: formValue(formData, "customerInvoiceId"),
   });
@@ -1805,7 +1977,7 @@ export async function postCustomerInvoice(formData: FormData) {
 }
 
 export async function registerCustomerPayment(formData: FormData) {
-  const user = await requireUser();
+  const user = await requirePermission("sales:orders:create");
   const parsed = registerCustomerPaymentSchema.safeParse({
     customerInvoiceId: formValue(formData, "customerInvoiceId"),
     paymentAccountId: formValue(formData, "paymentAccountId"),
@@ -1953,7 +2125,7 @@ export async function registerCustomerPayment(formData: FormData) {
 }
 
 export async function postCustomerPayment(formData: FormData) {
-  const user = await requireUser();
+  const user = await requirePermission("sales:orders:create");
   const parsed = paymentStatusSchema.safeParse({ paymentId: formValue(formData, "paymentId") });
 
   if (!parsed.success) {
@@ -2074,8 +2246,177 @@ export async function postCustomerPayment(formData: FormData) {
   redirect(`/admin/sales/payments/${parsed.data.paymentId}?notice=${encodeURIComponent("Customer payment posted")}`);
 }
 
+export async function updateCustomerPayment(formData: FormData) {
+  const user = await requirePermission("sales:orders:create");
+  const parsed = updateCustomerPaymentSchema.safeParse({
+    paymentId: formValue(formData, "paymentId"),
+    paymentAccountId: formValue(formData, "paymentAccountId"),
+    amount: formValue(formData, "amount"),
+    reference: formValue(formData, "reference"),
+    notes: formValue(formData, "notes"),
+  });
+
+  if (!parsed.success) {
+    redirectWithError("/admin/sales?view=payments", parsed.error.issues[0]?.message ?? "Invalid customer payment.");
+  }
+
+  const amountMinor = majorToMinor(parsed.data.amount);
+  if (amountMinor <= 0) {
+    redirectWithError(`/admin/sales/payments/${parsed.data.paymentId}`, "Payment amount must be greater than zero.");
+  }
+
+  const company = await getDefaultCompany();
+  let customerInvoiceId: string | undefined;
+
+  try {
+    await db.transaction(async (tx) => {
+      const [payment] = await tx
+        .select({
+          id: payments.id,
+          paymentNo: payments.paymentNo,
+          status: payments.status,
+          paymentType: payments.paymentType,
+        })
+        .from(payments)
+        .where(and(eq(payments.id, parsed.data.paymentId), eq(payments.companyId, company.id), isNull(payments.deletedAt)))
+        .limit(1);
+
+      if (!payment) {
+        throw new Error("Payment does not exist.");
+      }
+
+      if (payment.status !== "draft") {
+        throw new Error("Only draft payments can be edited.");
+      }
+
+      if (payment.paymentType !== "inbound") {
+        throw new Error("Only inbound customer payments can be edited here.");
+      }
+
+      const [allocation] = await tx
+        .select({ id: paymentAllocations.id, customerInvoiceId: paymentAllocations.customerInvoiceId })
+        .from(paymentAllocations)
+        .where(and(eq(paymentAllocations.paymentId, payment.id), isNull(paymentAllocations.deletedAt)))
+        .limit(1);
+
+      if (!allocation?.customerInvoiceId) {
+        throw new Error("Customer payment allocation is missing.");
+      }
+      customerInvoiceId = allocation.customerInvoiceId;
+
+      const [invoice] = await tx
+        .select({
+          id: customerInvoices.id,
+          status: customerInvoices.status,
+          totalMinor: customerInvoices.totalMinor,
+          currencyCode: customerInvoices.currencyCode,
+        })
+        .from(customerInvoices)
+        .where(and(eq(customerInvoices.id, allocation.customerInvoiceId), eq(customerInvoices.companyId, company.id), isNull(customerInvoices.deletedAt)))
+        .limit(1);
+
+      if (!invoice || invoice.status !== "posted") {
+        throw new Error("Customer invoice must be posted before editing payment.");
+      }
+
+      const [account] = await tx
+        .select({
+          id: paymentAccounts.id,
+          currencyCode: paymentAccounts.currencyCode,
+          methodId: paymentMethods.id,
+          requiresReference: paymentMethods.requiresReference,
+          allowInbound: paymentMethods.allowInbound,
+        })
+        .from(paymentAccounts)
+        .innerJoin(paymentMethods, eq(paymentAccounts.paymentMethodId, paymentMethods.id))
+        .where(
+          and(
+            eq(paymentAccounts.id, parsed.data.paymentAccountId),
+            eq(paymentAccounts.companyId, company.id),
+            eq(paymentAccounts.isActive, true),
+            eq(paymentMethods.isActive, true),
+            isNull(paymentAccounts.deletedAt),
+            isNull(paymentMethods.deletedAt),
+          ),
+        )
+        .limit(1);
+
+      if (!account || !account.allowInbound) {
+        throw new Error("Select an active inbound payment account.");
+      }
+
+      if (account.currencyCode !== invoice.currencyCode) {
+        throw new Error("Payment account currency must match the customer invoice.");
+      }
+
+      if (account.requiresReference && !parsed.data.reference) {
+        throw new Error("This payment method requires a reference.");
+      }
+
+      const [summary] = await tx.execute<{ residualAmountMinor: number }>(sql`
+        select greatest(
+          ${invoice.totalMinor} - coalesce(sum(pa.amount_minor) filter (
+            where p.status = 'posted'
+              and p.deleted_at is null
+              and pa.deleted_at is null
+          ), 0),
+          0
+        )::bigint as "residualAmountMinor"
+        from customer_invoices ci
+        left join payment_allocations pa on pa.customer_invoice_id = ci.id
+        left join payments p on p.id = pa.payment_id
+        where ci.id = ${invoice.id}
+        group by ci.id
+      `);
+
+      if (amountMinor > (summary?.residualAmountMinor ?? 0)) {
+        throw new Error("Payment amount cannot exceed the customer invoice residual.");
+      }
+
+      await tx
+        .update(payments)
+        .set({
+          paymentMethodId: account.methodId,
+          paymentAccountId: account.id,
+          amountMinor,
+          reference: parsed.data.reference || null,
+          notes: parsed.data.notes || null,
+          updatedAt: sql`now()`,
+        })
+        .where(eq(payments.id, payment.id));
+
+      await tx
+        .update(paymentAllocations)
+        .set({
+          amountMinor,
+          updatedAt: sql`now()`,
+        })
+        .where(eq(paymentAllocations.id, allocation.id));
+
+      await tx.insert(auditLogs).values({
+        companyId: company.id,
+        actorUserId: user.id,
+        action: "customer_payment.update",
+        entityType: "payment",
+        entityId: payment.id,
+        severity: "info",
+        metadata: { paymentNo: payment.paymentNo, customerInvoiceId },
+      });
+    });
+  } catch (error) {
+    redirectWithError(`/admin/sales/payments/${parsed.data.paymentId}`, error instanceof Error ? error.message : "Could not update customer payment.");
+  }
+
+  revalidatePath("/admin/sales");
+  revalidatePath(`/admin/sales/payments/${parsed.data.paymentId}`);
+  if (customerInvoiceId) {
+    revalidatePath(`/admin/sales/invoices/${customerInvoiceId}`);
+  }
+  redirect(`/admin/sales/payments/${parsed.data.paymentId}?notice=${encodeURIComponent("Customer payment updated")}`);
+}
+
 export async function cancelCustomerPayment(formData: FormData) {
-  const user = await requireUser();
+  const user = await requirePermission("sales:orders:create");
   const parsed = paymentStatusSchema.safeParse({ paymentId: formValue(formData, "paymentId") });
 
   if (!parsed.success) {

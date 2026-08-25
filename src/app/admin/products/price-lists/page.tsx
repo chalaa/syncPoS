@@ -1,69 +1,28 @@
-import { ButtonLink } from "@/components/ui/button";
-import { PageHeader, PageShell } from "@/components/ui/page-shell";
+import { PriceListManager } from "@/app/admin/products/price-list-manager";
 import { requirePermission } from "@/server/auth/session";
-import { getProductPriceListRows } from "@/server/catalog/products";
-import type { ProductPriceListRow } from "@/server/catalog/types";
+import { getPriceListFormOptions, getProductPriceListRows } from "@/server/catalog/products";
 
 export const dynamic = "force-dynamic";
 
-export default async function ProductPriceListsPage() {
+type ProductPriceListsPageProps = {
+  searchParams: Promise<{ notice?: string; error?: string }>;
+};
+
+export default async function ProductPriceListsPage({ searchParams }: ProductPriceListsPageProps) {
   await requirePermission("product.view");
 
-  const rows = await getProductPriceListRows();
+  const [params, rows, options] = await Promise.all([
+    searchParams,
+    getProductPriceListRows(),
+    getPriceListFormOptions(),
+  ]);
 
   return (
-    <PageShell>
-      <PageHeader
-        eyebrow="Catalog"
-        title="Price Lists"
-        actions={<ButtonLink href="/admin/products" variant="outline">Products</ButtonLink>}
-      />
-
-      <section className="rounded-lg border border-border bg-card">
-        <PriceListTable rows={rows} />
-      </section>
-    </PageShell>
-  );
-}
-
-function PriceListTable({ rows }: { rows: ProductPriceListRow[] }) {
-  return (
-    <div className="overflow-x-auto">
-      <table className="w-full min-w-[860px] text-left text-sm">
-        <thead className="bg-muted text-xs uppercase tracking-wide text-muted-foreground">
-          <tr>
-            <th className="px-4 py-3">Code</th>
-            <th className="px-4 py-3">Price List</th>
-            <th className="px-4 py-3">Type</th>
-            <th className="px-4 py-3">Currency</th>
-            <th className="px-4 py-3">Location</th>
-            <th className="px-4 py-3 text-right">Items</th>
-            <th className="px-4 py-3">Validity</th>
-            <th className="px-4 py-3">Status</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row) => (
-            <tr key={row.id} className="border-t border-border">
-              <td className="px-4 py-3 font-medium">{row.code}</td>
-              <td className="px-4 py-3">{row.name}</td>
-              <td className="px-4 py-3 capitalize">{row.priceListType.replace(/_/g, " ")}</td>
-              <td className="px-4 py-3">{row.currencyCode}</td>
-              <td className="px-4 py-3">{row.locationCode ?? "-"}</td>
-              <td className="px-4 py-3 text-right">{row.itemCount}</td>
-              <td className="px-4 py-3">{row.validFrom ?? "-"} / {row.validTo ?? "-"}</td>
-              <td className="px-4 py-3">{row.isActive ? "Active" : "Inactive"}</td>
-            </tr>
-          ))}
-          {rows.length === 0 ? (
-            <tr>
-              <td colSpan={8} className="px-4 py-10 text-center text-muted-foreground">
-                No price lists found.
-              </td>
-            </tr>
-          ) : null}
-        </tbody>
-      </table>
-    </div>
+    <PriceListManager
+      rows={rows}
+      options={options}
+      notice={params.notice}
+      error={params.error}
+    />
   );
 }

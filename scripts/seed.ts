@@ -20,6 +20,7 @@ import {
   userRoles,
   users,
 } from "@/server/db/schema";
+import { PERMISSION_CATALOG, SYSTEM_ROLES } from "@/server/iam/permissions";
 
 const databaseUrl = process.env.DATABASE_URL ?? "";
 
@@ -31,42 +32,23 @@ const ids = {
   company: "11111111-1111-4111-8111-111111111111",
   adminEmployee: "22222222-2222-4222-8222-222222222222",
   adminUser: "33333333-3333-4333-8333-333333333333",
+  ownerRole: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
   adminRole: "44444444-4444-4444-8444-444444444444",
   salespersonRole: "55555555-5555-4555-8555-555555555555",
   inventoryManagerRole: "66666666-6666-4666-8666-666666666666",
   warehouse: "77777777-7777-4777-8777-777777777777",
   displayShop: "88888888-8888-4888-8888-888888888888",
+  vendorLocation: "abababab-abab-4bab-8bab-abababababab",
+  customerLocation: "cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd",
   offlineDevice: "99999999-9999-4999-8999-999999999999",
   seedAudit: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
 };
 
-const permissionRows = [
-  ["00000000-0000-4000-8000-000000000001", "company.manage", "Manage company settings"],
-  ["00000000-0000-4000-8000-000000000002", "user.manage", "Manage users and access"],
-  ["00000000-0000-4000-8000-000000000003", "location.manage", "Manage stock locations"],
-  ["00000000-0000-4000-8000-000000000004", "product.view", "View products"],
-  ["00000000-0000-4000-8000-000000000005", "product.manage", "Manage products"],
-  ["00000000-0000-4000-8000-000000000006", "inventory.view", "View inventory"],
-  ["00000000-0000-4000-8000-000000000007", "inventory.receive", "Receive stock"],
-  ["00000000-0000-4000-8000-000000000008", "inventory.transfer.approve", "Approve transfers"],
-  ["00000000-0000-4000-8000-000000000009", "sales.create", "Create sales"],
-  ["00000000-0000-4000-8000-000000000010", "sales.discount.override", "Override discounts"],
-  ["00000000-0000-4000-8000-000000000011", "sales.cost.view", "View sales cost and margin"],
-  ["00000000-0000-4000-8000-000000000012", "report.profit.view", "View profit reports"],
-  ["00000000-0000-4000-8000-000000000013", "partner.view", "View customers and suppliers"],
-  ["00000000-0000-4000-8000-000000000014", "partner.manage", "Manage customers and suppliers"],
-] as const;
-
-const rolePermissionCodes = {
-  admin: permissionRows.map((permission) => permission[1]),
-  salesperson: ["product.view", "inventory.view", "sales.create"],
-  inventoryManager: [
-    "product.view",
-    "product.manage",
-    "inventory.view",
-    "inventory.receive",
-    "inventory.transfer.approve",
-  ],
+const roleIdsByCode = {
+  owner: ids.ownerRole,
+  admin: ids.adminRole,
+  salesperson: ids.salespersonRole,
+  inventory_manager: ids.inventoryManagerRole,
 };
 
 function hashPassword(password: string) {
@@ -79,6 +61,31 @@ function hashPassword(password: string) {
 function sha256(value: string) {
   return createHash("sha256").update(value).digest("hex");
 }
+
+function uuidFromSeed(value: string) {
+  const hash = sha256(value);
+
+  return `${hash.slice(0, 8)}-${hash.slice(8, 12)}-4${hash.slice(13, 16)}-8${hash.slice(17, 20)}-${hash.slice(20, 32)}`;
+}
+
+const permissionRows = PERMISSION_CATALOG.flatMap((item) => [
+  item,
+  ...item.legacyCodes.map((legacyCode) => ({
+    ...item,
+    code: legacyCode,
+    description: `${item.description} (legacy alias)`,
+  })),
+]).map((item) => ({
+  id: uuidFromSeed(`permission:${item.code}`),
+  ...item,
+}));
+
+const rolePermissionCodes: Record<keyof typeof roleIdsByCode, readonly string[]> = {
+  owner: SYSTEM_ROLES.find((role) => role.code === "owner")?.permissionCodes ?? [],
+  admin: SYSTEM_ROLES.find((role) => role.code === "admin")?.permissionCodes ?? [],
+  salesperson: SYSTEM_ROLES.find((role) => role.code === "salesperson")?.permissionCodes ?? [],
+  inventory_manager: SYSTEM_ROLES.find((role) => role.code === "inventory_manager")?.permissionCodes ?? [],
+};
 
 async function main() {
   const client = postgres(databaseUrl, { max: 1 });
@@ -165,7 +172,12 @@ async function main() {
           employeeId: ids.adminEmployee,
           username: "admin",
           email: "admin@syncpos.local",
+          normalizedEmail: "admin@syncpos.local",
           passwordHash: hashPassword("admin123"),
+          emailVerified: true,
+          failedLoginAttempts: 0,
+          lockedUntil: null,
+          passwordChangedAt: new Date(),
           status: "active",
         })
         .onConflictDoUpdate({
@@ -173,7 +185,12 @@ async function main() {
           set: {
             username: "admin",
             email: "admin@syncpos.local",
+            normalizedEmail: "admin@syncpos.local",
             passwordHash: hashPassword("admin123"),
+            emailVerified: true,
+            failedLoginAttempts: 0,
+            lockedUntil: null,
+            passwordChangedAt: sql`coalesce(${users.passwordChangedAt}, now())`,
             status: "active",
             deletedAt: null,
             deletedBy: null,
@@ -184,58 +201,39 @@ async function main() {
 
       await tx
         .insert(roles)
-        .values([
-          {
-            id: ids.adminRole,
+        .values(
+          SYSTEM_ROLES.map((role) => ({
+            id: roleIdsByCode[role.code],
             companyId: ids.company,
-            code: "admin",
-            name: "Administrator",
-            description: "Full system administration role.",
+            code: role.code,
+            name: role.name,
+            description: role.description,
             isSystem: true,
+            isEditable: role.isEditable,
+            isDeletable: role.isDeletable,
             isActive: true,
-          },
-          {
-            id: ids.salespersonRole,
-            companyId: ids.company,
-            code: "salesperson",
-            name: "Salesperson",
-            description: "Display-shop counter sales role.",
-            isSystem: true,
-            isActive: true,
-          },
-          {
-            id: ids.inventoryManagerRole,
-            companyId: ids.company,
-            code: "inventory_manager",
-            name: "Inventory Manager",
-            description: "Stock control, receiving, and transfer approval role.",
-            isSystem: true,
-            isActive: true,
-          },
-        ])
+          })),
+        )
         .onConflictDoNothing();
 
       await tx
         .insert(permissions)
         .values(
-          permissionRows.map(([id, code, description]) => ({
-            id,
-            code,
-            description,
+          permissionRows.map((permission) => ({
+            id: permission.id,
+            code: permission.code,
+            description: permission.description,
+            application: permission.application,
+            feature: permission.feature,
+            action: permission.action,
             isActive: true,
           })),
         )
         .onConflictDoNothing();
 
       const permissionIdByCode = Object.fromEntries(
-        permissionRows.map(([id, code]) => [code, id]),
+        permissionRows.map((permission) => [permission.code, permission.id]),
       );
-
-      const roleIdsByCode = {
-        admin: ids.adminRole,
-        salesperson: ids.salespersonRole,
-        inventoryManager: ids.inventoryManagerRole,
-      };
 
       await tx
         .insert(userRoles)
@@ -279,6 +277,26 @@ async function main() {
             name: "Main Display Shop",
             locationType: "display_shop",
             offlineSalesEnabled: true,
+            allowNegativeStock: false,
+            isActive: true,
+          },
+          {
+            id: ids.vendorLocation,
+            companyId: ids.company,
+            code: "VENDORS",
+            name: "Vendor Location",
+            locationType: "supplier",
+            offlineSalesEnabled: false,
+            allowNegativeStock: false,
+            isActive: true,
+          },
+          {
+            id: ids.customerLocation,
+            companyId: ids.company,
+            code: "CUSTOMERS",
+            name: "Customer Location",
+            locationType: "customer",
+            offlineSalesEnabled: false,
             allowNegativeStock: false,
             isActive: true,
           },

@@ -6,12 +6,21 @@ import {
   createDeliveryFromSalesOrder,
   updateSalesOrder,
 } from "@/app/admin/sales/actions";
+import { CreateDeliveryLinesEditor } from "@/app/admin/sales/[id]/create-delivery-lines-editor";
 import { SalesOrderForm } from "@/app/admin/sales/sales-order-form";
 import { Alert } from "@/components/ui/alert";
 import { Button, ButtonLink } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { Notebook } from "@/components/ui/notebook";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
-import { requireUser } from "@/server/auth/session";
+import { requirePermission } from "@/server/auth/session";
 import {
   displaySalesMoney,
   getSalesFormOptions,
@@ -29,8 +38,31 @@ function statusLabel(value: string) {
   return value.replace(/_/g, " ");
 }
 
+function CreateDeliveryDialog({
+  order,
+}: {
+  order: NonNullable<Awaited<ReturnType<typeof getSalesOrderDetail>>>;
+}) {
+  return (
+    <Dialog>
+      <DialogTrigger asChild>
+        <Button>Create Delivery</Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-5xl">
+        <DialogHeader>
+          <DialogTitle>Create Delivery</DialogTitle>
+          <DialogDescription>
+            Create a draft delivery for {order.orderNo}.
+          </DialogDescription>
+        </DialogHeader>
+        <CreateDeliveryLinesEditor action={createDeliveryFromSalesOrder} order={order} />
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default async function SalesOrderDetailPage({ params, searchParams }: SalesOrderDetailPageProps) {
-  await requireUser();
+  await requirePermission("sales:orders:create");
 
   const [{ id }, query, options] = await Promise.all([
     params,
@@ -44,7 +76,12 @@ export default async function SalesOrderDetailPage({ params, searchParams }: Sal
   }
 
   const isQuotation = order.status === "quotation";
-  const canCreateDelivery = order.status === "confirmed" || order.status === "partially_delivered";
+  const hasRemainingDeliveryQuantity = order.lines.some(
+    (line) => Number(line.quantityOrdered) - Number(line.quantityDelivered) > 0,
+  );
+  const canCreateDelivery =
+    ["confirmed", "partially_delivered", "invoiced"].includes(order.status) &&
+    hasRemainingDeliveryQuantity;
   const canCreateInvoice = order.status === "confirmed" || order.status === "partially_delivered" || order.status === "delivered";
 
   return (
@@ -89,10 +126,7 @@ export default async function SalesOrderDetailPage({ params, searchParams }: Sal
             </form>
           ) : null}
           {canCreateDelivery ? (
-            <form action={createDeliveryFromSalesOrder}>
-              <input type="hidden" name="salesOrderId" value={order.id} />
-              <Button>Create Delivery</Button>
-            </form>
+            <CreateDeliveryDialog order={order} />
           ) : null}
           {canCreateInvoice ? (
             <form action={createCustomerInvoiceFromSalesOrder}>

@@ -127,7 +127,12 @@ export default async function PartnersPage({ searchParams }: PartnersPageProps) 
                     <tr key={partner.id} className="border-t border-[#eef1f2]">
                       <td className="px-4 py-3 font-medium">{partner.code}</td>
                       <td className="px-4 py-3">
-                        <div className="font-medium">{partner.displayName}</div>
+                        <Link
+                          href={`/admin/partners/${partner.id}`}
+                          className="font-medium text-primary underline-offset-4 hover:underline"
+                        >
+                          {partner.displayName}
+                        </Link>
                         <div className="text-xs text-[#6a787d]">
                           {[partner.legalName, partner.tin ? `TIN ${partner.tin}` : null]
                             .filter(Boolean)

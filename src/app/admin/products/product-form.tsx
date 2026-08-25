@@ -1,15 +1,15 @@
-import {
-  formatProductType,
-  minorToDisplay,
-  productTypeOptions,
-  trackingModeOptions,
-} from "@/server/catalog/products";
+"use client";
+
+import { formatProductType, minorToDisplay } from "@/lib/catalog-utils";
+import { productTypeOptions, trackingModeOptions } from "@/server/catalog/types";
 import type { ProductFormRecord, SelectOption } from "@/server/catalog/types";
 import { createProduct, updateProduct } from "./actions";
 import { Alert } from "@/components/ui/alert";
 import { Button, ButtonLink } from "@/components/ui/button";
+import { ManyToManyTags } from "@/components/ui/many-to-many-tags";
 import { Notebook } from "@/components/ui/notebook";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
+import { useMemo, useState } from "react";
 
 type ProductFormProps = {
   mode: "create" | "edit";
@@ -17,6 +17,7 @@ type ProductFormProps = {
   categories: SelectOption[];
   brands: SelectOption[];
   units: SelectOption[];
+  taxes: { id: string; label: string; scope: "purchase" | "sale" | "both" }[];
   error?: string;
 };
 
@@ -29,11 +30,22 @@ export function ProductForm({
   categories,
   brands,
   units,
+  taxes,
   error,
 }: ProductFormProps) {
   const action = mode === "create" ? createProduct : updateProduct;
   const title = mode === "create" ? "New Product" : product?.name ?? "Edit Product";
   const submitLabel = mode === "create" ? "Create product" : "Save changes";
+  const [saleTaxIds, setSaleTaxIds] = useState(product?.saleTaxIds ?? []);
+  const [purchaseTaxIds, setPurchaseTaxIds] = useState(product?.purchaseTaxIds ?? []);
+  const saleTaxOptions = useMemo(
+    () => taxes.filter((tax) => tax.scope === "sale" || tax.scope === "both").map((tax) => ({ id: tax.id, label: tax.label })),
+    [taxes],
+  );
+  const purchaseTaxOptions = useMemo(
+    () => taxes.filter((tax) => tax.scope === "purchase" || tax.scope === "both").map((tax) => ({ id: tax.id, label: tax.label })),
+    [taxes],
+  );
 
   return (
     <PageShell maxWidth="max-w-6xl">
@@ -180,7 +192,7 @@ export function ProductForm({
               value: "inventory",
               label: "Inventory",
               content: (
-                <div className="grid gap-4 md:grid-cols-3">
+                <div className="grid gap-4 md:grid-cols-2">
                   <label className="grid gap-1 text-sm font-medium">
                     Tracking Mode
                     <select
@@ -195,8 +207,45 @@ export function ProductForm({
                       ))}
                     </select>
                   </label>
+                </div>
+              ),
+            },
+            {
+              value: "sales",
+              label: "Sales",
+              content: (
+                <div className="grid gap-4">
                   <label className="grid gap-1 text-sm font-medium">
-                    Standard Cost
+                    Sales Unit Price
+                    <input
+                      name="listPrice"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      defaultValue={product ? minorToDisplay(product.listPriceMinor) : "0.00"}
+                      className={inputClass}
+                    />
+                  </label>
+                  <label className="grid gap-1 text-sm font-medium">
+                    Customer Taxes
+                    <ManyToManyTags
+                      name="saleTaxIds"
+                      options={saleTaxOptions}
+                      value={saleTaxIds}
+                      onChange={setSaleTaxIds}
+                      placeholder="Select sale tax"
+                    />
+                  </label>
+                </div>
+              ),
+            },
+            {
+              value: "purchase",
+              label: "Purchase",
+              content: (
+                <div className="grid gap-4">
+                  <label className="grid gap-1 text-sm font-medium">
+                    Purchase Unit Cost
                     <input
                       name="standardCost"
                       type="number"
@@ -207,14 +256,13 @@ export function ProductForm({
                     />
                   </label>
                   <label className="grid gap-1 text-sm font-medium">
-                    List Price
-                    <input
-                      name="listPrice"
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      defaultValue={product ? minorToDisplay(product.listPriceMinor) : "0.00"}
-                      className={inputClass}
+                    Vendor Taxes
+                    <ManyToManyTags
+                      name="purchaseTaxIds"
+                      options={purchaseTaxOptions}
+                      value={purchaseTaxIds}
+                      onChange={setPurchaseTaxIds}
+                      placeholder="Select purchase tax"
                     />
                   </label>
                 </div>

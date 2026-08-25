@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, asc, eq, isNull, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
 
 import { getDefaultCompany, minorToDisplay } from "@/server/catalog/products";
 import { db } from "@/server/db/client";
@@ -10,9 +10,13 @@ import {
   deliveryLines,
   locations,
   partners,
+  productLots,
   products,
+  productSerials,
+  productSaleTaxes,
   salesOrderLines,
   salesOrders,
+  stockBalances,
   stockMovements,
   taxes,
 } from "@/server/db/schema";
@@ -20,6 +24,8 @@ import type {
   SalesFormOptions,
   DeliveryDetail,
   DeliveryDetailLine,
+  DeliveryLotOption,
+  DeliverySerialOption,
   DeliveryListRow,
   CustomerInvoiceDetail,
   CustomerInvoiceDetailLine,
@@ -51,9 +57,14 @@ export async function getSalesFormOptions(): Promise<SalesFormOptions> {
         id: products.id,
         code: products.sku,
         name: products.name,
+        listPriceMinor: products.listPriceMinor,
+        standardCostMinor: products.standardCostMinor,
+        saleTaxIds: sql<string[]>`coalesce(array_agg(${productSaleTaxes.taxId}) filter (where ${productSaleTaxes.taxId} is not null), '{}')`,
       })
       .from(products)
+      .leftJoin(productSaleTaxes, eq(productSaleTaxes.productId, products.id))
       .where(and(eq(products.companyId, company.id), isNull(products.deletedAt), eq(products.isActive, true)))
+      .groupBy(products.id)
       .orderBy(asc(products.name)),
     db
       .select({
@@ -171,6 +182,12 @@ export async function getDeliveryDetail(id: string): Promise<DeliveryDetail | nu
       customerName: partners.displayName,
       sourceLocationId: deliveries.sourceLocationId,
       sourceLocationCode: locations.code,
+      destinationLocationCode: sql<string | null>`(
+        select l.code
+        from stock_movements sm
+        left join locations l on l.id = sm.to_location_id
+        where sm.id = ${deliveries.stockMovementId}
+      )`,
       status: sql<string>`${deliveries.status}::text`,
       deliveryDate: sql<string>`${deliveries.deliveryDate}::text`,
       postedAt: sql<string | null>`${deliveries.postedAt}::text`,
@@ -211,10 +228,60 @@ export async function getDeliveryDetail(id: string): Promise<DeliveryDetail | nu
     .leftJoin(salesOrderLines, eq(deliveryLines.salesOrderLineId, salesOrderLines.id))
     .where(and(eq(deliveryLines.deliveryId, id), isNull(deliveryLines.deletedAt)))
     .orderBy(asc(deliveryLines.lineNo));
+  const productIds = [...new Set(lines.map((line) => line.productId))];
+  const [serialOptions, lotOptions] = productIds.length
+    ? await Promise.all([
+        db
+          .select({
+            id: productSerials.id,
+            productId: productSerials.productId,
+            serialNo: productSerials.serialNo,
+            quantityAvailable: stockBalances.quantityAvailable,
+          })
+          .from(stockBalances)
+          .innerJoin(productSerials, eq(stockBalances.productSerialId, productSerials.id))
+          .where(
+            and(
+              eq(stockBalances.companyId, company.id),
+              eq(stockBalances.locationId, delivery.sourceLocationId),
+              inArray(stockBalances.productId, productIds),
+              sql`cast(${stockBalances.quantityAvailable} as numeric) > 0`,
+              sql`${productSerials.status} in ('available', 'reserved')`,
+              eq(productSerials.currentLocationId, delivery.sourceLocationId),
+              isNull(stockBalances.deletedAt),
+              isNull(productSerials.deletedAt),
+            ),
+          )
+          .orderBy(asc(productSerials.serialNo)),
+        db
+          .select({
+            id: productLots.id,
+            productId: productLots.productId,
+            lotNo: productLots.lotNo,
+            quantityAvailable: stockBalances.quantityAvailable,
+          })
+          .from(stockBalances)
+          .innerJoin(productLots, eq(stockBalances.productLotId, productLots.id))
+          .where(
+            and(
+              eq(stockBalances.companyId, company.id),
+              eq(stockBalances.locationId, delivery.sourceLocationId),
+              inArray(stockBalances.productId, productIds),
+              sql`cast(${stockBalances.quantityAvailable} as numeric) > 0`,
+              sql`${productLots.status} in ('available', 'reserved')`,
+              isNull(stockBalances.deletedAt),
+              isNull(productLots.deletedAt),
+            ),
+          )
+          .orderBy(asc(productLots.lotNo)),
+      ])
+    : [[], []];
 
   return {
     ...delivery,
     lines: lines satisfies DeliveryDetailLine[],
+    serialOptions: serialOptions satisfies DeliverySerialOption[],
+    lotOptions: lotOptions satisfies DeliveryLotOption[],
   };
 }
 
@@ -222,11 +289,13 @@ export async function getCustomerInvoiceList(params: {
   salesOrderId?: string;
   deliveryId?: string;
   customerInvoiceId?: string;
+  customerId?: string;
 } = {}): Promise<CustomerInvoiceListRow[]> {
   const company = await getDefaultCompany();
   const salesOrderFilter = params.salesOrderId ? sql`and ci.sales_order_id = ${params.salesOrderId}` : sql``;
   const deliveryFilter = params.deliveryId ? sql`and ci.delivery_id = ${params.deliveryId}` : sql``;
   const invoiceFilter = params.customerInvoiceId ? sql`and ci.id = ${params.customerInvoiceId}` : sql``;
+  const customerFilter = params.customerId ? sql`and ci.customer_id = ${params.customerId}` : sql``;
 
   return db.execute<CustomerInvoiceListRow>(sql`
     select
@@ -291,6 +360,7 @@ export async function getCustomerInvoiceList(params: {
       ${salesOrderFilter}
       ${deliveryFilter}
       ${invoiceFilter}
+      ${customerFilter}
     group by ci.id, so.id, d.id, customer.id
     order by ci.invoice_date desc, ci.invoice_no desc
   `);
@@ -473,6 +543,54 @@ export async function getSalesOrderDetail(id: string): Promise<SalesOrderDetail 
     `),
     db.select({ count: sql<number>`count(*)::int` }).from(stockMovements).where(and(eq(stockMovements.sourceType, "sales_return"), eq(stockMovements.sourceId, id), isNull(stockMovements.deletedAt))),
   ]);
+  const productIds = [...new Set(lineRows.map((line) => line.productId))];
+  const [serialOptions, lotOptions] = order.sourceLocationId && productIds.length
+    ? await Promise.all([
+        db
+          .select({
+            id: productSerials.id,
+            productId: productSerials.productId,
+            serialNo: productSerials.serialNo,
+            quantityAvailable: stockBalances.quantityAvailable,
+          })
+          .from(stockBalances)
+          .innerJoin(productSerials, eq(stockBalances.productSerialId, productSerials.id))
+          .where(
+            and(
+              eq(stockBalances.companyId, company.id),
+              eq(stockBalances.locationId, order.sourceLocationId),
+              inArray(stockBalances.productId, productIds),
+              sql`cast(${stockBalances.quantityAvailable} as numeric) > 0`,
+              sql`${productSerials.status} in ('available', 'reserved')`,
+              eq(productSerials.currentLocationId, order.sourceLocationId),
+              isNull(stockBalances.deletedAt),
+              isNull(productSerials.deletedAt),
+            ),
+          )
+          .orderBy(asc(productSerials.serialNo)),
+        db
+          .select({
+            id: productLots.id,
+            productId: productLots.productId,
+            lotNo: productLots.lotNo,
+            quantityAvailable: stockBalances.quantityAvailable,
+          })
+          .from(stockBalances)
+          .innerJoin(productLots, eq(stockBalances.productLotId, productLots.id))
+          .where(
+            and(
+              eq(stockBalances.companyId, company.id),
+              eq(stockBalances.locationId, order.sourceLocationId),
+              inArray(stockBalances.productId, productIds),
+              sql`cast(${stockBalances.quantityAvailable} as numeric) > 0`,
+              sql`${productLots.status} in ('available', 'reserved')`,
+              isNull(stockBalances.deletedAt),
+              isNull(productLots.deletedAt),
+            ),
+          )
+          .orderBy(asc(productLots.lotNo)),
+      ])
+    : [[], []];
 
   return {
     ...order,
@@ -481,5 +599,7 @@ export async function getSalesOrderDetail(id: string): Promise<SalesOrderDetail 
     paymentCount: paymentCount?.count ?? 0,
     returnCount: returnCount?.count ?? 0,
     lines: lineRows,
+    serialOptions: serialOptions satisfies DeliverySerialOption[],
+    lotOptions: lotOptions satisfies DeliveryLotOption[],
   };
 }

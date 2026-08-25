@@ -9,6 +9,7 @@ import {
   getDefaultCompany,
   majorToMinor,
   normalizeCode,
+  priceListTypeOptions,
   productTypeOptions,
   taxComputationOptions,
   taxScopeOptions,
@@ -18,7 +19,11 @@ import {
 import { db } from "@/server/db/client";
 import {
   brands,
+  priceListItems,
+  priceLists,
   productCategories,
+  productPurchaseTaxes,
+  productSaleTaxes,
   products,
   taxes,
   unitsOfMeasure,
@@ -41,7 +46,35 @@ const productFormSchema = z.object({
   trackingMode: z.enum(trackingModeOptions),
   standardCost: z.string().trim().default("0"),
   listPrice: z.string().trim().default("0"),
+  saleTaxIds: z.array(z.string().uuid()),
+  purchaseTaxIds: z.array(z.string().uuid()),
   isActive: z.enum(["on"]).optional(),
+});
+
+const priceListItemSchema = z.object({
+  productId: z.string().uuid(),
+  minimumQuantity: z.string().trim().default("1"),
+  unitPrice: z.string().trim().default("0"),
+  discount: z.string().trim().default("0"),
+  validFrom: z.string().trim().min(1, "Item valid from date is required."),
+  validTo: z.string().trim().optional(),
+  isActive: z.boolean(),
+});
+
+const priceListSchema = z.object({
+  id: z.string().uuid().optional(),
+  code: z.string().trim().min(1).max(40).transform(normalizeCode),
+  name: z.string().trim().min(1).max(120),
+  priceListType: z.enum(priceListTypeOptions),
+  locationId: optionalUuid,
+  validFrom: z.string().trim().optional(),
+  validTo: z.string().trim().optional(),
+  isActive: z.boolean(),
+  items: z.array(priceListItemSchema),
+  returnPath: z.string().trim().startsWith("/admin/products/price-lists").default("/admin/products/price-lists"),
+}).refine((data) => !data.validTo || !data.validFrom || data.validTo >= data.validFrom, {
+  message: "Price list valid-to date must be after valid-from date.",
+  path: ["validTo"],
 });
 
 const referenceSchema = z.object({
@@ -92,8 +125,21 @@ function formPayload(formData: FormData) {
     trackingMode: formValue(formData, "trackingMode"),
     standardCost: formValue(formData, "standardCost") || "0",
     listPrice: formValue(formData, "listPrice") || "0",
+    saleTaxIds: parseCsvIds(formValue(formData, "saleTaxIds")),
+    purchaseTaxIds: parseCsvIds(formValue(formData, "purchaseTaxIds")),
     isActive: formData.get("isActive") === "on" ? "on" : undefined,
   };
+}
+
+function formValues(formData: FormData, key: string) {
+  return formData.getAll(key).filter((value): value is string => typeof value === "string");
+}
+
+function parseCsvIds(value: string) {
+  return value
+    .split(",")
+    .map((part) => part.trim())
+    .filter(Boolean);
 }
 
 function formErrorPath(path: string, error: unknown) {
@@ -136,6 +182,39 @@ function taxPayload(formData: FormData) {
   };
 }
 
+function priceListPayload(formData: FormData) {
+  const productIds = formValues(formData, "itemProductId");
+  const minimumQuantities = formValues(formData, "itemMinimumQuantity");
+  const unitPrices = formValues(formData, "itemUnitPrice");
+  const discounts = formValues(formData, "itemDiscount");
+  const validFromValues = formValues(formData, "itemValidFrom");
+  const validToValues = formValues(formData, "itemValidTo");
+  const activeValues = formValues(formData, "itemIsActive");
+
+  return {
+    id: formValue(formData, "id") || undefined,
+    code: formValue(formData, "code"),
+    name: formValue(formData, "name"),
+    priceListType: formValue(formData, "priceListType") || "retail",
+    locationId: formValue(formData, "locationId"),
+    validFrom: formValue(formData, "validFrom"),
+    validTo: formValue(formData, "validTo"),
+    isActive: formData.get("isActive") === "on",
+    returnPath: formValue(formData, "returnPath") || "/admin/products/price-lists",
+    items: productIds
+      .map((productId, index) => ({
+        productId,
+        minimumQuantity: minimumQuantities[index] || "1",
+        unitPrice: unitPrices[index] || "0",
+        discount: discounts[index] || "0",
+        validFrom: validFromValues[index] || formValue(formData, "validFrom") || new Date().toISOString().slice(0, 10),
+        validTo: validToValues[index] || "",
+        isActive: activeValues[index] !== "false",
+      }))
+      .filter((item) => item.productId),
+  };
+}
+
 function redirectWithMessage(path: string, key: "notice" | "error", message: string): never {
   redirect(`${path}${path.includes("?") ? "&" : "?"}${key}=${encodeURIComponent(message)}`);
 }
@@ -152,22 +231,32 @@ export async function createProduct(formData: FormData) {
   const company = await getDefaultCompany();
 
   try {
-    await db.insert(products).values({
-      companyId: company.id,
-      sku: parsed.data.sku,
-      barcode: parsed.data.barcode || null,
-      name: parsed.data.name,
-      categoryId: parsed.data.categoryId,
-      brandId: parsed.data.brandId,
-      model: parsed.data.model || null,
-      description: parsed.data.description || null,
-      unitId: parsed.data.unitId,
-      productType: parsed.data.productType,
-      trackingMode: parsed.data.trackingMode,
-      standardCostMinor: majorToMinor(parsed.data.standardCost),
-      listPriceMinor: majorToMinor(parsed.data.listPrice),
-      currencyCode: company.baseCurrencyCode,
-      isActive: parsed.data.isActive === "on",
+    await db.transaction(async (tx) => {
+      const [product] = await tx.insert(products).values({
+        companyId: company.id,
+        sku: parsed.data.sku,
+        barcode: parsed.data.barcode || null,
+        name: parsed.data.name,
+        categoryId: parsed.data.categoryId,
+        brandId: parsed.data.brandId,
+        model: parsed.data.model || null,
+        description: parsed.data.description || null,
+        unitId: parsed.data.unitId,
+        productType: parsed.data.productType,
+        trackingMode: parsed.data.trackingMode,
+        standardCostMinor: majorToMinor(parsed.data.standardCost),
+        listPriceMinor: majorToMinor(parsed.data.listPrice),
+        currencyCode: company.baseCurrencyCode,
+        isActive: parsed.data.isActive === "on",
+      }).returning({ id: products.id });
+
+      if (parsed.data.saleTaxIds.length > 0) {
+        await tx.insert(productSaleTaxes).values(parsed.data.saleTaxIds.map((taxId) => ({ productId: product.id, taxId })));
+      }
+
+      if (parsed.data.purchaseTaxIds.length > 0) {
+        await tx.insert(productPurchaseTaxes).values(parsed.data.purchaseTaxIds.map((taxId) => ({ productId: product.id, taxId })));
+      }
     });
   } catch (error) {
     redirect(
@@ -190,26 +279,41 @@ export async function updateProduct(formData: FormData) {
     redirect(formErrorPath("/admin/products", parsed.success ? "Product ID is missing" : parsed.error));
   }
 
+  const productId = parsed.data.id;
+
   try {
-    await db
-      .update(products)
-      .set({
-        sku: parsed.data.sku,
-        barcode: parsed.data.barcode || null,
-        name: parsed.data.name,
-        categoryId: parsed.data.categoryId,
-        brandId: parsed.data.brandId,
-        model: parsed.data.model || null,
-        description: parsed.data.description || null,
-        unitId: parsed.data.unitId,
-        productType: parsed.data.productType,
-        trackingMode: parsed.data.trackingMode,
-        standardCostMinor: majorToMinor(parsed.data.standardCost),
-        listPriceMinor: majorToMinor(parsed.data.listPrice),
-        isActive: parsed.data.isActive === "on",
-        updatedAt: sql`now()`,
-      })
-      .where(eq(products.id, parsed.data.id));
+    await db.transaction(async (tx) => {
+      await tx
+        .update(products)
+        .set({
+          sku: parsed.data.sku,
+          barcode: parsed.data.barcode || null,
+          name: parsed.data.name,
+          categoryId: parsed.data.categoryId,
+          brandId: parsed.data.brandId,
+          model: parsed.data.model || null,
+          description: parsed.data.description || null,
+          unitId: parsed.data.unitId,
+          productType: parsed.data.productType,
+          trackingMode: parsed.data.trackingMode,
+          standardCostMinor: majorToMinor(parsed.data.standardCost),
+          listPriceMinor: majorToMinor(parsed.data.listPrice),
+          isActive: parsed.data.isActive === "on",
+          updatedAt: sql`now()`,
+        })
+        .where(eq(products.id, productId));
+
+      await tx.delete(productSaleTaxes).where(eq(productSaleTaxes.productId, productId));
+      await tx.delete(productPurchaseTaxes).where(eq(productPurchaseTaxes.productId, productId));
+
+      if (parsed.data.saleTaxIds.length > 0) {
+        await tx.insert(productSaleTaxes).values(parsed.data.saleTaxIds.map((taxId) => ({ productId, taxId })));
+      }
+
+      if (parsed.data.purchaseTaxIds.length > 0) {
+        await tx.insert(productPurchaseTaxes).values(parsed.data.purchaseTaxIds.map((taxId) => ({ productId, taxId })));
+      }
+    });
   } catch (error) {
     redirect(
       `/admin/products/${parsed.data.id}/edit?error=${encodeURIComponent(
@@ -381,6 +485,126 @@ export async function restoreTax(formData: FormData) {
   revalidatePath("/admin/products");
   revalidatePath("/admin/products/taxes");
   redirectWithMessage(returnPath, "notice", "Tax restored");
+}
+
+async function savePriceListItems(
+  tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
+  priceListId: string,
+  items: z.infer<typeof priceListItemSchema>[],
+) {
+  await tx.delete(priceListItems).where(eq(priceListItems.priceListId, priceListId));
+
+  if (items.length === 0) {
+    return;
+  }
+
+  await tx.insert(priceListItems).values(
+    items.map((item) => ({
+      priceListId,
+      productId: item.productId,
+      minimumQuantity: item.minimumQuantity,
+      unitPriceMinor: majorToMinor(item.unitPrice),
+      discountMinor: majorToMinor(item.discount),
+      validFrom: item.validFrom,
+      validTo: item.validTo || null,
+      isActive: item.isActive,
+    })),
+  );
+}
+
+export async function createPriceList(formData: FormData) {
+  await requirePermission("product.manage");
+
+  const parsed = priceListSchema.safeParse(priceListPayload(formData));
+  if (!parsed.success) {
+    redirectWithMessage("/admin/products/price-lists", "error", parsed.error.issues[0]?.message ?? "Invalid price list.");
+  }
+
+  const company = await getDefaultCompany();
+
+  try {
+    await db.transaction(async (tx) => {
+      const [created] = await tx
+        .insert(priceLists)
+        .values({
+          companyId: company.id,
+          code: parsed.data.code,
+          name: parsed.data.name,
+          priceListType: parsed.data.priceListType,
+          currencyCode: company.baseCurrencyCode,
+          locationId: parsed.data.locationId,
+          validFrom: parsed.data.validFrom || null,
+          validTo: parsed.data.validTo || null,
+          isActive: parsed.data.isActive,
+        })
+        .returning({ id: priceLists.id });
+
+      await savePriceListItems(tx, created.id, parsed.data.items);
+    });
+  } catch (error) {
+    redirectWithMessage(parsed.data.returnPath, "error", uniqueViolationMessage(error, "Could not create price list."));
+  }
+
+  revalidatePath("/admin/products/price-lists");
+  redirectWithMessage(parsed.data.returnPath, "notice", "Price list created");
+}
+
+export async function updatePriceList(formData: FormData) {
+  await requirePermission("product.manage");
+
+  const parsed = priceListSchema.safeParse(priceListPayload(formData));
+  if (!parsed.success || !parsed.data.id) {
+    redirectWithMessage("/admin/products/price-lists", "error", parsed.success ? "Price list ID is missing." : (parsed.error.issues[0]?.message ?? "Invalid price list."));
+  }
+
+  const priceListId = parsed.data.id;
+
+  try {
+    await db.transaction(async (tx) => {
+      await tx
+        .update(priceLists)
+        .set({
+          code: parsed.data.code,
+          name: parsed.data.name,
+          priceListType: parsed.data.priceListType,
+          locationId: parsed.data.locationId,
+          validFrom: parsed.data.validFrom || null,
+          validTo: parsed.data.validTo || null,
+          isActive: parsed.data.isActive,
+          updatedAt: sql`now()`,
+        })
+        .where(eq(priceLists.id, priceListId));
+
+      await savePriceListItems(tx, priceListId, parsed.data.items);
+    });
+  } catch (error) {
+    redirectWithMessage(parsed.data.returnPath, "error", uniqueViolationMessage(error, "Could not update price list."));
+  }
+
+  revalidatePath("/admin/products/price-lists");
+  redirectWithMessage(parsed.data.returnPath, "notice", "Price list updated");
+}
+
+export async function softDeletePriceList(formData: FormData) {
+  await requirePermission("product.manage");
+
+  const id = formValue(formData, "id");
+  if (!id) {
+    redirectWithMessage("/admin/products/price-lists", "error", "Price list ID is missing.");
+  }
+
+  await db
+    .update(priceLists)
+    .set({
+      isActive: false,
+      deletedAt: sql`now()`,
+      deleteReason: "Deleted from price list screen.",
+      updatedAt: sql`now()`,
+    })
+    .where(eq(priceLists.id, id));
+
+  revalidatePath("/admin/products/price-lists");
+  redirectWithMessage("/admin/products/price-lists", "notice", "Price list deleted");
 }
 
 export async function createCategory(formData: FormData) {

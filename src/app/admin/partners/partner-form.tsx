@@ -5,15 +5,77 @@ import {
   minorToDisplay,
   partnerStatusOptions,
 } from "@/server/partners/partners";
-import type { PartnerFormRecord, PaymentTermOption } from "@/server/partners/types";
+import type { PartnerDetailRecord, PartnerFormRecord, PaymentTermOption } from "@/server/partners/types";
 import { createPartner, updatePartner } from "./actions";
 
 type PartnerFormProps = {
   mode: "create" | "edit";
-  partner?: PartnerFormRecord;
+  partner?: PartnerFormRecord | PartnerDetailRecord;
   paymentTerms: PaymentTermOption[];
   error?: string;
 };
+
+function hasFinancialSummary(partner?: PartnerFormRecord | PartnerDetailRecord): partner is PartnerDetailRecord {
+  return Boolean(partner && "financial" in partner);
+}
+
+function money(value: number, currencyCode: string) {
+  return `${currencyCode} ${minorToDisplay(value)}`;
+}
+
+function PartnerSmartSummary({ partner }: { partner: PartnerDetailRecord }) {
+  return (
+    <section className="mb-5 grid gap-3 md:grid-cols-[auto_auto_1fr]">
+      <div className="flex flex-wrap gap-2 md:col-span-3">
+        {partner.isCustomer ? (
+          <Link
+            href={`/admin/sales?view=invoices&partnerId=${partner.id}`}
+            className="rounded-md border border-[#c9d1d4] bg-white px-4 py-3 text-sm font-semibold text-[#2f4a49]"
+          >
+            <span className="block text-lg leading-none">{partner.financial.invoiceCount}</span>
+            <span className="mt-1 block text-xs font-medium text-[#58706f]">Customer Invoices</span>
+          </Link>
+        ) : null}
+        {partner.isSupplier ? (
+          <Link
+            href={`/admin/purchasing?view=supplier-bills&partnerId=${partner.id}`}
+            className="rounded-md border border-[#c9d1d4] bg-white px-4 py-3 text-sm font-semibold text-[#2f4a49]"
+          >
+            <span className="block text-lg leading-none">{partner.financial.billCount}</span>
+            <span className="mt-1 block text-xs font-medium text-[#58706f]">Vendor Bills</span>
+          </Link>
+        ) : null}
+      </div>
+
+      <div className="rounded-md border border-[#d7dcdf] bg-white p-4">
+        <div className="text-xs font-medium uppercase tracking-wide text-[#58706f]">Receivable unpaid</div>
+        <div className="mt-1 text-lg font-semibold">
+          {money(partner.financial.receivableResidualMinor, partner.currencyCode)}
+        </div>
+      </div>
+      <div className="rounded-md border border-[#d7dcdf] bg-white p-4">
+        <div className="text-xs font-medium uppercase tracking-wide text-[#58706f]">Remaining credit</div>
+        <div className="mt-1 text-lg font-semibold">
+          {money(partner.financial.remainingCreditMinor, partner.currencyCode)}
+        </div>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div className="rounded-md border border-[#d7dcdf] bg-white p-4">
+          <div className="text-xs font-medium uppercase tracking-wide text-[#58706f]">Payable unpaid</div>
+          <div className="mt-1 text-lg font-semibold">
+            {money(partner.financial.payableResidualMinor, partner.currencyCode)}
+          </div>
+        </div>
+        <div className="rounded-md border border-[#d7dcdf] bg-white p-4">
+          <div className="text-xs font-medium uppercase tracking-wide text-[#58706f]">Net balance</div>
+          <div className="mt-1 text-lg font-semibold">
+            {money(partner.financial.netBalanceMinor, partner.currencyCode)}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
 
 export function PartnerForm({ mode, partner, paymentTerms, error }: PartnerFormProps) {
   const action = mode === "create" ? createPartner : updatePartner;
@@ -43,6 +105,8 @@ export function PartnerForm({ mode, partner, paymentTerms, error }: PartnerFormP
             {error}
           </div>
         ) : null}
+
+        {hasFinancialSummary(partner) ? <PartnerSmartSummary partner={partner} /> : null}
 
         <form action={action} className="grid gap-5 rounded-lg border border-[#d7dcdf] bg-white p-5">
           {partner ? <input type="hidden" name="id" value={partner.id} /> : null}

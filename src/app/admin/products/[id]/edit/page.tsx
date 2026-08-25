@@ -32,6 +32,7 @@ export default async function EditProductPage({ params, searchParams }: EditProd
       categories={options.categories}
       brands={options.brands}
       units={options.units}
+      taxes={options.taxes}
       error={queryParams.error}
     />
   );

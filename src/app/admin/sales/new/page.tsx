@@ -2,7 +2,7 @@ import { createSalesOrder } from "@/app/admin/sales/actions";
 import { SalesOrderForm } from "@/app/admin/sales/sales-order-form";
 import { ButtonLink } from "@/components/ui/button";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
-import { requireUser } from "@/server/auth/session";
+import { requirePermission } from "@/server/auth/session";
 import { getSalesFormOptions } from "@/server/sales/sales";
 
 export const dynamic = "force-dynamic";
@@ -12,7 +12,7 @@ type NewSalesOrderPageProps = {
 };
 
 export default async function NewSalesOrderPage({ searchParams }: NewSalesOrderPageProps) {
-  await requireUser();
+  await requirePermission("sales:orders:create");
 
   const [query, options] = await Promise.all([searchParams, getSalesFormOptions()]);
 

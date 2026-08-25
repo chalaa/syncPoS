@@ -1,4 +1,5 @@
 import { createInventoryOperation } from "@/app/admin/inventory/operations/actions";
+import { OperationLinesEditor } from "@/app/admin/inventory/operations/operation-lines-editor";
 import { Alert } from "@/components/ui/alert";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
@@ -69,51 +70,7 @@ export default async function NewInventoryOperationPage({ searchParams }: NewInv
           </label>
         </div>
 
-        <div className="mt-5 overflow-x-auto">
-          <table className="w-full min-w-[1080px] text-left text-sm">
-            <thead className="text-xs uppercase text-muted-foreground">
-              <tr className="border-b border-border">
-                <th className="px-2 py-2">Product</th>
-                <th className="px-2 py-2 text-right">Quantity</th>
-                <th className="px-2 py-2 text-right">Unit Cost</th>
-                <th className="px-2 py-2">Serial</th>
-                <th className="px-2 py-2">Lot</th>
-                <th className="px-2 py-2">Notes</th>
-              </tr>
-            </thead>
-            <tbody>
-              {Array.from({ length: 5 }).map((_, index) => (
-                <tr key={index} className="border-b border-border/70">
-                  <td className="px-2 py-3">
-                    <select name="productId" defaultValue="" className={inputClass()}>
-                      <option value="">Select product</option>
-                      {options.products.map((product) => (
-                        <option key={product.id} value={product.id}>
-                          {product.code} - {product.name} ({product.trackingMode})
-                        </option>
-                      ))}
-                    </select>
-                  </td>
-                  <td className="px-2 py-3">
-                    <input name="quantity" type="number" step="0.000001" defaultValue={index === 0 ? "1" : ""} className={`${inputClass()} text-right`} />
-                  </td>
-                  <td className="px-2 py-3">
-                    <input name="unitCost" defaultValue="0" className={`${inputClass()} text-right`} />
-                  </td>
-                  <td className="px-2 py-3">
-                    <input name="serialNo" className={inputClass()} />
-                  </td>
-                  <td className="px-2 py-3">
-                    <input name="lotNo" className={inputClass()} />
-                  </td>
-                  <td className="px-2 py-3">
-                    <input name="lineNotes" className={inputClass()} />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <OperationLinesEditor products={options.products} />
 
         <label className="mt-5 block space-y-1">
           <span className="text-xs font-medium text-muted-foreground">Notes</span>

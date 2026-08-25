@@ -33,6 +33,7 @@ type PurchasingPageProps = {
     view?: string;
     purchaseOrderId?: string;
     vendorBillId?: string;
+    partnerId?: string;
     notice?: string;
     error?: string;
   }>;
@@ -55,7 +56,10 @@ export default async function PurchasingPage({ searchParams }: PurchasingPagePro
   }
 
   if (view === "supplier-bills") {
-    const bills = await getPurchaseVendorBillList(params.purchaseOrderId);
+    const bills = await getPurchaseVendorBillList({
+      purchaseOrderId: params.purchaseOrderId,
+      supplierId: params.partnerId,
+    });
 
     return (
       <PurchasingLayout title="Vendor Bills" notice={params.notice} error={params.error}>

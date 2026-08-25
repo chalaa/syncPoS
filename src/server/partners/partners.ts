@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, ilike, isNotNull, isNull, or } from "drizzle-orm";
+import { and, asc, desc, eq, ilike, isNotNull, isNull, or, sql } from "drizzle-orm";
 
 import { getDefaultCompany, majorToMinor, minorToDisplay, normalizeCode } from "@/server/catalog/products";
 import { db } from "@/server/db/client";
@@ -8,6 +8,7 @@ import {
   partners,
   paymentTerms,
 } from "@/server/db/schema";
+import type { PartnerDetailRecord, PartnerFinancialSummary } from "@/server/partners/types";
 export { addressTypeOptions, partnerStatusOptions } from "@/server/partners/types";
 
 export { majorToMinor, minorToDisplay, normalizeCode };
@@ -187,6 +188,192 @@ export async function getPartnerById(id: string) {
     primaryContact,
     primaryAddress,
   };
+}
+
+export async function getPartnerDetail(id: string): Promise<PartnerDetailRecord | undefined> {
+  const company = await getDefaultCompany();
+
+  const [partner] = await db
+    .select({
+      id: partners.id,
+      code: partners.code,
+      displayName: partners.displayName,
+      legalName: partners.legalName,
+      tin: partners.tin,
+      isCustomer: partners.isCustomer,
+      isSupplier: partners.isSupplier,
+      paymentTermId: partners.paymentTermId,
+      paymentTermName: paymentTerms.name,
+      paymentTermDueDays: paymentTerms.dueDays,
+      creditLimitMinor: partners.creditLimitMinor,
+      currencyCode: partners.currencyCode,
+      status: partners.status,
+      notes: partners.notes,
+      deletedAt: partners.deletedAt,
+    })
+    .from(partners)
+    .leftJoin(paymentTerms, eq(partners.paymentTermId, paymentTerms.id))
+    .where(and(eq(partners.id, id), eq(partners.companyId, company.id), isNull(partners.deletedAt)))
+    .limit(1);
+
+  if (!partner) {
+    return undefined;
+  }
+
+  const [primaryContact, primaryAddress, financial] = await Promise.all([
+    db
+      .select({
+        fullName: partnerContacts.fullName,
+        roleTitle: partnerContacts.roleTitle,
+        phone: partnerContacts.phone,
+        email: partnerContacts.email,
+      })
+      .from(partnerContacts)
+      .where(
+        and(
+          eq(partnerContacts.partnerId, id),
+          eq(partnerContacts.isPrimary, true),
+          isNull(partnerContacts.deletedAt),
+        ),
+      )
+      .limit(1)
+      .then((rows) => rows[0]),
+    db
+      .select({
+        addressType: partnerAddresses.addressType,
+        label: partnerAddresses.label,
+        line1: partnerAddresses.line1,
+        line2: partnerAddresses.line2,
+        city: partnerAddresses.city,
+        region: partnerAddresses.region,
+        country: partnerAddresses.country,
+      })
+      .from(partnerAddresses)
+      .where(
+        and(
+          eq(partnerAddresses.partnerId, id),
+          eq(partnerAddresses.isPrimary, true),
+          isNull(partnerAddresses.deletedAt),
+        ),
+      )
+      .limit(1)
+      .then((rows) => rows[0]),
+    getPartnerFinancialSummary(company.id, id, partner.creditLimitMinor),
+  ]);
+
+  return {
+    ...partner,
+    primaryContact,
+    primaryAddress,
+    financial,
+  };
+}
+
+async function getPartnerFinancialSummary(
+  companyId: string,
+  partnerId: string,
+  creditLimitMinor: number,
+): Promise<PartnerFinancialSummary> {
+  const [summary] = await db.execute<PartnerFinancialSummary>(sql`
+    select
+      coalesce((
+        select count(*)
+        from customer_invoices ci
+        where ci.company_id = ${companyId}
+          and ci.customer_id = ${partnerId}
+          and ci.deleted_at is null
+          and ci.status <> 'cancelled'
+      ), 0)::int as "invoiceCount",
+      coalesce((
+        select count(*)
+        from vendor_bills vb
+        where vb.company_id = ${companyId}
+          and vb.supplier_id = ${partnerId}
+          and vb.deleted_at is null
+          and vb.status <> 'cancelled'
+      ), 0)::int as "billCount",
+      coalesce((
+        select sum(greatest(ci.total_minor - coalesce((
+          select sum(pa.amount_minor)
+          from payment_allocations pa
+          inner join payments p on p.id = pa.payment_id
+          where pa.customer_invoice_id = ci.id
+            and pa.deleted_at is null
+            and p.deleted_at is null
+            and p.status = 'posted'
+        ), 0), 0))
+        from customer_invoices ci
+        where ci.company_id = ${companyId}
+          and ci.customer_id = ${partnerId}
+          and ci.deleted_at is null
+          and ci.status <> 'cancelled'
+      ), 0)::bigint as "receivableResidualMinor",
+      coalesce((
+        select sum(greatest(vb.total_minor - coalesce((
+          select sum(pa.amount_minor)
+          from payment_allocations pa
+          inner join payments p on p.id = pa.payment_id
+          where pa.vendor_bill_id = vb.id
+            and pa.deleted_at is null
+            and p.deleted_at is null
+            and p.status = 'posted'
+        ), 0), 0))
+        from vendor_bills vb
+        where vb.company_id = ${companyId}
+          and vb.supplier_id = ${partnerId}
+          and vb.deleted_at is null
+          and vb.status <> 'cancelled'
+      ), 0)::bigint as "payableResidualMinor",
+      greatest(${creditLimitMinor}::bigint - coalesce((
+        select sum(greatest(ci.total_minor - coalesce((
+          select sum(pa.amount_minor)
+          from payment_allocations pa
+          inner join payments p on p.id = pa.payment_id
+          where pa.customer_invoice_id = ci.id
+            and pa.deleted_at is null
+            and p.deleted_at is null
+            and p.status = 'posted'
+        ), 0), 0))
+        from customer_invoices ci
+        where ci.company_id = ${companyId}
+          and ci.customer_id = ${partnerId}
+          and ci.deleted_at is null
+          and ci.status <> 'cancelled'
+      ), 0), 0)::bigint as "remainingCreditMinor",
+      coalesce((
+        select sum(greatest(ci.total_minor - coalesce((
+          select sum(pa.amount_minor)
+          from payment_allocations pa
+          inner join payments p on p.id = pa.payment_id
+          where pa.customer_invoice_id = ci.id
+            and pa.deleted_at is null
+            and p.deleted_at is null
+            and p.status = 'posted'
+        ), 0), 0))
+        from customer_invoices ci
+        where ci.company_id = ${companyId}
+          and ci.customer_id = ${partnerId}
+          and ci.deleted_at is null
+          and ci.status <> 'cancelled'
+      ), 0)::bigint - coalesce((
+        select sum(greatest(vb.total_minor - coalesce((
+          select sum(pa.amount_minor)
+          from payment_allocations pa
+          inner join payments p on p.id = pa.payment_id
+          where pa.vendor_bill_id = vb.id
+            and pa.deleted_at is null
+            and p.deleted_at is null
+            and p.status = 'posted'
+        ), 0), 0))
+        from vendor_bills vb
+        where vb.company_id = ${companyId}
+          and vb.supplier_id = ${partnerId}
+          and vb.deleted_at is null
+          and vb.status <> 'cancelled'
+      ), 0)::bigint as "netBalanceMinor"
+  `);
+
+  return summary;
 }
 
 export function formatPartnerRoles(value: { isCustomer: boolean; isSupplier: boolean }) {

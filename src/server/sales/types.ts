@@ -63,6 +63,8 @@ export type SalesOrderDetail = {
   paymentCount: number;
   returnCount: number;
   lines: SalesOrderDetailLine[];
+  serialOptions: DeliverySerialOption[];
+  lotOptions: DeliveryLotOption[];
 };
 
 export type SalesFormOptions = {
@@ -109,6 +111,20 @@ export type DeliveryDetailLine = {
   lotNo: string | null;
 };
 
+export type DeliverySerialOption = {
+  id: string;
+  productId: string;
+  serialNo: string;
+  quantityAvailable: string;
+};
+
+export type DeliveryLotOption = {
+  id: string;
+  productId: string;
+  lotNo: string;
+  quantityAvailable: string;
+};
+
 export type DeliveryDetail = {
   id: string;
   deliveryNo: string;
@@ -117,12 +133,15 @@ export type DeliveryDetail = {
   customerName: string;
   sourceLocationId: string;
   sourceLocationCode: string;
+  destinationLocationCode: string | null;
   status: string;
   deliveryDate: string;
   postedAt: string | null;
   stockMovementId: string | null;
   notes: string | null;
   lines: DeliveryDetailLine[];
+  serialOptions: DeliverySerialOption[];
+  lotOptions: DeliveryLotOption[];
 };
 
 export type CustomerInvoiceListRow = {

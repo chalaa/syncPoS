@@ -118,6 +118,7 @@ export function SalesOrderForm({
       : [newLine()],
   );
   const taxById = useMemo(() => new Map(taxes.map((tax) => [tax.id, tax])), [taxes]);
+  const productById = useMemo(() => new Map(products.map((product) => [product.id, product])), [products]);
   const taxTagOptions = useMemo(
     () => taxes.map((tax) => ({ id: tax.id, label: taxLabel(tax) })),
     [taxes],
@@ -155,6 +156,16 @@ export function SalesOrderForm({
 
   function removeLine(key: string) {
     setLines((current) => (current.length === 1 ? current : current.filter((line) => line.key !== key)));
+  }
+
+  function updateLineProduct(key: string, productId: string) {
+    const product = productById.get(productId);
+
+    updateLine(key, {
+      productId,
+      unitPrice: product?.listPriceMinor !== undefined ? String(product.listPriceMinor / 100) : "0",
+      taxIds: product?.saleTaxIds ?? [],
+    });
   }
 
   return (
@@ -202,6 +213,16 @@ export function SalesOrderForm({
         </label>
       </div>
 
+      <label className="flex items-center gap-2 rounded-md border border-border bg-muted/30 px-3 py-2 text-sm font-medium">
+        <input
+          type="checkbox"
+          name="reserveOnConfirm"
+          defaultChecked={order?.reserveOnConfirm ?? false}
+          className="size-4 rounded border-input"
+        />
+        Reserve stock when quotation is confirmed
+      </label>
+
       <Notebook
         defaultValue="order-lines"
         items={[
@@ -233,7 +254,7 @@ export function SalesOrderForm({
                               required
                               value={line.productId}
                               className={tableInputClass}
-                              onChange={(event) => updateLine(line.key, { productId: event.target.value })}
+                              onChange={(event) => updateLineProduct(line.key, event.target.value)}
                             >
                               <option value="">Select product</option>
                               {products.map((product) => (
@@ -334,15 +355,6 @@ export function SalesOrderForm({
             label: "Other Information",
             content: (
               <div className="grid gap-4">
-                <label className="flex items-center gap-2 text-sm font-medium">
-                  <input
-                    type="checkbox"
-                    name="reserveOnConfirm"
-                    defaultChecked={order?.reserveOnConfirm ?? false}
-                    className="size-4 rounded border-input"
-                  />
-                  Reserve stock when quotation is confirmed
-                </label>
                 <label className="flex flex-col gap-1 text-sm font-medium">
                   Notes
                   <textarea

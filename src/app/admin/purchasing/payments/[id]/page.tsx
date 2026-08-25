@@ -4,12 +4,14 @@ import { notFound } from "next/navigation";
 import {
   cancelSupplierPayment,
   postSupplierPayment,
+  updateSupplierPayment,
 } from "@/app/admin/purchasing/payments/actions";
+import { PaymentFormDialog } from "@/components/app/payment-form-dialog";
 import { Alert } from "@/components/ui/alert";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
 import { requirePermission } from "@/server/auth/session";
-import { displayPaymentMoney, getPaymentDetail } from "@/server/payments/payments";
+import { displayPaymentMoney, getActivePaymentAccounts, getPaymentDetail } from "@/server/payments/payments";
 
 export const dynamic = "force-dynamic";
 
@@ -25,7 +27,11 @@ function statusLabel(value: string) {
 export default async function PaymentDetailPage({ params, searchParams }: PaymentDetailPageProps) {
   await requirePermission("inventory.receive");
 
-  const [{ id }, query] = await Promise.all([params, searchParams]);
+  const [{ id }, query, paymentAccounts] = await Promise.all([
+    params,
+    searchParams,
+    getActivePaymentAccounts("outbound"),
+  ]);
   const payment = await getPaymentDetail(id);
 
   if (!payment) {
@@ -45,6 +51,23 @@ export default async function PaymentDetailPage({ params, searchParams }: Paymen
         actions={
           <div className="flex flex-wrap gap-2">
             <ButtonLink href="/admin/purchasing?view=payments" variant="outline">Back to payments</ButtonLink>
+            {isSupplierPayment && payment.status === "draft" ? (
+              <PaymentFormDialog
+                title="Edit Supplier Payment"
+                description={`Update draft payment ${payment.paymentNo}.`}
+                triggerLabel="Edit Payment"
+                submitLabel="Save Payment"
+                action={updateSupplierPayment}
+                hiddenFieldName="paymentId"
+                hiddenFieldValue={payment.id}
+                paymentAccounts={paymentAccounts}
+                currencyCode={payment.currencyCode}
+                amountMinor={payment.amountMinor}
+                paymentAccountId={payment.paymentAccountId}
+                reference={payment.reference}
+                notes={payment.notes}
+              />
+            ) : null}
             {isSupplierPayment && payment.status === "draft" ? (
               <form action={postSupplierPayment}>
                 <input type="hidden" name="paymentId" value={payment.id} />
@@ -121,7 +144,7 @@ export default async function PaymentDetailPage({ params, searchParams }: Paymen
                 Open expense
               </Link>
             ) : customerInvoiceId ? (
-              <Link href={`/admin/sales?view=invoices&customerInvoiceId=${customerInvoiceId}`} className="mt-1 block text-sm font-medium text-primary underline-offset-4 hover:underline">
+              <Link href={`/admin/sales/invoices/${customerInvoiceId}`} className="mt-1 block text-sm font-medium text-primary underline-offset-4 hover:underline">
                 Open customer invoice
               </Link>
             ) : (
@@ -151,7 +174,7 @@ export default async function PaymentDetailPage({ params, searchParams }: Paymen
                         {allocation.expenseNo}
                       </Link>
                     ) : allocation.customerInvoiceId ? (
-                      <Link href={`/admin/sales?view=invoices&customerInvoiceId=${allocation.customerInvoiceId}`} className="font-medium text-primary underline-offset-4 hover:underline">
+                      <Link href={`/admin/sales/invoices/${allocation.customerInvoiceId}`} className="font-medium text-primary underline-offset-4 hover:underline">
                         {allocation.invoiceNo}
                       </Link>
                     ) : (

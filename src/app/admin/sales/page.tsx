@@ -3,7 +3,7 @@ import Link from "next/link";
 import { Alert } from "@/components/ui/alert";
 import { ButtonLink } from "@/components/ui/button";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
-import { requireUser } from "@/server/auth/session";
+import { requirePermission } from "@/server/auth/session";
 import { getPaymentList } from "@/server/payments/payments";
 import type { PaymentListRow } from "@/server/payments/types";
 import { displayReturnMoney, getCustomerReturnList } from "@/server/returns/returns";
@@ -18,6 +18,7 @@ type SalesPageProps = {
     view?: string;
     salesOrderId?: string;
     customerInvoiceId?: string;
+    partnerId?: string;
     notice?: string;
     error?: string;
   }>;
@@ -28,7 +29,7 @@ function statusLabel(value: string) {
 }
 
 export default async function SalesPage({ searchParams }: SalesPageProps) {
-  await requireUser();
+  await requirePermission("sales:orders:create");
 
   const params = await searchParams;
   const view = params.view ?? "orders";
@@ -47,6 +48,7 @@ export default async function SalesPage({ searchParams }: SalesPageProps) {
     const invoices = await getCustomerInvoiceList({
       salesOrderId: params.salesOrderId,
       customerInvoiceId: params.customerInvoiceId,
+      customerId: params.partnerId,
     });
 
     return (

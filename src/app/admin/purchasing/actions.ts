@@ -31,6 +31,7 @@ import {
   vendorBillLines,
   vendorBills,
 } from "@/server/db/schema";
+import { getOrCreatePartnerStockLocation } from "@/server/inventory/partner-locations";
 import { getPurchaseOrderReceiptLines } from "@/server/purchasing/purchasing";
 
 const purchaseOrderHeaderSchema = z.object({
@@ -745,6 +746,7 @@ export async function postGoodsReceipt(formData: FormData) {
   }
 
   const company = await getDefaultCompany();
+  const supplierLocation = await getOrCreatePartnerStockLocation(company.id, "supplier");
   const receiptNo = movementNo("GR");
   const stockMoveNo = movementNo("PR");
   let postedReceiptId: string | undefined;
@@ -772,16 +774,42 @@ export async function postGoodsReceipt(formData: FormData) {
       }
 
       const lines = await getPurchaseOrderReceiptLines(order.id);
-      const receiptInputByLineId = new Map(receiptInputLines.map((line) => [line.purchaseOrderLineId, line]));
+      const receiptInputsByLineId = new Map<string, typeof receiptInputLines>();
+      for (const line of receiptInputLines) {
+        receiptInputsByLineId.set(line.purchaseOrderLineId, [
+          ...(receiptInputsByLineId.get(line.purchaseOrderLineId) ?? []),
+          line,
+        ]);
+      }
 
       if (lines.length === 0) {
         throw new Error("Purchase order has no lines to receive.");
       }
 
-      const selectedLines = lines.filter((line) => receiptInputByLineId.has(line.id));
+      const selectedLines = lines.filter((line) => receiptInputsByLineId.has(line.id));
 
-      if (selectedLines.length !== receiptInputLines.length) {
+      if (selectedLines.length !== receiptInputsByLineId.size) {
         throw new Error("One or more receipt lines are invalid.");
+      }
+
+      for (const line of selectedLines) {
+        const remaining = Number(line.quantityOrdered) - Number(line.quantityReceived);
+        const inputs = receiptInputsByLineId.get(line.id) ?? [];
+        const totalQuantity = inputs.reduce((sum, input) => sum + input.quantity, 0);
+
+        if (totalQuantity > remaining) {
+          throw new Error(`Receipt quantity for ${line.sku} is greater than the remaining quantity.`);
+        }
+
+        for (const inputLine of inputs) {
+          if (line.trackingMode === "serial" && (!inputLine.serialNo || inputLine.quantity !== 1)) {
+            throw new Error(`Serialized product ${line.sku} requires quantity 1 and a serial number.`);
+          }
+
+          if (line.trackingMode === "lot" && !inputLine.lotNo) {
+            throw new Error(`Lot tracked product ${line.sku} requires a lot number.`);
+          }
+        }
       }
 
       const [movement] = await tx
@@ -791,6 +819,7 @@ export async function postGoodsReceipt(formData: FormData) {
           movementNo: stockMoveNo,
           movementType: "purchase_receipt",
           status: "posted",
+          fromLocationId: supplierLocation.id,
           toLocationId: parsed.data.locationId,
           sourceType: "goods_receipt",
           sourceNo: receiptNo,
@@ -817,26 +846,21 @@ export async function postGoodsReceipt(formData: FormData) {
         .returning({ id: goodsReceipts.id });
       postedReceiptId = receipt.id;
 
-      for (const [index, line] of selectedLines.entries()) {
+      let receiptLineNo = 1;
+      for (const line of selectedLines) {
         const remaining = Number(line.quantityOrdered) - Number(line.quantityReceived);
-        const inputLine = receiptInputByLineId.get(line.id);
-        const receiveQuantity = inputLine?.quantity ?? 0;
+        const inputLines = receiptInputsByLineId.get(line.id) ?? [];
+        const totalReceivedForLine = inputLines.reduce((sum, inputLine) => sum + inputLine.quantity, 0);
 
-        if (remaining <= 0 || receiveQuantity <= 0) {
+        if (remaining <= 0 || totalReceivedForLine <= 0) {
           continue;
         }
 
-        if (receiveQuantity > remaining) {
-          throw new Error(`Receipt quantity for ${line.sku} is greater than the remaining quantity.`);
-        }
-
-        if (line.trackingMode === "serial" && (!inputLine?.serialNo || receiveQuantity !== 1)) {
-          throw new Error(`Serialized product ${line.sku} requires quantity 1 and a serial number.`);
-        }
-
-        if (line.trackingMode === "lot" && !inputLine?.lotNo) {
-          throw new Error(`Lot tracked product ${line.sku} requires a lot number.`);
-        }
+        for (const inputLine of inputLines) {
+          const receiveQuantity = inputLine.quantity;
+          if (receiveQuantity <= 0) {
+            continue;
+          }
 
         let productSerialId: string | null = null;
         let productLotId: string | null = null;
@@ -895,7 +919,7 @@ export async function postGoodsReceipt(formData: FormData) {
         await tx.insert(goodsReceiptLines).values({
           goodsReceiptId: receipt.id,
           purchaseOrderLineId: line.id,
-          lineNo: index + 1,
+          lineNo: receiptLineNo,
           productId: line.productId,
           productSerialId,
           productLotId,
@@ -911,10 +935,11 @@ export async function postGoodsReceipt(formData: FormData) {
 
         await tx.insert(stockMovementLines).values({
           stockMovementId: movement.id,
-          lineNo: index + 1,
+          lineNo: receiptLineNo,
           productId: line.productId,
           productSerialId,
           productLotId,
+          fromLocationId: supplierLocation.id,
           toLocationId: parsed.data.locationId,
           unitId: line.unitId,
           quantity: String(receiveQuantity),
@@ -923,6 +948,7 @@ export async function postGoodsReceipt(formData: FormData) {
           currencyCode: line.currencyCode,
           notes: `Received from ${order.orderNo}`,
         });
+        receiptLineNo += 1;
 
         const serialFilter = productSerialId
           ? eq(stockBalances.productSerialId, productSerialId)
@@ -978,18 +1004,20 @@ export async function postGoodsReceipt(formData: FormData) {
           });
         }
 
+        }
+
         await tx
           .update(purchaseOrderLines)
           .set({
-            quantityReceived: String(Number(line.quantityReceived) + receiveQuantity),
+            quantityReceived: String(Number(line.quantityReceived) + totalReceivedForLine),
             updatedAt: sql`now()`,
           })
           .where(eq(purchaseOrderLines.id, line.id));
       }
 
       const allReceived = lines.every((line) => {
-        const inputLine = receiptInputByLineId.get(line.id);
-        const receivedNow = inputLine?.quantity ?? 0;
+        const inputLines = receiptInputsByLineId.get(line.id) ?? [];
+        const receivedNow = inputLines.reduce((sum, inputLine) => sum + inputLine.quantity, 0);
 
         return Number(line.quantityReceived) + receivedNow >= Number(line.quantityOrdered);
       });

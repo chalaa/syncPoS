@@ -3,6 +3,12 @@ import { alias } from "drizzle-orm/pg-core";
 
 import { db } from "@/server/db/client";
 import {
+  formatProductType,
+  majorToMinor,
+  minorToDisplay,
+  normalizeCode,
+} from "@/lib/catalog-utils";
+import {
   brands,
   companies,
   goodsReceiptLines,
@@ -10,7 +16,9 @@ import {
   locations,
   productLots,
   productCategories,
+  productPurchaseTaxes,
   productSerials,
+  productSaleTaxes,
   products,
   priceListItems,
   priceLists,
@@ -25,15 +33,19 @@ import {
 import type {
   CatalogReferenceKind,
   CatalogReferenceRecord,
+  PriceListFormOptions,
   ProductDetail,
   ProductDetailMovementRow,
+  ProductPriceListItemRow,
   ProductDetailStockRow,
   ProductDetailTrackingRow,
   ProductPriceListRow,
+  ProductTaxOption,
   ProductTrackingListRow,
   TaxRecord,
 } from "@/server/catalog/types";
 export {
+  priceListTypeOptions,
   productTypeOptions,
   taxComputationOptions,
   taxScopeOptions,
@@ -61,7 +73,7 @@ export async function getDefaultCompany() {
 export async function getCatalogFormOptions() {
   const company = await getDefaultCompany();
 
-  const [categoryRows, brandRows, unitRows] = await Promise.all([
+  const [categoryRows, brandRows, unitRows, taxRows] = await Promise.all([
     db
       .select({
         id: productCategories.id,
@@ -89,6 +101,23 @@ export async function getCatalogFormOptions() {
       .from(unitsOfMeasure)
       .where(and(eq(unitsOfMeasure.companyId, company.id), isNull(unitsOfMeasure.deletedAt)))
       .orderBy(asc(unitsOfMeasure.code)),
+    db
+      .select({
+        id: taxes.id,
+        code: taxes.code,
+        name: taxes.name,
+        scope: taxes.scope,
+        computation: taxes.computation,
+        rate: taxes.rate,
+        amountMinor: taxes.amountMinor,
+        priceIncluded: taxes.priceIncluded,
+        description: taxes.description,
+        isActive: taxes.isActive,
+        deletedAt: taxes.deletedAt,
+      })
+      .from(taxes)
+      .where(and(eq(taxes.companyId, company.id), isNull(taxes.deletedAt), eq(taxes.isActive, true)))
+      .orderBy(asc(taxes.name)),
   ]);
 
   return {
@@ -96,6 +125,7 @@ export async function getCatalogFormOptions() {
     categories: categoryRows,
     brands: brandRows,
     units: unitRows,
+    taxes: taxRows.map((tax) => ({ ...tax, label: `${tax.code} / ${tax.name}` })) satisfies ProductTaxOption[],
   };
 }
 
@@ -286,7 +316,30 @@ export async function getProductById(id: string) {
     .where(eq(products.id, id))
     .limit(1);
 
-  return product;
+  if (!product) {
+    return product;
+  }
+
+  const [saleTaxes, purchaseTaxes] = await Promise.all([
+    db
+      .select({ taxId: productSaleTaxes.taxId, name: taxes.name })
+      .from(productSaleTaxes)
+      .innerJoin(taxes, eq(productSaleTaxes.taxId, taxes.id))
+      .where(eq(productSaleTaxes.productId, id)),
+    db
+      .select({ taxId: productPurchaseTaxes.taxId, name: taxes.name })
+      .from(productPurchaseTaxes)
+      .innerJoin(taxes, eq(productPurchaseTaxes.taxId, taxes.id))
+      .where(eq(productPurchaseTaxes.productId, id)),
+  ]);
+
+  return {
+    ...product,
+    saleTaxIds: saleTaxes.map((tax) => tax.taxId),
+    purchaseTaxIds: purchaseTaxes.map((tax) => tax.taxId),
+    saleTaxNames: saleTaxes.map((tax) => tax.name).join(", "),
+    purchaseTaxNames: purchaseTaxes.map((tax) => tax.name).join(", "),
+  };
 }
 
 export async function getProductDetail(id: string): Promise<ProductDetail | null> {
@@ -338,6 +391,8 @@ export async function getProductDetail(id: string): Promise<ProductDetail | null
     incomingRows,
     receiptRows,
     movementCountRows,
+    saleTaxRows,
+    purchaseTaxRows,
   ] = await Promise.all([
     db
       .select({
@@ -456,6 +511,16 @@ export async function getProductDetail(id: string): Promise<ProductDetail | null
           isNull(stockMovementLines.deletedAt),
         ),
       ),
+    db
+      .select({ taxId: productSaleTaxes.taxId, name: taxes.name })
+      .from(productSaleTaxes)
+      .innerJoin(taxes, eq(productSaleTaxes.taxId, taxes.id))
+      .where(eq(productSaleTaxes.productId, id)),
+    db
+      .select({ taxId: productPurchaseTaxes.taxId, name: taxes.name })
+      .from(productPurchaseTaxes)
+      .innerJoin(taxes, eq(productPurchaseTaxes.taxId, taxes.id))
+      .where(eq(productPurchaseTaxes.productId, id)),
   ]);
 
   const totals = stockRows.reduce(
@@ -482,19 +547,24 @@ export async function getProductDetail(id: string): Promise<ProductDetail | null
     stockRows: stockRows satisfies ProductDetailStockRow[],
     trackingRows,
     movementRows: movementRows satisfies ProductDetailMovementRow[],
+    saleTaxIds: saleTaxRows.map((tax) => tax.taxId),
+    purchaseTaxIds: purchaseTaxRows.map((tax) => tax.taxId),
+    saleTaxNames: saleTaxRows.map((tax) => tax.name).join(", "),
+    purchaseTaxNames: purchaseTaxRows.map((tax) => tax.name).join(", "),
   };
 }
 
 export async function getProductPriceListRows(): Promise<ProductPriceListRow[]> {
   const company = await getDefaultCompany();
 
-  return db
+  const rows = await db
     .select({
       id: priceLists.id,
       code: priceLists.code,
       name: priceLists.name,
       priceListType: priceLists.priceListType,
       currencyCode: priceLists.currencyCode,
+      locationId: priceLists.locationId,
       locationCode: locations.code,
       itemCount: sql<number>`count(${priceListItems.id})::int`,
       isActive: priceLists.isActive,
@@ -507,6 +577,71 @@ export async function getProductPriceListRows(): Promise<ProductPriceListRow[]> 
     .where(and(eq(priceLists.companyId, company.id), isNull(priceLists.deletedAt)))
     .groupBy(priceLists.id, locations.code)
     .orderBy(asc(priceLists.name));
+
+  if (rows.length === 0) {
+    return [];
+  }
+
+  const itemRows = await db
+    .select({
+      id: priceListItems.id,
+      priceListId: priceListItems.priceListId,
+      productId: priceListItems.productId,
+      sku: products.sku,
+      productName: products.name,
+      minimumQuantity: priceListItems.minimumQuantity,
+      unitPriceMinor: priceListItems.unitPriceMinor,
+      discountMinor: priceListItems.discountMinor,
+      validFrom: sql<string>`${priceListItems.validFrom}::text`,
+      validTo: sql<string | null>`${priceListItems.validTo}::text`,
+      isActive: priceListItems.isActive,
+    })
+    .from(priceListItems)
+    .innerJoin(products, eq(priceListItems.productId, products.id))
+    .where(and(sql`${priceListItems.priceListId} in (${sql.join(rows.map((row) => sql`${row.id}`), sql`, `)})`, isNull(priceListItems.deletedAt)))
+    .orderBy(asc(products.name), asc(priceListItems.minimumQuantity));
+
+  const itemsByPriceList = new Map<string, ProductPriceListItemRow[]>();
+
+  for (const item of itemRows) {
+    const items = itemsByPriceList.get(item.priceListId) ?? [];
+    items.push(item);
+    itemsByPriceList.set(item.priceListId, items);
+  }
+
+  return rows.map((row) => ({
+    ...row,
+    items: itemsByPriceList.get(row.id) ?? [],
+  }));
+}
+
+export async function getPriceListFormOptions(): Promise<PriceListFormOptions> {
+  const company = await getDefaultCompany();
+  const [productRows, locationRows] = await Promise.all([
+    db
+      .select({
+        id: products.id,
+        code: products.sku,
+        name: products.name,
+      })
+      .from(products)
+      .where(and(eq(products.companyId, company.id), isNull(products.deletedAt), eq(products.isActive, true)))
+      .orderBy(asc(products.name)),
+    db
+      .select({
+        id: locations.id,
+        code: locations.code,
+        name: locations.name,
+      })
+      .from(locations)
+      .where(and(eq(locations.companyId, company.id), isNull(locations.deletedAt), eq(locations.isActive, true)))
+      .orderBy(asc(locations.name)),
+  ]);
+
+  return {
+    products: productRows,
+    locations: locationRows,
+  };
 }
 
 export async function getProductTrackingRows(): Promise<ProductTrackingListRow[]> {
@@ -558,27 +693,7 @@ export async function getProductTrackingRows(): Promise<ProductTrackingListRow[]
   ];
 }
 
-export function minorToDisplay(value: number) {
-  return (value / 100).toFixed(2);
-}
-
-export function majorToMinor(value: string) {
-  const parsed = Number(value);
-
-  if (!Number.isFinite(parsed)) {
-    return 0;
-  }
-
-  return Math.round(parsed * 100);
-}
-
-export function normalizeCode(value: string) {
-  return value.trim().toUpperCase().replace(/\s+/g, "-");
-}
-
-export function formatProductType(value: string) {
-  return value.replace(/_/g, " ");
-}
+export { formatProductType, majorToMinor, minorToDisplay, normalizeCode };
 
 export function uniqueViolationMessage(error: unknown, fallback: string) {
   if (

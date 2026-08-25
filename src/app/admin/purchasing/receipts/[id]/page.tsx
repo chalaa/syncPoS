@@ -83,7 +83,11 @@ export default async function ReceiptDetailPage({ params, searchParams }: Receip
             <p className="mt-1 text-sm font-medium">{receipt.receiptDate}</p>
           </div>
           <div>
-            <p className="text-xs font-medium uppercase text-muted-foreground">Location</p>
+            <p className="text-xs font-medium uppercase text-muted-foreground">Source Location</p>
+            <p className="mt-1 text-sm font-medium">{receipt.sourceLocationCode ?? "VENDORS"}</p>
+          </div>
+          <div>
+            <p className="text-xs font-medium uppercase text-muted-foreground">Destination Location</p>
             <p className="mt-1 text-sm font-medium">{receipt.locationCode ?? "-"}</p>
           </div>
           <div>

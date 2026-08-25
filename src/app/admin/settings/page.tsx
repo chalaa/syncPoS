@@ -1,20 +1,49 @@
-import { PageHeader, PageShell } from "@/components/ui/page-shell";
-import { requireUser } from "@/server/auth/session";
+import { redirect } from "next/navigation";
+
+import { IamManager } from "@/app/admin/settings/iam-manager";
+import { getUserPermissionCodes, requireUser } from "@/server/auth/session";
+import { getIamManagementData } from "@/server/iam/iam";
+import { PERMISSIONS, userHasPermission } from "@/server/iam/permissions";
 
 export const dynamic = "force-dynamic";
 
-export default async function SettingsPage() {
-  await requireUser();
+type SettingsPageProps = {
+  searchParams: Promise<{ view?: string; notice?: string; error?: string }>;
+};
+
+export default async function SettingsPage({ searchParams }: SettingsPageProps) {
+  const user = await requireUser();
+
+  const params = await searchParams;
+  const view = params.view === "roles" || params.view === "permissions" ? params.view : "users";
+  const permissionCodes = await getUserPermissionCodes(user.id);
+  const canViewUsers = userHasPermission(permissionCodes, PERMISSIONS.USERS.VIEW);
+  const canManageUsers = userHasPermission(permissionCodes, PERMISSIONS.USERS.MANAGE);
+  const canViewRoles = userHasPermission(permissionCodes, PERMISSIONS.ROLES.VIEW);
+  const canManageRoles = userHasPermission(permissionCodes, PERMISSIONS.ROLES.MANAGE);
+
+  if (view === "users" && !canViewUsers && canViewRoles && !params.view) {
+    redirect("/admin/settings?view=roles");
+  }
+
+  if ((view === "users" && !canViewUsers) || ((view === "roles" || view === "permissions") && !canViewRoles)) {
+    redirect("/unauthorized");
+  }
+
+  const data = await getIamManagementData();
+  const returnPath = `/admin/settings${view === "users" ? "" : `?view=${view}`}`;
 
   return (
-    <PageShell>
-      <PageHeader eyebrow="Settings" title="Company Settings" />
-      <section className="rounded-lg border border-border bg-card p-5">
-        <p className="text-sm leading-6 text-muted-foreground">
-          Settings screens for company profile, users, roles, locations, devices,
-          and audit logs will be implemented as separate vertical slices.
-        </p>
-      </section>
-    </PageShell>
+    <IamManager
+      {...data}
+      view={view}
+      canViewUsers={canViewUsers}
+      canManageUsers={canManageUsers}
+      canViewRoles={canViewRoles}
+      canManageRoles={canManageRoles}
+      notice={params.notice}
+      error={params.error}
+      returnPath={returnPath}
+    />
   );
 }

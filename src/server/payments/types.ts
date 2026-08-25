@@ -55,6 +55,7 @@ export type PaymentListRow = {
   status: PaymentDocumentStatus;
   paymentDate: string;
   partnerName: string | null;
+  paymentAccountId: string;
   paymentMethodName: string;
   paymentAccountName: string;
   amountMinor: number;

@@ -1,4 +1,5 @@
 import {
+  BarChart3Icon,
   BoxesIcon,
   ClipboardListIcon,
   GaugeIcon,
@@ -9,7 +10,8 @@ import {
   UsersIcon,
 } from "lucide-react";
 
-import type { AdminMenuItem } from "@/components/app/types";
+import type { AdminMenuItem, AdminSubMenuItem } from "@/components/app/types";
+import { PERMISSIONS, userHasPermission } from "@/server/iam/permissions";
 
 export const adminMenuItems: AdminMenuItem[] = [
   {
@@ -17,10 +19,11 @@ export const adminMenuItems: AdminMenuItem[] = [
     label: "Dashboard",
     href: "/admin",
     icon: GaugeIcon,
+    permission: PERMISSIONS.REPORTS.PROFIT_VIEW,
     submenus: [
-      { label: "Overview", href: "/admin" },
-      { label: "Daily Activity", href: "/admin?view=daily" },
-      { label: "Sync Status", href: "/admin?view=sync" },
+      { label: "Overview", href: "/admin", permission: PERMISSIONS.REPORTS.PROFIT_VIEW },
+      { label: "Daily Activity", href: "/admin?view=daily", permission: PERMISSIONS.REPORTS.PROFIT_VIEW },
+      { label: "Sync Status", href: "/admin?view=sync", permission: PERMISSIONS.REPORTS.PROFIT_VIEW },
     ],
   },
   {
@@ -28,14 +31,15 @@ export const adminMenuItems: AdminMenuItem[] = [
     label: "Products",
     href: "/admin/products",
     icon: BoxesIcon,
+    permission: PERMISSIONS.PRODUCTS.VIEW,
     submenus: [
-      { label: "Products", href: "/admin/products" },
-      { label: "Categories", href: "/admin/products/categories" },
-      { label: "Brands", href: "/admin/products/brands" },
-      { label: "Units", href: "/admin/products/units" },
-      { label: "Taxes", href: "/admin/products/taxes" },
-      { label: "Price Lists", href: "/admin/products/price-lists" },
-      { label: "Lots / Serials", href: "/admin/products/tracking" },
+      { label: "Products", href: "/admin/products", permission: PERMISSIONS.PRODUCTS.VIEW },
+      { label: "Categories", href: "/admin/products/categories", permission: PERMISSIONS.PRODUCTS.VIEW },
+      { label: "Brands", href: "/admin/products/brands", permission: PERMISSIONS.PRODUCTS.VIEW },
+      { label: "Units", href: "/admin/products/units", permission: PERMISSIONS.PRODUCTS.VIEW },
+      { label: "Taxes", href: "/admin/products/taxes", permission: PERMISSIONS.PRODUCTS.VIEW },
+      { label: "Price Lists", href: "/admin/products/price-lists", permission: PERMISSIONS.PRODUCTS.VIEW },
+      { label: "Lots / Serials", href: "/admin/products/tracking", permission: PERMISSIONS.PRODUCTS.VIEW },
     ],
   },
   {
@@ -43,11 +47,12 @@ export const adminMenuItems: AdminMenuItem[] = [
     label: "Partners",
     href: "/admin/partners",
     icon: UsersIcon,
+    permission: PERMISSIONS.PARTNERS.VIEW,
     submenus: [
-      { label: "All Partners", href: "/admin/partners" },
-      { label: "Customers", href: "/admin/partners?role=customer" },
-      { label: "Suppliers", href: "/admin/partners?role=supplier" },
-      { label: "Payment Terms", href: "/admin/partners/payment-terms" },
+      { label: "All Partners", href: "/admin/partners", permission: PERMISSIONS.PARTNERS.VIEW },
+      { label: "Customers", href: "/admin/partners?role=customer", permission: PERMISSIONS.PARTNERS.VIEW },
+      { label: "Suppliers", href: "/admin/partners?role=supplier", permission: PERMISSIONS.PARTNERS.VIEW },
+      { label: "Payment Terms", href: "/admin/partners/payment-terms", permission: PERMISSIONS.PARTNERS.VIEW },
     ],
   },
   {
@@ -55,13 +60,14 @@ export const adminMenuItems: AdminMenuItem[] = [
     label: "Purchasing",
     href: "/admin/purchasing",
     icon: ShoppingBagIcon,
+    permission: PERMISSIONS.INVENTORY.RECEIVE,
     submenus: [
-      { label: "RFQs / Orders", href: "/admin/purchasing" },
-      { label: "Receipts", href: "/admin/purchasing?view=receipts" },
-      { label: "Landed Costs", href: "/admin/purchasing?view=landed-costs" },
-      { label: "Vendor Bills", href: "/admin/purchasing?view=supplier-bills" },
-      { label: "Payments", href: "/admin/purchasing?view=payments" },
-      { label: "Returns", href: "/admin/purchasing?view=returns" },
+      { label: "RFQs / Orders", href: "/admin/purchasing", permission: PERMISSIONS.INVENTORY.RECEIVE },
+      { label: "Receipts", href: "/admin/purchasing?view=receipts", permission: PERMISSIONS.INVENTORY.RECEIVE },
+      { label: "Landed Costs", href: "/admin/purchasing?view=landed-costs", permission: PERMISSIONS.INVENTORY.RECEIVE },
+      { label: "Vendor Bills", href: "/admin/purchasing?view=supplier-bills", permission: PERMISSIONS.INVENTORY.RECEIVE },
+      { label: "Payments", href: "/admin/purchasing?view=payments", permission: PERMISSIONS.INVENTORY.RECEIVE },
+      { label: "Returns", href: "/admin/purchasing?view=returns", permission: PERMISSIONS.INVENTORY.RECEIVE },
     ],
   },
   {
@@ -69,12 +75,13 @@ export const adminMenuItems: AdminMenuItem[] = [
     label: "Sales",
     href: "/admin/sales",
     icon: ShoppingCartIcon,
+    permission: PERMISSIONS.SALES.CREATE,
     submenus: [
-      { label: "Quotations / Orders", href: "/admin/sales" },
-      { label: "Deliveries", href: "/admin/sales?view=deliveries" },
-      { label: "Invoices", href: "/admin/sales?view=invoices" },
-      { label: "Payments", href: "/admin/sales?view=payments" },
-      { label: "Returns", href: "/admin/sales?view=returns" },
+      { label: "Quotations / Orders", href: "/admin/sales", permission: PERMISSIONS.SALES.CREATE },
+      { label: "Deliveries", href: "/admin/sales?view=deliveries", permission: PERMISSIONS.SALES.CREATE },
+      { label: "Invoices", href: "/admin/sales?view=invoices", permission: PERMISSIONS.SALES.CREATE },
+      { label: "Payments", href: "/admin/sales?view=payments", permission: PERMISSIONS.SALES.CREATE },
+      { label: "Returns", href: "/admin/sales?view=returns", permission: PERMISSIONS.SALES.CREATE },
     ],
   },
   {
@@ -82,19 +89,43 @@ export const adminMenuItems: AdminMenuItem[] = [
     label: "Inventory",
     href: "/admin/inventory",
     icon: PackageCheckIcon,
+    permission: PERMISSIONS.INVENTORY.VIEW,
     submenus: [
-      { label: "Stock", href: "/admin/inventory" },
-      { label: "Operations", href: "/admin/inventory/operations" },
-      { label: "Receipts", href: "/admin/inventory/operations?view=receipts" },
-      { label: "Deliveries", href: "/admin/inventory/operations?view=deliveries" },
-      { label: "Transfers", href: "/admin/inventory/transfers" },
-      { label: "Adjustments", href: "/admin/inventory/operations?view=adjustments" },
-      { label: "Scrap", href: "/admin/inventory/operations?view=scrap" },
-      { label: "Returns", href: "/admin/inventory/operations?view=returns" },
-      { label: "Stock Card", href: "/admin/inventory/stock-card" },
-      { label: "Serial History", href: "/admin/inventory/serial-history" },
-      { label: "Locations", href: "/admin/inventory/locations" },
-      { label: "Opening Stock", href: "/admin/inventory/opening-stock" },
+      { label: "Stock", href: "/admin/inventory", permission: PERMISSIONS.INVENTORY.VIEW },
+      {
+        label: "Operations",
+        href: "/admin/inventory/operations",
+        permission: PERMISSIONS.INVENTORY.VIEW,
+        children: [
+          { label: "All Operations", href: "/admin/inventory/operations", permission: PERMISSIONS.INVENTORY.VIEW },
+          { label: "Receipts", href: "/admin/inventory/operations?view=receipts", permission: PERMISSIONS.INVENTORY.VIEW },
+          { label: "Deliveries", href: "/admin/inventory/operations?view=deliveries", permission: PERMISSIONS.INVENTORY.VIEW },
+          { label: "Transfers", href: "/admin/inventory/transfers", permission: PERMISSIONS.INVENTORY.VIEW },
+          { label: "Adjustments", href: "/admin/inventory/operations?view=adjustments", permission: PERMISSIONS.INVENTORY.RECEIVE },
+          { label: "Scrap", href: "/admin/inventory/operations?view=scrap", permission: PERMISSIONS.INVENTORY.RECEIVE },
+          { label: "Returns", href: "/admin/inventory/operations?view=returns", permission: PERMISSIONS.INVENTORY.RECEIVE },
+        ],
+      },
+      { label: "Stock Card", href: "/admin/inventory/stock-card", permission: PERMISSIONS.INVENTORY.VIEW },
+      { label: "Serial History", href: "/admin/inventory/serial-history", permission: PERMISSIONS.INVENTORY.VIEW },
+      { label: "Locations", href: "/admin/inventory/locations", permission: PERMISSIONS.LOCATIONS.MANAGE },
+      { label: "Opening Stock", href: "/admin/inventory/opening-stock", permission: PERMISSIONS.INVENTORY.RECEIVE },
+    ],
+  },
+  {
+    key: "reports",
+    label: "Reports",
+    href: "/admin/reports",
+    icon: BarChart3Icon,
+    permission: PERMISSIONS.REPORTS.PROFIT_VIEW,
+    submenus: [
+      { label: "Report Hub", href: "/admin/reports", permission: PERMISSIONS.REPORTS.PROFIT_VIEW },
+      { label: "Sales", href: "/admin/reports/sales", permission: PERMISSIONS.REPORTS.PROFIT_VIEW },
+      { label: "Expenses", href: "/admin/reports/expenses", permission: PERMISSIONS.REPORTS.PROFIT_VIEW },
+      { label: "Payment Accounts", href: "/admin/reports/payment-accounts", permission: PERMISSIONS.REPORTS.PROFIT_VIEW },
+      { label: "Stock", href: "/admin/reports/stock", permission: PERMISSIONS.REPORTS.PROFIT_VIEW },
+      { label: "Receivables", href: "/admin/reports/receivables", permission: PERMISSIONS.REPORTS.PROFIT_VIEW },
+      { label: "Payables", href: "/admin/reports/payables", permission: PERMISSIONS.REPORTS.PROFIT_VIEW },
     ],
   },
   {
@@ -103,13 +134,10 @@ export const adminMenuItems: AdminMenuItem[] = [
     href: "/admin/settings",
     icon: SettingsIcon,
     submenus: [
-      { label: "Company", href: "/admin/settings" },
-      { label: "Users", href: "/admin/settings?view=users" },
-      { label: "Roles", href: "/admin/settings?view=roles" },
-      { label: "Locations", href: "/admin/settings?view=locations" },
-      { label: "Payments", href: "/admin/settings/payments" },
-      { label: "Devices", href: "/admin/settings?view=devices" },
-      { label: "Audit Logs", href: "/admin/settings?view=audit-logs" },
+      { label: "Users", href: "/admin/settings?view=users", permission: PERMISSIONS.USERS.VIEW },
+      { label: "Roles", href: "/admin/settings?view=roles", permission: PERMISSIONS.ROLES.VIEW },
+      { label: "Permissions", href: "/admin/settings?view=permissions", permission: PERMISSIONS.ROLES.VIEW },
+      { label: "Payments", href: "/admin/settings/payments", permission: PERMISSIONS.COMPANY.MANAGE },
     ],
   },
   {
@@ -117,11 +145,39 @@ export const adminMenuItems: AdminMenuItem[] = [
     label: "Operations",
     href: "/admin/operations",
     icon: ClipboardListIcon,
+    permission: PERMISSIONS.COMPANY.MANAGE,
     submenus: [
-      { label: "Tasks", href: "/admin/operations" },
-      { label: "Approvals", href: "/admin/operations?view=approvals" },
-      { label: "Expenses", href: "/admin/operations/expenses" },
-      { label: "Expense Categories", href: "/admin/operations/expenses/categories" },
+      { label: "Tasks", href: "/admin/operations", permission: PERMISSIONS.COMPANY.MANAGE },
+      { label: "Approvals", href: "/admin/operations?view=approvals", permission: PERMISSIONS.COMPANY.MANAGE },
+      { label: "Expenses", href: "/admin/operations/expenses", permission: PERMISSIONS.COMPANY.MANAGE },
+      { label: "Expense Categories", href: "/admin/operations/expenses/categories", permission: PERMISSIONS.COMPANY.MANAGE },
     ],
   },
 ];
+
+function filterAdminSubmenus(
+  items: AdminSubMenuItem[],
+  permissionCodes: Iterable<string>,
+): AdminSubMenuItem[] {
+  return items
+    .filter((item) => !item.permission || userHasPermission(permissionCodes, item.permission))
+    .map((item): AdminSubMenuItem => {
+      const children = item.children ? filterAdminSubmenus(item.children, permissionCodes) : undefined;
+
+      return {
+        ...item,
+        children,
+      };
+    })
+    .filter((item) => !item.children || item.children.length > 0);
+}
+
+export function filterAdminMenuItems(permissionCodes: Iterable<string>) {
+  return adminMenuItems
+    .filter((item) => !item.permission || userHasPermission(permissionCodes, item.permission))
+    .map((item) => ({
+      ...item,
+      submenus: filterAdminSubmenus(item.submenus, permissionCodes),
+    }))
+    .filter((item) => item.submenus.length > 0);
+}

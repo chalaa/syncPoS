@@ -21,6 +21,7 @@ export default async function NewProductPage({ searchParams }: NewProductPagePro
       categories={options.categories}
       brands={options.brands}
       units={options.units}
+      taxes={options.taxes}
       error={params.error}
     />
   );

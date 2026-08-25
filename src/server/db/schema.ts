@@ -313,19 +313,29 @@ export const users = pgTable(
     }),
     username: varchar("username", { length: 80 }).notNull(),
     email: varchar("email", { length: 160 }),
+    normalizedEmail: varchar("normalized_email", { length: 160 }),
     passwordHash: text("password_hash").notNull(),
+    emailVerified: boolean("email_verified").notNull().default(false),
+    failedLoginAttempts: smallint("failed_login_attempts").notNull().default(0),
+    lockedUntil: timestamp("locked_until", { withTimezone: true }),
+    passwordChangedAt: timestamp("password_changed_at", { withTimezone: true }),
     status: userStatus("status").notNull().default("active"),
     lastLoginAt: timestamp("last_login_at", { withTimezone: true }),
+    lastLoginIp: varchar("last_login_ip", { length: 80 }),
     ...softDelete,
     ...timestamps,
   },
   (table) => [
+    check("users_failed_login_attempts_chk", sql`${table.failedLoginAttempts} >= 0`),
     uniqueIndex("users_username_active_uidx")
       .on(table.companyId, table.username)
       .where(sql`${table.deletedAt} is null`),
     uniqueIndex("users_email_active_uidx")
       .on(table.companyId, table.email)
       .where(sql`${table.email} is not null and ${table.deletedAt} is null`),
+    uniqueIndex("users_normalized_email_active_uidx")
+      .on(table.companyId, table.normalizedEmail)
+      .where(sql`${table.normalizedEmail} is not null and ${table.deletedAt} is null`),
     index("users_company_status_idx").on(table.companyId, table.status),
   ],
 );
@@ -340,10 +350,14 @@ export const authSessions = pgTable(
     tokenHash: char("token_hash", { length: 64 }).notNull(),
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
     revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    userAgent: text("user_agent"),
+    ipAddress: varchar("ip_address", { length: 80 }),
+    rotatedAt: timestamp("rotated_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
+    check("auth_sessions_expires_after_created_chk", sql`${table.expiresAt} > ${table.createdAt}`),
     uniqueIndex("auth_sessions_token_hash_uidx").on(table.tokenHash),
     index("auth_sessions_user_active_idx").on(table.userId, table.expiresAt, table.revokedAt),
   ],
@@ -360,6 +374,8 @@ export const roles = pgTable(
     name: varchar("name", { length: 120 }).notNull(),
     description: text("description"),
     isSystem: boolean("is_system").notNull().default(false),
+    isEditable: boolean("is_editable").notNull().default(true),
+    isDeletable: boolean("is_deletable").notNull().default(true),
     isActive: boolean("is_active").notNull().default(true),
     ...softDelete,
     ...timestamps,
@@ -377,11 +393,17 @@ export const permissions = pgTable(
     id: uuid("id").primaryKey().defaultRandom(),
     code: varchar("code", { length: 120 }).notNull(),
     description: text("description"),
+    application: varchar("application", { length: 80 }),
+    feature: varchar("feature", { length: 80 }),
+    action: varchar("action", { length: 80 }),
     isActive: boolean("is_active").notNull().default(true),
     ...softDelete,
     ...timestamps,
   },
   (table) => [
+    uniqueIndex("permissions_parts_active_uidx")
+      .on(table.application, table.feature, table.action)
+      .where(sql`${table.application} is not null and ${table.feature} is not null and ${table.action} is not null and ${table.deletedAt} is null`),
     uniqueIndex("permissions_code_active_uidx")
       .on(table.code)
       .where(sql`${table.deletedAt} is null`),
@@ -754,6 +776,40 @@ export const productCompatibilities = pgTable(
     uniqueIndex("product_compatibilities_active_uidx")
       .on(table.productId, table.relatedProductId, table.compatibilityType)
       .where(sql`${table.deletedAt} is null`),
+  ],
+);
+
+export const productSaleTaxes = pgTable(
+  "product_sale_taxes",
+  {
+    productId: uuid("product_id")
+      .notNull()
+      .references(() => products.id, { onDelete: "cascade", onUpdate: "cascade" }),
+    taxId: uuid("tax_id")
+      .notNull()
+      .references(() => taxes.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    assignedAt: timestamp("assigned_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.productId, table.taxId] }),
+    index("product_sale_taxes_tax_idx").on(table.taxId),
+  ],
+);
+
+export const productPurchaseTaxes = pgTable(
+  "product_purchase_taxes",
+  {
+    productId: uuid("product_id")
+      .notNull()
+      .references(() => products.id, { onDelete: "cascade", onUpdate: "cascade" }),
+    taxId: uuid("tax_id")
+      .notNull()
+      .references(() => taxes.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    assignedAt: timestamp("assigned_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.productId, table.taxId] }),
+    index("product_purchase_taxes_tax_idx").on(table.taxId),
   ],
 );
 

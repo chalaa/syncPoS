@@ -21,6 +21,8 @@
   --input: #c9d1d4;
   --ring: #1f6b5c;
   --radius: 0.5rem;
+  --font-system-sans: Arial, Helvetica, sans-serif;
+  --font-system-mono: "Liberation Mono", "Courier New", monospace;
 }
 
 @theme inline {
@@ -43,8 +45,8 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-system-sans);
+  --font-mono: var(--font-system-mono);
 }
 
 body {

@@ -2,11 +2,12 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { postCustomerInvoice, registerCustomerPayment } from "@/app/admin/sales/actions";
+import { PaymentFormDialog } from "@/components/app/payment-form-dialog";
 import { Alert } from "@/components/ui/alert";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { Notebook } from "@/components/ui/notebook";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
-import { requireUser } from "@/server/auth/session";
+import { requirePermission } from "@/server/auth/session";
 import { getActivePaymentAccounts } from "@/server/payments/payments";
 import { displaySalesMoney, getCustomerInvoiceDetail } from "@/server/sales/sales";
 
@@ -17,16 +18,12 @@ type CustomerInvoicePageProps = {
   searchParams: Promise<{ notice?: string; error?: string }>;
 };
 
-function inputClass() {
-  return "h-9 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus:border-primary";
-}
-
 function statusLabel(value: string) {
   return value.replace(/_/g, " ");
 }
 
 export default async function CustomerInvoicePage({ params, searchParams }: CustomerInvoicePageProps) {
-  await requireUser();
+  await requirePermission("sales:orders:create");
 
   const [{ id }, query, paymentAccounts] = await Promise.all([
     params,
@@ -54,6 +51,20 @@ export default async function CustomerInvoicePage({ params, searchParams }: Cust
                 <input type="hidden" name="customerInvoiceId" value={invoice.id} />
                 <Button>Post Invoice</Button>
               </form>
+            ) : null}
+            {canRegisterPayment ? (
+              <PaymentFormDialog
+                title="Register Customer Payment"
+                description={`Create a draft inbound payment for ${invoice.invoiceNo}.`}
+                triggerLabel="Register Payment"
+                submitLabel="Register Draft Payment"
+                action={registerCustomerPayment}
+                hiddenFieldName="customerInvoiceId"
+                hiddenFieldValue={invoice.id}
+                paymentAccounts={paymentAccounts}
+                currencyCode={invoice.currencyCode}
+                amountMinor={invoice.residualAmountMinor}
+              />
             ) : null}
           </div>
         }
@@ -135,45 +146,6 @@ export default async function CustomerInvoicePage({ params, searchParams }: Cust
               ),
             },
             {
-              value: "payment",
-              label: "Register Payment",
-              content: canRegisterPayment ? (
-                <form action={registerCustomerPayment} className="grid gap-4 md:grid-cols-4">
-                  <input type="hidden" name="customerInvoiceId" value={invoice.id} />
-                  <label className="space-y-1 md:col-span-2">
-                    <span className="text-xs font-medium text-muted-foreground">Payment Account</span>
-                    <select name="paymentAccountId" required className={inputClass()} defaultValue="">
-                      <option value="" disabled>Select account</option>
-                      {paymentAccounts
-                        .filter((account) => account.currencyCode === invoice.currencyCode)
-                        .map((account) => (
-                          <option key={account.id} value={account.id}>
-                            {account.code} - {account.name}
-                          </option>
-                        ))}
-                    </select>
-                  </label>
-                  <label className="space-y-1">
-                    <span className="text-xs font-medium text-muted-foreground">Amount</span>
-                    <input name="amount" required defaultValue={(invoice.residualAmountMinor / 100).toFixed(2)} className={inputClass()} />
-                  </label>
-                  <label className="space-y-1">
-                    <span className="text-xs font-medium text-muted-foreground">Reference</span>
-                    <input name="reference" className={inputClass()} />
-                  </label>
-                  <label className="space-y-1 md:col-span-4">
-                    <span className="text-xs font-medium text-muted-foreground">Notes</span>
-                    <input name="notes" className={inputClass()} />
-                  </label>
-                  <div className="md:col-span-4">
-                    <Button type="submit">Register Payment</Button>
-                  </div>
-                </form>
-              ) : (
-                <p className="text-sm text-muted-foreground">No payment can be registered for this invoice.</p>
-              ),
-            },
-            {
               value: "other-information",
               label: "Other Information",
               content: <p className="text-sm text-muted-foreground">{invoice.notes || "No notes"}</p>,
@@ -181,6 +153,7 @@ export default async function CustomerInvoicePage({ params, searchParams }: Cust
           ]}
         />
       </section>
+
     </PageShell>
   );
 }

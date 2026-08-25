@@ -115,6 +115,7 @@ export function PurchaseOrderForm({
       : [newLine()],
   );
   const taxById = useMemo(() => new Map(taxes.map((tax) => [tax.id, tax])), [taxes]);
+  const productById = useMemo(() => new Map(products.map((product) => [product.id, product])), [products]);
   const taxTagOptions = useMemo(
     () => taxes.map((tax) => ({ id: tax.id, label: taxLabel(tax) })),
     [taxes],
@@ -151,6 +152,16 @@ export function PurchaseOrderForm({
 
   function removeLine(key: string) {
     setLines((current) => (current.length === 1 ? current : current.filter((line) => line.key !== key)));
+  }
+
+  function updateLineProduct(key: string, productId: string) {
+    const product = productById.get(productId);
+
+    updateLine(key, {
+      productId,
+      unitCost: product?.standardCostMinor !== undefined ? String(product.standardCostMinor / 100) : "0",
+      taxIds: product?.purchaseTaxIds ?? [],
+    });
   }
 
   return (
@@ -228,7 +239,7 @@ export function PurchaseOrderForm({
                               required
                               value={line.productId}
                               className={tableInputClass}
-                              onChange={(event) => updateLine(line.key, { productId: event.target.value })}
+                              onChange={(event) => updateLineProduct(line.key, event.target.value)}
                             >
                               <option value="">Select product</option>
                               {products.map((product) => (

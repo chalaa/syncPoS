@@ -9,11 +9,18 @@ export const productTypeOptions = [
 export const trackingModeOptions = ["none", "lot", "serial"] as const;
 export const taxScopeOptions = ["purchase", "sale", "both"] as const;
 export const taxComputationOptions = ["percent", "fixed"] as const;
+export const priceListTypeOptions = [
+  "retail",
+  "wholesale",
+  "customer_specific",
+  "location_specific",
+] as const;
 
 export type ProductTypeOption = (typeof productTypeOptions)[number];
 export type TrackingModeOption = (typeof trackingModeOptions)[number];
 export type TaxScopeOption = (typeof taxScopeOptions)[number];
 export type TaxComputationOption = (typeof taxComputationOptions)[number];
+export type PriceListTypeOption = (typeof priceListTypeOptions)[number];
 
 export type SelectOption = {
   id: string;
@@ -49,6 +56,10 @@ export type ProductFormRecord = {
   listPriceMinor: number;
   currencyCode: string;
   isActive: boolean;
+  saleTaxIds: string[];
+  purchaseTaxIds: string[];
+  saleTaxNames?: string;
+  purchaseTaxNames?: string;
 };
 
 export type ProductDetailStockRow = {
@@ -112,11 +123,31 @@ export type ProductPriceListRow = {
   name: string;
   priceListType: string;
   currencyCode: string;
+  locationId: string | null;
   locationCode: string | null;
   itemCount: number;
   isActive: boolean;
   validFrom: string | null;
   validTo: string | null;
+  items: ProductPriceListItemRow[];
+};
+
+export type ProductPriceListItemRow = {
+  id: string;
+  productId: string;
+  sku: string;
+  productName: string;
+  minimumQuantity: string;
+  unitPriceMinor: number;
+  discountMinor: number;
+  validFrom: string;
+  validTo: string | null;
+  isActive: boolean;
+};
+
+export type PriceListFormOptions = {
+  products: SelectOption[];
+  locations: SelectOption[];
 };
 
 export type ProductTrackingListRow = {
@@ -144,4 +175,8 @@ export type TaxRecord = {
   description: string | null;
   isActive: boolean;
   deletedAt: Date | null;
+};
+
+export type ProductTaxOption = TaxRecord & {
+  label: string;
 };
