@@ -1,9 +1,60 @@
+"use client";
+
 import Link from "next/link";
 import { Slot } from "@radix-ui/react-slot";
 import { cva, type VariantProps } from "class-variance-authority";
+import { LoaderCircleIcon } from "lucide-react";
 import type { ButtonHTMLAttributes, ComponentProps, ReactNode } from "react";
+import { useFormStatus } from "react-dom";
 
 import { cn } from "@/lib/utils";
+
+function defaultPendingLabel(children: ReactNode) {
+  if (typeof children !== "string") {
+    return "Working...";
+  }
+
+  const label = children.trim();
+  const normalizedLabel = label.toLowerCase();
+
+  if (normalizedLabel === "sign in") {
+    return "Signing in...";
+  }
+
+  if (normalizedLabel.startsWith("save")) {
+    return "Saving...";
+  }
+
+  if (normalizedLabel.startsWith("create")) {
+    return "Creating...";
+  }
+
+  if (normalizedLabel.startsWith("post")) {
+    return "Posting...";
+  }
+
+  if (normalizedLabel.startsWith("register")) {
+    return "Registering...";
+  }
+
+  if (normalizedLabel.startsWith("approve")) {
+    return "Approving...";
+  }
+
+  if (normalizedLabel.startsWith("dispatch")) {
+    return "Dispatching...";
+  }
+
+  if (normalizedLabel.startsWith("cancel")) {
+    return "Cancelling...";
+  }
+
+  if (normalizedLabel.startsWith("apply")) {
+    return "Applying...";
+  }
+
+  return `${label}...`;
+}
 
 const buttonVariants = cva(
   "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-semibold transition-colors outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] disabled:pointer-events-none disabled:opacity-60 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
@@ -42,6 +93,7 @@ const buttonVariants = cva(
 type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> &
   VariantProps<typeof buttonVariants> & {
     asChild?: boolean;
+    pendingLabel?: ReactNode;
   };
 
 export function Button({
@@ -49,14 +101,38 @@ export function Button({
   variant,
   size,
   asChild = false,
+  children,
+  disabled,
+  type,
+  pendingLabel,
   ...props
 }: ButtonProps) {
-  const Comp = asChild ? Slot : "button";
+  const { pending } = useFormStatus();
+  const isSubmitButton = !asChild && (type ?? "submit") === "submit";
+  const isPending = isSubmitButton && pending;
+
+  if (asChild) {
+    return (
+      <Slot
+        className={cn(buttonVariants({ variant, size, className }))}
+        {...props}
+      >
+        {children}
+      </Slot>
+    );
+  }
+
   return (
-    <Comp
+    <button
       className={cn(buttonVariants({ variant, size, className }))}
+      aria-busy={isPending || undefined}
+      disabled={disabled || isPending}
+      type={type}
       {...props}
-    />
+    >
+      {isPending ? <LoaderCircleIcon className="animate-spin" aria-hidden="true" /> : null}
+      {isPending ? (pendingLabel ?? defaultPendingLabel(children)) : children}
+    </button>
   );
 }
 

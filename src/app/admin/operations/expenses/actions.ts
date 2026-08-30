@@ -1,6 +1,6 @@
 "use server";
 
-import { randomUUID, createHash } from "node:crypto";
+import { randomUUID } from "node:crypto";
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -11,7 +11,6 @@ import { getDefaultCompany, majorToMinor, uniqueViolationMessage } from "@/serve
 import { requirePermission } from "@/server/auth/session";
 import { db } from "@/server/db/client";
 import {
-  attachments,
   auditLogs,
   expenseCategories,
   expenses,
@@ -36,26 +35,14 @@ const expenseSchema = z.object({
   categoryId: z.string().uuid(),
   expenseDate: z.string().trim().min(1),
   amount: z.string().trim().min(1),
-  paymentStatus: z.enum(["unpaid", "paid"]),
-  paymentAccountId: optionalUuid,
-  paymentReference: z.string().trim().max(120).optional(),
   employeeId: optionalUuid,
-  vendorId: optionalUuid,
-  locationId: optionalUuid,
   description: z.string().trim().optional(),
-  attachmentObjectKey: z.string().trim().optional(),
-  attachmentFileName: z.string().trim().optional(),
-  attachmentMimeType: z.string().trim().optional(),
-  attachmentSizeBytes: z.coerce.number().int().nonnegative().optional(),
-  attachmentSha256Hash: z.string().trim().optional(),
 });
 
 const payExpenseSchema = z.object({
   expenseId: z.string().uuid(),
   paymentAccountId: z.string().uuid(),
   amount: z.string().trim().min(1),
-  reference: z.string().trim().max(120).optional(),
-  notes: z.string().trim().optional(),
 });
 
 const idSchema = z.object({
@@ -103,23 +90,9 @@ function expensePayload(formData: FormData) {
     categoryId: formValue(formData, "categoryId"),
     expenseDate: formValue(formData, "expenseDate"),
     amount: formValue(formData, "amount"),
-    paymentStatus: formValue(formData, "paymentStatus"),
-    paymentAccountId: formValue(formData, "paymentAccountId"),
-    paymentReference: formValue(formData, "paymentReference"),
     employeeId: formValue(formData, "employeeId"),
-    vendorId: formValue(formData, "vendorId"),
-    locationId: formValue(formData, "locationId"),
     description: formValue(formData, "description"),
-    attachmentObjectKey: formValue(formData, "attachmentObjectKey"),
-    attachmentFileName: formValue(formData, "attachmentFileName"),
-    attachmentMimeType: formValue(formData, "attachmentMimeType"),
-    attachmentSizeBytes: formValue(formData, "attachmentSizeBytes") || undefined,
-    attachmentSha256Hash: formValue(formData, "attachmentSha256Hash"),
   };
-}
-
-function sha256Fallback(value: string) {
-  return createHash("sha256").update(value).digest("hex");
 }
 
 async function getOutboundPaymentAccount(accountId: string, companyId: string, currencyCode: string) {
@@ -334,23 +307,10 @@ export async function createExpense(formData: FormData) {
     redirectWithMessage("/admin/operations/expenses/new", "error", "Expense amount must be greater than zero.");
   }
 
-  if (parsed.data.paymentStatus === "paid" && !parsed.data.paymentAccountId) {
-    redirectWithMessage("/admin/operations/expenses/new", "error", "Paid expense requires a payment account.");
-  }
-
   const company = await getDefaultCompany();
   let createdExpenseId: string | undefined;
 
   try {
-    const outboundPaymentAccount =
-      parsed.data.paymentStatus === "paid" && parsed.data.paymentAccountId
-        ? await getOutboundPaymentAccount(parsed.data.paymentAccountId, company.id, company.baseCurrencyCode)
-        : null;
-
-    if (outboundPaymentAccount?.requiresReference && !parsed.data.paymentReference) {
-      throw new Error("This payment method requires a reference.");
-    }
-
     await db.transaction(async (tx) => {
       const [category] = await tx
         .select({ id: expenseCategories.id })
@@ -368,11 +328,11 @@ export async function createExpense(formData: FormData) {
           companyId: company.id,
           categoryId: parsed.data.categoryId,
           employeeId: parsed.data.employeeId,
-          vendorId: parsed.data.vendorId,
-          locationId: parsed.data.locationId,
+          vendorId: null,
+          locationId: null,
           expenseNo: expenseNo(),
           status: "posted",
-          paymentStatus: parsed.data.paymentStatus,
+          paymentStatus: "unpaid",
           expenseDate: parsed.data.expenseDate,
           amountMinor,
           currencyCode: company.baseCurrencyCode,
@@ -381,48 +341,6 @@ export async function createExpense(formData: FormData) {
         .returning({ id: expenses.id, expenseNo: expenses.expenseNo });
       createdExpenseId = expense.id;
 
-      if (parsed.data.attachmentObjectKey && parsed.data.attachmentFileName) {
-        await tx.insert(attachments).values({
-          companyId: company.id,
-          entityType: "expense",
-          entityId: expense.id,
-          objectKey: parsed.data.attachmentObjectKey,
-          fileName: parsed.data.attachmentFileName,
-          mimeType: parsed.data.attachmentMimeType || "application/octet-stream",
-          sizeBytes: parsed.data.attachmentSizeBytes ?? 0,
-          sha256Hash: (parsed.data.attachmentSha256Hash || sha256Fallback(parsed.data.attachmentObjectKey)).slice(0, 64),
-          uploadedBy: user.id,
-        });
-      }
-
-      if (outboundPaymentAccount) {
-        const [payment] = await tx
-          .insert(payments)
-          .values({
-            companyId: company.id,
-            partnerId: parsed.data.vendorId,
-            paymentNo: paymentNo(),
-            paymentType: "outbound",
-            status: "posted",
-            paymentMethodId: outboundPaymentAccount.methodId,
-            paymentAccountId: outboundPaymentAccount.id,
-            amountMinor,
-            currencyCode: company.baseCurrencyCode,
-            reference: parsed.data.paymentReference || null,
-            notes: "Payment created from paid expense.",
-            postedAt: new Date(),
-            postedBy: user.id,
-          })
-          .returning({ id: payments.id, paymentNo: payments.paymentNo });
-
-        await tx.insert(paymentAllocations).values({
-          paymentId: payment.id,
-          expenseId: expense.id,
-          amountMinor,
-          notes: "Expense payment allocation.",
-        });
-      }
-
       await tx.insert(auditLogs).values({
         companyId: company.id,
         actorUserId: user.id,
@@ -430,7 +348,7 @@ export async function createExpense(formData: FormData) {
         entityType: "expense",
         entityId: expense.id,
         severity: "info",
-        metadata: { expenseNo: expense.expenseNo, paymentStatus: parsed.data.paymentStatus },
+        metadata: { expenseNo: expense.expenseNo, paymentStatus: "unpaid" },
       });
     });
   } catch (error) {
@@ -447,8 +365,6 @@ export async function registerExpensePayment(formData: FormData) {
     expenseId: formValue(formData, "expenseId"),
     paymentAccountId: formValue(formData, "paymentAccountId"),
     amount: formValue(formData, "amount"),
-    reference: formValue(formData, "reference"),
-    notes: formValue(formData, "notes"),
   });
 
   if (!parsed.success) {
@@ -501,8 +417,8 @@ export async function registerExpensePayment(formData: FormData) {
       paymentAccountId: parsed.data.paymentAccountId,
       amountMinor,
       currencyCode: expense.currencyCode,
-      reference: parsed.data.reference || null,
-      notes: parsed.data.notes || "Expense payment.",
+      reference: null,
+      notes: "Expense payment.",
     });
     await updateExpensePaymentStatus(expense.id);
   } catch (error) {
@@ -521,15 +437,41 @@ export async function cancelExpense(formData: FormData) {
     redirectWithMessage("/admin/operations/expenses", "error", "Expense ID is missing.");
   }
 
-  await db
-    .update(expenses)
-    .set({
-      status: "cancelled",
-      cancelledAt: new Date(),
-      cancelledBy: user.id,
-      updatedAt: sql`now()`,
-    })
-    .where(and(eq(expenses.id, parsed.data.id), isNull(expenses.deletedAt)));
+  try {
+    const [expense] = await db
+      .select({
+        id: expenses.id,
+        paymentStatus: expenses.paymentStatus,
+        status: expenses.status,
+      })
+      .from(expenses)
+      .where(and(eq(expenses.id, parsed.data.id), isNull(expenses.deletedAt)))
+      .limit(1);
+
+    if (!expense) {
+      throw new Error("Expense does not exist.");
+    }
+
+    if (expense.paymentStatus === "paid") {
+      throw new Error("Paid expenses cannot be cancelled.");
+    }
+
+    if (expense.status === "cancelled") {
+      throw new Error("Expense is already cancelled.");
+    }
+
+    await db
+      .update(expenses)
+      .set({
+        status: "cancelled",
+        cancelledAt: new Date(),
+        cancelledBy: user.id,
+        updatedAt: sql`now()`,
+      })
+      .where(and(eq(expenses.id, parsed.data.id), isNull(expenses.deletedAt)));
+  } catch (error) {
+    redirectWithMessage(parsed.data.returnPath, "error", error instanceof Error ? error.message : "Could not cancel expense.");
+  }
 
   revalidatePath("/admin/operations/expenses");
   redirectWithMessage(parsed.data.returnPath, "notice", "Expense cancelled");

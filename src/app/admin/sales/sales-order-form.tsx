@@ -4,6 +4,14 @@ import { PlusIcon, Trash2Icon } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { ManyToManyTags } from "@/components/ui/many-to-many-tags";
 import { Notebook } from "@/components/ui/notebook";
 import { cn } from "@/lib/utils";
@@ -105,6 +113,7 @@ export function SalesOrderForm({
   order?: SalesOrderDetail;
   submitLabel?: string;
 }) {
+  const [editingLineKey, setEditingLineKey] = useState<string | null>(null);
   const [lines, setLines] = useState<SalesLineDraft[]>(() =>
     order?.lines.length
       ? order.lines.map((line) => ({
@@ -167,6 +176,15 @@ export function SalesOrderForm({
       taxIds: product?.saleTaxIds ?? [],
     });
   }
+
+  function addLineForEditing() {
+    const line = newLine();
+
+    setLines((current) => [...current, line]);
+    setEditingLineKey(line.key);
+  }
+
+  const editingLine = lines.find((line) => line.key === editingLineKey);
 
   return (
     <form action={action} className="grid gap-5 rounded-lg border border-border bg-card p-5">
@@ -231,7 +249,17 @@ export function SalesOrderForm({
             label: "Order Lines",
             content: (
               <div className="grid gap-4">
-                <div className="overflow-x-auto">
+                {lines.map((line) => (
+                  <div key={`${line.key}-fields`} className="hidden">
+                    <input type="hidden" name="productId" value={line.productId} />
+                    <input type="hidden" name="quantity" value={line.quantity} />
+                    <input type="hidden" name="unitPrice" value={line.unitPrice} />
+                    <input type="hidden" name="discount" value={line.discount} />
+                    <input type="hidden" name="taxIds" value={line.taxIds.join(",")} />
+                  </div>
+                ))}
+
+                <div className="hidden overflow-x-auto lg:block">
                   <table className="w-full min-w-[1080px] border-collapse text-sm">
                     <thead>
                       <tr className="border-b border-border text-left text-xs font-semibold uppercase text-muted-foreground">
@@ -250,8 +278,6 @@ export function SalesOrderForm({
                         <tr key={line.key} className="border-b border-border/70">
                           <td className="px-2 py-3">
                             <select
-                              name="productId"
-                              required
                               value={line.productId}
                               className={tableInputClass}
                               onChange={(event) => updateLineProduct(line.key, event.target.value)}
@@ -266,11 +292,9 @@ export function SalesOrderForm({
                           </td>
                           <td className="px-2 py-3">
                             <input
-                              name="quantity"
                               type="number"
                               min="0.000001"
                               step="0.000001"
-                              required
                               value={line.quantity}
                               className={cn(tableInputClass, "text-right")}
                               onChange={(event) => updateLine(line.key, { quantity: event.target.value })}
@@ -278,11 +302,9 @@ export function SalesOrderForm({
                           </td>
                           <td className="px-2 py-3">
                             <input
-                              name="unitPrice"
                               type="number"
                               min="0"
                               step="0.01"
-                              required
                               value={line.unitPrice}
                               className={cn(tableInputClass, "text-right")}
                               onChange={(event) => updateLine(line.key, { unitPrice: event.target.value })}
@@ -290,7 +312,6 @@ export function SalesOrderForm({
                           </td>
                           <td className="px-2 py-3">
                             <input
-                              name="discount"
                               type="number"
                               min="0"
                               step="0.01"
@@ -301,7 +322,6 @@ export function SalesOrderForm({
                           </td>
                           <td className="px-2 py-3">
                             <ManyToManyTags
-                              name="taxIds"
                               options={taxTagOptions}
                               value={line.taxIds}
                               onChange={(taxIds) => updateLine(line.key, { taxIds })}
@@ -327,8 +347,44 @@ export function SalesOrderForm({
                   </table>
                 </div>
 
+                <div className="grid gap-3 lg:hidden">
+                  {lines.map((line, index) => {
+                    const product = productById.get(line.productId);
+                    const selectedTaxCount = line.taxIds.length;
+
+                    return (
+                      <div key={`${line.key}-card`} className="rounded-md border border-border bg-background p-3 text-sm">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="truncate font-semibold">{product ? `${product.code} / ${product.name}` : "No product selected"}</p>
+                            <p className="text-xs text-muted-foreground">
+                              Qty {line.quantity || "0"} / Unit price {line.unitPrice || "0"} / Taxes {selectedTaxCount}
+                            </p>
+                          </div>
+                          <div className="shrink-0 text-right font-semibold">{money(lineTotals[index]?.total ?? 0)}</div>
+                        </div>
+                        <div className="mt-3 flex justify-end gap-2">
+                          <Button type="button" variant="outline" size="sm" onClick={() => setEditingLineKey(line.key)}>
+                            Edit
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            disabled={lines.length === 1}
+                            onClick={() => removeLine(line.key)}
+                          >
+                            <Trash2Icon />
+                            <span className="sr-only">Remove line</span>
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
                 <div className="flex flex-wrap items-center justify-between gap-4">
-                  <Button type="button" variant="outline" onClick={() => setLines((current) => [...current, newLine()])}>
+                  <Button type="button" variant="outline" onClick={addLineForEditing}>
                     <PlusIcon data-icon="inline-start" />
                     Add line
                   </Button>
@@ -347,6 +403,83 @@ export function SalesOrderForm({
                     </div>
                   </div>
                 </div>
+
+                <Dialog open={Boolean(editingLine)} onOpenChange={(open) => !open && setEditingLineKey(null)}>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Order Line</DialogTitle>
+                      <DialogDescription>Add or edit one sales order line.</DialogDescription>
+                    </DialogHeader>
+                    {editingLine ? (
+                      <div className="grid gap-4">
+                        <label className="flex flex-col gap-1 text-sm font-medium">
+                          Product
+                          <select
+                            value={editingLine.productId}
+                            className={inputClass}
+                            onChange={(event) => updateLineProduct(editingLine.key, event.target.value)}
+                          >
+                            <option value="">Select product</option>
+                            {products.map((product) => (
+                              <option key={product.id} value={product.id}>
+                                {product.code} / {product.name}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                        <div className="grid gap-4 sm:grid-cols-3">
+                          <label className="flex flex-col gap-1 text-sm font-medium">
+                            Quantity
+                            <input
+                              type="number"
+                              min="0.000001"
+                              step="0.000001"
+                              value={editingLine.quantity}
+                              className={cn(inputClass, "text-right")}
+                              onChange={(event) => updateLine(editingLine.key, { quantity: event.target.value })}
+                            />
+                          </label>
+                          <label className="flex flex-col gap-1 text-sm font-medium">
+                            Unit price
+                            <input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              value={editingLine.unitPrice}
+                              className={cn(inputClass, "text-right")}
+                              onChange={(event) => updateLine(editingLine.key, { unitPrice: event.target.value })}
+                            />
+                          </label>
+                          <label className="flex flex-col gap-1 text-sm font-medium">
+                            Discount
+                            <input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              value={editingLine.discount}
+                              className={cn(inputClass, "text-right")}
+                              onChange={(event) => updateLine(editingLine.key, { discount: event.target.value })}
+                            />
+                          </label>
+                        </div>
+                        <label className="grid gap-1 text-sm font-medium">
+                          Taxes
+                          <ManyToManyTags
+                            options={taxTagOptions}
+                            value={editingLine.taxIds}
+                            onChange={(taxIds) => updateLine(editingLine.key, { taxIds })}
+                            placeholder="Select tax"
+                          />
+                        </label>
+                      </div>
+                    ) : null}
+                    <DialogFooter>
+                      <Button type="button" variant="outline" onClick={() => setEditingLineKey(null)}>
+                        Done
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
               </div>
             ),
           },

@@ -31,8 +31,8 @@ export function Notebook({
   }
 
   return (
-    <section className={cn("overflow-hidden rounded-md border border-border bg-card", className)}>
-      <div className="flex min-h-11 items-end gap-1 border-b border-border bg-muted/30 px-3 pt-2">
+    <section className={cn("min-w-0 overflow-hidden rounded-md border border-border bg-card", className)}>
+      <div className="flex min-h-11 items-end gap-1 overflow-x-auto border-b border-border bg-muted/30 px-2 pt-2 sm:px-3">
         {items.map((item) => {
           const isActive = item.value === resolvedActiveValue;
           const tabId = `${baseId}-${item.value}-tab`;
@@ -47,7 +47,7 @@ export function Notebook({
               aria-selected={isActive}
               aria-controls={panelId}
               className={cn(
-                "h-9 rounded-t-md border border-transparent px-4 text-sm font-medium text-muted-foreground outline-none transition-colors",
+                "h-9 shrink-0 rounded-t-md border border-transparent px-3 text-sm font-medium text-muted-foreground outline-none transition-colors sm:px-4",
                 "focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]",
                 isActive &&
                   "border-border border-b-card bg-card text-foreground shadow-[0_-1px_0_hsl(var(--border))]",
@@ -70,7 +70,7 @@ export function Notebook({
             role="tabpanel"
             aria-labelledby={`${baseId}-${item.value}-tab`}
             hidden={!isActive}
-            className="p-4"
+            className="min-w-0 p-3 sm:p-4"
           >
             {item.content}
           </div>

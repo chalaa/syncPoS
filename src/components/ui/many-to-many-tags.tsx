@@ -19,7 +19,7 @@ export function ManyToManyTags({
   placeholder = "Add item",
   className,
 }: {
-  name: string;
+  name?: string;
   options: ManyToManyTagOption[];
   value: string[];
   onChange: (value: string[]) => void;
@@ -45,7 +45,7 @@ export function ManyToManyTags({
 
   return (
     <div className={cn("grid gap-2", className)}>
-      <input type="hidden" name={name} value={value.join(",")} />
+      {name ? <input type="hidden" name={name} value={value.join(",")} /> : null}
       <div className="flex min-h-9 flex-wrap items-center gap-1 rounded-md border border-input bg-background px-2 py-1">
         {value.map((optionId) => {
           const option = optionById.get(optionId);

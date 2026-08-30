@@ -3,7 +3,7 @@
 import { ChevronDownIcon, LogOutIcon, MenuIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import type { ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 
 import { logout } from "@/app/login/actions";
 import { filterAdminMenuItems } from "@/components/app/admin-navigation";
@@ -54,19 +54,38 @@ export function AdminShell({
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const adminNavOpen = useAppStore((state) => state.adminNavOpen);
+  const setAdminNavOpen = useAppStore((state) => state.setAdminNavOpen);
   const toggleAdminNav = useAppStore((state) => state.toggleAdminNav);
   const syncStatus = useAppStore((state) => state.syncStatus);
   const adminMenuItems = filterAdminMenuItems(permissionCodes);
   const activeMenu = getActiveMenu(pathname, adminMenuItems);
   const queryString = searchParams.toString();
   const currentHref = queryString ? `${pathname}?${queryString}` : pathname;
+  const activeSubmenuLabel =
+    activeMenu?.submenus.find((item) => isSubmenuActive(item, currentHref, pathname))?.label ??
+    activeMenu?.submenus[0]?.label ??
+    "Menu";
+
+  useEffect(() => {
+    if (window.matchMedia("(max-width: 767px)").matches) {
+      setAdminNavOpen(false);
+    }
+  }, [pathname, setAdminNavOpen]);
 
   return (
     <div className="flex min-h-screen bg-background text-foreground">
+      {adminNavOpen ? (
+        <button
+          type="button"
+          aria-label="Close main menu"
+          className="fixed inset-0 z-40 bg-foreground/20 md:hidden"
+          onClick={toggleAdminNav}
+        />
+      ) : null}
       <aside
         className={cn(
-          "border-r border-border bg-card text-card-foreground transition-[width]",
-          adminNavOpen ? "w-64" : "w-20",
+          "fixed inset-y-0 left-0 z-50 flex h-screen flex-col border-r border-border bg-card text-card-foreground transition-[transform,width] md:sticky md:top-0 md:z-auto",
+          adminNavOpen ? "w-64 translate-x-0" : "-translate-x-full md:w-20 md:translate-x-0",
         )}
       >
         <div className="flex h-16 items-center gap-2 border-b border-border px-4">
@@ -90,7 +109,7 @@ export function AdminShell({
           </Link>
         </div>
 
-        <nav className="flex flex-col gap-1 p-3">
+        <nav className="flex flex-1 flex-col gap-1 overflow-y-auto p-3">
           {adminMenuItems.map((item) => {
             const isActive = activeMenu.key === item.key && activeMenu.label === item.label;
 
@@ -114,11 +133,88 @@ export function AdminShell({
             );
           })}
         </nav>
+
+        <form action={logout} className="border-t border-border p-3 md:hidden">
+          <div className="mb-3 flex items-center justify-between gap-3 text-sm">
+            <span className="text-muted-foreground">{syncStatus}</span>
+            <span className="truncate text-muted-foreground">{username}</span>
+          </div>
+          <Button variant="outline" size="sm" className="w-full justify-center">
+            <LogOutIcon data-icon="inline-start" />
+            Sign out
+          </Button>
+        </form>
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex min-h-16 flex-wrap items-center justify-between gap-3 border-b border-border bg-card px-6 py-3 text-sm text-card-foreground">
-          <nav className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+        <header className="flex min-h-16 items-center justify-between gap-2 border-b border-border bg-card px-3 py-3 text-sm text-card-foreground sm:gap-3 sm:px-6">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            aria-label="Open main menu"
+            className="md:hidden"
+            onClick={toggleAdminNav}
+          >
+            <MenuIcon />
+          </Button>
+
+          <div className="relative min-w-0 flex-1 lg:hidden">
+            <details className="group">
+              <summary className="flex h-9 min-w-0 cursor-pointer list-none items-center justify-between gap-2 rounded-md border border-input bg-card px-3 text-sm font-semibold [&::-webkit-details-marker]:hidden">
+                <span className="truncate">
+                  {activeMenu?.label}
+                  <span className="mx-2 text-muted-foreground">/</span>
+                  <span className="font-medium text-muted-foreground">{activeSubmenuLabel}</span>
+                </span>
+                <ChevronDownIcon className="size-4 shrink-0 transition-transform group-open:rotate-180" />
+              </summary>
+              <div className="absolute left-0 right-0 top-full z-50 mt-2 max-h-[70vh] overflow-y-auto rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-md">
+                {activeMenu?.submenus.map((item) => {
+                  const isActive = isSubmenuActive(item, currentHref, pathname);
+
+                  return (
+                    <div key={item.href}>
+                      <Link
+                        href={item.href}
+                        className={cn(
+                          "block rounded-sm px-3 py-2 text-sm hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground focus:outline-none",
+                          isActive && "bg-accent text-accent-foreground",
+                        )}
+                      >
+                        {item.label}
+                      </Link>
+                      {item.children?.length ? (
+                        <div className="ml-3 border-l border-border pl-2">
+                          {item.children.map((child) => {
+                            const childPath = hrefPath(child.href);
+                            const isChildActive =
+                              currentHref === child.href ||
+                              (!child.href.includes("?") && pathname.startsWith(`${childPath}/`));
+
+                            return (
+                              <Link
+                                key={child.href}
+                                href={child.href}
+                                className={cn(
+                                  "block rounded-sm px-3 py-2 text-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground focus:outline-none",
+                                  isChildActive && "bg-accent text-accent-foreground",
+                                )}
+                              >
+                                {child.label}
+                              </Link>
+                            );
+                          })}
+                        </div>
+                      ) : null}
+                    </div>
+                  );
+                })}
+              </div>
+            </details>
+          </div>
+
+          <nav className="hidden min-w-0 flex-1 items-center gap-2 overflow-x-auto whitespace-nowrap pb-1 lg:flex">
             {activeMenu ? (
               <>
                 <span className="shrink-0 font-semibold">{activeMenu.label}</span>
@@ -182,12 +278,12 @@ export function AdminShell({
             })}
           </nav>
 
-          <form action={logout} className="flex items-center gap-3">
-            <span className="hidden text-muted-foreground sm:inline">
+          <form action={logout} className="hidden shrink-0 items-center gap-3 md:flex">
+            <span className="text-muted-foreground">
               {syncStatus}
             </span>
             <span className="text-muted-foreground">{username}</span>
-            <Button variant="outline" size="sm">
+            <Button variant="outline" size="sm" aria-label="Sign out">
               <LogOutIcon data-icon="inline-start" />
               Sign out
             </Button>

@@ -114,25 +114,25 @@ export default async function PartnerDetailPage({ params }: PartnerDetailPagePro
 
       <section className="mb-5 grid gap-4 md:grid-cols-4">
         <div className="rounded-lg border border-border bg-card p-4">
-          <div className="text-xs font-medium uppercase text-muted-foreground">Receivable unpaid</div>
+          <div className="text-xs font-medium uppercase text-muted-foreground">Customer unpaid</div>
           <div className="mt-2 text-xl font-semibold">
             {money(partner.financial.receivableResidualMinor, partner.currencyCode)}
           </div>
         </div>
         <div className="rounded-lg border border-border bg-card p-4">
-          <div className="text-xs font-medium uppercase text-muted-foreground">Remaining credit</div>
+          <div className="text-xs font-medium uppercase text-muted-foreground">Available customer credit</div>
           <div className="mt-2 text-xl font-semibold">
             {money(partner.financial.remainingCreditMinor, partner.currencyCode)}
           </div>
         </div>
         <div className="rounded-lg border border-border bg-card p-4">
-          <div className="text-xs font-medium uppercase text-muted-foreground">Payable unpaid</div>
+          <div className="text-xs font-medium uppercase text-muted-foreground">Supplier unpaid</div>
           <div className="mt-2 text-xl font-semibold">
             {money(partner.financial.payableResidualMinor, partner.currencyCode)}
           </div>
         </div>
         <div className="rounded-lg border border-border bg-card p-4">
-          <div className="text-xs font-medium uppercase text-muted-foreground">Net balance</div>
+          <div className="text-xs font-medium uppercase text-muted-foreground">Net balance receivable-payable</div>
           <div className="mt-2 text-xl font-semibold">
             {money(partner.financial.netBalanceMinor, partner.currencyCode)}
           </div>

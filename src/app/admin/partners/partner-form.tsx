@@ -48,26 +48,26 @@ function PartnerSmartSummary({ partner }: { partner: PartnerDetailRecord }) {
       </div>
 
       <div className="rounded-md border border-[#d7dcdf] bg-white p-4">
-        <div className="text-xs font-medium uppercase tracking-wide text-[#58706f]">Receivable unpaid</div>
+        <div className="text-xs font-medium uppercase tracking-wide text-[#58706f]">Customer unpaid</div>
         <div className="mt-1 text-lg font-semibold">
           {money(partner.financial.receivableResidualMinor, partner.currencyCode)}
         </div>
       </div>
       <div className="rounded-md border border-[#d7dcdf] bg-white p-4">
-        <div className="text-xs font-medium uppercase tracking-wide text-[#58706f]">Remaining credit</div>
+        <div className="text-xs font-medium uppercase tracking-wide text-[#58706f]">Available customer credit</div>
         <div className="mt-1 text-lg font-semibold">
           {money(partner.financial.remainingCreditMinor, partner.currencyCode)}
         </div>
       </div>
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="rounded-md border border-[#d7dcdf] bg-white p-4">
-          <div className="text-xs font-medium uppercase tracking-wide text-[#58706f]">Payable unpaid</div>
+          <div className="text-xs font-medium uppercase tracking-wide text-[#58706f]">Supplier unpaid</div>
           <div className="mt-1 text-lg font-semibold">
             {money(partner.financial.payableResidualMinor, partner.currencyCode)}
           </div>
         </div>
         <div className="rounded-md border border-[#d7dcdf] bg-white p-4">
-          <div className="text-xs font-medium uppercase tracking-wide text-[#58706f]">Net balance</div>
+          <div className="text-xs font-medium uppercase tracking-wide text-[#58706f]">Net balance receivable-payable</div>
           <div className="mt-1 text-lg font-semibold">
             {money(partner.financial.netBalanceMinor, partner.currencyCode)}
           </div>

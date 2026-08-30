@@ -4,7 +4,6 @@ import { Button, ButtonLink } from "@/components/ui/button";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
 import { requirePermission } from "@/server/auth/session";
 import { getExpenseFormOptions } from "@/server/expenses/expenses";
-import { getActivePaymentAccounts } from "@/server/payments/payments";
 
 export const dynamic = "force-dynamic";
 
@@ -22,10 +21,9 @@ function todayInputValue() {
 export default async function NewExpensePage({ searchParams }: NewExpensePageProps) {
   await requirePermission("company.manage");
 
-  const [params, options, outboundAccounts] = await Promise.all([
+  const [params, options] = await Promise.all([
     searchParams,
     getExpenseFormOptions(),
-    getActivePaymentAccounts("outbound"),
   ]);
 
   return (
@@ -65,27 +63,7 @@ export default async function NewExpensePage({ searchParams }: NewExpensePagePro
 
           <label className="flex flex-col gap-1 text-sm font-medium">
             Payment Status
-            <select name="paymentStatus" required defaultValue="unpaid" className={inputClass}>
-              <option value="unpaid">Unpaid</option>
-              <option value="paid">Paid now</option>
-            </select>
-          </label>
-
-          <label className="flex flex-col gap-1 text-sm font-medium md:col-span-3">
-            Payment Account
-            <select name="paymentAccountId" className={inputClass}>
-              <option value="">Select account when paid now</option>
-              {outboundAccounts.map((account) => (
-                <option key={account.id} value={account.id}>
-                  {account.code} / {account.name} / {account.currencyCode}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label className="flex flex-col gap-1 text-sm font-medium">
-            Payment Reference
-            <input name="paymentReference" maxLength={120} className={inputClass} />
+            <input value="Unpaid" readOnly className={`${inputClass} text-muted-foreground`} />
           </label>
 
           <label className="flex flex-col gap-1 text-sm font-medium">
@@ -98,55 +76,6 @@ export default async function NewExpensePage({ searchParams }: NewExpensePagePro
                 </option>
               ))}
             </select>
-          </label>
-
-          <label className="flex flex-col gap-1 text-sm font-medium">
-            Vendor
-            <select name="vendorId" className={inputClass}>
-              <option value="">No vendor</option>
-              {options.vendors.map((vendor) => (
-                <option key={vendor.id} value={vendor.id}>
-                  {vendor.code} / {vendor.name}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label className="flex flex-col gap-1 text-sm font-medium">
-            Location
-            <select name="locationId" className={inputClass}>
-              <option value="">No location</option>
-              {options.locations.map((location) => (
-                <option key={location.id} value={location.id}>
-                  {location.code} / {location.name}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label className="flex flex-col gap-1 text-sm font-medium md:col-span-2">
-            Attachment Object Key
-            <input name="attachmentObjectKey" placeholder="uploads/expenses/receipt.pdf" className={inputClass} />
-          </label>
-
-          <label className="flex flex-col gap-1 text-sm font-medium md:col-span-2">
-            Attachment File Name
-            <input name="attachmentFileName" placeholder="receipt.pdf" className={inputClass} />
-          </label>
-
-          <label className="flex flex-col gap-1 text-sm font-medium">
-            MIME Type
-            <input name="attachmentMimeType" placeholder="application/pdf" className={inputClass} />
-          </label>
-
-          <label className="flex flex-col gap-1 text-sm font-medium">
-            Size Bytes
-            <input name="attachmentSizeBytes" type="number" min="0" className={inputClass} />
-          </label>
-
-          <label className="flex flex-col gap-1 text-sm font-medium md:col-span-2">
-            SHA256 Hash
-            <input name="attachmentSha256Hash" maxLength={64} className={inputClass} />
           </label>
 
           <label className="flex flex-col gap-1 text-sm font-medium md:col-span-4">

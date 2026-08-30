@@ -11,6 +11,7 @@ import type {
   ExpenseReportRow,
   PayableReportRow,
   PaymentAccountStatementRow,
+  PaymentReportRow,
   ReceivableReportRow,
   ReportFilters,
   ReportSummary,
@@ -325,6 +326,70 @@ export async function getPaymentAccountStatement(filters: ReportFilters): Promis
       and (${filters.paymentType ?? null}::payment_type is null or p.payment_type = ${filters.paymentType ?? null}::payment_type)
       and (${filters.paymentAccountId ?? null}::uuid is null or p.payment_account_id = ${filters.paymentAccountId ?? null}::uuid)
       and (${query} = '' or p.payment_no ilike ${`%${query}%`} or p.reference ilike ${`%${query}%`} or partner.display_name ilike ${`%${query}%`} or pa.name ilike ${`%${query}%`} or pa.institution_name ilike ${`%${query}%`})
+    group by p.id, partner.id, pm.id, pa.id
+    order by p.payment_date desc, p.payment_no desc
+  `);
+}
+
+export async function getPaymentReport(filters: ReportFilters): Promise<PaymentReportRow[]> {
+  const company = await getDefaultCompany();
+  const query = filters.query ?? "";
+
+  return db.execute<PaymentReportRow>(sql`
+    select
+      p.id as "id",
+      p.payment_no as "paymentNo",
+      p.payment_type::text as "paymentType",
+      p.status::text as "status",
+      p.payment_date::text as "paymentDate",
+      partner.display_name as "partnerName",
+      pm.name as "paymentMethodName",
+      pa.name as "paymentAccountName",
+      pa.institution_name as "institutionName",
+      p.reference as "reference",
+      p.amount_minor as "amountMinor",
+      case when p.payment_type = 'inbound' then p.amount_minor else -p.amount_minor end::bigint as "signedAmountMinor",
+      coalesce(sum(pal.amount_minor) filter (where pal.deleted_at is null), 0)::bigint as "allocatedAmountMinor",
+      string_agg(
+        distinct coalesce(ci.invoice_no, vb.bill_no, e.expense_no),
+        ', '
+      ) filter (where coalesce(ci.invoice_no, vb.bill_no, e.expense_no) is not null) as "sourceDocuments",
+      string_agg(
+        distinct case
+          when ci.id is not null then 'Customer Invoice'
+          when vb.id is not null then 'Vendor Bill'
+          when e.id is not null then 'Expense'
+          else null
+        end,
+        ', '
+      ) filter (where ci.id is not null or vb.id is not null or e.id is not null) as "sourceTypes",
+      p.currency_code as "currencyCode"
+    from payments p
+    left join partners partner on partner.id = p.partner_id
+    inner join payment_methods pm on pm.id = p.payment_method_id
+    inner join payment_accounts pa on pa.id = p.payment_account_id
+    left join payment_allocations pal on pal.payment_id = p.id and pal.deleted_at is null
+    left join customer_invoices ci on ci.id = pal.customer_invoice_id and ci.deleted_at is null
+    left join vendor_bills vb on vb.id = pal.vendor_bill_id and vb.deleted_at is null
+    left join expenses e on e.id = pal.expense_id and e.deleted_at is null
+    where p.company_id = ${company.id}
+      and p.deleted_at is null
+      and (${filters.dateFrom ?? null}::date is null or p.payment_date >= ${filters.dateFrom ?? null}::date)
+      and (${filters.dateTo ?? null}::date is null or p.payment_date <= ${filters.dateTo ?? null}::date)
+      and (${filters.status ?? null}::text is null or p.status::text = ${filters.status ?? null})
+      and (${filters.paymentType ?? null}::payment_type is null or p.payment_type = ${filters.paymentType ?? null}::payment_type)
+      and (${filters.paymentAccountId ?? null}::uuid is null or p.payment_account_id = ${filters.paymentAccountId ?? null}::uuid)
+      and (
+        ${query} = ''
+        or p.payment_no ilike ${`%${query}%`}
+        or p.reference ilike ${`%${query}%`}
+        or partner.display_name ilike ${`%${query}%`}
+        or pa.name ilike ${`%${query}%`}
+        or pa.institution_name ilike ${`%${query}%`}
+        or ci.invoice_no ilike ${`%${query}%`}
+        or vb.bill_no ilike ${`%${query}%`}
+        or e.expense_no ilike ${`%${query}%`}
+      )
     group by p.id, partner.id, pm.id, pa.id
     order by p.payment_date desc, p.payment_no desc
   `);

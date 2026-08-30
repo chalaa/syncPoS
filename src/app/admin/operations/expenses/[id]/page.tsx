@@ -42,6 +42,7 @@ export default async function ExpenseDetailPage({ params, searchParams }: Expens
   }
 
   const canPay = expense.status !== "cancelled" && expense.residualAmountMinor > 0;
+  const canCancel = expense.status !== "cancelled" && expense.paymentStatus !== "paid";
 
   return (
     <PageShell>
@@ -56,7 +57,7 @@ export default async function ExpenseDetailPage({ params, searchParams }: Expens
                 Payments {payments.length}
               </ButtonLink>
             ) : null}
-            {expense.status !== "cancelled" ? (
+            {canCancel ? (
               <form action={cancelExpense}>
                 <input type="hidden" name="id" value={expense.id} />
                 <input type="hidden" name="returnPath" value={`/admin/operations/expenses/${expense.id}`} />
@@ -124,8 +125,13 @@ export default async function ExpenseDetailPage({ params, searchParams }: Expens
             <div className="grid gap-4 md:grid-cols-4">
               <label className="flex flex-col gap-1 text-sm font-medium md:col-span-2">
                 Payment Account
-                <select name="paymentAccountId" required className="h-10 rounded-md border border-input bg-background px-3 text-sm">
-                  <option value="">Select account</option>
+                <select
+                  name="paymentAccountId"
+                  required
+                  defaultValue={outboundAccounts[0]?.id ?? ""}
+                  className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+                >
+                  <option value="">No outbound account configured</option>
                   {outboundAccounts.map((account) => (
                     <option key={account.id} value={account.id}>
                       {account.code} / {account.name} / {account.currencyCode}
@@ -133,7 +139,7 @@ export default async function ExpenseDetailPage({ params, searchParams }: Expens
                   ))}
                 </select>
               </label>
-              <label className="flex flex-col gap-1 text-sm font-medium">
+              <label className="flex flex-col gap-1 text-sm font-medium md:col-span-2">
                 Amount
                 <input
                   name="amount"
@@ -144,14 +150,6 @@ export default async function ExpenseDetailPage({ params, searchParams }: Expens
                   defaultValue={minorToInputValue(expense.residualAmountMinor)}
                   className="h-10 rounded-md border border-input bg-background px-3 text-sm"
                 />
-              </label>
-              <label className="flex flex-col gap-1 text-sm font-medium">
-                Reference
-                <input name="reference" className="h-10 rounded-md border border-input bg-background px-3 text-sm" />
-              </label>
-              <label className="flex flex-col gap-1 text-sm font-medium md:col-span-4">
-                Notes
-                <textarea name="notes" className="min-h-20 rounded-md border border-input bg-background px-3 py-2 text-sm" />
               </label>
             </div>
             <div className="flex justify-end">

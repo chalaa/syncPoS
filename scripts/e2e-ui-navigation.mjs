@@ -259,8 +259,19 @@ async function main() {
     }
 
     const inventoryText = await navigate(client, "/admin/inventory", "Operations");
-    assertCondition(inventoryText.includes("Stock Card"), "Inventory top menu is missing Stock Card.");
-    assertCondition(inventoryText.includes("Opening Stock"), "Inventory top menu is missing Opening Stock.");
+    if (!inventoryText.includes("Stock Card")) {
+      await evaluate(
+        client,
+        `(() => {
+          const summary = document.querySelector('header details summary');
+          if (summary) summary.click();
+          return true;
+        })()`,
+      );
+    }
+    const expandedInventoryText = await evaluate(client, "document.body.innerText");
+    assertCondition(expandedInventoryText.includes("Stock Card"), "Inventory top menu is missing Stock Card.");
+    assertCondition(expandedInventoryText.includes("Opening Stock"), "Inventory top menu is missing Opening Stock.");
 
     const receiptOperationText = await navigate(client, "/admin/inventory/operations?view=receipts", "Receipts");
     assertCondition(

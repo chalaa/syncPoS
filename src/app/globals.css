@@ -54,3 +54,32 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+* {
+  min-width: 0;
+}
+
+html,
+body {
+  overflow-x: hidden;
+}
+
+input,
+select,
+textarea,
+button {
+  font: inherit;
+}
+
+table {
+  border-spacing: 0;
+}
+
+th,
+td {
+  vertical-align: top;
+}
+
+.overflow-x-auto {
+  -webkit-overflow-scrolling: touch;
+}

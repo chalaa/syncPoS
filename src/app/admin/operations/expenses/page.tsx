@@ -125,7 +125,7 @@ function ExpenseTable({ rows, showCancelled }: { rows: ExpenseListRow[]; showCan
                     <BanknoteIcon data-icon="inline-start" />
                     Details
                   </ButtonLink>
-                  {!showCancelled && expense.status !== "cancelled" ? (
+                  {!showCancelled && expense.status !== "cancelled" && expense.paymentStatus !== "paid" ? (
                     <form action={cancelExpense}>
                       <input type="hidden" name="id" value={expense.id} />
                       <input type="hidden" name="returnPath" value="/admin/operations/expenses" />

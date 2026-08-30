@@ -26,6 +26,12 @@ const reports = [
     icon: BanknoteIcon,
   },
   {
+    title: "Payment Report",
+    description: "All customer invoice, vendor bill, and expense payments with account, source, and status.",
+    href: "/admin/reports/payments",
+    icon: BanknoteIcon,
+  },
+  {
     title: "Stock Report",
     description: "Current stock by product, location, serial, lot, available quantity, and stock value.",
     href: "/admin/reports/stock",

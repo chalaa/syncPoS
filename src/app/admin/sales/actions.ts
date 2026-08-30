@@ -4,9 +4,10 @@ import { randomUUID } from "node:crypto";
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { and, eq, inArray, isNull, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
 
+import { minorToDisplay } from "@/lib/catalog-utils";
 import { requirePermission } from "@/server/auth/session";
 import { getDefaultCompany, majorToMinor, uniqueViolationMessage } from "@/server/catalog/products";
 import { db } from "@/server/db/client";
@@ -127,6 +128,10 @@ function addYears(value: Date, years: number) {
   const copy = new Date(value);
   copy.setFullYear(copy.getFullYear() + years);
   return copy;
+}
+
+function formatMoneyForError(valueMinor: number, currencyCode: string) {
+  return `${currencyCode} ${minorToDisplay(valueMinor)}`;
 }
 
 function redirectWithError(path: string, message: string): never {
@@ -611,6 +616,7 @@ export async function confirmSalesOrder(formData: FormData) {
           status: salesOrders.status,
           customerId: salesOrders.customerId,
           sourceLocationId: salesOrders.sourceLocationId,
+          totalMinor: salesOrders.totalMinor,
           reserveOnConfirm: salesOrders.reserveOnConfirm,
         })
         .from(salesOrders)
@@ -641,6 +647,72 @@ export async function confirmSalesOrder(formData: FormData) {
         throw new Error("Sales order has no lines.");
       }
 
+      const [creditSummary] = await tx.execute<{
+        customerName: string;
+        creditLimitMinor: number;
+        receivableResidualMinor: number;
+      }>(sql`
+        select
+          p.display_name as "customerName",
+          p.credit_limit_minor as "creditLimitMinor",
+          coalesce((
+            select sum(greatest(open_invoices.total_minor - open_invoices.paid_minor, 0))
+            from (
+              select
+                ci.id,
+                ci.total_minor,
+                coalesce((
+                  select sum(pa.amount_minor)
+                  from payment_allocations pa
+                  inner join payments pay on pay.id = pa.payment_id
+                  where pa.customer_invoice_id = ci.id
+                    and pa.deleted_at is null
+                    and pay.deleted_at is null
+                    and pay.status = 'posted'
+                ), 0) as paid_minor
+              from customer_invoices ci
+              where ci.company_id = ${company.id}
+                and ci.customer_id = ${order.customerId}
+                and ci.deleted_at is null
+                and ci.status <> 'cancelled'
+            ) open_invoices
+          ), 0)::bigint as "receivableResidualMinor"
+        from partners p
+        where p.id = ${order.customerId}
+          and p.company_id = ${company.id}
+          and p.deleted_at is null
+        limit 1
+      `);
+
+      if (!creditSummary) {
+        throw new Error("Customer does not exist.");
+      }
+
+      const creditLimitMinor = Number(creditSummary.creditLimitMinor);
+      const receivableResidualMinor = Number(creditSummary.receivableResidualMinor);
+      const orderTotalMinor = Number(order.totalMinor);
+
+      if (creditLimitMinor > 0) {
+        const creditUsedAfterOrder = receivableResidualMinor + orderTotalMinor;
+
+        if (creditUsedAfterOrder > creditLimitMinor) {
+          const overLimitMinor = creditUsedAfterOrder - creditLimitMinor;
+
+          throw new Error(
+            `${creditSummary.customerName} is over the credit limit. Limit ${formatMoneyForError(
+              creditLimitMinor,
+              company.baseCurrencyCode,
+            )}, current unpaid ${formatMoneyForError(
+              receivableResidualMinor,
+              company.baseCurrencyCode,
+            )}, this order ${formatMoneyForError(orderTotalMinor, company.baseCurrencyCode)}, over by ${formatMoneyForError(
+              overLimitMinor,
+              company.baseCurrencyCode,
+            )}.`,
+          );
+        }
+      }
+
       if (order.reserveOnConfirm) {
         if (!order.sourceLocationId) {
           throw new Error("A source location is required to reserve stock.");
@@ -659,9 +731,11 @@ export async function confirmSalesOrder(formData: FormData) {
           : "the selected source location";
 
         for (const line of lines) {
-          const [balance] = await tx
+          const balances = await tx
             .select({
               id: stockBalances.id,
+              productSerialId: stockBalances.productSerialId,
+              productLotId: stockBalances.productLotId,
               quantityAvailable: stockBalances.quantityAvailable,
             })
             .from(stockBalances)
@@ -670,43 +744,60 @@ export async function confirmSalesOrder(formData: FormData) {
                 eq(stockBalances.companyId, company.id),
                 eq(stockBalances.locationId, order.sourceLocationId),
                 eq(stockBalances.productId, line.productId),
-                isNull(stockBalances.productSerialId),
-                isNull(stockBalances.productLotId),
+                sql`cast(${stockBalances.quantityAvailable} as numeric) > 0`,
                 isNull(stockBalances.deletedAt),
               ),
             )
-            .limit(1);
+            .orderBy(
+              asc(stockBalances.productSerialId),
+              asc(stockBalances.productLotId),
+              asc(stockBalances.createdAt),
+            );
           const quantity = Number(line.quantityOrdered);
-          const available = Number(balance?.quantityAvailable ?? 0);
+          const available = balances.reduce((sum, balance) => sum + Number(balance.quantityAvailable), 0);
 
-          if (!balance || available < quantity) {
+          if (available < quantity) {
             throw new Error(
               `Insufficient stock available for ${line.sku} / ${line.productName} in ${sourceLocationName}. Required ${quantity}, available ${available}.`,
             );
           }
 
-          const reservationNo = documentNo("RSV");
-          await tx.insert(stockReservations).values({
-            companyId: company.id,
-            reservationNo,
-            locationId: order.sourceLocationId,
-            productId: line.productId,
-            partnerId: order.customerId,
-            sourceType: "sales_order_line",
-            sourceId: line.id,
-            sourceNo: order.orderNo,
-            quantity: line.quantityOrdered,
-            status: "active",
-          });
+          let remainingToReserve = quantity;
 
-          await tx
-            .update(stockBalances)
-            .set({
-              quantityReserved: sql`${stockBalances.quantityReserved} + ${line.quantityOrdered}`,
-              quantityAvailable: sql`${stockBalances.quantityAvailable} - ${line.quantityOrdered}`,
-              updatedAt: sql`now()`,
-            })
-            .where(eq(stockBalances.id, balance.id));
+          for (const balance of balances) {
+            if (remainingToReserve <= 0) {
+              break;
+            }
+
+            const reserveQuantity = Math.min(Number(balance.quantityAvailable), remainingToReserve);
+            const reservationNo = documentNo("RSV");
+
+            await tx.insert(stockReservations).values({
+              companyId: company.id,
+              reservationNo,
+              locationId: order.sourceLocationId,
+              productId: line.productId,
+              productSerialId: balance.productSerialId,
+              productLotId: balance.productLotId,
+              partnerId: order.customerId,
+              sourceType: "sales_order_line",
+              sourceId: line.id,
+              sourceNo: order.orderNo,
+              quantity: String(reserveQuantity),
+              status: "active",
+            });
+
+            await tx
+              .update(stockBalances)
+              .set({
+                quantityReserved: sql`${stockBalances.quantityReserved} + ${String(reserveQuantity)}`,
+                quantityAvailable: sql`${stockBalances.quantityAvailable} - ${String(reserveQuantity)}`,
+                updatedAt: sql`now()`,
+              })
+              .where(eq(stockBalances.id, balance.id));
+
+            remainingToReserve -= reserveQuantity;
+          }
 
           await tx
             .update(salesOrderLines)

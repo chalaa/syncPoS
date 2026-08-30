@@ -122,6 +122,7 @@ export const adminMenuItems: AdminMenuItem[] = [
       { label: "Report Hub", href: "/admin/reports", permission: PERMISSIONS.REPORTS.PROFIT_VIEW },
       { label: "Sales", href: "/admin/reports/sales", permission: PERMISSIONS.REPORTS.PROFIT_VIEW },
       { label: "Expenses", href: "/admin/reports/expenses", permission: PERMISSIONS.REPORTS.PROFIT_VIEW },
+      { label: "Payments", href: "/admin/reports/payments", permission: PERMISSIONS.REPORTS.PROFIT_VIEW },
       { label: "Payment Accounts", href: "/admin/reports/payment-accounts", permission: PERMISSIONS.REPORTS.PROFIT_VIEW },
       { label: "Stock", href: "/admin/reports/stock", permission: PERMISSIONS.REPORTS.PROFIT_VIEW },
       { label: "Receivables", href: "/admin/reports/receivables", permission: PERMISSIONS.REPORTS.PROFIT_VIEW },

@@ -103,6 +103,11 @@ export type PaymentAccountStatementRow = {
   currencyCode: string;
 };
 
+export type PaymentReportRow = PaymentAccountStatementRow & {
+  sourceDocuments: string | null;
+  sourceTypes: string | null;
+};
+
 export type StockReportRow = {
   productId: string;
   locationId: string;
