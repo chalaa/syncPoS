@@ -62,7 +62,7 @@ function TaxForm({
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="flex flex-col gap-1 text-sm font-medium">
           Code
-          <input name="code" required defaultValue={record?.code} className={inputClass} />
+          <input name="code" placeholder={record ? undefined : "Auto"} defaultValue={record?.code} className={inputClass} />
         </label>
         <label className="flex flex-col gap-1 text-sm font-medium">
           Name

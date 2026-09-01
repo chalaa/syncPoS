@@ -5,7 +5,6 @@ import Dexie, { type EntityTable } from "dexie";
 export type LocalProduct = {
   id: string;
   sku: string;
-  barcode?: string;
   name: string;
   tracking: "none" | "lot" | "serial";
   price: number;
@@ -45,7 +44,7 @@ export const offlineDb = new Dexie("syncpos-offline") as Dexie & {
 };
 
 offlineDb.version(1).stores({
-  products: "id, sku, barcode, name, tracking, updatedAt",
+  products: "id, sku, name, tracking, updatedAt",
   stockBalances: "id, [locationId+productId+serialAssetId+status], productId, status",
   syncEvents: "id, eventId, [deviceId+deviceSequence], status, occurredAtLocal",
 });

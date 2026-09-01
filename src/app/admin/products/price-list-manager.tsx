@@ -103,7 +103,7 @@ function PriceListForm({
       <div className="grid gap-4 md:grid-cols-[0.7fr_1fr_0.9fr]">
         <label className="grid gap-1 text-sm font-medium">
           Code
-          <input name="code" required defaultValue={record?.code} className={inputClass} />
+          <input name="code" placeholder={record ? undefined : "Auto"} defaultValue={record?.code} className={inputClass} />
         </label>
         <label className="grid gap-1 text-sm font-medium">
           Name

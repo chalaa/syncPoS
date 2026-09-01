@@ -1,11 +1,3 @@
-export const productTypeOptions = [
-  "machinery",
-  "spare_part",
-  "accessory",
-  "consumable",
-  "service",
-] as const;
-
 export const trackingModeOptions = ["none", "lot", "serial"] as const;
 export const taxScopeOptions = ["purchase", "sale", "both"] as const;
 export const taxComputationOptions = ["percent", "fixed"] as const;
@@ -16,7 +8,6 @@ export const priceListTypeOptions = [
   "location_specific",
 ] as const;
 
-export type ProductTypeOption = (typeof productTypeOptions)[number];
 export type TrackingModeOption = (typeof trackingModeOptions)[number];
 export type TaxScopeOption = (typeof taxScopeOptions)[number];
 export type TaxComputationOption = (typeof taxComputationOptions)[number];
@@ -43,14 +34,12 @@ export type CatalogReferenceRecord = {
 export type ProductFormRecord = {
   id: string;
   sku: string;
-  barcode: string | null;
   name: string;
   categoryId: string | null;
   brandId: string | null;
   model: string | null;
   description: string | null;
   unitId: string;
-  productType: ProductTypeOption;
   trackingMode: TrackingModeOption;
   standardCostMinor: number;
   listPriceMinor: number;

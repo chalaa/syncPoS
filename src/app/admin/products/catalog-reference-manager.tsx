@@ -55,7 +55,7 @@ function ReferenceForm({
           Code
           <input
             name="code"
-            required
+            placeholder={record ? undefined : "Auto"}
             defaultValue={record?.code}
             className={inputClass}
           />

@@ -23,7 +23,7 @@ export function ProductStockCardFilters({
         <input
           name="q"
           defaultValue={query}
-          placeholder="SKU, product, movement, or source"
+          placeholder="Item code, product, movement, or source"
           className="h-10 rounded-md border border-input bg-background px-3 text-sm"
         />
       </label>
@@ -119,7 +119,7 @@ export function SerialHistoryFilters({
         <input
           name="serial"
           defaultValue={serialQuery}
-          placeholder="Serial, engine, chassis, or SKU"
+          placeholder="Serial, engine, chassis, or item code"
           className="h-10 rounded-md border border-input bg-background px-3 text-sm"
         />
       </label>

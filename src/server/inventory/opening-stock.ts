@@ -20,11 +20,11 @@ import type {
   OpeningStockImportRow,
 } from "@/server/inventory/types";
 
-const templateHeaders = ["sku", "location_code", "quantity", "unit_cost", "serial_no", "notes"];
+const templateHeaders = ["item_code", "location_code", "quantity", "unit_cost", "serial_no", "notes"];
 
 export const openingStockTemplateCsv = `${templateHeaders.join(",")}
-SKU-001,WH-001,10,1250.50,,Opening stock for bulk item
-SKU-002,SHOP-001,1,85000,SERIAL-001,Opening stock for serialized item
+ITEM-00001,WH-001,10,1250.50,,Opening stock for bulk item
+ITEM-00002,SHOP-001,1,85000,SERIAL-001,Opening stock for serialized item
 `;
 
 type ParsedCsvRow = {
@@ -82,13 +82,14 @@ function parseCsv(text: string): ParsedCsvRow[] {
 
   const headers = parseCsvLine(lines[0]).map((header) => header.toLowerCase());
   const headerIndex = Object.fromEntries(headers.map((header, index) => [header, index]));
+  const itemCodeIndex = headerIndex.item_code ?? headerIndex.sku;
 
   return lines.slice(1).map((line, index) => {
     const values = parseCsvLine(line);
 
     return {
       rowNumber: index + 2,
-      sku: values[headerIndex.sku] ?? "",
+      sku: itemCodeIndex === undefined ? "" : values[itemCodeIndex] ?? "",
       locationCode: values[headerIndex.location_code] ?? "",
       quantity: values[headerIndex.quantity] ?? "",
       unitCost: values[headerIndex.unit_cost] ?? "",
@@ -164,9 +165,9 @@ export async function previewOpeningStockCsv(text: string) {
     const errors: string[] = [];
 
     if (!sku) {
-      errors.push("SKU is required.");
+      errors.push("Item code is required.");
     } else if (!product) {
-      errors.push("SKU does not match an active product.");
+      errors.push("Item code does not match an active product.");
     }
 
     if (!locationCode) {

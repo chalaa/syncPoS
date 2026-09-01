@@ -15,7 +15,3 @@ export function majorToMinor(value: string) {
 export function normalizeCode(value: string) {
   return value.trim().toUpperCase().replace(/\s+/g, "-");
 }
-
-export function formatProductType(value: string) {
-  return value.replace(/_/g, " ");
-}

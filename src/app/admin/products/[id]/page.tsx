@@ -4,11 +4,7 @@ import { ButtonLink } from "@/components/ui/button";
 import { Notebook } from "@/components/ui/notebook";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
 import { requirePermission } from "@/server/auth/session";
-import {
-  formatProductType,
-  getProductDetail,
-  minorToDisplay,
-} from "@/server/catalog/products";
+import { getProductDetail, minorToDisplay } from "@/server/catalog/products";
 import { displayMoneyMinor, displayQuantity } from "@/server/inventory/stock";
 
 export const dynamic = "force-dynamic";
@@ -55,9 +51,6 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
             {[product.brandName, product.categoryName, product.model].filter(Boolean).join(" / ") || "No category"}
           </div>
           <div className="flex flex-wrap gap-2 pt-2 text-xs">
-            <span className="rounded-md border border-border bg-muted px-2 py-1 capitalize">
-              {formatProductType(product.productType)}
-            </span>
             <span className="rounded-md border border-border bg-muted px-2 py-1">
               Tracking: {trackingLabel(product.trackingMode)}
             </span>
@@ -100,8 +93,6 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
             content: (
               <div className="grid gap-5 md:grid-cols-2">
                 <section className="grid gap-3 text-sm">
-                  <InfoRow label="Barcode" value={product.barcode ?? "-"} />
-                  <InfoRow label="Product Type" value={formatProductType(product.productType)} />
                   <InfoRow label="Category" value={product.categoryName ?? "-"} />
                   <InfoRow label="Brand" value={product.brandName ?? "-"} />
                   <InfoRow label="Unit" value={`${product.unitCode} / ${product.unitName}`} />

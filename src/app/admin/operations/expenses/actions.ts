@@ -10,6 +10,7 @@ import { z } from "zod";
 import { getDefaultCompany, majorToMinor, uniqueViolationMessage } from "@/server/catalog/products";
 import { requirePermission } from "@/server/auth/session";
 import { db } from "@/server/db/client";
+import { generateCompanyCode } from "@/server/db/code-generator";
 import {
   auditLogs,
   expenseCategories,
@@ -24,7 +25,7 @@ const optionalUuid = z.string().uuid().or(z.literal("")).transform((value) => va
 
 const expenseCategorySchema = z.object({
   id: z.string().uuid().optional(),
-  code: z.string().trim().min(1).max(40).transform((value) => value.toUpperCase()),
+  code: z.string().trim().max(40).transform((value) => value.toUpperCase()),
   name: z.string().trim().min(1).max(120),
   description: z.string().trim().optional(),
   isActive: z.boolean(),
@@ -220,7 +221,11 @@ export async function createExpenseCategory(formData: FormData) {
   try {
     await db.insert(expenseCategories).values({
       companyId: company.id,
-      code: parsed.data.code,
+      code: parsed.data.code || await generateCompanyCode(db, {
+        companyId: company.id,
+        table: "expense_categories",
+        prefix: "EXP-CAT",
+      }),
       name: parsed.data.name,
       description: parsed.data.description || null,
       isActive: parsed.data.isActive,
@@ -237,7 +242,7 @@ export async function updateExpenseCategory(formData: FormData) {
   await requirePermission("company.manage");
   const parsed = expenseCategorySchema.safeParse(categoryPayload(formData));
 
-  if (!parsed.success || !parsed.data.id) {
+  if (!parsed.success || !parsed.data.id || !parsed.data.code) {
     redirectWithMessage("/admin/operations/expenses/categories", "error", "Expense category ID, code, and name are required.");
   }
 

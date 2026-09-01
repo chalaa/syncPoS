@@ -3,7 +3,6 @@ import { alias } from "drizzle-orm/pg-core";
 
 import { db } from "@/server/db/client";
 import {
-  formatProductType,
   majorToMinor,
   minorToDisplay,
   normalizeCode,
@@ -46,7 +45,6 @@ import type {
 } from "@/server/catalog/types";
 export {
   priceListTypeOptions,
-  productTypeOptions,
   taxComputationOptions,
   taxScopeOptions,
   trackingModeOptions,
@@ -136,7 +134,6 @@ export async function getProductList(params: { query?: string; showDeleted?: boo
   const searchFilter = query
     ? or(
         ilike(products.sku, `%${query}%`),
-        ilike(products.barcode, `%${query}%`),
         ilike(products.name, `%${query}%`),
         ilike(products.model, `%${query}%`),
       )
@@ -148,10 +145,8 @@ export async function getProductList(params: { query?: string; showDeleted?: boo
     .select({
       id: products.id,
       sku: products.sku,
-      barcode: products.barcode,
       name: products.name,
       model: products.model,
-      productType: products.productType,
       trackingMode: products.trackingMode,
       standardCostMinor: products.standardCostMinor,
       listPriceMinor: products.listPriceMinor,
@@ -297,14 +292,12 @@ export async function getProductById(id: string) {
     .select({
       id: products.id,
       sku: products.sku,
-      barcode: products.barcode,
       name: products.name,
       categoryId: products.categoryId,
       brandId: products.brandId,
       model: products.model,
       description: products.description,
       unitId: products.unitId,
-      productType: products.productType,
       trackingMode: products.trackingMode,
       standardCostMinor: products.standardCostMinor,
       listPriceMinor: products.listPriceMinor,
@@ -353,7 +346,6 @@ export async function getProductDetail(id: string): Promise<ProductDetail | null
     .select({
       id: products.id,
       sku: products.sku,
-      barcode: products.barcode,
       name: products.name,
       categoryId: products.categoryId,
       categoryName: productCategories.name,
@@ -364,7 +356,6 @@ export async function getProductDetail(id: string): Promise<ProductDetail | null
       unitId: products.unitId,
       unitCode: unitsOfMeasure.code,
       unitName: unitsOfMeasure.name,
-      productType: products.productType,
       trackingMode: products.trackingMode,
       standardCostMinor: products.standardCostMinor,
       listPriceMinor: products.listPriceMinor,
@@ -693,7 +684,7 @@ export async function getProductTrackingRows(): Promise<ProductTrackingListRow[]
   ];
 }
 
-export { formatProductType, majorToMinor, minorToDisplay, normalizeCode };
+export { majorToMinor, minorToDisplay, normalizeCode };
 
 export function uniqueViolationMessage(error: unknown, fallback: string) {
   if (
@@ -702,7 +693,7 @@ export function uniqueViolationMessage(error: unknown, fallback: string) {
     "code" in error &&
     (error as { code?: string }).code === "23505"
   ) {
-    return "A record with the same unique code, SKU, barcode, or name already exists.";
+    return "A record with the same unique code, item code, or name already exists.";
   }
 
   return fallback;

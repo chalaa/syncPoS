@@ -10,13 +10,13 @@ import {
   majorToMinor,
   normalizeCode,
   priceListTypeOptions,
-  productTypeOptions,
   taxComputationOptions,
   taxScopeOptions,
   trackingModeOptions,
   uniqueViolationMessage,
 } from "@/server/catalog/products";
 import { db } from "@/server/db/client";
+import { generateCompanyCode } from "@/server/db/code-generator";
 import {
   brands,
   priceListItems,
@@ -34,15 +34,13 @@ const optionalUuid = z.string().uuid().or(z.literal("")).transform((value) => va
 
 const productFormSchema = z.object({
   id: z.string().uuid().optional(),
-  sku: z.string().trim().min(1, "SKU is required").max(60),
-  barcode: z.string().trim().max(80).optional(),
+  sku: z.string().trim().max(60),
   name: z.string().trim().min(1, "Name is required").max(200),
   categoryId: optionalUuid,
   brandId: optionalUuid,
   model: z.string().trim().max(100).optional(),
   description: z.string().trim().optional(),
   unitId: z.string().uuid("Unit is required"),
-  productType: z.enum(productTypeOptions),
   trackingMode: z.enum(trackingModeOptions),
   standardCost: z.string().trim().default("0"),
   listPrice: z.string().trim().default("0"),
@@ -63,7 +61,7 @@ const priceListItemSchema = z.object({
 
 const priceListSchema = z.object({
   id: z.string().uuid().optional(),
-  code: z.string().trim().min(1).max(40).transform(normalizeCode),
+  code: z.string().trim().max(40).transform(normalizeCode),
   name: z.string().trim().min(1).max(120),
   priceListType: z.enum(priceListTypeOptions),
   locationId: optionalUuid,
@@ -79,7 +77,7 @@ const priceListSchema = z.object({
 
 const referenceSchema = z.object({
   id: z.string().uuid().optional(),
-  code: z.string().trim().min(1).max(40),
+  code: z.string().trim().max(40),
   name: z.string().trim().min(1).max(120),
   description: z.string().trim().optional(),
   isActive: z.enum(["on"]).optional(),
@@ -92,7 +90,7 @@ const unitSchema = referenceSchema.extend({
 
 const taxSchema = z.object({
   id: z.string().uuid().optional(),
-  code: z.string().trim().min(1).max(40),
+  code: z.string().trim().max(40),
   name: z.string().trim().min(1).max(120),
   scope: z.enum(taxScopeOptions),
   computation: z.enum(taxComputationOptions),
@@ -114,14 +112,12 @@ function formPayload(formData: FormData) {
   return {
     id: formValue(formData, "id") || undefined,
     sku: formValue(formData, "sku"),
-    barcode: formValue(formData, "barcode"),
     name: formValue(formData, "name"),
     categoryId: formValue(formData, "categoryId"),
     brandId: formValue(formData, "brandId"),
     model: formValue(formData, "model"),
     description: formValue(formData, "description"),
     unitId: formValue(formData, "unitId"),
-    productType: formValue(formData, "productType"),
     trackingMode: formValue(formData, "trackingMode"),
     standardCost: formValue(formData, "standardCost") || "0",
     listPrice: formValue(formData, "listPrice") || "0",
@@ -219,6 +215,30 @@ function redirectWithMessage(path: string, key: "notice" | "error", message: str
   redirect(`${path}${path.includes("?") ? "&" : "?"}${key}=${encodeURIComponent(message)}`);
 }
 
+async function generateProductSku(
+  executor: Parameters<Parameters<typeof db.transaction>[0]>[0] | typeof db,
+  companyId: string,
+) {
+  const [row] = await executor.execute(sql`
+    select (
+      'ITEM'
+      || '-'
+      || lpad(
+        (coalesce(max((substring(sku from '^ITEM-([0-9]+)$'))::int), 0) + 1)::text,
+        5,
+        '0'
+      )
+    ) as "sku"
+    from products
+    where company_id = ${companyId}
+      and deleted_at is null
+      and sku ~ '^ITEM-[0-9]+$'
+  `);
+  const sku = typeof row === "object" && row && "sku" in row ? row.sku : undefined;
+
+  return typeof sku === "string" ? sku : "ITEM-00001";
+}
+
 export async function createProduct(formData: FormData) {
   await requirePermission("product.manage");
 
@@ -232,22 +252,21 @@ export async function createProduct(formData: FormData) {
 
   try {
     await db.transaction(async (tx) => {
+      const sku = parsed.data.sku || await generateProductSku(tx, company.id);
       const [product] = await tx.insert(products).values({
         companyId: company.id,
-        sku: parsed.data.sku,
-        barcode: parsed.data.barcode || null,
+        sku,
         name: parsed.data.name,
         categoryId: parsed.data.categoryId,
         brandId: parsed.data.brandId,
         model: parsed.data.model || null,
         description: parsed.data.description || null,
         unitId: parsed.data.unitId,
-        productType: parsed.data.productType,
         trackingMode: parsed.data.trackingMode,
         standardCostMinor: majorToMinor(parsed.data.standardCost),
         listPriceMinor: majorToMinor(parsed.data.listPrice),
         currencyCode: company.baseCurrencyCode,
-        isActive: parsed.data.isActive === "on",
+        isActive: true,
       }).returning({ id: products.id });
 
       if (parsed.data.saleTaxIds.length > 0) {
@@ -275,8 +294,8 @@ export async function updateProduct(formData: FormData) {
 
   const parsed = productFormSchema.safeParse(formPayload(formData));
 
-  if (!parsed.success || !parsed.data.id) {
-    redirect(formErrorPath("/admin/products", parsed.success ? "Product ID is missing" : parsed.error));
+  if (!parsed.success || !parsed.data.id || !parsed.data.sku) {
+    redirect(formErrorPath("/admin/products", parsed.success ? "Product ID and item code are required" : parsed.error));
   }
 
   const productId = parsed.data.id;
@@ -287,18 +306,15 @@ export async function updateProduct(formData: FormData) {
         .update(products)
         .set({
           sku: parsed.data.sku,
-          barcode: parsed.data.barcode || null,
           name: parsed.data.name,
           categoryId: parsed.data.categoryId,
           brandId: parsed.data.brandId,
           model: parsed.data.model || null,
           description: parsed.data.description || null,
           unitId: parsed.data.unitId,
-          productType: parsed.data.productType,
           trackingMode: parsed.data.trackingMode,
           standardCostMinor: majorToMinor(parsed.data.standardCost),
           listPriceMinor: majorToMinor(parsed.data.listPrice),
-          isActive: parsed.data.isActive === "on",
           updatedAt: sql`now()`,
         })
         .where(eq(products.id, productId));
@@ -385,7 +401,7 @@ export async function createTax(formData: FormData) {
   try {
     await db.insert(taxes).values({
       companyId: company.id,
-      code: parsed.data.code,
+      code: parsed.data.code || await generateCompanyCode(db, { companyId: company.id, table: "taxes", prefix: "TAX" }),
       name: parsed.data.name,
       scope: parsed.data.scope,
       computation: parsed.data.computation,
@@ -409,7 +425,7 @@ export async function updateTax(formData: FormData) {
 
   const parsed = taxSchema.safeParse(taxPayload(formData));
 
-  if (!parsed.success || !parsed.data.id) {
+  if (!parsed.success || !parsed.data.id || !parsed.data.code) {
     redirectWithMessage("/admin/products/taxes", "error", parsed.success ? "Tax ID is missing" : (parsed.error.issues[0]?.message ?? "Tax details are required"));
   }
 
@@ -524,11 +540,16 @@ export async function createPriceList(formData: FormData) {
 
   try {
     await db.transaction(async (tx) => {
+      const code = parsed.data.code || await generateCompanyCode(tx, {
+        companyId: company.id,
+        table: "price_lists",
+        prefix: "PL",
+      });
       const [created] = await tx
         .insert(priceLists)
         .values({
           companyId: company.id,
-          code: parsed.data.code,
+          code,
           name: parsed.data.name,
           priceListType: parsed.data.priceListType,
           currencyCode: company.baseCurrencyCode,
@@ -553,7 +574,7 @@ export async function updatePriceList(formData: FormData) {
   await requirePermission("product.manage");
 
   const parsed = priceListSchema.safeParse(priceListPayload(formData));
-  if (!parsed.success || !parsed.data.id) {
+  if (!parsed.success || !parsed.data.id || !parsed.data.code) {
     redirectWithMessage("/admin/products/price-lists", "error", parsed.success ? "Price list ID is missing." : (parsed.error.issues[0]?.message ?? "Invalid price list."));
   }
 
@@ -621,7 +642,11 @@ export async function createCategory(formData: FormData) {
   try {
     await db.insert(productCategories).values({
       companyId: company.id,
-      code: parsed.data.code,
+      code: parsed.data.code || await generateCompanyCode(db, {
+        companyId: company.id,
+        table: "product_categories",
+        prefix: "CAT",
+      }),
       name: parsed.data.name,
       description: parsed.data.description || null,
       isActive: parsed.data.isActive === "on",
@@ -649,7 +674,11 @@ export async function createBrand(formData: FormData) {
   try {
     await db.insert(brands).values({
       companyId: company.id,
-      code: parsed.data.code,
+      code: parsed.data.code || await generateCompanyCode(db, {
+        companyId: company.id,
+        table: "brands",
+        prefix: "BRD",
+      }),
       name: parsed.data.name,
       description: parsed.data.description || null,
       isActive: parsed.data.isActive === "on",
@@ -677,7 +706,11 @@ export async function createUnit(formData: FormData) {
   try {
     await db.insert(unitsOfMeasure).values({
       companyId: company.id,
-      code: parsed.data.code,
+      code: parsed.data.code || await generateCompanyCode(db, {
+        companyId: company.id,
+        table: "units_of_measure",
+        prefix: "UOM",
+      }),
       name: parsed.data.name,
       precision: parsed.data.precision,
       isActive: parsed.data.isActive === "on",
@@ -696,7 +729,7 @@ export async function updateCategory(formData: FormData) {
 
   const parsed = referenceSchema.safeParse(referencePayload(formData));
 
-  if (!parsed.success || !parsed.data.id) {
+  if (!parsed.success || !parsed.data.id || !parsed.data.code) {
     redirectWithMessage("/admin/products/categories", "error", "Category ID, code, and name are required");
   }
 
@@ -725,7 +758,7 @@ export async function updateBrand(formData: FormData) {
 
   const parsed = referenceSchema.safeParse(referencePayload(formData));
 
-  if (!parsed.success || !parsed.data.id) {
+  if (!parsed.success || !parsed.data.id || !parsed.data.code) {
     redirectWithMessage("/admin/products/brands", "error", "Brand ID, code, and name are required");
   }
 
@@ -754,7 +787,7 @@ export async function updateUnit(formData: FormData) {
 
   const parsed = unitSchema.safeParse(unitPayload(formData));
 
-  if (!parsed.success || !parsed.data.id) {
+  if (!parsed.success || !parsed.data.id || !parsed.data.code) {
     redirectWithMessage("/admin/products/units", "error", "Unit ID, code, name, and precision are required");
   }
 

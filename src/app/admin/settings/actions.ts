@@ -9,6 +9,7 @@ import { requirePermission } from "@/server/auth/session";
 import { hashPassword } from "@/server/auth/password";
 import { uniqueViolationMessage } from "@/server/catalog/products";
 import { db } from "@/server/db/client";
+import { generateCompanyCode } from "@/server/db/code-generator";
 import {
   authSessions,
   employees,
@@ -35,7 +36,7 @@ const userSchema = z.object({
 
 const roleSchema = z.object({
   id: z.string().uuid().optional(),
-  code: z.string().trim().min(2).max(80).transform((value) => value.toUpperCase().replace(/\s+/g, "_")),
+  code: z.string().trim().max(80).transform((value) => value.toUpperCase().replace(/\s+/g, "_")),
   name: z.string().trim().min(2).max(120),
   description: z.string().trim().max(500).optional(),
   isActive: z.boolean(),
@@ -331,11 +332,16 @@ export async function createRole(formData: FormData) {
     }
 
     await db.transaction(async (tx) => {
+      const code = parsed.data.code || await generateCompanyCode(tx, {
+        companyId: currentUser.companyId,
+        table: "roles",
+        prefix: "ROLE",
+      });
       const [createdRole] = await tx
         .insert(roles)
         .values({
           companyId: currentUser.companyId,
-          code: parsed.data.code,
+          code,
           name: parsed.data.name,
           description: parsed.data.description || null,
           isSystem: false,
@@ -367,7 +373,7 @@ export async function updateRole(formData: FormData) {
   const currentUser = await requirePermission("iam:roles:manage");
   const parsed = roleSchema.safeParse(rolePayload(formData));
 
-  if (!parsed.success || !parsed.data.id) {
+  if (!parsed.success || !parsed.data.id || !parsed.data.code) {
     redirectWithMessage("/admin/settings?view=roles", "error", parsed.error?.issues[0]?.message ?? "Role ID, code, and name are required.");
   }
 

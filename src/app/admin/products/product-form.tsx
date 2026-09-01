@@ -1,7 +1,7 @@
 "use client";
 
-import { formatProductType, minorToDisplay } from "@/lib/catalog-utils";
-import { productTypeOptions, trackingModeOptions } from "@/server/catalog/types";
+import { minorToDisplay } from "@/lib/catalog-utils";
+import { trackingModeOptions } from "@/server/catalog/types";
 import type { ProductFormRecord, SelectOption } from "@/server/catalog/types";
 import { createProduct, updateProduct } from "./actions";
 import { Alert } from "@/components/ui/alert";
@@ -73,8 +73,9 @@ export function ProductForm({
 
       <form action={action} className="grid gap-5 rounded-lg border border-border bg-card p-5">
         {product ? <input type="hidden" name="id" value={product.id} /> : null}
+        <input type="hidden" name="isActive" value="on" />
 
-        <div className="grid gap-4 md:grid-cols-[1fr_1fr_180px]">
+        <div className="grid gap-4 md:grid-cols-2">
           <label className="grid gap-1 text-sm font-medium">
             Product Name
             <input
@@ -86,25 +87,14 @@ export function ProductForm({
             />
           </label>
           <label className="grid gap-1 text-sm font-medium">
-            SKU
+            Item Code
             <input
               name="sku"
               defaultValue={product?.sku}
-              required
+              placeholder={mode === "create" ? "Auto" : undefined}
               maxLength={60}
               className={inputClass}
             />
-          </label>
-          <label className="grid gap-1 text-sm font-medium">
-            Active
-            <span className="flex h-10 items-center rounded-md border border-input bg-background px-3">
-              <input
-                name="isActive"
-                type="checkbox"
-                defaultChecked={product?.isActive ?? true}
-                className="size-4"
-              />
-            </span>
           </label>
         </div>
 
@@ -116,21 +106,7 @@ export function ProductForm({
               label: "General Information",
               content: (
                 <div className="grid gap-4">
-                  <div className="grid gap-4 md:grid-cols-3">
-                    <label className="grid gap-1 text-sm font-medium">
-                      Product Type
-                      <select
-                        name="productType"
-                        defaultValue={product?.productType ?? "machinery"}
-                        className={inputClass}
-                      >
-                        {productTypeOptions.map((type) => (
-                          <option key={type} value={type}>
-                            {formatProductType(type)}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
+                  <div className="grid gap-4 md:grid-cols-2">
                     <label className="grid gap-1 text-sm font-medium">
                       Category
                       <select name="categoryId" defaultValue={product?.categoryId ?? ""} className={inputClass}>
@@ -155,11 +131,7 @@ export function ProductForm({
                     </label>
                   </div>
 
-                  <div className="grid gap-4 md:grid-cols-3">
-                    <label className="grid gap-1 text-sm font-medium">
-                      Barcode
-                      <input name="barcode" defaultValue={product?.barcode ?? ""} maxLength={80} className={inputClass} />
-                    </label>
+                  <div className="grid gap-4 md:grid-cols-2">
                     <label className="grid gap-1 text-sm font-medium">
                       Model
                       <input name="model" defaultValue={product?.model ?? ""} maxLength={100} className={inputClass} />

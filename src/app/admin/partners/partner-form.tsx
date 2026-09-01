@@ -117,7 +117,7 @@ export function PartnerForm({ mode, partner, paymentTerms, error }: PartnerFormP
               <input
                 name="code"
                 defaultValue={partner?.code}
-                required
+                placeholder={partner ? undefined : "Auto"}
                 maxLength={40}
                 className="h-10 rounded-md border border-[#c9d1d4] px-3 font-normal"
               />

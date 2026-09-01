@@ -44,13 +44,6 @@ export const deviceStatus = pgEnum("device_status", ["active", "revoked", "repla
 export const userStatus = pgEnum("user_status", ["active", "disabled", "locked"]);
 export const employeeStatus = pgEnum("employee_status", ["active", "inactive"]);
 export const auditSeverity = pgEnum("audit_severity", ["info", "warning", "critical"]);
-export const productType = pgEnum("product_type", [
-  "machinery",
-  "spare_part",
-  "accessory",
-  "consumable",
-  "service",
-]);
 export const trackingMode = pgEnum("tracking_mode", ["none", "lot", "serial"]);
 export const serialStatus = pgEnum("serial_status", [
   "available",
@@ -689,7 +682,6 @@ export const products = pgTable(
       .notNull()
       .references(() => companies.id, { onDelete: "restrict", onUpdate: "cascade" }),
     sku: varchar("sku", { length: 60 }).notNull(),
-    barcode: varchar("barcode", { length: 80 }),
     name: varchar("name", { length: 200 }).notNull(),
     categoryId: uuid("category_id").references(() => productCategories.id, {
       onDelete: "restrict",
@@ -704,7 +696,6 @@ export const products = pgTable(
     unitId: uuid("unit_id")
       .notNull()
       .references(() => unitsOfMeasure.id, { onDelete: "restrict", onUpdate: "cascade" }),
-    productType: productType("product_type").notNull(),
     trackingMode: trackingMode("tracking_mode").notNull().default("none"),
     standardCostMinor: bigint("standard_cost_minor", { mode: "number" }).notNull().default(0),
     listPriceMinor: bigint("list_price_minor", { mode: "number" }).notNull().default(0),
@@ -721,9 +712,6 @@ export const products = pgTable(
     uniqueIndex("products_sku_active_uidx")
       .on(table.companyId, table.sku)
       .where(sql`${table.deletedAt} is null`),
-    uniqueIndex("products_barcode_active_uidx")
-      .on(table.companyId, table.barcode)
-      .where(sql`${table.barcode} is not null and ${table.deletedAt} is null`),
     index("products_company_name_idx").on(table.companyId, table.name),
     index("products_category_active_idx").on(table.categoryId, table.isActive),
   ],

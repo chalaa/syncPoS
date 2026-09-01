@@ -28,7 +28,7 @@ function errorReportHref(rows: { rowNumber: number; sku: string; locationCode: s
       [row.rowNumber, row.sku, row.locationCode, error].map(csvValue).join(","),
     ),
   );
-  const csv = ["row,sku,location_code,error", ...errorRows].join("\n");
+  const csv = ["row,item_code,location_code,error", ...errorRows].join("\n");
 
   return `data:text/csv;charset=utf-8,${encodeURIComponent(csv)}`;
 }
@@ -134,7 +134,7 @@ export function OpeningStockImporter() {
             <thead className="bg-muted text-xs uppercase tracking-wide text-muted-foreground">
               <tr>
                 <th className="px-4 py-3">Row</th>
-                <th className="px-4 py-3">SKU</th>
+                <th className="px-4 py-3">Item Code</th>
                 <th className="px-4 py-3">Product</th>
                 <th className="px-4 py-3">Location</th>
                 <th className="px-4 py-3 text-right">Qty</th>

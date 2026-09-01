@@ -8,13 +8,14 @@ import { z } from "zod";
 import { getDefaultCompany, majorToMinor, uniqueViolationMessage } from "@/server/catalog/products";
 import { requirePermission } from "@/server/auth/session";
 import { db } from "@/server/db/client";
+import { generateCompanyCode } from "@/server/db/code-generator";
 import { paymentAccounts, paymentMethods } from "@/server/db/schema";
 
 const methodTypeSchema = z.enum(["cash", "bank_transfer", "mobile_money", "card"]);
 
 const paymentMethodSchema = z.object({
   id: z.string().uuid().optional(),
-  code: z.string().trim().min(1).max(40).transform((value) => value.toUpperCase()),
+  code: z.string().trim().max(40).transform((value) => value.toUpperCase()),
   name: z.string().trim().min(1).max(120),
   methodType: methodTypeSchema,
   allowInbound: z.boolean(),
@@ -31,7 +32,7 @@ const paymentMethodSchema = z.object({
 const paymentAccountSchema = z.object({
   id: z.string().uuid().optional(),
   paymentMethodId: z.string().uuid(),
-  code: z.string().trim().min(1).max(40).transform((value) => value.toUpperCase()),
+  code: z.string().trim().max(40).transform((value) => value.toUpperCase()),
   name: z.string().trim().min(1).max(120),
   institutionName: z.string().trim().max(120).optional(),
   accountNumber: z.string().trim().max(80).optional(),
@@ -100,7 +101,11 @@ export async function createPaymentMethod(formData: FormData) {
   try {
     await db.insert(paymentMethods).values({
       companyId: company.id,
-      code: parsed.data.code,
+      code: parsed.data.code || await generateCompanyCode(db, {
+        companyId: company.id,
+        table: "payment_methods",
+        prefix: "PM",
+      }),
       name: parsed.data.name,
       methodType: parsed.data.methodType,
       allowInbound: parsed.data.allowInbound,
@@ -121,7 +126,7 @@ export async function updatePaymentMethod(formData: FormData) {
   await requirePermission("company.manage");
 
   const parsed = paymentMethodSchema.safeParse(methodPayload(formData));
-  if (!parsed.success || !parsed.data.id) {
+  if (!parsed.success || !parsed.data.id || !parsed.data.code) {
     redirectWithMessage("/admin/settings/payments", "error", "Payment method ID, code, name, and type are required.");
   }
 
@@ -229,7 +234,11 @@ export async function createPaymentAccount(formData: FormData) {
     await db.insert(paymentAccounts).values({
       companyId: company.id,
       paymentMethodId: parsed.data.paymentMethodId,
-      code: parsed.data.code,
+      code: parsed.data.code || await generateCompanyCode(db, {
+        companyId: company.id,
+        table: "payment_accounts",
+        prefix: "PA",
+      }),
       name: parsed.data.name,
       institutionName: parsed.data.institutionName || null,
       accountNumber: parsed.data.accountNumber || null,
@@ -250,7 +259,7 @@ export async function updatePaymentAccount(formData: FormData) {
   await requirePermission("company.manage");
 
   const parsed = paymentAccountSchema.safeParse(accountPayload(formData));
-  if (!parsed.success || !parsed.data.id) {
+  if (!parsed.success || !parsed.data.id || !parsed.data.code) {
     redirectWithMessage("/admin/settings/payments?tab=accounts", "error", "Payment account ID, method, code, and name are required.");
   }
 

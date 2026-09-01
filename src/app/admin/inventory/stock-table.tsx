@@ -28,7 +28,7 @@ export function StockFilters({
         <input
           name="q"
           defaultValue={query}
-          placeholder="SKU, product, or serial"
+          placeholder="Item code, product, or serial"
           className="h-10 rounded-md border border-input bg-background px-3 text-sm"
         />
       </label>

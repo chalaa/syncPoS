@@ -4,11 +4,7 @@ import { SearchIcon } from "lucide-react";
 import { Alert } from "@/components/ui/alert";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
-import {
-  formatProductType,
-  getProductList,
-  minorToDisplay,
-} from "@/server/catalog/products";
+import { getProductList, minorToDisplay } from "@/server/catalog/products";
 import { restoreProduct, softDeleteProduct } from "./actions";
 import { requirePermission } from "@/server/auth/session";
 
@@ -48,7 +44,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
                 <input
                   name="q"
                   defaultValue={query}
-                  placeholder="Search SKU, barcode, name, model"
+                  placeholder="Search item code, name, model"
                   className="h-10 min-w-0 flex-1 rounded-md border border-input bg-background px-3 text-sm"
                 />
                 {showDeleted ? <input type="hidden" name="show" value="deleted" /> : null}
@@ -71,9 +67,8 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
               <table className="w-full min-w-[920px] text-left text-sm">
                 <thead className="bg-muted text-xs uppercase tracking-wide text-muted-foreground">
                   <tr>
-                    <th className="px-4 py-3">SKU</th>
+                    <th className="px-4 py-3">Item Code</th>
                     <th className="px-4 py-3">Product</th>
-                    <th className="px-4 py-3">Type</th>
                     <th className="px-4 py-3">Tracking</th>
                     <th className="px-4 py-3">Unit</th>
                     <th className="px-4 py-3 text-right">Cost</th>
@@ -97,7 +92,6 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
                             .join(" / ") || "No category"}
                         </div>
                       </td>
-                      <td className="px-4 py-3 capitalize">{formatProductType(product.productType)}</td>
                       <td className="px-4 py-3">{product.trackingMode}</td>
                       <td className="px-4 py-3">{product.unitCode}</td>
                       <td className="px-4 py-3 text-right">
@@ -143,7 +137,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
                   ))}
                   {products.length === 0 ? (
                     <tr>
-                      <td colSpan={8} className="px-4 py-10 text-center text-muted-foreground">
+                      <td colSpan={7} className="px-4 py-10 text-center text-muted-foreground">
                         No products found.
                       </td>
                     </tr>

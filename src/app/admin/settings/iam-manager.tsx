@@ -245,7 +245,7 @@ function RoleForm({
       <div className="grid gap-4 sm:grid-cols-[0.7fr_1fr]">
         <label className="flex flex-col gap-1 text-sm font-medium">
           Code
-          <input name="code" required defaultValue={role?.code} className={inputClass} />
+          <input name="code" placeholder={role ? undefined : "Auto"} defaultValue={role?.code} className={inputClass} />
         </label>
         <label className="flex flex-col gap-1 text-sm font-medium">
           Name

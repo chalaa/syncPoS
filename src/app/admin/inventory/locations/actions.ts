@@ -8,12 +8,13 @@ import { z } from "zod";
 import { getDefaultCompany, normalizeCode, uniqueViolationMessage } from "@/server/catalog/products";
 import { requirePermission } from "@/server/auth/session";
 import { db } from "@/server/db/client";
+import { generateCompanyCode } from "@/server/db/code-generator";
 import { locations } from "@/server/db/schema";
 import { stockLocationTypeOptions } from "@/server/inventory/location-types";
 
 const locationSchema = z.object({
   id: z.string().uuid().optional(),
-  code: z.string().trim().min(1).max(20),
+  code: z.string().trim().max(20),
   name: z.string().trim().min(1).max(120),
   locationType: z.enum(stockLocationTypeOptions),
   addressText: z.string().trim().optional(),
@@ -27,6 +28,20 @@ function formValue(formData: FormData, key: string) {
   const value = formData.get(key);
 
   return typeof value === "string" ? value : "";
+}
+
+function locationCodePrefix(locationType: string) {
+  const prefixes: Record<string, string> = {
+    warehouse: "WH",
+    display_shop: "SHOP",
+    transit: "TRANS",
+    vendor: "VEND",
+    customer: "CUSTLOC",
+    adjustment: "ADJ",
+    scrap: "SCRAP",
+  };
+
+  return prefixes[locationType] ?? "LOC";
 }
 
 function redirectWithMessage(path: string, key: "notice" | "error", message: string): never {
@@ -61,7 +76,12 @@ export async function createStockLocation(formData: FormData) {
   try {
     await db.insert(locations).values({
       companyId: company.id,
-      code: parsed.data.code,
+      code: parsed.data.code || await generateCompanyCode(db, {
+        companyId: company.id,
+        table: "locations",
+        prefix: locationCodePrefix(parsed.data.locationType),
+        padding: 3,
+      }),
       name: parsed.data.name,
       locationType: parsed.data.locationType,
       addressJson: parsed.data.addressText ? { addressText: parsed.data.addressText } : null,
@@ -83,7 +103,7 @@ export async function updateStockLocation(formData: FormData) {
 
   const parsed = locationSchema.safeParse(locationPayload(formData));
 
-  if (!parsed.success || !parsed.data.id) {
+  if (!parsed.success || !parsed.data.id || !parsed.data.code) {
     redirectWithMessage("/admin/inventory/locations", "error", "Location ID, code, name, and type are required.");
   }
 

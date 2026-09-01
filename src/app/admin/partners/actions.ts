@@ -15,6 +15,7 @@ import {
 import { uniqueViolationMessage } from "@/server/catalog/products";
 import { requirePermission } from "@/server/auth/session";
 import { db } from "@/server/db/client";
+import { generateCompanyCode } from "@/server/db/code-generator";
 import {
   partnerAddresses,
   partnerContacts,
@@ -27,7 +28,7 @@ const optionalUuid = z.string().uuid().or(z.literal("")).transform((value) => va
 const partnerFormSchema = z
   .object({
     id: z.string().uuid().optional(),
-    code: z.string().trim().min(1, "Code is required").max(40),
+    code: z.string().trim().max(40),
     displayName: z.string().trim().min(1, "Display name is required").max(200),
     legalName: z.string().trim().max(200).optional(),
     tin: z.string().trim().max(30).optional(),
@@ -56,7 +57,7 @@ const partnerFormSchema = z
 
 const paymentTermSchema = z.object({
   id: z.string().uuid().optional(),
-  code: z.string().trim().min(1).max(40),
+  code: z.string().trim().max(40),
   name: z.string().trim().min(1).max(120),
   dueDays: z.coerce.number().int().min(0).max(3650),
   description: z.string().trim().optional(),
@@ -117,6 +118,14 @@ function paymentTermPayload(formData: FormData) {
     isActive: formData.get("isActive") === "on" ? "on" : undefined,
     returnPath: formValue(formData, "returnPath") || "/admin/partners/payment-terms",
   };
+}
+
+function partnerCodePrefix(value: { isCustomer: boolean; isSupplier: boolean }) {
+  if (value.isCustomer && value.isSupplier) {
+    return "PART";
+  }
+
+  return value.isCustomer ? "CUST" : "SUP";
 }
 
 async function upsertPrimaryContact(
@@ -227,11 +236,16 @@ export async function createPartner(formData: FormData) {
   const { company } = await getPartnerFormOptions();
 
   try {
+    const code = parsed.data.code || await generateCompanyCode(db, {
+      companyId: company.id,
+      table: "partners",
+      prefix: partnerCodePrefix(parsed.data),
+    });
     const [partner] = await db
       .insert(partners)
       .values({
         companyId: company.id,
-        code: parsed.data.code,
+        code,
         displayName: parsed.data.displayName,
         legalName: parsed.data.legalName || null,
         tin: parsed.data.tin || null,
@@ -264,7 +278,7 @@ export async function updatePartner(formData: FormData) {
 
   const parsed = partnerFormSchema.safeParse(partnerPayload(formData));
 
-  if (!parsed.success || !parsed.data.id) {
+  if (!parsed.success || !parsed.data.id || !parsed.data.code) {
     redirect(formErrorPath("/admin/partners", parsed.success ? "Partner ID is missing" : parsed.error));
   }
 
@@ -359,7 +373,11 @@ export async function createPaymentTerm(formData: FormData) {
   try {
     await db.insert(paymentTerms).values({
       companyId: company.id,
-      code: parsed.data.code,
+      code: parsed.data.code || await generateCompanyCode(db, {
+        companyId: company.id,
+        table: "payment_terms",
+        prefix: "TERM",
+      }),
       name: parsed.data.name,
       dueDays: parsed.data.dueDays,
       description: parsed.data.description || null,
@@ -379,7 +397,7 @@ export async function updatePaymentTerm(formData: FormData) {
 
   const parsed = paymentTermSchema.safeParse(paymentTermPayload(formData));
 
-  if (!parsed.success || !parsed.data.id) {
+  if (!parsed.success || !parsed.data.id || !parsed.data.code) {
     redirectWithMessage("/admin/partners/payment-terms", "error", "Payment term ID, code, name, and due days are required");
   }
 
