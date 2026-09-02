@@ -176,6 +176,7 @@ async function main() {
           deliver_to_location_id,
           order_no,
           vendor_reference,
+          payment_term,
           status,
           order_date,
           expected_date,
@@ -191,7 +192,8 @@ async function main() {
           ${supplier.id},
           ${location.id},
           ${testNo("PO-E2E")},
-          ${`VR-${suffix}`},
+          ${`REF-${suffix}`},
+          'credit',
           'draft',
           ${today},
           ${today},
@@ -251,6 +253,65 @@ async function main() {
         where id = ${purchaseOrder.id}
       `;
 
+      const [draftReceipt] = await sql<{ id: string; receipt_no: string }[]>`
+        insert into goods_receipts (
+          company_id,
+          purchase_order_id,
+          supplier_id,
+          location_id,
+          receipt_no,
+          status,
+          notes
+        )
+        values (
+          ${company.id},
+          ${purchaseOrder.id},
+          ${supplier.id},
+          ${location.id},
+          ${testNo("GR-DRAFT-E2E")},
+          'draft',
+          'E2E draft receipt generated on confirmation'
+        )
+        returning id, receipt_no
+      `;
+      assertCondition(draftReceipt, "Could not create draft receipt on confirmation.");
+
+      await sql`
+        insert into goods_receipt_lines (
+          goods_receipt_id,
+          purchase_order_line_id,
+          line_no,
+          product_id,
+          unit_id,
+          quantity_received,
+          unit_cost_minor,
+          landed_unit_cost_minor,
+          line_total_minor,
+          currency_code
+        )
+        values (
+          ${draftReceipt.id},
+          ${purchaseOrderLine.id},
+          1,
+          ${product.id},
+          ${unit.id},
+          ${quantity},
+          ${unitCostMinor},
+          ${unitCostMinor},
+          ${totalMinor},
+          ${company.base_currency_code}
+        )
+      `;
+
+      const [draftReceiptLineCheck] = await sql<{ line_count: number; planned_quantity: string }[]>`
+        select count(*)::int as line_count, coalesce(sum(quantity_received), 0)::text as planned_quantity
+        from goods_receipt_lines
+        where goods_receipt_id = ${draftReceipt.id}
+          and deleted_at is null
+      `;
+      assertCondition(draftReceiptLineCheck?.line_count === 1, "Draft receipt did not include expected product lines.");
+      assertCondition(Number(draftReceiptLineCheck.planned_quantity) === quantity, "Draft receipt planned quantity is incorrect.");
+
       const overReceiptQuantity = quantity + 1;
       const [overReceiptCheck] = await sql<{ valid: boolean }[]>`
         select (${overReceiptQuantity} <= quantity_ordered - quantity_received) as valid
@@ -291,33 +352,23 @@ async function main() {
       assertCondition(movement, "Could not create purchase receipt stock movement.");
 
       const [receipt] = await sql<{ id: string }[]>`
-        insert into goods_receipts (
-          company_id,
-          purchase_order_id,
-          supplier_id,
-          location_id,
-          receipt_no,
-          status,
-          posted_at,
-          posted_by,
-          stock_movement_id,
-          supplier_invoice_no
-        )
-        values (
-          ${company.id},
-          ${purchaseOrder.id},
-          ${supplier.id},
-          ${location.id},
-          ${testNo("GR-E2E")},
-          'posted',
-          now(),
-          ${adminUser.id},
-          ${movement.id},
-          ${`SI-${suffix}`}
-        )
+        update goods_receipts
+        set
+          status = 'posted',
+          posted_at = now(),
+          posted_by = ${adminUser.id},
+          stock_movement_id = ${movement.id},
+          supplier_invoice_no = ${`SI-${suffix}`},
+          updated_at = now()
+        where id = ${draftReceipt.id}
         returning id
       `;
       assertCondition(receipt, "Could not create goods receipt.");
+
+      await sql`
+        delete from goods_receipt_lines
+        where goods_receipt_id = ${receipt.id}
+      `;
 
       const [receiptLine] = await sql<{ id: string }[]>`
         insert into goods_receipt_lines (
@@ -446,80 +497,6 @@ async function main() {
       assertCondition(receiptCheck.movement_from === "VENDORS", "Receipt movement source is not VENDORS.");
       assertCondition(receiptCheck.movement_to === location.code, "Receipt movement destination is incorrect.");
 
-      const [vendorBill] = await sql<{ id: string }[]>`
-        insert into vendor_bills (
-          company_id,
-          supplier_id,
-          purchase_order_id,
-          goods_receipt_id,
-          bill_no,
-          vendor_reference,
-          status,
-          payment_status,
-          bill_date,
-          accounting_date,
-          posted_at,
-          posted_by,
-          untaxed_amount_minor,
-          tax_amount_minor,
-          total_minor,
-          currency_code
-        )
-        values (
-          ${company.id},
-          ${supplier.id},
-          ${purchaseOrder.id},
-          ${receipt.id},
-          ${testNo("BILL-E2E")},
-          ${`BILL-REF-${suffix}`},
-          'posted',
-          'not_paid',
-          ${today},
-          ${today},
-          now(),
-          ${adminUser.id},
-          ${subtotalMinor},
-          ${taxAmountMinor},
-          ${totalMinor},
-          ${company.base_currency_code}
-        )
-        returning id
-      `;
-      assertCondition(vendorBill, "Could not create vendor bill.");
-
-      await sql`
-        insert into vendor_bill_lines (
-          vendor_bill_id,
-          purchase_order_line_id,
-          goods_receipt_line_id,
-          line_no,
-          product_id,
-          description,
-          unit_id,
-          quantity,
-          unit_price_minor,
-          subtotal_minor,
-          tax_amount_minor,
-          total_minor,
-          currency_code
-        )
-        values (
-          ${vendorBill.id},
-          ${purchaseOrderLine.id},
-          ${receiptLine.id},
-          1,
-          ${product.id},
-          'E2E vendor bill line',
-          ${unit.id},
-          ${quantity},
-          ${unitCostMinor},
-          ${subtotalMinor},
-          ${taxAmountMinor},
-          ${totalMinor},
-          ${company.base_currency_code}
-        )
-      `;
-
       const [paymentMethod] = await sql<{ id: string }[]>`
         insert into payment_methods (
           company_id,
@@ -608,35 +585,30 @@ async function main() {
       await sql`
         insert into payment_allocations (
           payment_id,
-          vendor_bill_id,
+          purchase_order_id,
           amount_minor,
           notes
         )
         values (
           ${payment.id},
-          ${vendorBill.id},
+          ${purchaseOrder.id},
           ${totalMinor},
           'E2E full supplier allocation'
         )
       `;
-      await sql`
-        update vendor_bills
-        set payment_status = 'paid', updated_at = now()
-        where id = ${vendorBill.id}
-      `;
 
       const [finalCheck] = await sql<{
-        bill_status: string;
-        payment_status: string;
+        order_status: string;
+        payment_term: string;
         residual_minor: number;
         paid_minor: number;
         payment_type: string;
         allow_outbound: boolean;
       }[]>`
         select
-          vb.status as bill_status,
-          vb.payment_status,
-          greatest(vb.total_minor - coalesce(sum(pa.amount_minor) filter (
+          po.status as order_status,
+          po.payment_term,
+          greatest(po.total_minor - coalesce(sum(pa.amount_minor) filter (
             where p.status = 'posted' and p.deleted_at is null and pa.deleted_at is null
           ), 0), 0)::bigint as residual_minor,
           coalesce(sum(pa.amount_minor) filter (
@@ -644,16 +616,16 @@ async function main() {
           ), 0)::bigint as paid_minor,
           max(p.payment_type::text) as payment_type,
           bool_and(pm.allow_outbound) as allow_outbound
-        from vendor_bills vb
-        left join payment_allocations pa on pa.vendor_bill_id = vb.id
+        from purchase_orders po
+        left join payment_allocations pa on pa.purchase_order_id = po.id
         left join payments p on p.id = pa.payment_id
         left join payment_methods pm on pm.id = p.payment_method_id
-        where vb.id = ${vendorBill.id}
-        group by vb.id
+        where po.id = ${purchaseOrder.id}
+        group by po.id
       `;
-      assertCondition(finalCheck?.bill_status === "posted", "Vendor bill is not posted.");
-      assertCondition(finalCheck.payment_status === "paid", "Vendor bill payment status is not paid.");
-      assertCondition(Number(finalCheck.residual_minor) === 0, "Vendor bill residual is not zero after full payment.");
+      assertCondition(finalCheck?.order_status === "received", "Purchase order is not received.");
+      assertCondition(finalCheck.payment_term === "credit", "Purchase order payment term is incorrect.");
+      assertCondition(Number(finalCheck.residual_minor) === 0, "Purchase order residual is not zero after full payment.");
       assertCondition(Number(finalCheck.paid_minor) === totalMinor, "Supplier payment allocation total is incorrect.");
       assertCondition(finalCheck.payment_type === "outbound", "Supplier payment is not outbound.");
       assertCondition(finalCheck.allow_outbound === true, "Supplier payment method does not allow outbound payments.");
@@ -661,6 +633,7 @@ async function main() {
       const [allocationGuard] = await sql<{ valid: boolean }[]>`
         select (
           (case when vendor_bill_id is not null then 1 else 0 end)
+          + (case when purchase_order_id is not null then 1 else 0 end)
           + (case when expense_id is not null then 1 else 0 end)
           + (case when customer_invoice_id is not null then 1 else 0 end)
         ) = 1 as valid
@@ -675,7 +648,7 @@ async function main() {
     console.log("E2E purchase flow test passed.");
     console.log(`Company: ${company.code}`);
     console.log(`Receiving location: ${location.code}`);
-    console.log("Flow: RFQ -> confirmed PO -> posted receipt -> posted vendor bill -> outbound supplier payment");
+    console.log("Flow: RFQ -> confirmed PO -> draft receipt -> posted receipt -> direct outbound supplier payment");
     console.log(`Expected totals: subtotal ${subtotalMinor}, tax ${taxAmountMinor}, total ${totalMinor}`);
   } finally {
     await sql.end();

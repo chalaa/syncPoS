@@ -65,7 +65,6 @@ export const adminMenuItems: AdminMenuItem[] = [
       { label: "RFQs / Orders", href: "/admin/purchasing", permission: PERMISSIONS.INVENTORY.RECEIVE },
       { label: "Receipts", href: "/admin/purchasing?view=receipts", permission: PERMISSIONS.INVENTORY.RECEIVE },
       { label: "Landed Costs", href: "/admin/purchasing?view=landed-costs", permission: PERMISSIONS.INVENTORY.RECEIVE },
-      { label: "Vendor Bills", href: "/admin/purchasing?view=supplier-bills", permission: PERMISSIONS.INVENTORY.RECEIVE },
       { label: "Payments", href: "/admin/purchasing?view=payments", permission: PERMISSIONS.INVENTORY.RECEIVE },
       { label: "Returns", href: "/admin/purchasing?view=returns", permission: PERMISSIONS.INVENTORY.RECEIVE },
     ],

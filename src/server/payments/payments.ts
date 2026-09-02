@@ -12,6 +12,7 @@ import {
   paymentAllocations,
   paymentMethods,
   payments,
+  purchaseOrders,
   vendorBills,
 } from "@/server/db/schema";
 import type {
@@ -24,6 +25,7 @@ import type {
   PaymentMethodRow,
   VendorBillPaymentSummary,
   CustomerInvoicePaymentSummary,
+  PurchaseOrderPaymentSummary,
 } from "@/server/payments/types";
 
 export function displayPaymentMoney(value: number, currencyCode: string) {
@@ -257,11 +259,9 @@ export async function getPaymentList(params: {
         or exists (
           select 1
           from payment_allocations po_pal
-          inner join vendor_bills po_vb on po_vb.id = po_pal.vendor_bill_id
           where po_pal.payment_id = p.id
-            and po_vb.purchase_order_id = ${params.purchaseOrderId ?? null}::uuid
+            and po_pal.purchase_order_id = ${params.purchaseOrderId ?? null}::uuid
             and po_pal.deleted_at is null
-            and po_vb.deleted_at is null
         )
       )
     group by p.id, partner.id, pm.id, pa.id
@@ -311,6 +311,8 @@ export async function getPaymentDetail(id: string): Promise<PaymentDetail | null
       id: paymentAllocations.id,
       vendorBillId: paymentAllocations.vendorBillId,
       billNo: vendorBills.billNo,
+      purchaseOrderId: paymentAllocations.purchaseOrderId,
+      purchaseOrderNo: purchaseOrders.orderNo,
       expenseId: paymentAllocations.expenseId,
       expenseNo: expenses.expenseNo,
       customerInvoiceId: paymentAllocations.customerInvoiceId,
@@ -321,12 +323,53 @@ export async function getPaymentDetail(id: string): Promise<PaymentDetail | null
     .from(paymentAllocations)
     .innerJoin(payments, eq(paymentAllocations.paymentId, payments.id))
     .leftJoin(vendorBills, eq(paymentAllocations.vendorBillId, vendorBills.id))
+    .leftJoin(purchaseOrders, eq(paymentAllocations.purchaseOrderId, purchaseOrders.id))
     .leftJoin(expenses, eq(paymentAllocations.expenseId, expenses.id))
     .leftJoin(customerInvoices, eq(paymentAllocations.customerInvoiceId, customerInvoices.id))
     .where(and(eq(paymentAllocations.paymentId, id), isNull(paymentAllocations.deletedAt)))
-    .orderBy(asc(vendorBills.billNo), asc(expenses.expenseNo), asc(customerInvoices.invoiceNo));
+    .orderBy(asc(vendorBills.billNo), asc(purchaseOrders.orderNo), asc(expenses.expenseNo), asc(customerInvoices.invoiceNo));
 
   return { ...payment, allocations };
+}
+
+export async function getPurchaseOrderPaymentSummary(purchaseOrderId: string): Promise<PurchaseOrderPaymentSummary> {
+  const [summary] = await db.execute<{
+    totalMinor: number;
+    paidMinor: number;
+    paymentCount: number;
+  }>(sql`
+    select
+      po.total_minor as "totalMinor",
+      coalesce(sum(pa.amount_minor) filter (
+        where p.status = 'posted'
+          and p.deleted_at is null
+          and pa.deleted_at is null
+      ), 0)::bigint as "paidMinor",
+      count(distinct p.id) filter (
+        where p.deleted_at is null
+          and pa.deleted_at is null
+      )::int as "paymentCount"
+    from purchase_orders po
+    left join payment_allocations pa on pa.purchase_order_id = po.id
+    left join payments p on p.id = pa.payment_id
+    where po.id = ${purchaseOrderId}
+      and po.deleted_at is null
+    group by po.id
+    limit 1
+  `);
+
+  const totalMinor = summary?.totalMinor ?? 0;
+  const postedPaidMinor = summary?.paidMinor ?? 0;
+  const residualAmountMinor = Math.max(totalMinor - postedPaidMinor, 0);
+  const paymentStatus =
+    postedPaidMinor <= 0 ? "not_paid" : residualAmountMinor <= 0 ? "paid" : "partial";
+
+  return {
+    paymentCount: summary?.paymentCount ?? 0,
+    postedPaidMinor,
+    residualAmountMinor,
+    paymentStatus,
+  };
 }
 
 export async function getVendorBillPaymentSummary(vendorBillId: string): Promise<VendorBillPaymentSummary> {

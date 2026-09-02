@@ -39,7 +39,7 @@ const purchaseOrderHeaderSchema = z.object({
   supplierId: z.string().uuid(),
   deliverToLocationId: z.string().uuid().or(z.literal("")).transform((value) => value || null),
   vendorReference: z.string().trim().max(80).optional(),
-  orderDeadline: z.string().trim().optional(),
+  paymentTerm: z.enum(["cash", "credit"]).default("credit"),
   expectedDate: z.string().trim().optional(),
   notes: z.string().trim().optional(),
 });
@@ -118,7 +118,7 @@ function parsePurchaseOrderForm(formData: FormData, errorPath: string) {
     supplierId: formValue(formData, "supplierId"),
     deliverToLocationId: formValue(formData, "deliverToLocationId"),
     vendorReference: formValue(formData, "vendorReference"),
-    orderDeadline: formValue(formData, "orderDeadline"),
+    paymentTerm: formValue(formData, "paymentTerm") || "credit",
     expectedDate: formValue(formData, "expectedDate"),
     notes: formValue(formData, "notes"),
   });
@@ -257,6 +257,7 @@ export async function createPurchaseOrder(formData: FormData) {
   const { header, lines } = parsePurchaseOrderForm(formData, "/admin/purchasing/new");
   const company = await getDefaultCompany();
   const orderNo = movementNo("PO");
+  const reference = movementNo("REF");
 
   try {
     await db.transaction(async (tx) => {
@@ -369,9 +370,9 @@ export async function createPurchaseOrder(formData: FormData) {
           supplierId: supplier.id,
           orderNo,
           deliverToLocationId: header.deliverToLocationId,
-          vendorReference: header.vendorReference || null,
+          vendorReference: header.vendorReference || reference,
+          paymentTerm: header.paymentTerm,
           status: "draft",
-          orderDeadline: header.orderDeadline || null,
           expectedDate: header.expectedDate || null,
           currencyCode,
           subtotalMinor,
@@ -595,8 +596,7 @@ export async function updatePurchaseOrder(formData: FormData) {
         .set({
           supplierId: supplier.id,
           deliverToLocationId: header.deliverToLocationId,
-          vendorReference: header.vendorReference || null,
-          orderDeadline: header.orderDeadline || null,
+          paymentTerm: header.paymentTerm,
           expectedDate: header.expectedDate || null,
           currencyCode,
           subtotalMinor,
@@ -677,11 +677,14 @@ export async function confirmPurchaseOrder(formData: FormData) {
 
   const company = await getDefaultCompany();
 
-  await db.transaction(async (tx) => {
+  try {
+    await db.transaction(async (tx) => {
     const [order] = await tx
       .select({
         id: purchaseOrders.id,
         orderNo: purchaseOrders.orderNo,
+        supplierId: purchaseOrders.supplierId,
+        deliverToLocationId: purchaseOrders.deliverToLocationId,
         status: purchaseOrders.status,
       })
       .from(purchaseOrders)
@@ -702,6 +705,10 @@ export async function confirmPurchaseOrder(formData: FormData) {
       return;
     }
 
+    if (!order.deliverToLocationId) {
+      throw new Error("Select a receiving location before confirming the purchase order.");
+    }
+
     await tx
       .update(purchaseOrders)
       .set({
@@ -712,6 +719,66 @@ export async function confirmPurchaseOrder(formData: FormData) {
       })
       .where(eq(purchaseOrders.id, order.id));
 
+    const [existingReceipt] = await tx
+      .select({ id: goodsReceipts.id })
+      .from(goodsReceipts)
+      .where(and(eq(goodsReceipts.purchaseOrderId, order.id), isNull(goodsReceipts.deletedAt)))
+      .limit(1);
+
+    if (!existingReceipt) {
+      const receiptNo = movementNo("GR");
+
+      const [receipt] = await tx
+        .insert(goodsReceipts)
+        .values({
+          companyId: company.id,
+          purchaseOrderId: order.id,
+          supplierId: order.supplierId,
+          locationId: order.deliverToLocationId,
+          receiptNo,
+          status: "draft",
+          notes: `Draft receipt generated from ${order.orderNo}.`,
+        })
+        .returning({ id: goodsReceipts.id });
+
+      const expectedLines = await tx
+        .select({
+          id: purchaseOrderLines.id,
+          lineNo: purchaseOrderLines.lineNo,
+          productId: purchaseOrderLines.productId,
+          unitId: purchaseOrderLines.unitId,
+          quantityOrdered: purchaseOrderLines.quantityOrdered,
+          quantityReceived: purchaseOrderLines.quantityReceived,
+          unitCostMinor: purchaseOrderLines.unitCostMinor,
+          currencyCode: purchaseOrderLines.currencyCode,
+        })
+        .from(purchaseOrderLines)
+        .where(and(eq(purchaseOrderLines.purchaseOrderId, order.id), isNull(purchaseOrderLines.deletedAt)))
+        .orderBy(purchaseOrderLines.lineNo);
+
+      const receiptLines = expectedLines
+        .map((line) => {
+          const quantityRemaining = Number(line.quantityOrdered) - Number(line.quantityReceived);
+          return {
+            goodsReceiptId: receipt.id,
+            purchaseOrderLineId: line.id,
+            lineNo: line.lineNo,
+            productId: line.productId,
+            unitId: line.unitId,
+            quantityReceived: String(quantityRemaining),
+            unitCostMinor: line.unitCostMinor,
+            landedUnitCostMinor: line.unitCostMinor,
+            lineTotalMinor: Math.round(quantityRemaining * line.unitCostMinor),
+            currencyCode: line.currencyCode,
+          };
+        })
+        .filter((line) => Number(line.quantityReceived) > 0);
+
+      if (receiptLines.length > 0) {
+        await tx.insert(goodsReceiptLines).values(receiptLines);
+      }
+    }
+
     await tx.insert(auditLogs).values({
       companyId: company.id,
       actorUserId: user.id,
@@ -721,7 +788,13 @@ export async function confirmPurchaseOrder(formData: FormData) {
       severity: "info",
       metadata: { orderNo: order.orderNo },
     });
-  });
+    });
+  } catch (error) {
+    redirectWithError(
+      parsed.data.returnPath ?? `/admin/purchasing/${parsed.data.purchaseOrderId}`,
+      error instanceof Error ? error.message : "Could not confirm purchase order.",
+    );
+  }
 
   revalidatePath("/admin/purchasing");
   revalidatePath(`/admin/purchasing/${parsed.data.purchaseOrderId}`);
@@ -747,7 +820,7 @@ export async function postGoodsReceipt(formData: FormData) {
 
   const company = await getDefaultCompany();
   const supplierLocation = await getOrCreatePartnerStockLocation(company.id, "supplier");
-  const receiptNo = movementNo("GR");
+  let receiptNo = movementNo("GR");
   const stockMoveNo = movementNo("PR");
   let postedReceiptId: string | undefined;
 
@@ -812,6 +885,16 @@ export async function postGoodsReceipt(formData: FormData) {
         }
       }
 
+      const [draftReceipt] = await tx
+        .select({ id: goodsReceipts.id, receiptNo: goodsReceipts.receiptNo })
+        .from(goodsReceipts)
+        .where(and(eq(goodsReceipts.purchaseOrderId, order.id), eq(goodsReceipts.status, "draft"), isNull(goodsReceipts.deletedAt)))
+        .limit(1);
+
+      if (draftReceipt) {
+        receiptNo = draftReceipt.receiptNo;
+      }
+
       const [movement] = await tx
         .insert(stockMovements)
         .values({
@@ -829,22 +912,40 @@ export async function postGoodsReceipt(formData: FormData) {
         })
         .returning({ id: stockMovements.id });
 
-      const [receipt] = await tx
-        .insert(goodsReceipts)
-        .values({
-          companyId: company.id,
-          purchaseOrderId: order.id,
-          supplierId: order.supplierId,
-          locationId: parsed.data.locationId,
-          receiptNo,
-          status: "posted",
-          postedAt: new Date(),
-          postedBy: user.id,
-          stockMovementId: movement.id,
-          supplierInvoiceNo: parsed.data.supplierInvoiceNo || null,
-        })
-        .returning({ id: goodsReceipts.id });
+      const [receipt] = draftReceipt
+        ? await tx
+            .update(goodsReceipts)
+            .set({
+              locationId: parsed.data.locationId,
+              status: "posted",
+              postedAt: new Date(),
+              postedBy: user.id,
+              stockMovementId: movement.id,
+              supplierInvoiceNo: parsed.data.supplierInvoiceNo || null,
+              updatedAt: sql`now()`,
+            })
+            .where(eq(goodsReceipts.id, draftReceipt.id))
+            .returning({ id: goodsReceipts.id })
+        : await tx
+            .insert(goodsReceipts)
+            .values({
+              companyId: company.id,
+              purchaseOrderId: order.id,
+              supplierId: order.supplierId,
+              locationId: parsed.data.locationId,
+              receiptNo,
+              status: "posted",
+              postedAt: new Date(),
+              postedBy: user.id,
+              stockMovementId: movement.id,
+              supplierInvoiceNo: parsed.data.supplierInvoiceNo || null,
+            })
+            .returning({ id: goodsReceipts.id });
       postedReceiptId = receipt.id;
+
+      if (draftReceipt) {
+        await tx.delete(goodsReceiptLines).where(eq(goodsReceiptLines.goodsReceiptId, draftReceipt.id));
+      }
 
       let receiptLineNo = 1;
       for (const line of selectedLines) {

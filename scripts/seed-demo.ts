@@ -833,7 +833,6 @@ async function main() {
           vendorReference: "DEMO-SUP-QUOTE-001",
           status: "confirmed",
           orderDate: todayDate,
-          orderDeadline: nextWeekDate,
           expectedDate: nextWeekDate,
           currencyCode,
           subtotalMinor: purchaseSubtotal,

@@ -126,15 +126,17 @@ export async function getPurchaseOrderList(): Promise<PurchaseOrderListRow[]> {
       po.id as "id",
       po.order_no as "orderNo",
       po.vendor_reference as "vendorReference",
+      po.payment_term as "paymentTerm",
       p.display_name as "supplierName",
       po.status as "status",
       po.order_date::text as "orderDate",
-      po.order_deadline::text as "orderDeadline",
       po.expected_date::text as "expectedDate",
       po.deliver_to_location_id as "deliverToLocationId",
       l.code as "deliverToLocationCode",
       po.currency_code as "currencyCode",
       po.total_minor as "totalMinor",
+      coalesce(pay.paid_minor, 0)::bigint as "paidMinor",
+      greatest(po.total_minor - coalesce(pay.paid_minor, 0), 0)::bigint as "residualAmountMinor",
       count(pol.id)::int as "lineCount",
       coalesce(sum(pol.quantity_ordered), 0)::text as "quantityOrdered",
       coalesce(sum(pol.quantity_received), 0)::text as "quantityReceived"
@@ -142,9 +144,18 @@ export async function getPurchaseOrderList(): Promise<PurchaseOrderListRow[]> {
     inner join partners p on p.id = po.supplier_id
     left join locations l on l.id = po.deliver_to_location_id
     left join purchase_order_lines pol on pol.purchase_order_id = po.id and pol.deleted_at is null
+    left join lateral (
+      select sum(pa.amount_minor) as paid_minor
+      from payment_allocations pa
+      inner join payments pay on pay.id = pa.payment_id
+      where pa.purchase_order_id = po.id
+        and pa.deleted_at is null
+        and pay.deleted_at is null
+        and pay.status = 'posted'
+    ) pay on true
     where po.company_id = ${company.id}
       and po.deleted_at is null
-    group by po.id, p.display_name, l.code
+    group by po.id, p.display_name, l.code, pay.paid_minor
     order by po.created_at desc
   `);
 
@@ -647,14 +658,39 @@ export async function getPurchaseOrderDetail(id: string): Promise<PurchaseOrderD
       supplierName: partners.displayName,
       deliverToLocationId: purchaseOrders.deliverToLocationId,
       vendorReference: purchaseOrders.vendorReference,
+      paymentTerm: purchaseOrders.paymentTerm,
       status: purchaseOrders.status,
       orderDate: sql<string>`${purchaseOrders.orderDate}::text`,
-      orderDeadline: sql<string | null>`${purchaseOrders.orderDeadline}::text`,
       expectedDate: sql<string | null>`${purchaseOrders.expectedDate}::text`,
       currencyCode: purchaseOrders.currencyCode,
       subtotalMinor: purchaseOrders.subtotalMinor,
       taxAmountMinor: purchaseOrders.taxAmountMinor,
       totalMinor: purchaseOrders.totalMinor,
+      paidMinor: sql<number>`
+        coalesce((
+          select sum(pa.amount_minor)
+          from payment_allocations pa
+          inner join payments p on p.id = pa.payment_id
+          where pa.purchase_order_id = ${purchaseOrders.id}
+            and pa.deleted_at is null
+            and p.deleted_at is null
+            and p.status = 'posted'
+        ), 0)::bigint
+      `,
+      residualAmountMinor: sql<number>`
+        greatest(
+          ${purchaseOrders.totalMinor} - coalesce((
+            select sum(pa.amount_minor)
+            from payment_allocations pa
+            inner join payments p on p.id = pa.payment_id
+            where pa.purchase_order_id = ${purchaseOrders.id}
+              and pa.deleted_at is null
+              and p.deleted_at is null
+              and p.status = 'posted'
+          ), 0),
+          0
+        )::bigint
+      `,
       notes: purchaseOrders.notes,
     })
     .from(purchaseOrders)
@@ -847,11 +883,9 @@ export async function getPurchaseOrderDetail(id: string): Promise<PurchaseOrderD
       select count(distinct p.id)::int as "count"
       from payments p
       inner join payment_allocations pa on pa.payment_id = p.id
-      inner join vendor_bills vb on vb.id = pa.vendor_bill_id
-      where vb.purchase_order_id = ${id}
+      where pa.purchase_order_id = ${id}
         and p.deleted_at is null
         and pa.deleted_at is null
-        and vb.deleted_at is null
     `),
   ]);
 

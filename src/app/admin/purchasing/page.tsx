@@ -10,7 +10,6 @@ import {
   getPurchaseLandedCostList,
   getPurchaseOrderList,
   getPurchaseReceiptList,
-  getPurchaseVendorBillList,
 } from "@/server/purchasing/purchasing";
 import {
   displayPaymentMoney,
@@ -21,7 +20,6 @@ import type {
   PurchaseLandedCostListRow,
   PurchaseOrderListRow,
   PurchaseReceiptListRow,
-  PurchaseVendorBillListRow,
 } from "@/server/purchasing/types";
 import type { PaymentListRow } from "@/server/payments/types";
 import type { SupplierReturnListRow } from "@/server/returns/types";
@@ -51,19 +49,6 @@ export default async function PurchasingPage({ searchParams }: PurchasingPagePro
     return (
       <PurchasingLayout title="Receipts" notice={params.notice} error={params.error}>
         <ReceiptList receipts={receipts} />
-      </PurchasingLayout>
-    );
-  }
-
-  if (view === "supplier-bills") {
-    const bills = await getPurchaseVendorBillList({
-      purchaseOrderId: params.purchaseOrderId,
-      supplierId: params.partnerId,
-    });
-
-    return (
-      <PurchasingLayout title="Vendor Bills" notice={params.notice} error={params.error}>
-        <VendorBillList bills={bills} />
       </PurchasingLayout>
     );
   }
@@ -274,6 +259,7 @@ function PurchaseOrderList({ orders }: { orders: PurchaseOrderListRow[] }) {
                 <th className="px-4 py-3">Supplier</th>
                 <th className="px-4 py-3">Status</th>
                 <th className="px-4 py-3">Date</th>
+                <th className="px-4 py-3">Payment</th>
                 <th className="px-4 py-3">Deliver To</th>
                 <th className="px-4 py-3 text-right">Qty</th>
                 <th className="px-4 py-3 text-right">Received</th>
@@ -291,15 +277,17 @@ function PurchaseOrderList({ orders }: { orders: PurchaseOrderListRow[] }) {
                   </td>
                   <td className="px-4 py-3">
                     <div>{order.supplierName}</div>
-                    <div className="text-xs text-muted-foreground">
-                      Ref {order.vendorReference ?? "-"}
-                    </div>
+                    <div className="text-xs text-muted-foreground">Ref {order.vendorReference ?? "-"}</div>
                   </td>
                   <td className="px-4 py-3">{order.status.replace(/_/g, " ")}</td>
                   <td className="px-4 py-3">
                     <div>{order.orderDate}</div>
+                    <div className="text-xs text-muted-foreground">ETA {order.expectedDate ?? "-"}</div>
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="capitalize">{order.paymentTerm}</div>
                     <div className="text-xs text-muted-foreground">
-                      Deadline {order.orderDeadline ?? "-"} / ETA {order.expectedDate ?? "-"}
+                      Unpaid {displayPurchaseMoney(order.residualAmountMinor, order.currencyCode)}
                     </div>
                   </td>
                   <td className="px-4 py-3">{order.deliverToLocationCode ?? "-"}</td>
@@ -386,82 +374,6 @@ function ReceiptList({ receipts }: { receipts: PurchaseReceiptListRow[] }) {
               <tr>
                 <td colSpan={9} className="px-4 py-10 text-center text-muted-foreground">
                   No receipts found.
-                </td>
-              </tr>
-            ) : null}
-          </tbody>
-        </table>
-      </div>
-    </section>
-  );
-}
-
-function VendorBillList({ bills }: { bills: PurchaseVendorBillListRow[] }) {
-  return (
-    <section className="rounded-lg border border-border bg-card">
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[1040px] text-left text-sm">
-          <thead className="bg-muted text-xs uppercase tracking-wide text-muted-foreground">
-            <tr>
-              <th className="px-4 py-3">Bill</th>
-              <th className="px-4 py-3">Purchase Order</th>
-              <th className="px-4 py-3">Supplier</th>
-              <th className="px-4 py-3">Date</th>
-              <th className="px-4 py-3">Due</th>
-              <th className="px-4 py-3">Source</th>
-              <th className="px-4 py-3">Payment</th>
-              <th className="px-4 py-3 text-right">Lines</th>
-              <th className="px-4 py-3 text-right">Tax</th>
-              <th className="px-4 py-3 text-right">Total</th>
-              <th className="px-4 py-3 text-right">Residual</th>
-              <th className="px-4 py-3 text-right">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {bills.map((bill) => (
-              <tr key={`${bill.source}-${bill.id}`} className="border-t border-border">
-                <td className="px-4 py-3">
-                  <div className="font-medium">{bill.billNo}</div>
-                  <div className="text-xs text-muted-foreground">
-                    {bill.status.replace(/_/g, " ")} / Ref {bill.vendorReference ?? "-"}
-                  </div>
-                </td>
-                <td className="px-4 py-3">
-                  {bill.purchaseOrderId ? (
-                    <Link href={`/admin/purchasing/${bill.purchaseOrderId}`} className="text-primary underline-offset-4 hover:underline">
-                      {bill.orderNo}
-                    </Link>
-                  ) : (
-                    "-"
-                  )}
-                </td>
-                <td className="px-4 py-3">{bill.supplierName}</td>
-                <td className="px-4 py-3">{bill.productSummary ?? "-"}</td>
-                <td className="px-4 py-3">{bill.billDate}</td>
-                <td className="px-4 py-3">{bill.dueDate ?? "-"}</td>
-                <td className="px-4 py-3">{bill.source === "placeholder" ? "Receipt placeholder" : "Vendor bill"}</td>
-                <td className="px-4 py-3 capitalize">{bill.paymentStatus.replace(/_/g, " ")}</td>
-                <td className="px-4 py-3 text-right">{bill.lineCount}</td>
-                <td className="px-4 py-3 text-right">{displayPurchaseMoney(bill.taxAmountMinor, bill.currencyCode)}</td>
-                <td className="px-4 py-3 text-right">{displayPurchaseMoney(bill.totalMinor, bill.currencyCode)}</td>
-                <td className="px-4 py-3 text-right">{displayPurchaseMoney(bill.residualAmountMinor, bill.currencyCode)}</td>
-                <td className="px-4 py-3">
-                  <div className="flex justify-end">
-                    {bill.purchaseOrderId ? (
-                      <ButtonLink href={`/admin/purchasing/vendor-bills/${bill.source}/${bill.id}`} size="sm">
-                        Details
-                      </ButtonLink>
-                    ) : (
-                      <span className="text-muted-foreground">-</span>
-                    )}
-                  </div>
-                </td>
-              </tr>
-            ))}
-            {bills.length === 0 ? (
-              <tr>
-                <td colSpan={12} className="px-4 py-10 text-center text-muted-foreground">
-                  No vendor bills found.
                 </td>
               </tr>
             ) : null}

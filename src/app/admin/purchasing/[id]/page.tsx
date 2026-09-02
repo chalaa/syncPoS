@@ -2,10 +2,11 @@ import { notFound } from "next/navigation";
 
 import {
   confirmPurchaseOrder,
-  createVendorBillFromPurchaseOrder,
   postGoodsReceipt,
   updatePurchaseOrder,
 } from "@/app/admin/purchasing/actions";
+import { registerSupplierPayment } from "@/app/admin/purchasing/payments/actions";
+import { PaymentFormDialog } from "@/components/app/payment-form-dialog";
 import { PurchaseOrderForm } from "@/app/admin/purchasing/purchase-order-form";
 import { ReceiptLinesEditor } from "@/app/admin/purchasing/receipt-lines-editor";
 import { Alert } from "@/components/ui/alert";
@@ -26,6 +27,7 @@ import {
   getPurchaseFormOptions,
   getPurchaseOrderDetail,
 } from "@/server/purchasing/purchasing";
+import { getActivePaymentAccounts } from "@/server/payments/payments";
 
 export const dynamic = "force-dynamic";
 
@@ -73,10 +75,11 @@ function CreateReceiptDialog({
 export default async function PurchaseOrderDetailPage({ params, searchParams }: PurchaseOrderDetailPageProps) {
   await requirePermission("inventory.receive");
 
-  const [{ id }, query, options] = await Promise.all([
+  const [{ id }, query, options, paymentAccounts] = await Promise.all([
     params,
     searchParams,
     getPurchaseFormOptions(),
+    getActivePaymentAccounts("outbound"),
   ]);
   const order = await getPurchaseOrderDetail(id);
 
@@ -104,10 +107,6 @@ export default async function PurchaseOrderDetailPage({ params, searchParams }: 
             <span className="block text-lg font-semibold">{order.receiptCount}</span>
             <span className="text-muted-foreground">Receipts</span>
           </a>
-          <a href={`/admin/purchasing?view=supplier-bills&purchaseOrderId=${order.id}`} className="rounded-md border border-border bg-card px-4 py-3 text-sm hover:bg-accent">
-            <span className="block text-lg font-semibold">{order.vendorBillCount}</span>
-            <span className="text-muted-foreground">Vendor Bills</span>
-          </a>
           <a href={`/admin/purchasing?view=landed-costs&purchaseOrderId=${order.id}`} className="rounded-md border border-border bg-card px-4 py-3 text-sm hover:bg-accent">
             <span className="block text-lg font-semibold">{order.landedCostCount}</span>
             <span className="text-muted-foreground">Landed Costs</span>
@@ -131,11 +130,19 @@ export default async function PurchaseOrderDetailPage({ params, searchParams }: 
           {canReceive ? (
             <CreateReceiptDialog order={order} locations={options.locations} />
           ) : null}
-          {!isDraft ? (
-            <form action={createVendorBillFromPurchaseOrder}>
-              <input type="hidden" name="purchaseOrderId" value={order.id} />
-              <Button variant="outline">Create Vendor Bill</Button>
-            </form>
+          {!isDraft && order.residualAmountMinor > 0 ? (
+            <PaymentFormDialog
+              title="Register Payment"
+              description={`Create a draft supplier payment for ${order.orderNo}.`}
+              triggerLabel="Register Payment"
+              submitLabel="Create Draft Payment"
+              action={registerSupplierPayment}
+              hiddenFieldName="purchaseOrderId"
+              hiddenFieldValue={order.id}
+              paymentAccounts={paymentAccounts}
+              currencyCode={order.currencyCode}
+              amountMinor={order.residualAmountMinor}
+            />
           ) : null}
           {order.receiptCount > 0 ? (
             <ButtonLink href={`/admin/purchasing/landed-costs/new?purchaseOrderId=${order.id}`} variant="outline">
@@ -164,12 +171,24 @@ export default async function PurchaseOrderDetailPage({ params, searchParams }: 
               <p className="mt-1 text-sm font-medium">{order.supplierName}</p>
             </div>
             <div>
-              <p className="text-xs font-medium uppercase text-muted-foreground">Vendor Reference</p>
+              <p className="text-xs font-medium uppercase text-muted-foreground">Reference</p>
               <p className="mt-1 text-sm font-medium">{order.vendorReference ?? "-"}</p>
+            </div>
+            <div>
+              <p className="text-xs font-medium uppercase text-muted-foreground">Payment Term</p>
+              <p className="mt-1 text-sm font-medium capitalize">{order.paymentTerm}</p>
             </div>
             <div>
               <p className="text-xs font-medium uppercase text-muted-foreground">Expected Arrival</p>
               <p className="mt-1 text-sm font-medium">{order.expectedDate ?? "-"}</p>
+            </div>
+            <div>
+              <p className="text-xs font-medium uppercase text-muted-foreground">Paid</p>
+              <p className="mt-1 text-sm font-medium">{displayPurchaseMoney(order.paidMinor, order.currencyCode)}</p>
+            </div>
+            <div>
+              <p className="text-xs font-medium uppercase text-muted-foreground">Unpaid</p>
+              <p className="mt-1 text-sm font-medium">{displayPurchaseMoney(order.residualAmountMinor, order.currencyCode)}</p>
             </div>
           </div>
 

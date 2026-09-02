@@ -112,6 +112,7 @@ export const purchaseOrderStatus = pgEnum("purchase_order_status", [
   "received",
   "cancelled",
 ]);
+export const purchasePaymentTerm = pgEnum("purchase_payment_term", ["cash", "credit"]);
 export const goodsReceiptStatus = pgEnum("goods_receipt_status", [
   "draft",
   "posted",
@@ -1535,9 +1536,9 @@ export const purchaseOrders = pgTable(
     }),
     orderNo: varchar("order_no", { length: 60 }).notNull(),
     vendorReference: varchar("vendor_reference", { length: 80 }),
+    paymentTerm: purchasePaymentTerm("payment_term").notNull().default("credit"),
     status: purchaseOrderStatus("status").notNull().default("draft"),
     orderDate: date("order_date").notNull().defaultNow(),
-    orderDeadline: date("order_deadline"),
     expectedDate: date("expected_date"),
     currencyCode: char("currency_code", { length: 3 })
       .notNull()
@@ -2347,6 +2348,10 @@ export const paymentAllocations = pgTable(
       onDelete: "restrict",
       onUpdate: "cascade",
     }),
+    purchaseOrderId: uuid("purchase_order_id").references(() => purchaseOrders.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
     expenseId: uuid("expense_id").references(() => expenses.id, {
       onDelete: "restrict",
       onUpdate: "cascade",
@@ -2366,6 +2371,7 @@ export const paymentAllocations = pgTable(
       "payment_allocations_target_chk",
       sql`
         (case when ${table.vendorBillId} is not null then 1 else 0 end)
+        + (case when ${table.purchaseOrderId} is not null then 1 else 0 end)
         + (case when ${table.expenseId} is not null then 1 else 0 end)
         + (case when ${table.customerInvoiceId} is not null then 1 else 0 end)
         = 1
@@ -2374,6 +2380,9 @@ export const paymentAllocations = pgTable(
     uniqueIndex("payment_allocations_vendor_bill_active_uidx")
       .on(table.paymentId, table.vendorBillId)
       .where(sql`${table.deletedAt} is null and ${table.vendorBillId} is not null`),
+    uniqueIndex("payment_allocations_purchase_order_active_uidx")
+      .on(table.paymentId, table.purchaseOrderId)
+      .where(sql`${table.deletedAt} is null and ${table.purchaseOrderId} is not null`),
     uniqueIndex("payment_allocations_expense_active_uidx")
       .on(table.paymentId, table.expenseId)
       .where(sql`${table.deletedAt} is null and ${table.expenseId} is not null`),
@@ -2382,6 +2391,7 @@ export const paymentAllocations = pgTable(
       .where(sql`${table.deletedAt} is null and ${table.customerInvoiceId} is not null`),
     index("payment_allocations_payment_idx").on(table.paymentId),
     index("payment_allocations_vendor_bill_idx").on(table.vendorBillId),
+    index("payment_allocations_purchase_order_idx").on(table.purchaseOrderId),
     index("payment_allocations_expense_idx").on(table.expenseId),
     index("payment_allocations_customer_invoice_idx").on(table.customerInvoiceId),
   ],

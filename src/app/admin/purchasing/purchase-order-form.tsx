@@ -200,15 +200,24 @@ export function PurchaseOrderForm({
           </select>
         </label>
         <label className="flex flex-col gap-1 text-sm font-medium">
-          Vendor reference
-          <input name="vendorReference" defaultValue={order?.vendorReference ?? ""} className={inputClass} />
+          Reference
+          <input
+            name="vendorReference"
+            defaultValue={order?.vendorReference ?? ""}
+            placeholder="Auto"
+            readOnly
+            className={cn(inputClass, "bg-muted text-muted-foreground")}
+          />
         </label>
       </div>
 
       <div className="grid gap-4 md:grid-cols-3">
         <label className="flex flex-col gap-1 text-sm font-medium">
-          Order deadline
-          <input name="orderDeadline" type="date" defaultValue={order?.orderDeadline ?? ""} className={inputClass} />
+          Payment Term
+          <select name="paymentTerm" defaultValue={order?.paymentTerm ?? "credit"} className={inputClass}>
+            <option value="cash">Cash</option>
+            <option value="credit">Credit</option>
+          </select>
         </label>
         <label className="flex flex-col gap-1 text-sm font-medium">
           Expected arrival

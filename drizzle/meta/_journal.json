@@ -148,6 +148,20 @@
       "when": 1788289615964,
       "tag": "0020_strange_killer_shrike",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1788291678705,
+      "tag": "0021_polite_stranger",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1788330502172,
+      "tag": "0022_yellow_spencer_smythe",
+      "breakpoints": true
     }
   ]
 }

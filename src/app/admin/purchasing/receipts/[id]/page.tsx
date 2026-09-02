@@ -1,9 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { createVendorBillFromReceipt } from "@/app/admin/purchasing/actions";
 import { Alert } from "@/components/ui/alert";
-import { Button, ButtonLink } from "@/components/ui/button";
+import { ButtonLink } from "@/components/ui/button";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
 import { requirePermission } from "@/server/auth/session";
 import {
@@ -44,19 +43,21 @@ export default async function ReceiptDetailPage({ params, searchParams }: Receip
               Landed Costs {receipt.landedCostCount}
             </ButtonLink>
             <ButtonLink href={`/admin/purchasing/landed-costs/new?receiptId=${receipt.id}`} variant="outline">Add Landed Cost</ButtonLink>
-            {receipt.existingVendorBillId ? (
-              <ButtonLink href={`/admin/purchasing/vendor-bills/vendor_bill/${receipt.existingVendorBillId}`}>Open Vendor Bill</ButtonLink>
-            ) : (
-              <form action={createVendorBillFromReceipt}>
-                <input type="hidden" name="receiptId" value={receipt.id} />
-                <Button>Create Vendor Bill</Button>
-              </form>
-            )}
           </div>
         }
       />
 
       {query.notice ? <Alert kind="success">{query.notice}</Alert> : null}
+
+      <div className="mb-4 flex flex-wrap gap-2">
+        <Link
+          href={`/admin/purchasing/${receipt.purchaseOrderId}`}
+          className="rounded-md border border-border bg-card px-4 py-3 text-sm hover:bg-accent"
+        >
+          <span className="block text-base font-semibold">{receipt.orderNo}</span>
+          <span className="text-muted-foreground">Purchase Order</span>
+        </Link>
+      </div>
 
       <section className="rounded-lg border border-border bg-card p-5">
         <div className="mb-5 grid gap-4 md:grid-cols-4">

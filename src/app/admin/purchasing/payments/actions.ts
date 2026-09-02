@@ -16,19 +16,27 @@ import {
   paymentAllocations,
   paymentMethods,
   payments,
+  purchaseOrders,
   vendorBills,
 } from "@/server/db/schema";
-import { getVendorBillPaymentSummary } from "@/server/payments/payments";
+import { getPurchaseOrderPaymentSummary, getVendorBillPaymentSummary } from "@/server/payments/payments";
 
-const registerSupplierPaymentSchema = z.object({
-  vendorBillId: z.string().uuid(),
+const optionalUuid = z.string().uuid().or(z.literal("")).optional().transform((value) => value || undefined);
+
+const supplierPaymentFormSchema = z.object({
+  vendorBillId: optionalUuid,
+  purchaseOrderId: optionalUuid,
   paymentAccountId: z.string().uuid(),
   amount: z.string().trim(),
   reference: z.string().trim().max(120).optional(),
   notes: z.string().trim().optional(),
 });
 
-const updateSupplierPaymentSchema = registerSupplierPaymentSchema.omit({ vendorBillId: true }).extend({
+const registerSupplierPaymentSchema = supplierPaymentFormSchema.refine((data) => Boolean(data.vendorBillId) !== Boolean(data.purchaseOrderId), {
+  message: "Select either a vendor bill or purchase order for payment.",
+});
+
+const updateSupplierPaymentSchema = supplierPaymentFormSchema.omit({ vendorBillId: true, purchaseOrderId: true }).extend({
   paymentId: z.string().uuid(),
 });
 
@@ -68,6 +76,7 @@ export async function registerSupplierPayment(formData: FormData) {
   const user = await requirePermission("inventory.receive");
   const parsed = registerSupplierPaymentSchema.safeParse({
     vendorBillId: formValue(formData, "vendorBillId"),
+    purchaseOrderId: formValue(formData, "purchaseOrderId"),
     paymentAccountId: formValue(formData, "paymentAccountId"),
     amount: formValue(formData, "amount"),
     reference: formValue(formData, "reference"),
@@ -75,41 +84,88 @@ export async function registerSupplierPayment(formData: FormData) {
   });
 
   if (!parsed.success) {
-    redirectWithError("/admin/purchasing?view=supplier-bills", parsed.error.issues[0]?.message ?? "Invalid supplier payment.");
+    redirectWithError("/admin/purchasing?view=payments", parsed.error.issues[0]?.message ?? "Invalid supplier payment.");
   }
 
   const amountMinor = majorToMinor(parsed.data.amount);
   if (amountMinor <= 0) {
-    redirectWithError(`/admin/purchasing/vendor-bills/vendor_bill/${parsed.data.vendorBillId}`, "Payment amount must be greater than zero.");
+    redirectWithError(
+      parsed.data.purchaseOrderId ? `/admin/purchasing/${parsed.data.purchaseOrderId}` : `/admin/purchasing/vendor-bills/vendor_bill/${parsed.data.vendorBillId}`,
+      "Payment amount must be greater than zero.",
+    );
   }
 
   const company = await getDefaultCompany();
   let paymentId: string | undefined;
+  const returnPath = parsed.data.purchaseOrderId ? `/admin/purchasing/${parsed.data.purchaseOrderId}` : `/admin/purchasing/vendor-bills/vendor_bill/${parsed.data.vendorBillId}`;
 
   try {
     await db.transaction(async (tx) => {
-      const [bill] = await tx
-        .select({
-          id: vendorBills.id,
-          supplierId: vendorBills.supplierId,
-          status: vendorBills.status,
-          totalMinor: vendorBills.totalMinor,
-          currencyCode: vendorBills.currencyCode,
-          paymentStatus: vendorBills.paymentStatus,
-        })
-        .from(vendorBills)
-        .where(and(eq(vendorBills.id, parsed.data.vendorBillId), eq(vendorBills.companyId, company.id), isNull(vendorBills.deletedAt)))
-        .limit(1);
+      const target = parsed.data.purchaseOrderId
+        ? await (async () => {
+            const [order] = await tx
+              .select({
+                id: purchaseOrders.id,
+                supplierId: purchaseOrders.supplierId,
+                status: purchaseOrders.status,
+                totalMinor: purchaseOrders.totalMinor,
+                currencyCode: purchaseOrders.currencyCode,
+                orderNo: purchaseOrders.orderNo,
+              })
+              .from(purchaseOrders)
+              .where(and(eq(purchaseOrders.id, parsed.data.purchaseOrderId!), eq(purchaseOrders.companyId, company.id), isNull(purchaseOrders.deletedAt)))
+              .limit(1);
 
-      if (!bill) {
+            if (!order) {
+              throw new Error("Purchase order does not exist.");
+            }
+
+            if (order.status === "draft" || order.status === "cancelled") {
+              throw new Error("Only confirmed purchase orders can be paid.");
+            }
+
+            const summary = await getPurchaseOrderPaymentSummary(order.id);
+            if (summary.paymentStatus === "paid") {
+              throw new Error("Purchase order is already paid.");
+            }
+
+            return {
+              id: order.id,
+              no: order.orderNo,
+              supplierId: order.supplierId,
+              totalMinor: order.totalMinor,
+              currencyCode: order.currencyCode,
+              residualAmountMinor: summary.residualAmountMinor,
+              purchaseOrderId: order.id,
+              vendorBillId: null as string | null,
+            };
+          })()
+        : null;
+
+      const [bill] = target
+        ? []
+        : await tx
+            .select({
+              id: vendorBills.id,
+              supplierId: vendorBills.supplierId,
+              status: vendorBills.status,
+              totalMinor: vendorBills.totalMinor,
+              currencyCode: vendorBills.currencyCode,
+              paymentStatus: vendorBills.paymentStatus,
+            })
+            .from(vendorBills)
+            .where(and(eq(vendorBills.id, parsed.data.vendorBillId!), eq(vendorBills.companyId, company.id), isNull(vendorBills.deletedAt)))
+            .limit(1);
+
+      if (!target && !bill) {
         throw new Error("Vendor bill does not exist.");
       }
 
-      if (bill.status !== "posted") {
+      if (!target && bill.status !== "posted") {
         throw new Error("Only posted vendor bills can be paid.");
       }
 
-      if (bill.paymentStatus === "paid") {
+      if (!target && bill.paymentStatus === "paid") {
         throw new Error("Vendor bill is already paid.");
       }
 
@@ -139,15 +195,19 @@ export async function registerSupplierPayment(formData: FormData) {
         throw new Error("Select an active outbound payment account.");
       }
 
-      if (account.currencyCode !== bill.currencyCode) {
-        throw new Error("Payment account currency must match the vendor bill.");
+      const currencyCode = target?.currencyCode ?? bill.currencyCode;
+      const supplierId = target?.supplierId ?? bill.supplierId;
+      const residualAmountMinor = target?.residualAmountMinor;
+
+      if (account.currencyCode !== currencyCode) {
+        throw new Error("Payment account currency must match the purchase currency.");
       }
 
       if (account.requiresReference && !parsed.data.reference) {
         throw new Error("This payment method requires a reference.");
       }
 
-      const [summary] = await tx.execute<{ residualAmountMinor: number }>(sql`
+      const [summary] = target ? [{ residualAmountMinor }] : await tx.execute<{ residualAmountMinor: number }>(sql`
         select greatest(
           ${bill.totalMinor} - coalesce(sum(pa.amount_minor) filter (
             where p.status = 'posted'
@@ -164,21 +224,21 @@ export async function registerSupplierPayment(formData: FormData) {
       `);
 
       if (amountMinor > (summary?.residualAmountMinor ?? 0)) {
-        throw new Error("Payment amount cannot exceed the vendor bill residual.");
+        throw new Error("Payment amount cannot exceed the unpaid purchase balance.");
       }
 
       const [payment] = await tx
         .insert(payments)
         .values({
           companyId: company.id,
-          partnerId: bill.supplierId,
+          partnerId: supplierId,
           paymentNo: paymentNo("PAY-OUT"),
           paymentType: "outbound",
           status: "draft",
           paymentMethodId: account.methodId,
           paymentAccountId: account.id,
           amountMinor,
-          currencyCode: bill.currencyCode,
+          currencyCode,
           reference: parsed.data.reference || null,
           notes: parsed.data.notes || null,
         })
@@ -187,7 +247,8 @@ export async function registerSupplierPayment(formData: FormData) {
 
       await tx.insert(paymentAllocations).values({
         paymentId: payment.id,
-        vendorBillId: bill.id,
+        vendorBillId: target ? null : bill.id,
+        purchaseOrderId: target?.purchaseOrderId ?? null,
         amountMinor,
         notes: "Supplier payment allocation.",
       });
@@ -199,15 +260,15 @@ export async function registerSupplierPayment(formData: FormData) {
         entityType: "payment",
         entityId: payment.id,
         severity: "info",
-        metadata: { paymentNo: payment.paymentNo, vendorBillId: bill.id },
+        metadata: { paymentNo: payment.paymentNo, vendorBillId: target ? null : bill.id, purchaseOrderId: target?.purchaseOrderId ?? null },
       });
     });
   } catch (error) {
-    redirectWithError(`/admin/purchasing/vendor-bills/vendor_bill/${parsed.data.vendorBillId}`, error instanceof Error ? error.message : "Could not register supplier payment.");
+    redirectWithError(returnPath, error instanceof Error ? error.message : "Could not register supplier payment.");
   }
 
   revalidatePath("/admin/purchasing");
-  revalidatePath(`/admin/purchasing/vendor-bills/vendor_bill/${parsed.data.vendorBillId}`);
+  revalidatePath(returnPath);
   redirect(`/admin/purchasing/payments/${paymentId}?notice=${encodeURIComponent("Supplier payment registered as draft")}`);
 }
 
@@ -220,6 +281,7 @@ export async function postSupplierPayment(formData: FormData) {
   }
 
   let vendorBillId: string | undefined;
+  let purchaseOrderId: string | undefined;
   const company = await getDefaultCompany();
 
   try {
@@ -251,19 +313,58 @@ export async function postSupplierPayment(formData: FormData) {
       const allocations = await tx
         .select({
           vendorBillId: paymentAllocations.vendorBillId,
+          purchaseOrderId: paymentAllocations.purchaseOrderId,
           amountMinor: paymentAllocations.amountMinor,
         })
         .from(paymentAllocations)
         .where(and(eq(paymentAllocations.paymentId, payment.id), isNull(paymentAllocations.deletedAt)));
 
       const allocationTotal = allocations.reduce((sum, allocation) => sum + allocation.amountMinor, 0);
-      if (allocations.length !== 1 || !allocations[0]?.vendorBillId || allocationTotal !== payment.amountMinor) {
+      const allocation = allocations[0];
+      if (allocations.length !== 1 || (!allocation?.vendorBillId && !allocation?.purchaseOrderId) || allocationTotal !== payment.amountMinor) {
         throw new Error("Supplier payment allocation must match payment amount.");
       }
 
-      vendorBillId = allocations[0].vendorBillId;
+      vendorBillId = allocation.vendorBillId ?? undefined;
+      purchaseOrderId = allocation.purchaseOrderId ?? undefined;
 
-      const [bill] = await tx
+      if (purchaseOrderId) {
+        const [order] = await tx
+          .select({
+            id: purchaseOrders.id,
+            status: purchaseOrders.status,
+            totalMinor: purchaseOrders.totalMinor,
+          })
+          .from(purchaseOrders)
+          .where(and(eq(purchaseOrders.id, purchaseOrderId), eq(purchaseOrders.companyId, company.id), isNull(purchaseOrders.deletedAt)))
+          .limit(1);
+
+        if (!order || order.status === "draft" || order.status === "cancelled") {
+          throw new Error("Purchase order must be confirmed before payment posting.");
+        }
+
+        const [summary] = await tx.execute<{ residualAmountMinor: number }>(sql`
+          select greatest(
+            ${order.totalMinor} - coalesce(sum(pa.amount_minor) filter (
+              where p.status = 'posted'
+                and p.deleted_at is null
+                and pa.deleted_at is null
+            ), 0),
+            0
+          )::bigint as "residualAmountMinor"
+          from purchase_orders po
+          left join payment_allocations pa on pa.purchase_order_id = po.id
+          left join payments p on p.id = pa.payment_id
+          where po.id = ${order.id}
+          group by po.id
+        `);
+
+        if (payment.amountMinor > (summary?.residualAmountMinor ?? 0)) {
+          throw new Error("Payment amount cannot exceed the unpaid purchase balance.");
+        }
+      }
+
+      const [bill] = vendorBillId ? await tx
         .select({
           id: vendorBills.id,
           status: vendorBills.status,
@@ -271,13 +372,14 @@ export async function postSupplierPayment(formData: FormData) {
         })
         .from(vendorBills)
         .where(and(eq(vendorBills.id, vendorBillId), eq(vendorBills.companyId, company.id), isNull(vendorBills.deletedAt)))
-        .limit(1);
+        .limit(1) : [];
 
-      if (!bill || bill.status !== "posted") {
+      if (vendorBillId && (!bill || bill.status !== "posted")) {
         throw new Error("Vendor bill must be posted before payment posting.");
       }
 
-      const [summary] = await tx.execute<{ residualAmountMinor: number }>(sql`
+      if (vendorBillId && bill) {
+        const [summary] = await tx.execute<{ residualAmountMinor: number }>(sql`
         select greatest(
           ${bill.totalMinor} - coalesce(sum(pa.amount_minor) filter (
             where p.status = 'posted'
@@ -293,8 +395,9 @@ export async function postSupplierPayment(formData: FormData) {
         group by vb.id
       `);
 
-      if (payment.amountMinor > (summary?.residualAmountMinor ?? 0)) {
-        throw new Error("Payment amount cannot exceed the vendor bill residual.");
+        if (payment.amountMinor > (summary?.residualAmountMinor ?? 0)) {
+          throw new Error("Payment amount cannot exceed the vendor bill residual.");
+        }
       }
 
       await tx
@@ -314,7 +417,7 @@ export async function postSupplierPayment(formData: FormData) {
         entityType: "payment",
         entityId: payment.id,
         severity: "info",
-        metadata: { paymentNo: payment.paymentNo, vendorBillId },
+        metadata: { paymentNo: payment.paymentNo, vendorBillId, purchaseOrderId },
       });
     });
 
@@ -329,6 +432,9 @@ export async function postSupplierPayment(formData: FormData) {
   revalidatePath(`/admin/purchasing/payments/${parsed.data.paymentId}`);
   if (vendorBillId) {
     revalidatePath(`/admin/purchasing/vendor-bills/vendor_bill/${vendorBillId}`);
+  }
+  if (purchaseOrderId) {
+    revalidatePath(`/admin/purchasing/${purchaseOrderId}`);
   }
   redirect(`/admin/purchasing/payments/${parsed.data.paymentId}?notice=${encodeURIComponent("Supplier payment posted")}`);
 }
@@ -354,6 +460,7 @@ export async function updateSupplierPayment(formData: FormData) {
 
   const company = await getDefaultCompany();
   let vendorBillId: string | undefined;
+  let purchaseOrderId: string | undefined;
 
   try {
     await db.transaction(async (tx) => {
@@ -381,17 +488,22 @@ export async function updateSupplierPayment(formData: FormData) {
       }
 
       const [allocation] = await tx
-        .select({ id: paymentAllocations.id, vendorBillId: paymentAllocations.vendorBillId })
+        .select({
+          id: paymentAllocations.id,
+          vendorBillId: paymentAllocations.vendorBillId,
+          purchaseOrderId: paymentAllocations.purchaseOrderId,
+        })
         .from(paymentAllocations)
         .where(and(eq(paymentAllocations.paymentId, payment.id), isNull(paymentAllocations.deletedAt)))
         .limit(1);
 
-      if (!allocation?.vendorBillId) {
+      if (!allocation?.vendorBillId && !allocation?.purchaseOrderId) {
         throw new Error("Supplier payment allocation is missing.");
       }
-      vendorBillId = allocation.vendorBillId;
+      vendorBillId = allocation.vendorBillId ?? undefined;
+      purchaseOrderId = allocation.purchaseOrderId ?? undefined;
 
-      const [bill] = await tx
+      const [bill] = vendorBillId ? await tx
         .select({
           id: vendorBills.id,
           status: vendorBills.status,
@@ -399,11 +511,26 @@ export async function updateSupplierPayment(formData: FormData) {
           currencyCode: vendorBills.currencyCode,
         })
         .from(vendorBills)
-        .where(and(eq(vendorBills.id, allocation.vendorBillId), eq(vendorBills.companyId, company.id), isNull(vendorBills.deletedAt)))
-        .limit(1);
+        .where(and(eq(vendorBills.id, vendorBillId), eq(vendorBills.companyId, company.id), isNull(vendorBills.deletedAt)))
+        .limit(1) : [];
 
-      if (!bill || bill.status !== "posted") {
+      const [order] = purchaseOrderId ? await tx
+        .select({
+          id: purchaseOrders.id,
+          status: purchaseOrders.status,
+          totalMinor: purchaseOrders.totalMinor,
+          currencyCode: purchaseOrders.currencyCode,
+        })
+        .from(purchaseOrders)
+        .where(and(eq(purchaseOrders.id, purchaseOrderId), eq(purchaseOrders.companyId, company.id), isNull(purchaseOrders.deletedAt)))
+        .limit(1) : [];
+
+      if (vendorBillId && (!bill || bill.status !== "posted")) {
         throw new Error("Vendor bill must be posted before editing payment.");
+      }
+
+      if (purchaseOrderId && (!order || order.status === "draft" || order.status === "cancelled")) {
+        throw new Error("Purchase order must be confirmed before editing payment.");
       }
 
       const [account] = await tx
@@ -432,15 +559,31 @@ export async function updateSupplierPayment(formData: FormData) {
         throw new Error("Select an active outbound payment account.");
       }
 
-      if (account.currencyCode !== bill.currencyCode) {
-        throw new Error("Payment account currency must match the vendor bill.");
+      const currencyCode = order?.currencyCode ?? bill?.currencyCode;
+
+      if (account.currencyCode !== currencyCode) {
+        throw new Error("Payment account currency must match the purchase currency.");
       }
 
       if (account.requiresReference && !parsed.data.reference) {
         throw new Error("This payment method requires a reference.");
       }
 
-      const [summary] = await tx.execute<{ residualAmountMinor: number }>(sql`
+      const [summary] = purchaseOrderId && order ? await tx.execute<{ residualAmountMinor: number }>(sql`
+        select greatest(
+          ${order.totalMinor} - coalesce(sum(pa.amount_minor) filter (
+            where p.status = 'posted'
+              and p.deleted_at is null
+              and pa.deleted_at is null
+          ), 0),
+          0
+        )::bigint as "residualAmountMinor"
+        from purchase_orders po
+        left join payment_allocations pa on pa.purchase_order_id = po.id
+        left join payments p on p.id = pa.payment_id
+        where po.id = ${order.id}
+        group by po.id
+      `) : await tx.execute<{ residualAmountMinor: number }>(sql`
         select greatest(
           ${bill.totalMinor} - coalesce(sum(pa.amount_minor) filter (
             where p.status = 'posted'
@@ -457,7 +600,7 @@ export async function updateSupplierPayment(formData: FormData) {
       `);
 
       if (amountMinor > (summary?.residualAmountMinor ?? 0)) {
-        throw new Error("Payment amount cannot exceed the vendor bill residual.");
+        throw new Error("Payment amount cannot exceed the unpaid purchase balance.");
       }
 
       await tx
@@ -487,7 +630,7 @@ export async function updateSupplierPayment(formData: FormData) {
         entityType: "payment",
         entityId: payment.id,
         severity: "info",
-        metadata: { paymentNo: payment.paymentNo, vendorBillId },
+        metadata: { paymentNo: payment.paymentNo, vendorBillId, purchaseOrderId },
       });
     });
   } catch (error) {
@@ -498,6 +641,9 @@ export async function updateSupplierPayment(formData: FormData) {
   revalidatePath(`/admin/purchasing/payments/${parsed.data.paymentId}`);
   if (vendorBillId) {
     revalidatePath(`/admin/purchasing/vendor-bills/vendor_bill/${vendorBillId}`);
+  }
+  if (purchaseOrderId) {
+    revalidatePath(`/admin/purchasing/${purchaseOrderId}`);
   }
   redirect(`/admin/purchasing/payments/${parsed.data.paymentId}?notice=${encodeURIComponent("Supplier payment updated")}`);
 }
@@ -511,6 +657,7 @@ export async function cancelSupplierPayment(formData: FormData) {
   }
 
   let vendorBillId: string | undefined;
+  let purchaseOrderId: string | undefined;
   const company = await getDefaultCompany();
 
   try {
@@ -530,11 +677,15 @@ export async function cancelSupplierPayment(formData: FormData) {
       }
 
       const [allocation] = await tx
-        .select({ vendorBillId: paymentAllocations.vendorBillId })
+        .select({
+          vendorBillId: paymentAllocations.vendorBillId,
+          purchaseOrderId: paymentAllocations.purchaseOrderId,
+        })
         .from(paymentAllocations)
         .where(and(eq(paymentAllocations.paymentId, payment.id), isNull(paymentAllocations.deletedAt)))
         .limit(1);
       vendorBillId = allocation?.vendorBillId ?? undefined;
+      purchaseOrderId = allocation?.purchaseOrderId ?? undefined;
 
       await tx
         .update(payments)
@@ -553,7 +704,7 @@ export async function cancelSupplierPayment(formData: FormData) {
         entityType: "payment",
         entityId: payment.id,
         severity: "warning",
-        metadata: { paymentNo: payment.paymentNo, vendorBillId },
+        metadata: { paymentNo: payment.paymentNo, vendorBillId, purchaseOrderId },
       });
     });
 
@@ -568,6 +719,9 @@ export async function cancelSupplierPayment(formData: FormData) {
   revalidatePath(`/admin/purchasing/payments/${parsed.data.paymentId}`);
   if (vendorBillId) {
     revalidatePath(`/admin/purchasing/vendor-bills/vendor_bill/${vendorBillId}`);
+  }
+  if (purchaseOrderId) {
+    revalidatePath(`/admin/purchasing/${purchaseOrderId}`);
   }
   redirect(`/admin/purchasing/payments/${parsed.data.paymentId}?notice=${encodeURIComponent("Supplier payment cancelled")}`);
 }

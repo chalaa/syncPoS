@@ -39,9 +39,10 @@ export default async function PaymentDetailPage({ params, searchParams }: Paymen
   }
 
   const vendorBillId = payment.allocations.find((allocation) => allocation.vendorBillId)?.vendorBillId;
+  const purchaseOrderId = payment.allocations.find((allocation) => allocation.purchaseOrderId)?.purchaseOrderId;
   const expenseId = payment.allocations.find((allocation) => allocation.expenseId)?.expenseId;
   const customerInvoiceId = payment.allocations.find((allocation) => allocation.customerInvoiceId)?.customerInvoiceId;
-  const isSupplierPayment = Boolean(vendorBillId);
+  const isSupplierPayment = Boolean(vendorBillId || purchaseOrderId);
 
   return (
     <PageShell>
@@ -86,6 +87,20 @@ export default async function PaymentDetailPage({ params, searchParams }: Paymen
 
       {query.notice ? <Alert kind="success">{query.notice}</Alert> : null}
       {query.error ? <Alert kind="error">{query.error}</Alert> : null}
+
+      {purchaseOrderId ? (
+        <div className="mb-4 flex flex-wrap gap-2">
+          <Link
+            href={`/admin/purchasing/${purchaseOrderId}`}
+            className="rounded-md border border-border bg-card px-4 py-3 text-sm hover:bg-accent"
+          >
+            <span className="block text-base font-semibold">
+              {payment.allocations.find((allocation) => allocation.purchaseOrderId === purchaseOrderId)?.purchaseOrderNo ?? "Purchase Order"}
+            </span>
+            <span className="text-muted-foreground">Purchase Order</span>
+          </Link>
+        </div>
+      ) : null}
 
       <section className="rounded-lg border border-border bg-card p-5">
         <div className="mb-5 grid gap-4 md:grid-cols-4">
@@ -139,6 +154,10 @@ export default async function PaymentDetailPage({ params, searchParams }: Paymen
               <Link href={`/admin/purchasing/vendor-bills/vendor_bill/${vendorBillId}`} className="mt-1 block text-sm font-medium text-primary underline-offset-4 hover:underline">
                 Open vendor bill
               </Link>
+            ) : purchaseOrderId ? (
+              <Link href={`/admin/purchasing/${purchaseOrderId}`} className="mt-1 block text-sm font-medium text-primary underline-offset-4 hover:underline">
+                Open purchase order
+              </Link>
             ) : expenseId ? (
               <Link href={`/admin/operations/expenses/${expenseId}`} className="mt-1 block text-sm font-medium text-primary underline-offset-4 hover:underline">
                 Open expense
@@ -168,6 +187,10 @@ export default async function PaymentDetailPage({ params, searchParams }: Paymen
                     {allocation.vendorBillId ? (
                       <Link href={`/admin/purchasing/vendor-bills/vendor_bill/${allocation.vendorBillId}`} className="font-medium text-primary underline-offset-4 hover:underline">
                         {allocation.billNo}
+                      </Link>
+                    ) : allocation.purchaseOrderId ? (
+                      <Link href={`/admin/purchasing/${allocation.purchaseOrderId}`} className="font-medium text-primary underline-offset-4 hover:underline">
+                        {allocation.purchaseOrderNo}
                       </Link>
                     ) : allocation.expenseId ? (
                       <Link href={`/admin/operations/expenses/${allocation.expenseId}`} className="font-medium text-primary underline-offset-4 hover:underline">
