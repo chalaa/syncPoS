@@ -366,7 +366,7 @@ function SalesOrderList({ orders }: { orders: SalesOrderListRow[] }) {
               <th className="px-4 py-3">Customer</th>
               <th className="px-4 py-3">Status</th>
               <th className="px-4 py-3">Order Date</th>
-              <th className="px-4 py-3">Valid Until</th>
+              <th className="px-4 py-3">Payment</th>
               <th className="px-4 py-3">Source</th>
               <th className="px-4 py-3 text-right">Lines</th>
               <th className="px-4 py-3 text-right">Ordered</th>
@@ -383,11 +383,17 @@ function SalesOrderList({ orders }: { orders: SalesOrderListRow[] }) {
                     {order.orderNo}
                   </Link>
                   <div className="text-xs text-muted-foreground">{order.customerReference ?? "-"}</div>
+                  {order.fsNumber ? <div className="text-xs text-muted-foreground">FS {order.fsNumber}</div> : null}
                 </td>
                 <td className="px-4 py-3">{order.customerName}</td>
                 <td className="px-4 py-3 capitalize">{statusLabel(order.status)}</td>
                 <td className="px-4 py-3">{order.orderDate}</td>
-                <td className="px-4 py-3">{order.validUntil ?? "-"}</td>
+                <td className="px-4 py-3">
+                  <div className="capitalize">{order.paymentTerm}</div>
+                  <div className="text-xs text-muted-foreground">
+                    Unpaid {displaySalesMoney(order.residualAmountMinor, order.currencyCode)}
+                  </div>
+                </td>
                 <td className="px-4 py-3">{order.sourceLocationCode ?? "-"}</td>
                 <td className="px-4 py-3 text-right">{order.lineCount}</td>
                 <td className="px-4 py-3 text-right">{order.quantityOrdered}</td>

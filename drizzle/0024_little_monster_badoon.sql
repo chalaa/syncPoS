@@ -1,0 +1,1 @@
+ALTER TABLE "sales_orders" ALTER COLUMN "reserve_on_confirm" SET DEFAULT true;

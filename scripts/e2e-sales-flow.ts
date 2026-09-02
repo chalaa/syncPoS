@@ -205,6 +205,7 @@ async function main() {
           source_location_id,
           order_no,
           customer_reference,
+          payment_term,
           status,
           order_date,
           currency_code,
@@ -220,6 +221,7 @@ async function main() {
           ${location.id},
           ${testNo("SO-E2E")},
           'E2E customer reference',
+          'credit',
           'quotation',
           ${today},
           ${company.base_currency_code},
@@ -284,14 +286,6 @@ async function main() {
         where id = ${salesOrder.id}
       `;
 
-      const overDeliveryQuantity = openingQuantity + 1;
-      const [overDeliveryCheck] = await sql<{ can_deliver: boolean }[]>`
-        select cast(quantity_available as numeric) >= ${overDeliveryQuantity} as can_deliver
-        from stock_balances
-        where id = ${balance.id}
-      `;
-      assertCondition(overDeliveryCheck?.can_deliver === false, "Over-delivery guard failed.");
-
       const [delivery] = await sql<{ id: string }[]>`
         insert into deliveries (
           company_id,
@@ -311,7 +305,7 @@ async function main() {
         )
         returning id
       `;
-      assertCondition(delivery, "Could not create delivery.");
+      assertCondition(delivery, "Could not create draft delivery on confirmation.");
 
       const totalCostMinor = quantity * unitCostMinor;
       const [deliveryLine] = await sql<{ id: string }[]>`
@@ -339,7 +333,24 @@ async function main() {
         )
         returning id
       `;
-      assertCondition(deliveryLine, "Could not create delivery line.");
+      assertCondition(deliveryLine, "Could not create draft delivery line.");
+
+      const [draftDeliveryLineCheck] = await sql<{ line_count: number; planned_quantity: string }[]>`
+        select count(*)::int as line_count, coalesce(sum(quantity_delivered), 0)::text as planned_quantity
+        from delivery_lines
+        where delivery_id = ${delivery.id}
+          and deleted_at is null
+      `;
+      assertCondition(draftDeliveryLineCheck?.line_count === 1, "Draft delivery did not include expected product lines.");
+      assertCondition(Number(draftDeliveryLineCheck.planned_quantity) === quantity, "Draft delivery planned quantity is incorrect.");
+
+      const overDeliveryQuantity = openingQuantity + 1;
+      const [overDeliveryCheck] = await sql<{ can_deliver: boolean }[]>`
+        select cast(quantity_available as numeric) >= ${overDeliveryQuantity} as can_deliver
+        from stock_balances
+        where id = ${balance.id}
+      `;
+      assertCondition(overDeliveryCheck?.can_deliver === false, "Over-delivery guard failed.");
 
       const [movement] = await sql<{ id: string }[]>`
         insert into stock_movements (
@@ -458,86 +469,6 @@ async function main() {
       assertCondition(deliveryCheck.movement_from === location.code, "Delivery movement source is incorrect.");
       assertCondition(deliveryCheck.movement_to === "CUSTOMERS", "Delivery movement destination is not CUSTOMERS.");
 
-      const [invoice] = await sql<{ id: string }[]>`
-        insert into customer_invoices (
-          company_id,
-          sales_order_id,
-          delivery_id,
-          customer_id,
-          invoice_no,
-          customer_reference,
-          status,
-          payment_status,
-          invoice_date,
-          posted_at,
-          posted_by,
-          currency_code,
-          untaxed_amount_minor,
-          tax_amount_minor,
-          total_minor
-        )
-        values (
-          ${company.id},
-          ${salesOrder.id},
-          ${delivery.id},
-          ${customer.id},
-          ${testNo("INV-E2E")},
-          'E2E customer reference',
-          'posted',
-          'not_paid',
-          ${today},
-          now(),
-          ${adminUser.id},
-          ${company.base_currency_code},
-          ${subtotalMinor},
-          ${taxAmountMinor},
-          ${totalMinor}
-        )
-        returning id
-      `;
-      assertCondition(invoice, "Could not create customer invoice.");
-
-      await sql`
-        insert into customer_invoice_lines (
-          customer_invoice_id,
-          sales_order_line_id,
-          delivery_line_id,
-          line_no,
-          product_id,
-          description,
-          quantity,
-          unit_price_minor,
-          discount_minor,
-          tax_amount_minor,
-          line_total_minor,
-          currency_code
-        )
-        values (
-          ${invoice.id},
-          ${salesOrderLine.id},
-          ${deliveryLine.id},
-          1,
-          ${product.id},
-          'E2E invoice line',
-          ${quantity},
-          ${unitPriceMinor},
-          0,
-          ${taxAmountMinor},
-          ${totalMinor},
-          ${company.base_currency_code}
-        )
-      `;
-      await sql`
-        update sales_order_lines
-        set quantity_invoiced = ${quantity}, updated_at = now()
-        where id = ${salesOrderLine.id}
-      `;
-      await sql`
-        update sales_orders
-        set status = 'invoiced', updated_at = now()
-        where id = ${salesOrder.id}
-      `;
-
       const [paymentMethod] = await sql<{ id: string }[]>`
         insert into payment_methods (
           company_id,
@@ -624,61 +555,54 @@ async function main() {
       await sql`
         insert into payment_allocations (
           payment_id,
-          customer_invoice_id,
+          sales_order_id,
           amount_minor,
           notes
         )
         values (
           ${payment.id},
-          ${invoice.id},
+          ${salesOrder.id},
           ${totalMinor},
           'E2E full allocation'
         )
       `;
-      await sql`
-        update customer_invoices
-        set payment_status = 'paid', updated_at = now()
-        where id = ${invoice.id}
-      `;
 
       const [finalCheck] = await sql<{
         order_status: string;
-        invoice_status: string;
-        payment_status: string;
+        payment_term: string;
         residual_minor: number;
         paid_minor: number;
         payment_type: string;
       }[]>`
         select
           so.status as order_status,
-          ci.status as invoice_status,
-          ci.payment_status,
-          greatest(ci.total_minor - coalesce(sum(pa.amount_minor) filter (
+          so.payment_term::text as payment_term,
+          greatest(so.total_minor - coalesce(sum(pa.amount_minor) filter (
             where p.status = 'posted' and p.deleted_at is null and pa.deleted_at is null
           ), 0), 0)::bigint as residual_minor,
           coalesce(sum(pa.amount_minor) filter (
             where p.status = 'posted' and p.deleted_at is null and pa.deleted_at is null
           ), 0)::bigint as paid_minor,
           max(p.payment_type::text) as payment_type
-        from customer_invoices ci
-        join sales_orders so on so.id = ci.sales_order_id
-        left join payment_allocations pa on pa.customer_invoice_id = ci.id
+        from sales_orders so
+        left join payment_allocations pa on pa.sales_order_id = so.id
         left join payments p on p.id = pa.payment_id
-        where ci.id = ${invoice.id}
-        group by so.id, ci.id
+        where so.id = ${salesOrder.id}
+        group by so.id
       `;
-      assertCondition(finalCheck?.order_status === "invoiced", "Sales order did not move to invoiced.");
-      assertCondition(finalCheck.invoice_status === "posted", "Invoice is not posted.");
-      assertCondition(finalCheck.payment_status === "paid", "Invoice payment status is not paid.");
-      assertCondition(Number(finalCheck.residual_minor) === 0, "Invoice residual is not zero after full payment.");
+      assertCondition(finalCheck?.order_status === "delivered", "Sales order did not remain delivered.");
+      assertCondition(finalCheck.payment_term === "credit", "Sales payment term is incorrect.");
+      assertCondition(Number(finalCheck.residual_minor) === 0, "Sales order residual is not zero after full payment.");
       assertCondition(Number(finalCheck.paid_minor) === totalMinor, "Payment allocation total is incorrect.");
       assertCondition(finalCheck.payment_type === "inbound", "Customer payment is not inbound.");
 
       const [allocationGuard] = await sql<{ valid: boolean }[]>`
         select (
           (case when vendor_bill_id is not null then 1 else 0 end)
+          + (case when purchase_order_id is not null then 1 else 0 end)
           + (case when expense_id is not null then 1 else 0 end)
           + (case when customer_invoice_id is not null then 1 else 0 end)
+          + (case when sales_order_id is not null then 1 else 0 end)
         ) = 1 as valid
         from payment_allocations
         where payment_id = ${payment.id}
@@ -691,7 +615,7 @@ async function main() {
     console.log("E2E sales flow test passed.");
     console.log(`Company: ${company.code}`);
     console.log(`Source location: ${location.code}`);
-    console.log(`Flow: quotation -> confirmed order -> posted delivery -> posted invoice -> inbound payment`);
+    console.log(`Flow: quotation -> confirmed order -> draft delivery -> posted delivery -> direct inbound customer payment`);
     console.log(`Expected totals: subtotal ${subtotalMinor}, tax ${taxAmountMinor}, total ${totalMinor}`);
   } finally {
     await sql.end();

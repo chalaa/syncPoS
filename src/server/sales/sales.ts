@@ -114,6 +114,8 @@ export async function getSalesOrderList(): Promise<SalesOrderListRow[]> {
       so.id as "id",
       so.order_no as "orderNo",
       so.customer_reference as "customerReference",
+      so.fs_number as "fsNumber",
+      so.payment_term as "paymentTerm",
       customer.display_name as "customerName",
       so.status::text as "status",
       so.order_date::text as "orderDate",
@@ -122,6 +124,8 @@ export async function getSalesOrderList(): Promise<SalesOrderListRow[]> {
       loc.code as "sourceLocationCode",
       so.currency_code as "currencyCode",
       so.total_minor as "totalMinor",
+      coalesce(pay.paid_minor, 0)::bigint as "paidMinor",
+      greatest(so.total_minor - coalesce(pay.paid_minor, 0), 0)::bigint as "residualAmountMinor",
       count(sol.id)::int as "lineCount",
       coalesce(sum(sol.quantity_ordered), 0)::text as "quantityOrdered",
       coalesce(sum(sol.quantity_delivered), 0)::text as "quantityDelivered",
@@ -130,9 +134,18 @@ export async function getSalesOrderList(): Promise<SalesOrderListRow[]> {
     inner join partners customer on customer.id = so.customer_id
     left join locations loc on loc.id = so.source_location_id
     left join sales_order_lines sol on sol.sales_order_id = so.id and sol.deleted_at is null
+    left join lateral (
+      select sum(pa.amount_minor) as paid_minor
+      from payment_allocations pa
+      inner join payments p on p.id = pa.payment_id
+      where pa.sales_order_id = so.id
+        and pa.deleted_at is null
+        and p.deleted_at is null
+        and p.status = 'posted'
+    ) pay on true
     where so.company_id = ${company.id}
       and so.deleted_at is null
-    group by so.id, customer.id, loc.id
+    group by so.id, customer.id, loc.id, pay.paid_minor
     order by so.created_at desc
   `);
 }
@@ -480,6 +493,8 @@ export async function getSalesOrderDetail(id: string): Promise<SalesOrderDetail 
       customerName: partners.displayName,
       sourceLocationId: salesOrders.sourceLocationId,
       customerReference: salesOrders.customerReference,
+      fsNumber: salesOrders.fsNumber,
+      paymentTerm: salesOrders.paymentTerm,
       status: sql<string>`${salesOrders.status}::text`,
       orderDate: sql<string>`${salesOrders.orderDate}::text`,
       validUntil: sql<string | null>`${salesOrders.validUntil}::text`,
@@ -488,6 +503,31 @@ export async function getSalesOrderDetail(id: string): Promise<SalesOrderDetail 
       subtotalMinor: salesOrders.subtotalMinor,
       taxAmountMinor: salesOrders.taxAmountMinor,
       totalMinor: salesOrders.totalMinor,
+      paidMinor: sql<number>`
+        coalesce((
+          select sum(pa.amount_minor)
+          from payment_allocations pa
+          inner join payments p on p.id = pa.payment_id
+          where pa.sales_order_id = ${salesOrders.id}
+            and pa.deleted_at is null
+            and p.deleted_at is null
+            and p.status = 'posted'
+        ), 0)::bigint
+      `,
+      residualAmountMinor: sql<number>`
+        greatest(
+          ${salesOrders.totalMinor} - coalesce((
+            select sum(pa.amount_minor)
+            from payment_allocations pa
+            inner join payments p on p.id = pa.payment_id
+            where pa.sales_order_id = ${salesOrders.id}
+              and pa.deleted_at is null
+              and p.deleted_at is null
+              and p.status = 'posted'
+          ), 0),
+          0
+        )::bigint
+      `,
       reserveOnConfirm: salesOrders.reserveOnConfirm,
       notes: salesOrders.notes,
     })
@@ -535,11 +575,9 @@ export async function getSalesOrderDetail(id: string): Promise<SalesOrderDetail 
       select count(distinct p.id)::int as "count"
       from payments p
       inner join payment_allocations pa on pa.payment_id = p.id
-      inner join customer_invoices ci on ci.id = pa.customer_invoice_id
-      where ci.sales_order_id = ${id}
+      where pa.sales_order_id = ${id}
         and p.deleted_at is null
         and pa.deleted_at is null
-        and ci.deleted_at is null
     `),
     db.select({ count: sql<number>`count(*)::int` }).from(stockMovements).where(and(eq(stockMovements.sourceType, "sales_return"), eq(stockMovements.sourceId, id), isNull(stockMovements.deletedAt))),
   ]);

@@ -13,9 +13,12 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { ManyToManyTags } from "@/components/ui/many-to-many-tags";
+import { ManyToOneCreateSelect } from "@/components/ui/many-to-one-create-select";
 import { Notebook } from "@/components/ui/notebook";
 import { cn } from "@/lib/utils";
+import { createCustomerFromSales } from "@/app/admin/sales/actions";
 import type { SalesFormOption, SalesOrderDetail, SalesTaxOption } from "@/server/sales/types";
+import { useAppStore } from "@/stores/app-store";
 
 const inputClass = "h-10 rounded-md border border-input bg-background px-3 text-sm";
 const tableInputClass = "h-9 w-full rounded-md border border-input bg-background px-2 text-sm";
@@ -114,6 +117,10 @@ export function SalesOrderForm({
   submitLabel?: string;
 }) {
   const [editingLineKey, setEditingLineKey] = useState<string | null>(null);
+  const [paymentTerm, setPaymentTerm] = useState<"cash" | "credit">(order?.paymentTerm ?? "credit");
+  const selectedLocationId = useAppStore((state) => state.selectedLocationId);
+  const setSelectedLocationId = useAppStore((state) => state.setSelectedLocationId);
+  const [sourceLocationId, setSourceLocationId] = useState(order?.sourceLocationId ?? "");
   const [lines, setLines] = useState<SalesLineDraft[]>(() =>
     order?.lines.length
       ? order.lines.map((line) => ({
@@ -185,42 +192,80 @@ export function SalesOrderForm({
   }
 
   const editingLine = lines.find((line) => line.key === editingLineKey);
+  const selectedShopId = !order && selectedLocationId && locations.some((location) => location.id === selectedLocationId)
+    ? selectedLocationId
+    : "";
+  const effectiveSourceLocationId = sourceLocationId || selectedShopId;
+
+  function changeSourceLocation(locationId: string) {
+    setSourceLocationId(locationId);
+
+    if (!order) {
+      setSelectedLocationId(locationId || null);
+    }
+  }
 
   return (
     <form action={action} className="grid gap-5 rounded-lg border border-border bg-card p-5">
       {order ? <input type="hidden" name="salesOrderId" value={order.id} /> : null}
       {error ? <p className="rounded-md border border-destructive/30 p-3 text-sm text-destructive">{error}</p> : null}
 
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-4 md:grid-cols-3">
+        <ManyToOneCreateSelect
+          name="customerId"
+          label="Customer"
+          options={customers}
+          defaultValue={order?.customerId}
+          placeholder="Search customer"
+          onCreate={createCustomerFromSales}
+        />
         <label className="flex flex-col gap-1 text-sm font-medium">
-          Customer
-          <select name="customerId" required defaultValue={order?.customerId ?? ""} className={inputClass}>
-            <option value="">Select customer</option>
-            {customers.map((customer) => (
-              <option key={customer.id} value={customer.id}>
-                {customer.code} / {customer.name}
-              </option>
-            ))}
-          </select>
+          Reference
+          <input
+            name="customerReference"
+            defaultValue={order?.customerReference ?? ""}
+            placeholder="Auto"
+            readOnly
+            className={cn(inputClass, "bg-muted text-muted-foreground")}
+          />
         </label>
         <label className="flex flex-col gap-1 text-sm font-medium">
-          Customer reference
-          <input name="customerReference" defaultValue={order?.customerReference ?? ""} className={inputClass} />
+          FS Number
+          <input name="fsNumber" defaultValue={order?.fsNumber ?? ""} className={inputClass} />
         </label>
       </div>
 
       <div className="grid gap-4 md:grid-cols-3">
         <label className="flex flex-col gap-1 text-sm font-medium">
-          Valid until
-          <input name="validUntil" type="date" defaultValue={order?.validUntil ?? ""} className={inputClass} />
+          Payment Term
+          <select
+            name="paymentTerm"
+            value={paymentTerm}
+            onChange={(event) => setPaymentTerm(event.target.value as "cash" | "credit")}
+            className={inputClass}
+          >
+            <option value="cash">Cash</option>
+            <option value="credit">Credit</option>
+          </select>
         </label>
         <label className="flex flex-col gap-1 text-sm font-medium">
-          Expected delivery
-          <input name="expectedDeliveryDate" type="date" defaultValue={order?.expectedDeliveryDate ?? ""} className={inputClass} />
+          Order Date
+          <input name="orderDate" type="date" defaultValue={order?.orderDate ?? ""} className={inputClass} />
         </label>
+        {paymentTerm === "credit" ? (
+          <label className="flex flex-col gap-1 text-sm font-medium">
+            Last Payment Date
+            <input name="validUntil" type="date" defaultValue={order?.validUntil ?? ""} className={inputClass} />
+          </label>
+        ) : null}
         <label className="flex flex-col gap-1 text-sm font-medium">
           Source location
-          <select name="sourceLocationId" defaultValue={order?.sourceLocationId ?? ""} className={inputClass}>
+          <select
+            name="sourceLocationId"
+            value={effectiveSourceLocationId}
+            onChange={(event) => changeSourceLocation(event.target.value)}
+            className={inputClass}
+          >
             <option value="">Select when delivering/reserving</option>
             {locations.map((location) => (
               <option key={location.id} value={location.id}>
@@ -235,7 +280,7 @@ export function SalesOrderForm({
         <input
           type="checkbox"
           name="reserveOnConfirm"
-          defaultChecked={order?.reserveOnConfirm ?? false}
+          defaultChecked={order?.reserveOnConfirm ?? true}
           className="size-4 rounded border-input"
         />
         Reserve stock when quotation is confirmed

@@ -7,6 +7,8 @@ export type SalesOrderListRow = {
   id: string;
   orderNo: string;
   customerReference: string | null;
+  fsNumber: string | null;
+  paymentTerm: "cash" | "credit";
   customerName: string;
   status: string;
   orderDate: string;
@@ -15,6 +17,8 @@ export type SalesOrderListRow = {
   sourceLocationCode: string | null;
   currencyCode: string;
   totalMinor: number;
+  paidMinor: number;
+  residualAmountMinor: number;
   lineCount: number;
   quantityOrdered: string;
   quantityDelivered: string;
@@ -48,6 +52,8 @@ export type SalesOrderDetail = {
   customerName: string;
   sourceLocationId: string | null;
   customerReference: string | null;
+  fsNumber: string | null;
+  paymentTerm: "cash" | "credit";
   status: string;
   orderDate: string;
   validUntil: string | null;
@@ -56,6 +62,8 @@ export type SalesOrderDetail = {
   subtotalMinor: number;
   taxAmountMinor: number;
   totalMinor: number;
+  paidMinor: number;
+  residualAmountMinor: number;
   reserveOnConfirm: boolean;
   notes: string | null;
   deliveryCount: number;

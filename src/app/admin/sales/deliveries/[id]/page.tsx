@@ -1,14 +1,16 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { cancelDelivery, createCustomerInvoiceFromDelivery, postDelivery } from "@/app/admin/sales/actions";
+import { cancelDelivery, postDelivery, updateDeliverySourceLocation } from "@/app/admin/sales/actions";
+import { DeliverySourceLocationAutosave } from "@/app/admin/sales/deliveries/[id]/delivery-source-location-autosave";
 import { DeliveryOperationsForm } from "@/app/admin/sales/deliveries/[id]/delivery-operations-form";
 import { Alert } from "@/components/ui/alert";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { Notebook } from "@/components/ui/notebook";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
 import { requirePermission } from "@/server/auth/session";
-import { displaySalesMoney, getDeliveryDetail } from "@/server/sales/sales";
+import { displaySalesMoney, getDeliveryDetail, getSalesFormOptions } from "@/server/sales/sales";
+import type { SalesFormOption } from "@/server/sales/types";
 
 export const dynamic = "force-dynamic";
 
@@ -25,7 +27,7 @@ export default async function DeliveryDetailPage({ params, searchParams }: Deliv
   await requirePermission("sales:orders:create");
 
   const [{ id }, query] = await Promise.all([params, searchParams]);
-  const delivery = await getDeliveryDetail(id);
+  const [delivery, options] = await Promise.all([getDeliveryDetail(id), getSalesFormOptions()]);
 
   if (!delivery) {
     notFound();
@@ -69,19 +71,13 @@ export default async function DeliveryDetailPage({ params, searchParams }: Deliv
               <Button type="submit" variant="outline">Cancel</Button>
             </form>
           ) : null}
-          {delivery.status === "posted" ? (
-            <form action={createCustomerInvoiceFromDelivery}>
-              <input type="hidden" name="deliveryId" value={delivery.id} />
-              <Button type="submit">Create Invoice</Button>
-            </form>
-          ) : null}
         </div>
       </div>
 
       <section className="rounded-lg border border-border bg-card p-5">
         <div className="mb-5 grid gap-4 md:grid-cols-4">
           <Info label="Customer" value={delivery.customerName} />
-          <Info label="Source Location" value={delivery.sourceLocationCode} />
+          <SourceLocationInfo delivery={delivery} locations={options.locations} isDraft={isDraft} />
           <Info label="Destination Location" value={delivery.destinationLocationCode ?? "CUSTOMERS"} />
           <Info label="Delivery Date" value={delivery.deliveryDate} />
           <Info label="Posted At" value={delivery.postedAt ?? "-"} />
@@ -114,5 +110,28 @@ function Info({ label, value }: { label: string; value: string }) {
       <p className="text-xs font-medium uppercase text-muted-foreground">{label}</p>
       <p className="mt-1 text-sm font-medium">{value}</p>
     </div>
+  );
+}
+
+function SourceLocationInfo({
+  delivery,
+  locations,
+  isDraft,
+}: {
+  delivery: NonNullable<Awaited<ReturnType<typeof getDeliveryDetail>>>;
+  locations: SalesFormOption[];
+  isDraft: boolean;
+}) {
+  if (!isDraft) {
+    return <Info label="Source Location" value={delivery.sourceLocationCode} />;
+  }
+
+  return (
+    <DeliverySourceLocationAutosave
+      deliveryId={delivery.id}
+      sourceLocationId={delivery.sourceLocationId}
+      locations={locations}
+      action={updateDeliverySourceLocation}
+    />
   );
 }

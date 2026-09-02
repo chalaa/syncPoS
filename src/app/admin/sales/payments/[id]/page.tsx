@@ -35,6 +35,7 @@ export default async function CustomerPaymentPage({ params, searchParams }: Cust
   }
 
   const customerInvoiceId = payment.allocations.find((allocation) => allocation.customerInvoiceId)?.customerInvoiceId;
+  const salesOrderId = payment.allocations.find((allocation) => allocation.salesOrderId)?.salesOrderId;
 
   return (
     <PageShell>
@@ -80,6 +81,20 @@ export default async function CustomerPaymentPage({ params, searchParams }: Cust
       {query.notice ? <Alert kind="success">{query.notice}</Alert> : null}
       {query.error ? <Alert kind="error">{query.error}</Alert> : null}
 
+      {salesOrderId ? (
+        <div className="mb-4 flex flex-wrap gap-2">
+          <Link
+            href={`/admin/sales/${salesOrderId}`}
+            className="rounded-md border border-border bg-card px-4 py-3 text-sm hover:bg-accent"
+          >
+            <span className="block text-base font-semibold">
+              {payment.allocations.find((allocation) => allocation.salesOrderId === salesOrderId)?.salesOrderNo ?? "Sales Order"}
+            </span>
+            <span className="text-muted-foreground">Sales Order</span>
+          </Link>
+        </div>
+      ) : null}
+
       <section className="rounded-lg border border-border bg-card p-5">
         <div className="mb-5 grid gap-4 md:grid-cols-4">
           <Info label="Status" value={statusLabel(payment.status)} />
@@ -99,6 +114,10 @@ export default async function CustomerPaymentPage({ params, searchParams }: Cust
               <Link href={`/admin/sales/invoices/${customerInvoiceId}`} className="mt-1 block text-sm font-medium text-primary underline-offset-4 hover:underline">
                 Open customer invoice
               </Link>
+            ) : salesOrderId ? (
+              <Link href={`/admin/sales/${salesOrderId}`} className="mt-1 block text-sm font-medium text-primary underline-offset-4 hover:underline">
+                Open sales order
+              </Link>
             ) : (
               <p className="mt-1 text-sm font-medium">-</p>
             )}
@@ -109,7 +128,7 @@ export default async function CustomerPaymentPage({ params, searchParams }: Cust
           <table className="w-full min-w-[720px] text-left text-sm">
             <thead className="text-xs uppercase text-muted-foreground">
               <tr className="border-b border-border">
-                <th className="px-3 py-2">Invoice</th>
+                <th className="px-3 py-2">Document</th>
                 <th className="px-3 py-2 text-right">Allocated</th>
               </tr>
             </thead>
@@ -120,6 +139,10 @@ export default async function CustomerPaymentPage({ params, searchParams }: Cust
                     {allocation.customerInvoiceId ? (
                       <Link href={`/admin/sales/invoices/${allocation.customerInvoiceId}`} className="font-medium text-primary underline-offset-4 hover:underline">
                         {allocation.invoiceNo}
+                      </Link>
+                    ) : allocation.salesOrderId ? (
+                      <Link href={`/admin/sales/${allocation.salesOrderId}`} className="font-medium text-primary underline-offset-4 hover:underline">
+                        {allocation.salesOrderNo}
                       </Link>
                     ) : (
                       "-"

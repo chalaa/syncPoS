@@ -11,6 +11,7 @@ import { minorToDisplay } from "@/lib/catalog-utils";
 import { requirePermission } from "@/server/auth/session";
 import { getDefaultCompany, majorToMinor, uniqueViolationMessage } from "@/server/catalog/products";
 import { db } from "@/server/db/client";
+import { generateCompanyCode } from "@/server/db/code-generator";
 import {
   auditLogs,
   customerInvoiceLines,
@@ -22,6 +23,7 @@ import {
   paymentAllocations,
   paymentMethods,
   payments,
+  partnerContacts,
   partners,
   locations,
   productLots,
@@ -39,17 +41,27 @@ import {
   warrantyRegistrations,
 } from "@/server/db/schema";
 import { getOrCreatePartnerStockLocation } from "@/server/inventory/partner-locations";
-import { getCustomerInvoicePaymentSummary } from "@/server/payments/payments";
+import { getCustomerInvoicePaymentSummary, getSalesOrderPaymentSummary } from "@/server/payments/payments";
 
 const salesOrderHeaderSchema = z.object({
   salesOrderId: z.string().uuid().optional(),
   customerId: z.string().uuid(),
   sourceLocationId: z.string().uuid().or(z.literal("")).transform((value) => value || null),
   customerReference: z.string().trim().max(80).optional(),
+  fsNumber: z.string().trim().max(80).optional(),
+  paymentTerm: z.enum(["cash", "credit"]).default("credit"),
+  orderDate: z.string().trim().optional(),
   validUntil: z.string().trim().optional(),
-  expectedDeliveryDate: z.string().trim().optional(),
   reserveOnConfirm: z.boolean(),
   notes: z.string().trim().optional(),
+});
+
+const salesCustomerCreateSchema = z.object({
+  displayName: z.string().trim().min(1, "Display name is required").max(200),
+  legalName: z.string().trim().max(200).optional(),
+  tin: z.string().trim().max(30).optional(),
+  phone: z.string().trim().max(40).optional(),
+  email: z.string().trim().email("Email is invalid").max(160).or(z.literal("")).optional(),
 });
 
 const salesOrderLineSchema = z.object({
@@ -73,6 +85,11 @@ const postDeliverySchema = z.object({
   deliveryId: z.string().uuid(),
 });
 
+const updateDeliverySourceLocationSchema = z.object({
+  deliveryId: z.string().uuid(),
+  sourceLocationId: z.string().uuid(),
+});
+
 const cancelDeliverySchema = z.object({
   deliveryId: z.string().uuid(),
 });
@@ -86,15 +103,22 @@ const invoiceStatusSchema = z.object({
   customerInvoiceId: z.string().uuid(),
 });
 
-const registerCustomerPaymentSchema = z.object({
-  customerInvoiceId: z.string().uuid(),
+const optionalUuid = z.string().uuid().or(z.literal("")).optional().transform((value) => value || undefined);
+
+const customerPaymentFormSchema = z.object({
+  customerInvoiceId: optionalUuid,
+  salesOrderId: optionalUuid,
   paymentAccountId: z.string().uuid(),
   amount: z.string().trim(),
   reference: z.string().trim().max(120).optional(),
   notes: z.string().trim().optional(),
 });
 
-const updateCustomerPaymentSchema = registerCustomerPaymentSchema.omit({ customerInvoiceId: true }).extend({
+const registerCustomerPaymentSchema = customerPaymentFormSchema.refine((data) => Boolean(data.customerInvoiceId) !== Boolean(data.salesOrderId), {
+  message: "Select either a customer invoice or sales order for payment.",
+});
+
+const updateCustomerPaymentSchema = customerPaymentFormSchema.omit({ customerInvoiceId: true, salesOrderId: true }).extend({
   paymentId: z.string().uuid(),
 });
 
@@ -136,6 +160,80 @@ function formatMoneyForError(valueMinor: number, currencyCode: string) {
 
 function redirectWithError(path: string, message: string): never {
   redirect(`${path}?error=${encodeURIComponent(message)}`);
+}
+
+export async function createCustomerFromSales(input: unknown) {
+  const user = await requirePermission("sales:orders:create");
+
+  const parsed = salesCustomerCreateSchema.safeParse(input);
+  if (!parsed.success) {
+    throw new Error(parsed.error.issues[0]?.message ?? "Invalid customer.");
+  }
+
+  const company = await getDefaultCompany();
+
+  try {
+    const customer = await db.transaction(async (tx) => {
+      const code = await generateCompanyCode(tx, {
+        companyId: company.id,
+        table: "partners",
+        prefix: "CUST",
+      });
+
+      const [created] = await tx
+        .insert(partners)
+        .values({
+          companyId: company.id,
+          code,
+          displayName: parsed.data.displayName,
+          legalName: parsed.data.legalName || parsed.data.displayName,
+          tin: parsed.data.tin || null,
+          isCustomer: true,
+          isSupplier: false,
+          creditLimitMinor: 0,
+          currencyCode: company.baseCurrencyCode,
+          status: "active",
+        })
+        .returning({
+          id: partners.id,
+          code: partners.code,
+          name: partners.displayName,
+        });
+
+      if (!created) {
+        throw new Error("Could not create customer.");
+      }
+
+      if (parsed.data.phone || parsed.data.email) {
+        await tx.insert(partnerContacts).values({
+          partnerId: created.id,
+          fullName: parsed.data.displayName,
+          phone: parsed.data.phone || null,
+          email: parsed.data.email || null,
+          isPrimary: true,
+        });
+      }
+
+      await tx.insert(auditLogs).values({
+        companyId: company.id,
+        actorUserId: user.id,
+        action: "customer.quick_create_from_sales",
+        entityType: "partner",
+        entityId: created.id,
+        severity: "info",
+        metadata: { code: created.code, displayName: created.name },
+      });
+
+      return created;
+    });
+
+    revalidatePath("/admin/sales");
+    revalidatePath("/admin/partners");
+
+    return customer;
+  } catch (error) {
+    throw new Error(uniqueViolationMessage(error, "Could not create customer."));
+  }
 }
 
 function parseTaxIds(value: string) {
@@ -187,8 +285,10 @@ function parseSalesOrderForm(formData: FormData, errorPath: string) {
     customerId: formValue(formData, "customerId"),
     sourceLocationId: formValue(formData, "sourceLocationId"),
     customerReference: formValue(formData, "customerReference"),
+    fsNumber: formValue(formData, "fsNumber"),
+    paymentTerm: formValue(formData, "paymentTerm") || "credit",
+    orderDate: formValue(formData, "orderDate"),
     validUntil: formValue(formData, "validUntil"),
-    expectedDeliveryDate: formValue(formData, "expectedDeliveryDate"),
     reserveOnConfirm: checkboxValue(formData, "reserveOnConfirm"),
     notes: formValue(formData, "notes"),
   });
@@ -379,6 +479,7 @@ export async function createSalesOrder(formData: FormData) {
   const { header, lines } = parseSalesOrderForm(formData, "/admin/sales/new");
   const company = await getDefaultCompany();
   const orderNo = documentNo("SO");
+  const reference = documentNo("REF");
   let createdOrderId: string | undefined;
 
   try {
@@ -401,10 +502,13 @@ export async function createSalesOrder(formData: FormData) {
           customerId: customer.id,
           sourceLocationId: header.sourceLocationId,
           orderNo,
-          customerReference: header.customerReference || null,
+          customerReference: header.customerReference || reference,
+          fsNumber: header.fsNumber || null,
+          paymentTerm: header.paymentTerm,
           status: "quotation",
-          validUntil: header.validUntil || null,
-          expectedDeliveryDate: header.expectedDeliveryDate || null,
+          orderDate: header.orderDate || dateOnly(new Date()),
+          validUntil: header.paymentTerm === "credit" ? header.validUntil || null : null,
+          expectedDeliveryDate: null,
           currencyCode: prepared.currencyCode,
           subtotalMinor: prepared.subtotalMinor,
           taxAmountMinor: prepared.taxAmountMinor,
@@ -528,9 +632,11 @@ export async function updateSalesOrder(formData: FormData) {
         .set({
           customerId: customer.id,
           sourceLocationId: header.sourceLocationId,
-          customerReference: header.customerReference || null,
-          validUntil: header.validUntil || null,
-          expectedDeliveryDate: header.expectedDeliveryDate || null,
+          fsNumber: header.fsNumber || null,
+          paymentTerm: header.paymentTerm,
+          orderDate: header.orderDate || dateOnly(new Date()),
+          validUntil: header.paymentTerm === "credit" ? header.validUntil || null : null,
+          expectedDeliveryDate: null,
           currencyCode: prepared.currencyCode,
           subtotalMinor: prepared.subtotalMinor,
           taxAmountMinor: prepared.taxAmountMinor,
@@ -634,17 +740,26 @@ export async function confirmSalesOrder(formData: FormData) {
       const lines = await tx
         .select({
           id: salesOrderLines.id,
+          lineNo: salesOrderLines.lineNo,
           productId: salesOrderLines.productId,
           productName: products.name,
           sku: products.sku,
           quantityOrdered: salesOrderLines.quantityOrdered,
+          quantityDelivered: salesOrderLines.quantityDelivered,
+          unitId: salesOrderLines.unitId,
+          currencyCode: salesOrderLines.currencyCode,
         })
         .from(salesOrderLines)
         .innerJoin(products, eq(salesOrderLines.productId, products.id))
-        .where(and(eq(salesOrderLines.salesOrderId, order.id), isNull(salesOrderLines.deletedAt)));
+        .where(and(eq(salesOrderLines.salesOrderId, order.id), isNull(salesOrderLines.deletedAt)))
+        .orderBy(salesOrderLines.lineNo);
 
       if (lines.length === 0) {
         throw new Error("Sales order has no lines.");
+      }
+
+      if (!order.sourceLocationId) {
+        throw new Error("Select a source location before confirming the quotation.");
       }
 
       const [creditSummary] = await tx.execute<{
@@ -818,6 +933,48 @@ export async function confirmSalesOrder(formData: FormData) {
           updatedAt: sql`now()`,
         })
         .where(eq(salesOrders.id, order.id));
+
+      const [existingDelivery] = await tx
+        .select({ id: deliveries.id })
+        .from(deliveries)
+        .where(and(eq(deliveries.salesOrderId, order.id), isNull(deliveries.deletedAt)))
+        .limit(1);
+
+      if (!existingDelivery) {
+        const deliveryNo = documentNo("DO");
+        const [delivery] = await tx
+          .insert(deliveries)
+          .values({
+            companyId: company.id,
+            salesOrderId: order.id,
+            customerId: order.customerId,
+            sourceLocationId: order.sourceLocationId,
+            deliveryNo,
+            status: "draft",
+            notes: `Draft delivery generated from ${order.orderNo}.`,
+          })
+          .returning({ id: deliveries.id });
+
+        const deliveryLineValues = lines
+          .map((line) => {
+            const quantityRemaining = Number(line.quantityOrdered) - Number(line.quantityDelivered);
+
+            return {
+              deliveryId: delivery.id,
+              salesOrderLineId: line.id,
+              lineNo: line.lineNo,
+              productId: line.productId,
+              unitId: line.unitId,
+              quantityDelivered: String(quantityRemaining),
+              currencyCode: line.currencyCode,
+            };
+          })
+          .filter((line) => Number(line.quantityDelivered) > 0);
+
+        if (deliveryLineValues.length > 0) {
+          await tx.insert(deliveryLines).values(deliveryLineValues);
+        }
+      }
 
       await tx.insert(auditLogs).values({
         companyId: company.id,
@@ -1431,14 +1588,23 @@ export async function postDelivery(formData: FormData) {
             .where(eq(salesOrderLines.id, line.salesOrderLineId));
 
           if (reservedQuantity > 0) {
+            const reservationUpdate =
+              nextLineReserved <= 0
+                ? {
+                    status: "fulfilled" as const,
+                    fulfilledAt: new Date(),
+                    updatedAt: sql`now()`,
+                  }
+                : {
+                    quantity: String(nextLineReserved),
+                    status: "active" as const,
+                    fulfilledAt: null,
+                    updatedAt: sql`now()`,
+                  };
+
             await tx
               .update(stockReservations)
-              .set({
-                quantity: String(nextLineReserved),
-                status: nextLineReserved <= 0 ? "fulfilled" : "active",
-                fulfilledAt: nextLineReserved <= 0 ? new Date() : null,
-                updatedAt: sql`now()`,
-              })
+              .set(reservationUpdate)
               .where(
                 and(
                   eq(stockReservations.sourceType, "sales_order_line"),
@@ -1499,6 +1665,111 @@ export async function postDelivery(formData: FormData) {
   }
   revalidatePath(`/admin/sales/deliveries/${parsed.data.deliveryId}`);
   redirect(`/admin/sales/deliveries/${parsed.data.deliveryId}?notice=${encodeURIComponent("Delivery posted")}`);
+}
+
+export async function updateDeliverySourceLocation(formData: FormData) {
+  const user = await requirePermission("sales:orders:create");
+  const parsed = updateDeliverySourceLocationSchema.safeParse({
+    deliveryId: formValue(formData, "deliveryId"),
+    sourceLocationId: formValue(formData, "sourceLocationId"),
+  });
+
+  if (!parsed.success) {
+    redirectWithError("/admin/sales?view=deliveries", "Delivery and source location are required.");
+  }
+
+  const company = await getDefaultCompany();
+  let salesOrderId: string | undefined;
+
+  try {
+    await db.transaction(async (tx) => {
+      const [delivery] = await tx
+        .select({
+          id: deliveries.id,
+          deliveryNo: deliveries.deliveryNo,
+          status: deliveries.status,
+          salesOrderId: deliveries.salesOrderId,
+          sourceLocationId: deliveries.sourceLocationId,
+        })
+        .from(deliveries)
+        .where(and(eq(deliveries.id, parsed.data.deliveryId), eq(deliveries.companyId, company.id), isNull(deliveries.deletedAt)))
+        .limit(1);
+
+      if (!delivery) {
+        throw new Error("Delivery does not exist.");
+      }
+
+      salesOrderId = delivery.salesOrderId;
+
+      if (delivery.status !== "draft") {
+        throw new Error("Only draft deliveries can change source location.");
+      }
+
+      const [sourceLocation] = await tx
+        .select({ id: locations.id })
+        .from(locations)
+        .where(
+          and(
+            eq(locations.id, parsed.data.sourceLocationId),
+            eq(locations.companyId, company.id),
+            eq(locations.isActive, true),
+            isNull(locations.deletedAt),
+            sql`${locations.locationType} in ('warehouse', 'display_shop')`,
+          ),
+        )
+        .limit(1);
+
+      if (!sourceLocation) {
+        throw new Error("Source location is invalid.");
+      }
+
+      if (delivery.sourceLocationId === sourceLocation.id) {
+        return;
+      }
+
+      await tx
+        .update(deliveries)
+        .set({
+          sourceLocationId: sourceLocation.id,
+          updatedAt: sql`now()`,
+        })
+        .where(eq(deliveries.id, delivery.id));
+
+      await tx
+        .update(deliveryLines)
+        .set({
+          serialNo: null,
+          productSerialId: null,
+          lotNo: null,
+          productLotId: null,
+          updatedAt: sql`now()`,
+        })
+        .where(eq(deliveryLines.deliveryId, delivery.id));
+
+      await tx.insert(auditLogs).values({
+        companyId: company.id,
+        actorUserId: user.id,
+        action: "delivery.source_location.update",
+        entityType: "delivery",
+        entityId: delivery.id,
+        severity: "info",
+        metadata: {
+          deliveryNo: delivery.deliveryNo,
+          previousSourceLocationId: delivery.sourceLocationId,
+          sourceLocationId: sourceLocation.id,
+        },
+      });
+    });
+  } catch (error) {
+    redirectWithError(`/admin/sales/deliveries/${parsed.data.deliveryId}`, error instanceof Error ? error.message : "Could not update source location.");
+  }
+
+  if (salesOrderId) {
+    revalidatePath(`/admin/sales/${salesOrderId}`);
+  }
+  revalidatePath(`/admin/sales/deliveries/${parsed.data.deliveryId}`);
+  revalidatePath("/admin/sales?view=deliveries");
+  redirect(`/admin/sales/deliveries/${parsed.data.deliveryId}?notice=${encodeURIComponent("Source location updated")}`);
 }
 
 export async function cancelDelivery(formData: FormData) {
@@ -2071,6 +2342,7 @@ export async function registerCustomerPayment(formData: FormData) {
   const user = await requirePermission("sales:orders:create");
   const parsed = registerCustomerPaymentSchema.safeParse({
     customerInvoiceId: formValue(formData, "customerInvoiceId"),
+    salesOrderId: formValue(formData, "salesOrderId"),
     paymentAccountId: formValue(formData, "paymentAccountId"),
     amount: formValue(formData, "amount"),
     reference: formValue(formData, "reference"),
@@ -2078,12 +2350,14 @@ export async function registerCustomerPayment(formData: FormData) {
   });
 
   if (!parsed.success) {
-    redirectWithError("/admin/sales?view=invoices", parsed.error.issues[0]?.message ?? "Invalid customer payment.");
+    redirectWithError("/admin/sales?view=payments", parsed.error.issues[0]?.message ?? "Invalid customer payment.");
   }
 
   const amountMinor = majorToMinor(parsed.data.amount);
+  const returnPath = parsed.data.salesOrderId ? `/admin/sales/${parsed.data.salesOrderId}` : `/admin/sales/invoices/${parsed.data.customerInvoiceId}`;
+
   if (amountMinor <= 0) {
-    redirectWithError(`/admin/sales/invoices/${parsed.data.customerInvoiceId}`, "Payment amount must be greater than zero.");
+    redirectWithError(returnPath, "Payment amount must be greater than zero.");
   }
 
   const company = await getDefaultCompany();
@@ -2091,29 +2365,69 @@ export async function registerCustomerPayment(formData: FormData) {
 
   try {
     await db.transaction(async (tx) => {
-      const [invoice] = await tx
-        .select({
-          id: customerInvoices.id,
-          invoiceNo: customerInvoices.invoiceNo,
-          customerId: customerInvoices.customerId,
-          status: customerInvoices.status,
-          totalMinor: customerInvoices.totalMinor,
-          currencyCode: customerInvoices.currencyCode,
-          paymentStatus: customerInvoices.paymentStatus,
-        })
-        .from(customerInvoices)
-        .where(and(eq(customerInvoices.id, parsed.data.customerInvoiceId), eq(customerInvoices.companyId, company.id), isNull(customerInvoices.deletedAt)))
-        .limit(1);
+      const target = parsed.data.salesOrderId
+        ? await (async () => {
+            const [order] = await tx
+              .select({
+                id: salesOrders.id,
+                orderNo: salesOrders.orderNo,
+                customerId: salesOrders.customerId,
+                status: salesOrders.status,
+                totalMinor: salesOrders.totalMinor,
+                currencyCode: salesOrders.currencyCode,
+              })
+              .from(salesOrders)
+              .where(and(eq(salesOrders.id, parsed.data.salesOrderId!), eq(salesOrders.companyId, company.id), isNull(salesOrders.deletedAt)))
+              .limit(1);
 
-      if (!invoice) {
+            if (!order) {
+              throw new Error("Sales order does not exist.");
+            }
+
+            if (order.status === "quotation" || order.status === "cancelled") {
+              throw new Error("Only confirmed sales orders can be paid.");
+            }
+
+            const summary = await getSalesOrderPaymentSummary(order.id);
+            if (summary.paymentStatus === "paid") {
+              throw new Error("Sales order is already paid.");
+            }
+
+            return {
+              customerId: order.customerId,
+              currencyCode: order.currencyCode,
+              residualAmountMinor: summary.residualAmountMinor,
+              salesOrderId: order.id,
+              customerInvoiceId: null as string | null,
+            };
+          })()
+        : null;
+
+      const [invoice] = target
+        ? []
+        : await tx
+            .select({
+              id: customerInvoices.id,
+              invoiceNo: customerInvoices.invoiceNo,
+              customerId: customerInvoices.customerId,
+              status: customerInvoices.status,
+              totalMinor: customerInvoices.totalMinor,
+              currencyCode: customerInvoices.currencyCode,
+              paymentStatus: customerInvoices.paymentStatus,
+            })
+            .from(customerInvoices)
+            .where(and(eq(customerInvoices.id, parsed.data.customerInvoiceId!), eq(customerInvoices.companyId, company.id), isNull(customerInvoices.deletedAt)))
+            .limit(1);
+
+      if (!target && !invoice) {
         throw new Error("Customer invoice does not exist.");
       }
 
-      if (invoice.status !== "posted") {
+      if (!target && invoice.status !== "posted") {
         throw new Error("Only posted customer invoices can be paid.");
       }
 
-      if (invoice.paymentStatus === "paid") {
+      if (!target && invoice.paymentStatus === "paid") {
         throw new Error("Customer invoice is already paid.");
       }
 
@@ -2143,15 +2457,19 @@ export async function registerCustomerPayment(formData: FormData) {
         throw new Error("Select an active inbound payment account.");
       }
 
-      if (account.currencyCode !== invoice.currencyCode) {
-        throw new Error("Payment account currency must match the customer invoice.");
+      const currencyCode = target?.currencyCode ?? invoice.currencyCode;
+      const customerId = target?.customerId ?? invoice.customerId;
+      const residualAmountMinor = target?.residualAmountMinor;
+
+      if (account.currencyCode !== currencyCode) {
+        throw new Error("Payment account currency must match the sale currency.");
       }
 
       if (account.requiresReference && !parsed.data.reference) {
         throw new Error("This payment method requires a reference.");
       }
 
-      const [summary] = await tx.execute<{ residualAmountMinor: number }>(sql`
+      const [summary] = target ? [{ residualAmountMinor }] : await tx.execute<{ residualAmountMinor: number }>(sql`
         select greatest(
           ${invoice.totalMinor} - coalesce(sum(pa.amount_minor) filter (
             where p.status = 'posted'
@@ -2168,21 +2486,21 @@ export async function registerCustomerPayment(formData: FormData) {
       `);
 
       if (amountMinor > (summary?.residualAmountMinor ?? 0)) {
-        throw new Error("Payment amount cannot exceed the customer invoice residual.");
+        throw new Error("Payment amount cannot exceed the unpaid sale balance.");
       }
 
       const [payment] = await tx
         .insert(payments)
         .values({
           companyId: company.id,
-          partnerId: invoice.customerId,
+          partnerId: customerId,
           paymentNo: documentNo("PAY-IN"),
           paymentType: "inbound",
           status: "draft",
           paymentMethodId: account.methodId,
           paymentAccountId: account.id,
           amountMinor,
-          currencyCode: invoice.currencyCode,
+          currencyCode,
           reference: parsed.data.reference || null,
           notes: parsed.data.notes || null,
         })
@@ -2191,7 +2509,8 @@ export async function registerCustomerPayment(formData: FormData) {
 
       await tx.insert(paymentAllocations).values({
         paymentId: payment.id,
-        customerInvoiceId: invoice.id,
+        customerInvoiceId: target ? null : invoice.id,
+        salesOrderId: target?.salesOrderId ?? null,
         amountMinor,
         notes: "Customer payment allocation.",
       });
@@ -2203,15 +2522,15 @@ export async function registerCustomerPayment(formData: FormData) {
         entityType: "payment",
         entityId: payment.id,
         severity: "info",
-        metadata: { paymentNo: payment.paymentNo, customerInvoiceId: invoice.id },
+        metadata: { paymentNo: payment.paymentNo, customerInvoiceId: target ? null : invoice.id, salesOrderId: target?.salesOrderId ?? null },
       });
     });
   } catch (error) {
-    redirectWithError(`/admin/sales/invoices/${parsed.data.customerInvoiceId}`, error instanceof Error ? error.message : "Could not register customer payment.");
+    redirectWithError(returnPath, error instanceof Error ? error.message : "Could not register customer payment.");
   }
 
   revalidatePath("/admin/sales");
-  revalidatePath(`/admin/sales/invoices/${parsed.data.customerInvoiceId}`);
+  revalidatePath(returnPath);
   redirect(`/admin/sales/payments/${paymentId}?notice=${encodeURIComponent("Customer payment registered as draft")}`);
 }
 
@@ -2224,6 +2543,7 @@ export async function postCustomerPayment(formData: FormData) {
   }
 
   let customerInvoiceId: string | undefined;
+  let salesOrderId: string | undefined;
   const company = await getDefaultCompany();
 
   try {
@@ -2255,19 +2575,58 @@ export async function postCustomerPayment(formData: FormData) {
       const allocations = await tx
         .select({
           customerInvoiceId: paymentAllocations.customerInvoiceId,
+          salesOrderId: paymentAllocations.salesOrderId,
           amountMinor: paymentAllocations.amountMinor,
         })
         .from(paymentAllocations)
         .where(and(eq(paymentAllocations.paymentId, payment.id), isNull(paymentAllocations.deletedAt)));
 
       const allocationTotal = allocations.reduce((sum, allocation) => sum + allocation.amountMinor, 0);
-      if (allocations.length !== 1 || !allocations[0]?.customerInvoiceId || allocationTotal !== payment.amountMinor) {
+      const allocation = allocations[0];
+      if (allocations.length !== 1 || (!allocation?.customerInvoiceId && !allocation?.salesOrderId) || allocationTotal !== payment.amountMinor) {
         throw new Error("Customer payment allocation must match payment amount.");
       }
 
-      customerInvoiceId = allocations[0].customerInvoiceId;
+      customerInvoiceId = allocation.customerInvoiceId ?? undefined;
+      salesOrderId = allocation.salesOrderId ?? undefined;
 
-      const [invoice] = await tx
+      if (salesOrderId) {
+        const [order] = await tx
+          .select({
+            id: salesOrders.id,
+            status: salesOrders.status,
+            totalMinor: salesOrders.totalMinor,
+          })
+          .from(salesOrders)
+          .where(and(eq(salesOrders.id, salesOrderId), eq(salesOrders.companyId, company.id), isNull(salesOrders.deletedAt)))
+          .limit(1);
+
+        if (!order || order.status === "quotation" || order.status === "cancelled") {
+          throw new Error("Sales order must be confirmed before payment posting.");
+        }
+
+        const [summary] = await tx.execute<{ residualAmountMinor: number }>(sql`
+          select greatest(
+            ${order.totalMinor} - coalesce(sum(pa.amount_minor) filter (
+              where p.status = 'posted'
+                and p.deleted_at is null
+                and pa.deleted_at is null
+            ), 0),
+            0
+          )::bigint as "residualAmountMinor"
+          from sales_orders so
+          left join payment_allocations pa on pa.sales_order_id = so.id
+          left join payments p on p.id = pa.payment_id
+          where so.id = ${order.id}
+          group by so.id
+        `);
+
+        if (payment.amountMinor > (summary?.residualAmountMinor ?? 0)) {
+          throw new Error("Payment amount cannot exceed the unpaid sale balance.");
+        }
+      }
+
+      const [invoice] = customerInvoiceId ? await tx
         .select({
           id: customerInvoices.id,
           status: customerInvoices.status,
@@ -2275,13 +2634,14 @@ export async function postCustomerPayment(formData: FormData) {
         })
         .from(customerInvoices)
         .where(and(eq(customerInvoices.id, customerInvoiceId), eq(customerInvoices.companyId, company.id), isNull(customerInvoices.deletedAt)))
-        .limit(1);
+        .limit(1) : [];
 
-      if (!invoice || invoice.status !== "posted") {
+      if (customerInvoiceId && (!invoice || invoice.status !== "posted")) {
         throw new Error("Customer invoice must be posted before payment posting.");
       }
 
-      const [summary] = await tx.execute<{ residualAmountMinor: number }>(sql`
+      if (customerInvoiceId && invoice) {
+        const [summary] = await tx.execute<{ residualAmountMinor: number }>(sql`
         select greatest(
           ${invoice.totalMinor} - coalesce(sum(pa.amount_minor) filter (
             where p.status = 'posted'
@@ -2297,8 +2657,9 @@ export async function postCustomerPayment(formData: FormData) {
         group by ci.id
       `);
 
-      if (payment.amountMinor > (summary?.residualAmountMinor ?? 0)) {
-        throw new Error("Payment amount cannot exceed the customer invoice residual.");
+        if (payment.amountMinor > (summary?.residualAmountMinor ?? 0)) {
+          throw new Error("Payment amount cannot exceed the customer invoice residual.");
+        }
       }
 
       await tx
@@ -2318,7 +2679,7 @@ export async function postCustomerPayment(formData: FormData) {
         entityType: "payment",
         entityId: payment.id,
         severity: "info",
-        metadata: { paymentNo: payment.paymentNo, customerInvoiceId },
+        metadata: { paymentNo: payment.paymentNo, customerInvoiceId, salesOrderId },
       });
     });
 
@@ -2333,6 +2694,9 @@ export async function postCustomerPayment(formData: FormData) {
   revalidatePath(`/admin/sales/payments/${parsed.data.paymentId}`);
   if (customerInvoiceId) {
     revalidatePath(`/admin/sales/invoices/${customerInvoiceId}`);
+  }
+  if (salesOrderId) {
+    revalidatePath(`/admin/sales/${salesOrderId}`);
   }
   redirect(`/admin/sales/payments/${parsed.data.paymentId}?notice=${encodeURIComponent("Customer payment posted")}`);
 }
@@ -2358,6 +2722,7 @@ export async function updateCustomerPayment(formData: FormData) {
 
   const company = await getDefaultCompany();
   let customerInvoiceId: string | undefined;
+  let salesOrderId: string | undefined;
 
   try {
     await db.transaction(async (tx) => {
@@ -2385,17 +2750,22 @@ export async function updateCustomerPayment(formData: FormData) {
       }
 
       const [allocation] = await tx
-        .select({ id: paymentAllocations.id, customerInvoiceId: paymentAllocations.customerInvoiceId })
+        .select({
+          id: paymentAllocations.id,
+          customerInvoiceId: paymentAllocations.customerInvoiceId,
+          salesOrderId: paymentAllocations.salesOrderId,
+        })
         .from(paymentAllocations)
         .where(and(eq(paymentAllocations.paymentId, payment.id), isNull(paymentAllocations.deletedAt)))
         .limit(1);
 
-      if (!allocation?.customerInvoiceId) {
+      if (!allocation?.customerInvoiceId && !allocation?.salesOrderId) {
         throw new Error("Customer payment allocation is missing.");
       }
-      customerInvoiceId = allocation.customerInvoiceId;
+      customerInvoiceId = allocation.customerInvoiceId ?? undefined;
+      salesOrderId = allocation.salesOrderId ?? undefined;
 
-      const [invoice] = await tx
+      const [invoice] = customerInvoiceId ? await tx
         .select({
           id: customerInvoices.id,
           status: customerInvoices.status,
@@ -2403,11 +2773,26 @@ export async function updateCustomerPayment(formData: FormData) {
           currencyCode: customerInvoices.currencyCode,
         })
         .from(customerInvoices)
-        .where(and(eq(customerInvoices.id, allocation.customerInvoiceId), eq(customerInvoices.companyId, company.id), isNull(customerInvoices.deletedAt)))
-        .limit(1);
+        .where(and(eq(customerInvoices.id, customerInvoiceId), eq(customerInvoices.companyId, company.id), isNull(customerInvoices.deletedAt)))
+        .limit(1) : [];
 
-      if (!invoice || invoice.status !== "posted") {
+      const [order] = salesOrderId ? await tx
+        .select({
+          id: salesOrders.id,
+          status: salesOrders.status,
+          totalMinor: salesOrders.totalMinor,
+          currencyCode: salesOrders.currencyCode,
+        })
+        .from(salesOrders)
+        .where(and(eq(salesOrders.id, salesOrderId), eq(salesOrders.companyId, company.id), isNull(salesOrders.deletedAt)))
+        .limit(1) : [];
+
+      if (customerInvoiceId && (!invoice || invoice.status !== "posted")) {
         throw new Error("Customer invoice must be posted before editing payment.");
+      }
+
+      if (salesOrderId && (!order || order.status === "quotation" || order.status === "cancelled")) {
+        throw new Error("Sales order must be confirmed before editing payment.");
       }
 
       const [account] = await tx
@@ -2436,15 +2821,31 @@ export async function updateCustomerPayment(formData: FormData) {
         throw new Error("Select an active inbound payment account.");
       }
 
-      if (account.currencyCode !== invoice.currencyCode) {
-        throw new Error("Payment account currency must match the customer invoice.");
+      const currencyCode = order?.currencyCode ?? invoice?.currencyCode;
+
+      if (account.currencyCode !== currencyCode) {
+        throw new Error("Payment account currency must match the sale currency.");
       }
 
       if (account.requiresReference && !parsed.data.reference) {
         throw new Error("This payment method requires a reference.");
       }
 
-      const [summary] = await tx.execute<{ residualAmountMinor: number }>(sql`
+      const [summary] = salesOrderId && order ? await tx.execute<{ residualAmountMinor: number }>(sql`
+        select greatest(
+          ${order.totalMinor} - coalesce(sum(pa.amount_minor) filter (
+            where p.status = 'posted'
+              and p.deleted_at is null
+              and pa.deleted_at is null
+          ), 0),
+          0
+        )::bigint as "residualAmountMinor"
+        from sales_orders so
+        left join payment_allocations pa on pa.sales_order_id = so.id
+        left join payments p on p.id = pa.payment_id
+        where so.id = ${order.id}
+        group by so.id
+      `) : await tx.execute<{ residualAmountMinor: number }>(sql`
         select greatest(
           ${invoice.totalMinor} - coalesce(sum(pa.amount_minor) filter (
             where p.status = 'posted'
@@ -2461,7 +2862,7 @@ export async function updateCustomerPayment(formData: FormData) {
       `);
 
       if (amountMinor > (summary?.residualAmountMinor ?? 0)) {
-        throw new Error("Payment amount cannot exceed the customer invoice residual.");
+        throw new Error("Payment amount cannot exceed the unpaid sale balance.");
       }
 
       await tx
@@ -2491,7 +2892,7 @@ export async function updateCustomerPayment(formData: FormData) {
         entityType: "payment",
         entityId: payment.id,
         severity: "info",
-        metadata: { paymentNo: payment.paymentNo, customerInvoiceId },
+        metadata: { paymentNo: payment.paymentNo, customerInvoiceId, salesOrderId },
       });
     });
   } catch (error) {
@@ -2502,6 +2903,9 @@ export async function updateCustomerPayment(formData: FormData) {
   revalidatePath(`/admin/sales/payments/${parsed.data.paymentId}`);
   if (customerInvoiceId) {
     revalidatePath(`/admin/sales/invoices/${customerInvoiceId}`);
+  }
+  if (salesOrderId) {
+    revalidatePath(`/admin/sales/${salesOrderId}`);
   }
   redirect(`/admin/sales/payments/${parsed.data.paymentId}?notice=${encodeURIComponent("Customer payment updated")}`);
 }
@@ -2515,6 +2919,7 @@ export async function cancelCustomerPayment(formData: FormData) {
   }
 
   let customerInvoiceId: string | undefined;
+  let salesOrderId: string | undefined;
   const company = await getDefaultCompany();
 
   try {
@@ -2539,11 +2944,15 @@ export async function cancelCustomerPayment(formData: FormData) {
       }
 
       const [allocation] = await tx
-        .select({ customerInvoiceId: paymentAllocations.customerInvoiceId })
+        .select({
+          customerInvoiceId: paymentAllocations.customerInvoiceId,
+          salesOrderId: paymentAllocations.salesOrderId,
+        })
         .from(paymentAllocations)
         .where(and(eq(paymentAllocations.paymentId, payment.id), isNull(paymentAllocations.deletedAt)))
         .limit(1);
       customerInvoiceId = allocation?.customerInvoiceId ?? undefined;
+      salesOrderId = allocation?.salesOrderId ?? undefined;
 
       await tx
         .update(payments)
@@ -2562,7 +2971,7 @@ export async function cancelCustomerPayment(formData: FormData) {
         entityType: "payment",
         entityId: payment.id,
         severity: "warning",
-        metadata: { paymentNo: payment.paymentNo, customerInvoiceId },
+        metadata: { paymentNo: payment.paymentNo, customerInvoiceId, salesOrderId },
       });
     });
 
@@ -2577,6 +2986,9 @@ export async function cancelCustomerPayment(formData: FormData) {
   revalidatePath(`/admin/sales/payments/${parsed.data.paymentId}`);
   if (customerInvoiceId) {
     revalidatePath(`/admin/sales/invoices/${customerInvoiceId}`);
+  }
+  if (salesOrderId) {
+    revalidatePath(`/admin/sales/${salesOrderId}`);
   }
   redirect(`/admin/sales/payments/${parsed.data.paymentId}?notice=${encodeURIComponent("Customer payment cancelled")}`);
 }

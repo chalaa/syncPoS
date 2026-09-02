@@ -78,7 +78,6 @@ export const adminMenuItems: AdminMenuItem[] = [
     submenus: [
       { label: "Quotations / Orders", href: "/admin/sales", permission: PERMISSIONS.SALES.CREATE },
       { label: "Deliveries", href: "/admin/sales?view=deliveries", permission: PERMISSIONS.SALES.CREATE },
-      { label: "Invoices", href: "/admin/sales?view=invoices", permission: PERMISSIONS.SALES.CREATE },
       { label: "Payments", href: "/admin/sales?view=payments", permission: PERMISSIONS.SALES.CREATE },
       { label: "Returns", href: "/admin/sales?view=returns", permission: PERMISSIONS.SALES.CREATE },
     ],

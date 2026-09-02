@@ -10,6 +10,7 @@ import { filterAdminMenuItems } from "@/components/app/admin-navigation";
 import type { AdminSubMenuItem } from "@/components/app/types";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import type { ShopOption } from "@/server/locations/shop-options";
 import { useAppStore } from "@/stores/app-store";
 
 function getActiveMenu(pathname: string, menuItems: ReturnType<typeof filterAdminMenuItems>) {
@@ -45,10 +46,12 @@ function isSubmenuActive(item: AdminSubMenuItem, currentHref: string, pathname: 
 export function AdminShell({
   username,
   permissionCodes,
+  shopLocations,
   children,
 }: {
   username: string;
   permissionCodes: string[];
+  shopLocations: ShopOption[];
   children: ReactNode;
 }) {
   const pathname = usePathname();
@@ -56,6 +59,8 @@ export function AdminShell({
   const adminNavOpen = useAppStore((state) => state.adminNavOpen);
   const setAdminNavOpen = useAppStore((state) => state.setAdminNavOpen);
   const toggleAdminNav = useAppStore((state) => state.toggleAdminNav);
+  const selectedLocationId = useAppStore((state) => state.selectedLocationId);
+  const setSelectedLocationId = useAppStore((state) => state.setSelectedLocationId);
   const syncStatus = useAppStore((state) => state.syncStatus);
   const adminMenuItems = filterAdminMenuItems(permissionCodes);
   const activeMenu = getActiveMenu(pathname, adminMenuItems);
@@ -71,6 +76,21 @@ export function AdminShell({
       setAdminNavOpen(false);
     }
   }, [pathname, setAdminNavOpen]);
+
+  useEffect(() => {
+    if (!shopLocations.length) {
+      if (selectedLocationId) {
+        setSelectedLocationId(null);
+      }
+      return;
+    }
+
+    const selectedShopIsAvailable = shopLocations.some((shop) => shop.id === selectedLocationId);
+
+    if (!selectedShopIsAvailable) {
+      setSelectedLocationId(shopLocations[0]?.id ?? null);
+    }
+  }, [selectedLocationId, setSelectedLocationId, shopLocations]);
 
   return (
     <div className="flex min-h-screen bg-background text-foreground">
@@ -278,6 +298,14 @@ export function AdminShell({
             })}
           </nav>
 
+          <div className="shrink-0">
+            <ShopSelector
+              locations={shopLocations}
+              selectedLocationId={selectedLocationId}
+              onChange={setSelectedLocationId}
+            />
+          </div>
+
           <form action={logout} className="hidden shrink-0 items-center gap-3 md:flex">
             <span className="text-muted-foreground">
               {syncStatus}
@@ -293,5 +321,37 @@ export function AdminShell({
         <div className="min-w-0 flex-1">{children}</div>
       </div>
     </div>
+  );
+}
+
+function ShopSelector({
+  locations,
+  selectedLocationId,
+  onChange,
+}: {
+  locations: ShopOption[];
+  selectedLocationId: string | null;
+  onChange: (locationId: string | null) => void;
+}) {
+  if (locations.length === 0) {
+    return null;
+  }
+
+  return (
+    <label className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+      <span className="hidden xl:inline">Shop</span>
+      <select
+        aria-label="Default sales shop"
+        value={selectedLocationId ?? locations[0]?.id ?? ""}
+        onChange={(event) => onChange(event.target.value || null)}
+        className="h-9 w-28 rounded-md border border-input bg-background px-2 text-xs text-foreground sm:w-40 lg:w-48"
+      >
+        {locations.map((location) => (
+          <option key={location.id} value={location.id}>
+            {location.code} / {location.name}
+          </option>
+        ))}
+      </select>
+    </label>
   );
 }

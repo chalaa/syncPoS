@@ -162,6 +162,27 @@
       "when": 1788330502172,
       "tag": "0022_yellow_spencer_smythe",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1788331357965,
+      "tag": "0023_chemical_the_spike",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1788334136834,
+      "tag": "0024_little_monster_badoon",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1788335223548,
+      "tag": "0025_foamy_prima",
+      "breakpoints": true
     }
   ]
 }

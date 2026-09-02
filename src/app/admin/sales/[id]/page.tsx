@@ -2,12 +2,13 @@ import { notFound } from "next/navigation";
 
 import {
   confirmSalesOrder,
-  createCustomerInvoiceFromSalesOrder,
   createDeliveryFromSalesOrder,
+  registerCustomerPayment,
   updateSalesOrder,
 } from "@/app/admin/sales/actions";
 import { CreateDeliveryLinesEditor } from "@/app/admin/sales/[id]/create-delivery-lines-editor";
 import { SalesOrderForm } from "@/app/admin/sales/sales-order-form";
+import { PaymentFormDialog } from "@/components/app/payment-form-dialog";
 import { Alert } from "@/components/ui/alert";
 import { Button, ButtonLink } from "@/components/ui/button";
 import {
@@ -21,6 +22,7 @@ import {
 import { Notebook } from "@/components/ui/notebook";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
 import { requirePermission } from "@/server/auth/session";
+import { getActivePaymentAccounts } from "@/server/payments/payments";
 import {
   displaySalesMoney,
   getSalesFormOptions,
@@ -36,6 +38,22 @@ type SalesOrderDetailPageProps = {
 
 function statusLabel(value: string) {
   return value.replace(/_/g, " ");
+}
+
+function paymentStatusLabel(order: NonNullable<Awaited<ReturnType<typeof getSalesOrderDetail>>>) {
+  if (order.status === "cancelled") {
+    return "Cancelled";
+  }
+
+  if (order.paidMinor <= 0) {
+    return "Not Paid";
+  }
+
+  if (order.residualAmountMinor <= 0) {
+    return "Paid";
+  }
+
+  return "Partial";
 }
 
 function CreateDeliveryDialog({
@@ -69,7 +87,10 @@ export default async function SalesOrderDetailPage({ params, searchParams }: Sal
     searchParams,
     getSalesFormOptions(),
   ]);
-  const order = await getSalesOrderDetail(id);
+  const [order, paymentAccounts] = await Promise.all([
+    getSalesOrderDetail(id),
+    getActivePaymentAccounts("inbound"),
+  ]);
 
   if (!order) {
     notFound();
@@ -80,9 +101,9 @@ export default async function SalesOrderDetailPage({ params, searchParams }: Sal
     (line) => Number(line.quantityOrdered) - Number(line.quantityDelivered) > 0,
   );
   const canCreateDelivery =
-    ["confirmed", "partially_delivered", "invoiced"].includes(order.status) &&
+    ["confirmed", "partially_delivered", "delivered", "invoiced"].includes(order.status) &&
     hasRemainingDeliveryQuantity;
-  const canCreateInvoice = order.status === "confirmed" || order.status === "partially_delivered" || order.status === "delivered";
+  const canRegisterPayment = !isQuotation && order.status !== "cancelled" && order.residualAmountMinor > 0;
 
   return (
     <PageShell>
@@ -101,10 +122,6 @@ export default async function SalesOrderDetailPage({ params, searchParams }: Sal
             <span className="block text-lg font-semibold">{order.deliveryCount}</span>
             <span className="text-muted-foreground">Deliveries</span>
           </a>
-          <a href={`/admin/sales?view=invoices&salesOrderId=${order.id}`} className="rounded-md border border-border bg-card px-4 py-3 text-sm hover:bg-accent">
-            <span className="block text-lg font-semibold">{order.invoiceCount}</span>
-            <span className="text-muted-foreground">Invoices</span>
-          </a>
           <a href={`/admin/sales?view=payments&salesOrderId=${order.id}`} className="rounded-md border border-border bg-card px-4 py-3 text-sm hover:bg-accent">
             <span className="block text-lg font-semibold">{order.paymentCount}</span>
             <span className="text-muted-foreground">Payments</span>
@@ -118,6 +135,9 @@ export default async function SalesOrderDetailPage({ params, searchParams }: Sal
           <span className="rounded-md border border-border bg-muted px-3 py-2 text-sm capitalize">
             {statusLabel(order.status)}
           </span>
+          <span className="rounded-md border border-border bg-muted px-3 py-2 text-sm">
+            {paymentStatusLabel(order)}
+          </span>
           {isQuotation ? (
             <form action={confirmSalesOrder}>
               <input type="hidden" name="salesOrderId" value={order.id} />
@@ -128,11 +148,19 @@ export default async function SalesOrderDetailPage({ params, searchParams }: Sal
           {canCreateDelivery ? (
             <CreateDeliveryDialog order={order} />
           ) : null}
-          {canCreateInvoice ? (
-            <form action={createCustomerInvoiceFromSalesOrder}>
-              <input type="hidden" name="salesOrderId" value={order.id} />
-              <Button variant="outline">Create Invoice</Button>
-            </form>
+          {canRegisterPayment ? (
+            <PaymentFormDialog
+              title="Register Payment"
+              description={`Create a draft customer payment for ${order.orderNo}.`}
+              triggerLabel="Register Payment"
+              submitLabel="Create Draft Payment"
+              action={registerCustomerPayment}
+              hiddenFieldName="salesOrderId"
+              hiddenFieldValue={order.id}
+              paymentAccounts={paymentAccounts}
+              currencyCode={order.currencyCode}
+              amountMinor={order.residualAmountMinor}
+            />
           ) : null}
         </div>
       </div>
@@ -152,12 +180,18 @@ export default async function SalesOrderDetailPage({ params, searchParams }: Sal
         <section className="rounded-lg border border-border bg-card p-5">
           <div className="mb-5 grid gap-4 md:grid-cols-4">
             <Info label="Customer" value={order.customerName} />
-            <Info label="Customer Reference" value={order.customerReference ?? "-"} />
+            <Info label="Reference" value={order.customerReference ?? "-"} />
+            <Info label="FS Number" value={order.fsNumber ?? "-"} />
+            <Info label="Payment Term" value={statusLabel(order.paymentTerm)} />
             <Info label="Order Date" value={order.orderDate} />
-            <Info label="Expected Delivery" value={order.expectedDeliveryDate ?? "-"} />
+            {order.paymentTerm === "credit" ? (
+              <Info label="Last Payment Date" value={order.validUntil ?? "-"} />
+            ) : null}
             <Info label="Subtotal" value={displaySalesMoney(order.subtotalMinor, order.currencyCode)} />
             <Info label="Tax" value={displaySalesMoney(order.taxAmountMinor, order.currencyCode)} />
             <Info label="Total" value={displaySalesMoney(order.totalMinor, order.currencyCode)} />
+            <Info label="Paid" value={displaySalesMoney(order.paidMinor, order.currencyCode)} />
+            <Info label="Unpaid" value={displaySalesMoney(order.residualAmountMinor, order.currencyCode)} />
             <Info label="Reserve Policy" value={order.reserveOnConfirm ? "Reserve on confirm" : "No reservation"} />
           </div>
 

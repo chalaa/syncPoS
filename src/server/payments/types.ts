@@ -74,6 +74,8 @@ export type PaymentAllocationRow = {
   expenseNo: string | null;
   customerInvoiceId: string | null;
   invoiceNo: string | null;
+  salesOrderId: string | null;
+  salesOrderNo: string | null;
   amountMinor: number;
   currencyCode: string;
 };
@@ -94,3 +96,4 @@ export type VendorBillPaymentSummary = {
 
 export type CustomerInvoicePaymentSummary = VendorBillPaymentSummary;
 export type PurchaseOrderPaymentSummary = VendorBillPaymentSummary;
+export type SalesOrderPaymentSummary = VendorBillPaymentSummary;

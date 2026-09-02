@@ -173,6 +173,7 @@ export const salesOrderStatus = pgEnum("sales_order_status", [
   "invoiced",
   "cancelled",
 ]);
+export const salesPaymentTerm = pgEnum("sales_payment_term", ["cash", "credit"]);
 export const deliveryStatus = pgEnum("delivery_status", ["draft", "posted", "cancelled"]);
 export const customerInvoiceStatus = pgEnum("customer_invoice_status", [
   "draft",
@@ -1985,6 +1986,8 @@ export const salesOrders = pgTable(
     }),
     orderNo: varchar("order_no", { length: 60 }).notNull(),
     customerReference: varchar("customer_reference", { length: 80 }),
+    fsNumber: varchar("fs_number", { length: 80 }),
+    paymentTerm: salesPaymentTerm("payment_term").notNull().default("credit"),
     status: salesOrderStatus("status").notNull().default("quotation"),
     orderDate: date("order_date").notNull().defaultNow(),
     validUntil: date("valid_until"),
@@ -1995,7 +1998,7 @@ export const salesOrders = pgTable(
     subtotalMinor: bigint("subtotal_minor", { mode: "number" }).notNull().default(0),
     taxAmountMinor: bigint("tax_amount_minor", { mode: "number" }).notNull().default(0),
     totalMinor: bigint("total_minor", { mode: "number" }).notNull().default(0),
-    reserveOnConfirm: boolean("reserve_on_confirm").notNull().default(false),
+    reserveOnConfirm: boolean("reserve_on_confirm").notNull().default(true),
     notes: text("notes"),
     createdBy: uuid("created_by").references(() => users.id, {
       onDelete: "restrict",
@@ -2360,6 +2363,10 @@ export const paymentAllocations = pgTable(
       onDelete: "restrict",
       onUpdate: "cascade",
     }),
+    salesOrderId: uuid("sales_order_id").references(() => salesOrders.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
     amountMinor: bigint("amount_minor", { mode: "number" }).notNull().default(0),
     notes: text("notes"),
     ...softDelete,
@@ -2374,6 +2381,7 @@ export const paymentAllocations = pgTable(
         + (case when ${table.purchaseOrderId} is not null then 1 else 0 end)
         + (case when ${table.expenseId} is not null then 1 else 0 end)
         + (case when ${table.customerInvoiceId} is not null then 1 else 0 end)
+        + (case when ${table.salesOrderId} is not null then 1 else 0 end)
         = 1
       `,
     ),
@@ -2389,11 +2397,15 @@ export const paymentAllocations = pgTable(
     uniqueIndex("payment_allocations_customer_invoice_active_uidx")
       .on(table.paymentId, table.customerInvoiceId)
       .where(sql`${table.deletedAt} is null and ${table.customerInvoiceId} is not null`),
+    uniqueIndex("payment_allocations_sales_order_active_uidx")
+      .on(table.paymentId, table.salesOrderId)
+      .where(sql`${table.deletedAt} is null and ${table.salesOrderId} is not null`),
     index("payment_allocations_payment_idx").on(table.paymentId),
     index("payment_allocations_vendor_bill_idx").on(table.vendorBillId),
     index("payment_allocations_purchase_order_idx").on(table.purchaseOrderId),
     index("payment_allocations_expense_idx").on(table.expenseId),
     index("payment_allocations_customer_invoice_idx").on(table.customerInvoiceId),
+    index("payment_allocations_sales_order_idx").on(table.salesOrderId),
   ],
 );
 

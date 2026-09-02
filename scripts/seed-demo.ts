@@ -694,7 +694,7 @@ async function main() {
           subtotalMinor: salesSubtotal,
           taxAmountMinor: salesTax,
           totalMinor: salesTotal,
-          reserveOnConfirm: false,
+          reserveOnConfirm: true,
           notes: "Demo quotation for user testing.",
           createdBy: foundationIds.adminUser,
         })
