@@ -36,6 +36,7 @@ export const locationType = pgEnum("location_type", [
   "display_shop",
   "transit",
   "adjustment",
+  "scrap",
   "customer",
   "supplier",
 ]);
@@ -1540,7 +1541,7 @@ export const purchaseOrders = pgTable(
     paymentTerm: purchasePaymentTerm("payment_term").notNull().default("credit"),
     status: purchaseOrderStatus("status").notNull().default("draft"),
     orderDate: date("order_date").notNull().defaultNow(),
-    expectedDate: date("expected_date"),
+    paymentDueDate: date("payment_due_date"),
     currencyCode: char("currency_code", { length: 3 })
       .notNull()
       .references(() => currencies.code, { onDelete: "restrict", onUpdate: "cascade" }),

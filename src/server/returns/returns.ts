@@ -9,6 +9,7 @@ import {
   locations,
   partners,
   products,
+  purchaseOrders,
   salesOrders,
 } from "@/server/db/schema";
 import type {
@@ -26,7 +27,7 @@ export function displayReturnMoney(value: number, currencyCode: string) {
 
 export async function getReturnFormOptions(): Promise<ReturnFormOptions> {
   const company = await getDefaultCompany();
-  const [salesOrderRows, receiptRows, locationRows, productRows] = await Promise.all([
+  const [salesOrderRows, purchaseOrderRows, receiptRows, locationRows, productRows, customerReturnableLines, supplierReturnableLines] = await Promise.all([
     db
       .select({
         id: salesOrders.id,
@@ -39,9 +40,22 @@ export async function getReturnFormOptions(): Promise<ReturnFormOptions> {
       .orderBy(asc(salesOrders.orderNo)),
     db
       .select({
+        id: purchaseOrders.id,
+        code: purchaseOrders.orderNo,
+        name: partners.displayName,
+      })
+      .from(purchaseOrders)
+      .innerJoin(partners, eq(purchaseOrders.supplierId, partners.id))
+      .innerJoin(goodsReceipts, eq(goodsReceipts.purchaseOrderId, purchaseOrders.id))
+      .where(and(eq(purchaseOrders.companyId, company.id), isNull(purchaseOrders.deletedAt), isNull(goodsReceipts.deletedAt), eq(goodsReceipts.status, "posted")))
+      .groupBy(purchaseOrders.id, partners.id)
+      .orderBy(asc(purchaseOrders.orderNo)),
+    db
+      .select({
         id: goodsReceipts.id,
         code: goodsReceipts.receiptNo,
         name: partners.displayName,
+        purchaseOrderId: goodsReceipts.purchaseOrderId,
       })
       .from(goodsReceipts)
       .innerJoin(partners, eq(goodsReceipts.supplierId, partners.id))
@@ -66,13 +80,96 @@ export async function getReturnFormOptions(): Promise<ReturnFormOptions> {
       .from(products)
       .where(and(eq(products.companyId, company.id), isNull(products.deletedAt), eq(products.isActive, true)))
       .orderBy(asc(products.name)),
+    db.execute<ReturnFormOptions["customerReturnableLines"][number]>(sql`
+      select
+        dl.id as "id",
+        d.sales_order_id as "salesOrderId",
+        dl.sales_order_line_id as "salesOrderLineId",
+        dl.product_id as "productId",
+        pr.name as "productName",
+        pr.sku as "sku",
+        pr.tracking_mode::text as "trackingMode",
+        dl.quantity_delivered::text as "quantityDelivered",
+        coalesce(returned.quantity_returned, 0)::text as "quantityReturned",
+        greatest(dl.quantity_delivered - coalesce(returned.quantity_returned, 0), 0)::text as "quantityRemaining",
+        case
+          when sol.quantity_ordered::numeric > 0
+            then round(sol.line_total_minor::numeric / sol.quantity_ordered::numeric)::bigint
+          else 0::bigint
+        end as "unitRefundMinor",
+        dl.currency_code as "currencyCode",
+        dl.serial_no as "serialNo",
+        dl.lot_no as "lotNo"
+      from delivery_lines dl
+      inner join deliveries d on d.id = dl.delivery_id
+      inner join sales_order_lines sol on sol.id = dl.sales_order_line_id
+      inner join products pr on pr.id = dl.product_id
+      left join lateral (
+        select sum(crl.quantity_returned)::numeric as quantity_returned
+        from customer_return_lines crl
+        inner join customer_returns cr on cr.id = crl.customer_return_id
+        where crl.delivery_line_id = dl.id
+          and crl.deleted_at is null
+          and cr.deleted_at is null
+          and cr.status <> 'cancelled'
+      ) returned on true
+      where d.company_id = ${company.id}
+        and d.status = 'posted'
+        and d.deleted_at is null
+        and dl.deleted_at is null
+        and greatest(dl.quantity_delivered - coalesce(returned.quantity_returned, 0), 0) > 0
+      order by d.delivery_date desc, dl.line_no asc
+    `),
+    db.execute<ReturnFormOptions["supplierReturnableLines"][number]>(sql`
+      select
+        grl.id as "id",
+        grl.goods_receipt_id as "goodsReceiptId",
+        grl.purchase_order_line_id as "purchaseOrderLineId",
+        grl.product_id as "productId",
+        pr.name as "productName",
+        pr.sku as "sku",
+        pr.tracking_mode::text as "trackingMode",
+        gr.location_id as "sourceLocationId",
+        grl.quantity_received::text as "quantityReceived",
+        coalesce(returned.quantity_returned, 0)::text as "quantityReturned",
+        greatest(grl.quantity_received - coalesce(returned.quantity_returned, 0), 0)::text as "quantityRemaining",
+        case
+          when grl.quantity_received::numeric > 0
+            then round(grl.line_total_minor::numeric / grl.quantity_received::numeric)::bigint
+          else 0::bigint
+        end as "unitRefundMinor",
+        grl.currency_code as "currencyCode",
+        grl.serial_no as "serialNo",
+        grl.lot_no as "lotNo"
+      from goods_receipt_lines grl
+      inner join goods_receipts gr on gr.id = grl.goods_receipt_id
+      inner join products pr on pr.id = grl.product_id
+      left join lateral (
+        select sum(srl.quantity_returned)::numeric as quantity_returned
+        from supplier_return_lines srl
+        inner join supplier_returns sr on sr.id = srl.supplier_return_id
+        where srl.goods_receipt_line_id = grl.id
+          and srl.deleted_at is null
+          and sr.deleted_at is null
+          and sr.status <> 'cancelled'
+      ) returned on true
+      where gr.company_id = ${company.id}
+        and gr.status = 'posted'
+        and gr.deleted_at is null
+        and grl.deleted_at is null
+        and greatest(grl.quantity_received - coalesce(returned.quantity_returned, 0), 0) > 0
+      order by gr.receipt_date desc, grl.line_no asc
+    `),
   ]);
 
   return {
     salesOrders: salesOrderRows,
+    purchaseOrders: purchaseOrderRows,
     receipts: receiptRows,
     locations: locationRows,
     products: productRows,
+    customerReturnableLines,
+    supplierReturnableLines,
   };
 }
 

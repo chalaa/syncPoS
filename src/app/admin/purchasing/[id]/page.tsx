@@ -43,6 +43,15 @@ function statusLabel(value: string) {
   return value.replace(/_/g, " ");
 }
 
+function todayDate() {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Africa/Addis_Ababa",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+}
+
 function CreateReceiptDialog({
   order,
   locations,
@@ -89,6 +98,7 @@ export default async function PurchaseOrderDetailPage({ params, searchParams }: 
 
   const isDraft = order.status === "draft";
   const canReceive = order.status === "confirmed" || order.status === "partially_received";
+  const canCreateReturn = !isDraft && order.receiptCount > 0;
 
   return (
     <PageShell>
@@ -114,6 +124,10 @@ export default async function PurchaseOrderDetailPage({ params, searchParams }: 
           <a href={`/admin/purchasing?view=payments&purchaseOrderId=${order.id}`} className="rounded-md border border-border bg-card px-4 py-3 text-sm hover:bg-accent">
             <span className="block text-lg font-semibold">{order.paymentCount}</span>
             <span className="text-muted-foreground">Payments</span>
+          </a>
+          <a href={`/admin/purchasing?view=returns&purchaseOrderId=${order.id}`} className="rounded-md border border-border bg-card px-4 py-3 text-sm hover:bg-accent">
+            <span className="block text-lg font-semibold">{order.returnCount}</span>
+            <span className="text-muted-foreground">Returns</span>
           </a>
         </div>
         <div className="flex items-center gap-3">
@@ -149,6 +163,11 @@ export default async function PurchaseOrderDetailPage({ params, searchParams }: 
               Add Landed Cost
             </ButtonLink>
           ) : null}
+          {canCreateReturn ? (
+            <ButtonLink href={`/admin/purchasing/returns/new?purchaseOrderId=${order.id}`} variant="outline">
+              Add Return
+            </ButtonLink>
+          ) : null}
         </div>
       </div>
 
@@ -162,6 +181,7 @@ export default async function PurchaseOrderDetailPage({ params, searchParams }: 
           error={query.error}
           order={order}
           submitLabel="Save RFQ"
+          defaultDate={todayDate()}
         />
       ) : (
         <section className="rounded-lg border border-border bg-card p-5">
@@ -179,9 +199,15 @@ export default async function PurchaseOrderDetailPage({ params, searchParams }: 
               <p className="mt-1 text-sm font-medium capitalize">{order.paymentTerm}</p>
             </div>
             <div>
-              <p className="text-xs font-medium uppercase text-muted-foreground">Expected Arrival</p>
-              <p className="mt-1 text-sm font-medium">{order.expectedDate ?? "-"}</p>
+              <p className="text-xs font-medium uppercase text-muted-foreground">Order Date</p>
+              <p className="mt-1 text-sm font-medium">{order.orderDate}</p>
             </div>
+            {order.paymentTerm === "credit" ? (
+              <div>
+                <p className="text-xs font-medium uppercase text-muted-foreground">Payment Date</p>
+                <p className="mt-1 text-sm font-medium">{order.paymentDueDate ?? "-"}</p>
+              </div>
+            ) : null}
             <div>
               <p className="text-xs font-medium uppercase text-muted-foreground">Paid</p>
               <p className="mt-1 text-sm font-medium">{displayPurchaseMoney(order.paidMinor, order.currencyCode)}</p>

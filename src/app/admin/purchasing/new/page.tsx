@@ -10,6 +10,15 @@ type NewPurchaseOrderPageProps = {
   searchParams: Promise<{ error?: string }>;
 };
 
+function todayDate() {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Africa/Addis_Ababa",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+}
+
 export default async function NewPurchaseOrderPage({ searchParams }: NewPurchaseOrderPageProps) {
   await requirePermission("inventory.receive");
 
@@ -26,6 +35,7 @@ export default async function NewPurchaseOrderPage({ searchParams }: NewPurchase
         locations={options.locations}
         taxes={options.taxes}
         error={params.error}
+        defaultDate={todayDate()}
       />
     </PageShell>
   );

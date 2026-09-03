@@ -10,12 +10,14 @@ import { z } from "zod";
 import { getDefaultCompany, majorToMinor, uniqueViolationMessage } from "@/server/catalog/products";
 import { requirePermission } from "@/server/auth/session";
 import { db } from "@/server/db/client";
+import { generateCompanyCode } from "@/server/db/code-generator";
 import {
   auditLogs,
   goodsReceiptLines,
   goodsReceipts,
   landedCostAllocations,
   landedCosts,
+  partnerContacts,
   partners,
   productLots,
   productSerials,
@@ -40,8 +42,17 @@ const purchaseOrderHeaderSchema = z.object({
   deliverToLocationId: z.string().uuid().or(z.literal("")).transform((value) => value || null),
   vendorReference: z.string().trim().max(80).optional(),
   paymentTerm: z.enum(["cash", "credit"]).default("credit"),
-  expectedDate: z.string().trim().optional(),
+  orderDate: z.string().trim().optional(),
+  paymentDueDate: z.string().trim().optional(),
   notes: z.string().trim().optional(),
+});
+
+const purchaseSupplierCreateSchema = z.object({
+  displayName: z.string().trim().min(1, "Display name is required").max(200),
+  legalName: z.string().trim().max(200).optional(),
+  tin: z.string().trim().max(30).optional(),
+  phone: z.string().trim().max(40).optional(),
+  email: z.string().trim().email("Email is invalid").max(160).or(z.literal("")).optional(),
 });
 
 const purchaseOrderLineSchema = z.object({
@@ -119,7 +130,8 @@ function parsePurchaseOrderForm(formData: FormData, errorPath: string) {
     deliverToLocationId: formValue(formData, "deliverToLocationId"),
     vendorReference: formValue(formData, "vendorReference"),
     paymentTerm: formValue(formData, "paymentTerm") || "credit",
-    expectedDate: formValue(formData, "expectedDate"),
+    orderDate: formValue(formData, "orderDate"),
+    paymentDueDate: formValue(formData, "paymentDueDate"),
     notes: formValue(formData, "notes"),
   });
   const productIds = formValues(formData, "productId");
@@ -188,6 +200,10 @@ function movementNo(prefix: string) {
   return `${prefix}-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${randomUUID().slice(0, 8).toUpperCase()}`;
 }
 
+function dateOnly(date: Date) {
+  return date.toISOString().slice(0, 10);
+}
+
 function calculateTaxAmount(
   lineAmountMinor: number,
   quantity: number,
@@ -250,6 +266,80 @@ function calculateLineTaxes(
 
 function redirectWithError(path: string, message: string): never {
   redirect(`${path}?error=${encodeURIComponent(message)}`);
+}
+
+export async function createSupplierFromPurchasing(input: unknown) {
+  const user = await requirePermission("inventory.receive");
+
+  const parsed = purchaseSupplierCreateSchema.safeParse(input);
+  if (!parsed.success) {
+    throw new Error(parsed.error.issues[0]?.message ?? "Invalid supplier.");
+  }
+
+  const company = await getDefaultCompany();
+
+  try {
+    const supplier = await db.transaction(async (tx) => {
+      const code = await generateCompanyCode(tx, {
+        companyId: company.id,
+        table: "partners",
+        prefix: "SUP",
+      });
+
+      const [created] = await tx
+        .insert(partners)
+        .values({
+          companyId: company.id,
+          code,
+          displayName: parsed.data.displayName,
+          legalName: parsed.data.legalName || parsed.data.displayName,
+          tin: parsed.data.tin || null,
+          isCustomer: false,
+          isSupplier: true,
+          creditLimitMinor: 0,
+          currencyCode: company.baseCurrencyCode,
+          status: "active",
+        })
+        .returning({
+          id: partners.id,
+          code: partners.code,
+          name: partners.displayName,
+        });
+
+      if (!created) {
+        throw new Error("Could not create supplier.");
+      }
+
+      if (parsed.data.phone || parsed.data.email) {
+        await tx.insert(partnerContacts).values({
+          partnerId: created.id,
+          fullName: parsed.data.displayName,
+          phone: parsed.data.phone || null,
+          email: parsed.data.email || null,
+          isPrimary: true,
+        });
+      }
+
+      await tx.insert(auditLogs).values({
+        companyId: company.id,
+        actorUserId: user.id,
+        action: "supplier.quick_create_from_purchasing",
+        entityType: "partner",
+        entityId: created.id,
+        severity: "info",
+        metadata: { code: created.code, displayName: created.name },
+      });
+
+      return created;
+    });
+
+    revalidatePath("/admin/purchasing");
+    revalidatePath("/admin/partners");
+
+    return supplier;
+  } catch (error) {
+    throw new Error(uniqueViolationMessage(error, error instanceof Error ? error.message : "Could not create supplier."));
+  }
 }
 
 export async function createPurchaseOrder(formData: FormData) {
@@ -373,7 +463,8 @@ export async function createPurchaseOrder(formData: FormData) {
           vendorReference: header.vendorReference || reference,
           paymentTerm: header.paymentTerm,
           status: "draft",
-          expectedDate: header.expectedDate || null,
+          orderDate: header.orderDate || dateOnly(new Date()),
+          paymentDueDate: header.paymentTerm === "credit" ? header.paymentDueDate || null : null,
           currencyCode,
           subtotalMinor,
           taxAmountMinor,
@@ -597,7 +688,8 @@ export async function updatePurchaseOrder(formData: FormData) {
           supplierId: supplier.id,
           deliverToLocationId: header.deliverToLocationId,
           paymentTerm: header.paymentTerm,
-          expectedDate: header.expectedDate || null,
+          orderDate: header.orderDate || dateOnly(new Date()),
+          paymentDueDate: header.paymentTerm === "credit" ? header.paymentDueDate || null : null,
           currencyCode,
           subtotalMinor,
           taxAmountMinor,

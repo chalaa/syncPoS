@@ -14,7 +14,7 @@ import {
   stockMovementLines,
   stockMovements,
 } from "@/server/db/schema";
-import { stockLocationTypeOptions } from "@/server/inventory/location-types";
+import { stockLocationTypeOptions, stockSelectableLocationTypeOptions } from "@/server/inventory/location-types";
 import {
   stockStatusOptions,
   inventoryOperationViewOptions,
@@ -138,7 +138,7 @@ export async function getInventoryOperationFormOptions(): Promise<InventoryOpera
       .where(
         and(
           eq(locations.companyId, company.id),
-          inArray(locations.locationType, [...stockLocationTypeOptions]),
+          inArray(locations.locationType, [...stockSelectableLocationTypeOptions]),
           isNull(locations.deletedAt),
           eq(locations.isActive, true),
         ),
@@ -205,6 +205,25 @@ export async function getInventoryOperationList(params: {
   `);
 
   return rows;
+}
+
+export async function getInventoryAdjustmentFormOptions() {
+  const options = await getInventoryOperationFormOptions();
+  const balances = await getStockByLocation({});
+
+  return {
+    ...options,
+    balances: balances.map((balance) => ({
+      locationId: balance.locationId,
+      productId: balance.productId,
+      serialNo: balance.serialNo,
+      lotNo: balance.lotNo,
+      quantityOnHand: balance.quantityOnHand,
+      quantityAvailable: balance.quantityAvailable,
+      averageCostMinor: balance.averageCostMinor,
+      currencyCode: balance.currencyCode,
+    })),
+  };
 }
 
 export async function getInventoryOperationDetail(id: string): Promise<InventoryOperationDetail | null> {

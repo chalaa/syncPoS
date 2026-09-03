@@ -11,6 +11,15 @@ type NewSalesOrderPageProps = {
   searchParams: Promise<{ error?: string }>;
 };
 
+function todayDate() {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Africa/Addis_Ababa",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+}
+
 export default async function NewSalesOrderPage({ searchParams }: NewSalesOrderPageProps) {
   await requirePermission("sales:orders:create");
 
@@ -31,6 +40,7 @@ export default async function NewSalesOrderPage({ searchParams }: NewSalesOrderP
         locations={options.locations}
         taxes={options.taxes}
         error={query.error}
+        defaultDate={todayDate()}
       />
     </PageShell>
   );

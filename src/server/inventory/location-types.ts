@@ -3,6 +3,13 @@ export const stockLocationTypeOptions = [
   "display_shop",
   "transit",
   "adjustment",
+  "scrap",
+] as const;
+
+export const stockSelectableLocationTypeOptions = [
+  "warehouse",
+  "display_shop",
+  "transit",
 ] as const;
 
 export type StockLocationTypeOption = (typeof stockLocationTypeOptions)[number];

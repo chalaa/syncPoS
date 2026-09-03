@@ -23,7 +23,7 @@ export type PurchaseOrderListRow = {
   supplierName: string;
   status: string;
   orderDate: string;
-  expectedDate: string | null;
+  paymentDueDate: string | null;
   deliverToLocationId: string | null;
   deliverToLocationCode: string | null;
   currencyCode: string;
@@ -204,7 +204,7 @@ export type PurchaseOrderDetail = {
   paymentTerm: "cash" | "credit";
   status: string;
   orderDate: string;
-  expectedDate: string | null;
+  paymentDueDate: string | null;
   currencyCode: string;
   subtotalMinor: number;
   taxAmountMinor: number;
@@ -216,6 +216,7 @@ export type PurchaseOrderDetail = {
   vendorBillCount: number;
   landedCostCount: number;
   paymentCount: number;
+  returnCount: number;
   lines: PurchaseOrderDetailLine[];
   receipts: PurchaseOrderReceiptDocument[];
   vendorBills: PurchaseOrderVendorBillDocument[];

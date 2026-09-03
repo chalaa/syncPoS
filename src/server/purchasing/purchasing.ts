@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, asc, eq, isNull, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
 
 import { getDefaultCompany, minorToDisplay } from "@/server/catalog/products";
 import { db } from "@/server/db/client";
@@ -18,9 +18,11 @@ import {
   purchaseOrderLines,
   purchaseOrders,
   supplierBillPlaceholders,
+  supplierReturns,
   taxes,
   vendorBills,
 } from "@/server/db/schema";
+import { stockSelectableLocationTypeOptions } from "@/server/inventory/location-types";
 import type {
   PurchaseOrderDetail,
   PurchaseOrderDetailLine,
@@ -85,7 +87,14 @@ export async function getPurchaseFormOptions() {
         name: locations.name,
       })
       .from(locations)
-      .where(and(eq(locations.companyId, company.id), isNull(locations.deletedAt), eq(locations.isActive, true)))
+      .where(
+        and(
+          eq(locations.companyId, company.id),
+          isNull(locations.deletedAt),
+          eq(locations.isActive, true),
+          inArray(locations.locationType, [...stockSelectableLocationTypeOptions]),
+        ),
+      )
       .orderBy(asc(locations.name)),
     db
       .select({
@@ -130,7 +139,7 @@ export async function getPurchaseOrderList(): Promise<PurchaseOrderListRow[]> {
       p.display_name as "supplierName",
       po.status as "status",
       po.order_date::text as "orderDate",
-      po.expected_date::text as "expectedDate",
+      po.payment_due_date::text as "paymentDueDate",
       po.deliver_to_location_id as "deliverToLocationId",
       l.code as "deliverToLocationCode",
       po.currency_code as "currencyCode",
@@ -661,7 +670,7 @@ export async function getPurchaseOrderDetail(id: string): Promise<PurchaseOrderD
       paymentTerm: purchaseOrders.paymentTerm,
       status: purchaseOrders.status,
       orderDate: sql<string>`${purchaseOrders.orderDate}::text`,
-      expectedDate: sql<string | null>`${purchaseOrders.expectedDate}::text`,
+      paymentDueDate: sql<string | null>`${purchaseOrders.paymentDueDate}::text`,
       currencyCode: purchaseOrders.currencyCode,
       subtotalMinor: purchaseOrders.subtotalMinor,
       taxAmountMinor: purchaseOrders.taxAmountMinor,
@@ -714,6 +723,7 @@ export async function getPurchaseOrderDetail(id: string): Promise<PurchaseOrderD
     vendorBillCountRows,
     landedCostCountRows,
     paymentCountRows,
+    returnCountRows,
   ] = await Promise.all([
     db.execute<PurchaseOrderDetailLine>(sql`
       select
@@ -887,6 +897,10 @@ export async function getPurchaseOrderDetail(id: string): Promise<PurchaseOrderD
         and p.deleted_at is null
         and pa.deleted_at is null
     `),
+    db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(supplierReturns)
+      .where(and(eq(supplierReturns.purchaseOrderId, id), isNull(supplierReturns.deletedAt))),
   ]);
 
   const receiptLinesByReceiptId = new Map<string, PurchaseOrderReceiptDocumentLine[]>();
@@ -933,6 +947,7 @@ export async function getPurchaseOrderDetail(id: string): Promise<PurchaseOrderD
     vendorBillCount: (placeholderBillCountRows[0]?.count ?? 0) + (vendorBillCountRows[0]?.count ?? 0),
     landedCostCount: landedCostCountRows[0]?.count ?? 0,
     paymentCount: paymentCountRows[0]?.count ?? 0,
+    returnCount: returnCountRows[0]?.count ?? 0,
     lines: lineRows satisfies PurchaseOrderDetailLine[],
     receipts: receiptRows.map((receipt) => ({
       ...receipt,

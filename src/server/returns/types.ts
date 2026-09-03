@@ -4,8 +4,49 @@ export type ReturnFormOption = {
   name: string;
 };
 
+export type ReturnReceiptOption = ReturnFormOption & {
+  purchaseOrderId: string | null;
+};
+
+export type ReturnPurchaseOrderOption = ReturnFormOption;
+
 export type ReturnProductOption = ReturnFormOption & {
   trackingMode: "none" | "lot" | "serial";
+};
+
+export type CustomerReturnableLine = {
+  id: string;
+  salesOrderId: string;
+  salesOrderLineId: string;
+  productId: string;
+  productName: string;
+  sku: string;
+  trackingMode: "none" | "lot" | "serial";
+  quantityDelivered: string;
+  quantityReturned: string;
+  quantityRemaining: string;
+  unitRefundMinor: number;
+  currencyCode: string;
+  serialNo: string | null;
+  lotNo: string | null;
+};
+
+export type SupplierReturnableLine = {
+  id: string;
+  goodsReceiptId: string;
+  purchaseOrderLineId: string | null;
+  productId: string;
+  productName: string;
+  sku: string;
+  trackingMode: "none" | "lot" | "serial";
+  sourceLocationId: string;
+  quantityReceived: string;
+  quantityReturned: string;
+  quantityRemaining: string;
+  unitRefundMinor: number;
+  currencyCode: string;
+  serialNo: string | null;
+  lotNo: string | null;
 };
 
 export type CustomerReturnListRow = {
@@ -67,7 +108,10 @@ export type SupplierReturnDetail = SupplierReturnListRow & {
 
 export type ReturnFormOptions = {
   salesOrders: ReturnFormOption[];
-  receipts: ReturnFormOption[];
+  purchaseOrders: ReturnPurchaseOrderOption[];
+  receipts: ReturnReceiptOption[];
   locations: ReturnFormOption[];
   products: ReturnProductOption[];
+  customerReturnableLines: CustomerReturnableLine[];
+  supplierReturnableLines: SupplierReturnableLine[];
 };

@@ -34,6 +34,7 @@ type ManyToOneCreateSelectProps = {
   options: ManyToOneOption[];
   defaultValue?: string | null;
   placeholder?: string;
+  entityLabel?: string;
   onCreate: (input: CreateCustomerInput) => Promise<ManyToOneOption>;
 };
 
@@ -45,6 +46,7 @@ export function ManyToOneCreateSelect({
   options,
   defaultValue,
   placeholder = "Search or create",
+  entityLabel = "Customer",
   onCreate,
 }: ManyToOneCreateSelectProps) {
   const [items, setItems] = useState(options);
@@ -94,7 +96,7 @@ export function ManyToOneCreateSelect({
         setIsOpen(false);
         setIsDialogOpen(false);
       } catch (caught) {
-        setError(caught instanceof Error ? caught.message : "Could not create customer.");
+        setError(caught instanceof Error ? caught.message : `Could not create ${entityLabel.toLowerCase()}.`);
       }
     });
   }
@@ -154,7 +156,7 @@ export function ManyToOneCreateSelect({
           ) : null}
 
           {filteredItems.length === 0 && !trimmedQuery ? (
-            <p className="px-3 py-4 text-sm text-muted-foreground">No customers found.</p>
+            <p className="px-3 py-4 text-sm text-muted-foreground">No {entityLabel.toLowerCase()}s found.</p>
           ) : null}
         </div>
       ) : null}
@@ -166,6 +168,7 @@ export function ManyToOneCreateSelect({
         initialName={trimmedQuery}
         isPending={isPending}
         error={error}
+        entityLabel={entityLabel}
         onOpenChange={setIsDialogOpen}
         onCreate={createCustomer}
       />
@@ -178,6 +181,7 @@ function CustomerCreateDialog({
   initialName,
   isPending,
   error,
+  entityLabel,
   onOpenChange,
   onCreate,
 }: {
@@ -185,6 +189,7 @@ function CustomerCreateDialog({
   initialName: string;
   isPending: boolean;
   error: string | null;
+  entityLabel: string;
   onOpenChange: (open: boolean) => void;
   onCreate: (input: CreateCustomerInput) => void;
 }) {
@@ -207,8 +212,8 @@ function CustomerCreateDialog({
           }}
         >
           <DialogHeader>
-            <DialogTitle>Create Customer</DialogTitle>
-            <DialogDescription>Create a customer and select it on this sales order.</DialogDescription>
+            <DialogTitle>Create {entityLabel}</DialogTitle>
+            <DialogDescription>Create a {entityLabel.toLowerCase()} and select it on this document.</DialogDescription>
           </DialogHeader>
 
           {error ? <p className="rounded-md border border-destructive/30 p-3 text-sm text-destructive">{error}</p> : null}
@@ -241,7 +246,7 @@ function CustomerCreateDialog({
               Cancel
             </Button>
             <Button type="submit" disabled={isPending}>
-              {isPending ? "Creating..." : "Create Customer"}
+              {isPending ? "Creating..." : `Create ${entityLabel}`}
             </Button>
           </DialogFooter>
         </form>

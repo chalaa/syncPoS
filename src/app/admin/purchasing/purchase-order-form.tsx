@@ -13,8 +13,10 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { ManyToManyTags } from "@/components/ui/many-to-many-tags";
+import { ManyToOneCreateSelect } from "@/components/ui/many-to-one-create-select";
 import { Notebook } from "@/components/ui/notebook";
 import { cn } from "@/lib/utils";
+import { createSupplierFromPurchasing } from "@/app/admin/purchasing/actions";
 import type { PurchaseFormOption, PurchaseOrderDetail, PurchaseTaxOption } from "@/server/purchasing/types";
 
 const inputClass = "h-10 rounded-md border border-input bg-background px-3 text-sm";
@@ -101,6 +103,7 @@ export function PurchaseOrderForm({
   error,
   order,
   submitLabel = "Create RFQ",
+  defaultDate = "",
 }: {
   action: (formData: FormData) => void | Promise<void>;
   suppliers: PurchaseFormOption[];
@@ -110,8 +113,10 @@ export function PurchaseOrderForm({
   error?: string;
   order?: PurchaseOrderDetail;
   submitLabel?: string;
+  defaultDate?: string;
 }) {
   const [editingLineKey, setEditingLineKey] = useState<string | null>(null);
+  const [paymentTerm, setPaymentTerm] = useState<"cash" | "credit">(order?.paymentTerm ?? "credit");
   const [lines, setLines] = useState<PurchaseLineDraft[]>(() =>
     order?.lines.length
       ? order.lines.map((line) => ({
@@ -188,17 +193,15 @@ export function PurchaseOrderForm({
       {error ? <p className="rounded-md border border-destructive/30 p-3 text-sm text-destructive">{error}</p> : null}
 
       <div className="grid gap-4 md:grid-cols-2">
-        <label className="flex flex-col gap-1 text-sm font-medium">
-          Supplier
-          <select name="supplierId" required defaultValue={order?.supplierId ?? ""} className={inputClass}>
-            <option value="">Select supplier</option>
-            {suppliers.map((supplier) => (
-              <option key={supplier.id} value={supplier.id}>
-                {supplier.code} / {supplier.name}
-              </option>
-            ))}
-          </select>
-        </label>
+        <ManyToOneCreateSelect
+          name="supplierId"
+          label="Supplier"
+          options={suppliers}
+          defaultValue={order?.supplierId}
+          placeholder="Search supplier"
+          entityLabel="Supplier"
+          onCreate={createSupplierFromPurchasing}
+        />
         <label className="flex flex-col gap-1 text-sm font-medium">
           Reference
           <input
@@ -214,15 +217,26 @@ export function PurchaseOrderForm({
       <div className="grid gap-4 md:grid-cols-3">
         <label className="flex flex-col gap-1 text-sm font-medium">
           Payment Term
-          <select name="paymentTerm" defaultValue={order?.paymentTerm ?? "credit"} className={inputClass}>
+          <select
+            name="paymentTerm"
+            value={paymentTerm}
+            onChange={(event) => setPaymentTerm(event.target.value as "cash" | "credit")}
+            className={inputClass}
+          >
             <option value="cash">Cash</option>
             <option value="credit">Credit</option>
           </select>
         </label>
         <label className="flex flex-col gap-1 text-sm font-medium">
-          Expected arrival
-          <input name="expectedDate" type="date" defaultValue={order?.expectedDate ?? ""} className={inputClass} />
+          Order Date
+          <input name="orderDate" type="date" defaultValue={order?.orderDate ?? defaultDate} className={inputClass} />
         </label>
+        {paymentTerm === "credit" ? (
+          <label className="flex flex-col gap-1 text-sm font-medium">
+            Payment Date
+            <input name="paymentDueDate" type="date" defaultValue={order?.paymentDueDate ?? defaultDate} className={inputClass} />
+          </label>
+        ) : null}
         <label className="flex flex-col gap-1 text-sm font-medium">
           Deliver to
           <select name="deliverToLocationId" defaultValue={order?.deliverToLocationId ?? ""} className={inputClass}>

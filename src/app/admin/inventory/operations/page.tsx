@@ -37,7 +37,6 @@ export default async function InventoryOperationsPage({ searchParams }: Inventor
   const view = parseInventoryOperationView(params.view);
   const query = params.q ?? "";
   const rows = await getInventoryOperationList({ view, query });
-  const canCreateManualOperation = view !== "receipts" && view !== "deliveries";
 
   return (
     <PageShell>
@@ -47,9 +46,8 @@ export default async function InventoryOperationsPage({ searchParams }: Inventor
         actions={
           <div className="flex flex-wrap gap-2">
             <ButtonLink href="/admin/inventory" variant="outline">Stock</ButtonLink>
-            {canCreateManualOperation ? (
-              <ButtonLink href="/admin/inventory/operations/new">New Operation</ButtonLink>
-            ) : null}
+            <ButtonLink href="/admin/inventory/operations/adjustments/new">New Adjustment</ButtonLink>
+            <ButtonLink href="/admin/inventory/operations/scrap/new">New Scrap</ButtonLink>
           </div>
         }
       />

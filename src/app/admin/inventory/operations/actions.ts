@@ -12,6 +12,7 @@ import { getDefaultCompany, majorToMinor } from "@/server/catalog/products";
 import { db } from "@/server/db/client";
 import {
   auditLogs,
+  locations,
   productLots,
   productSerials,
   products,
@@ -19,6 +20,7 @@ import {
   stockMovementLines,
   stockMovements,
 } from "@/server/db/schema";
+import { getOrCreateSystemStockLocation } from "@/server/inventory/system-locations";
 
 const operationTypes = ["transfer", "adjustment", "scrap", "customer_return", "supplier_return"] as const;
 
@@ -32,6 +34,18 @@ const createOperationSchema = z.object({
 
 const statusSchema = z.object({
   movementId: z.string().uuid(),
+});
+
+const adjustmentSchema = z.object({
+  locationId: z.string().uuid(),
+  sourceNo: z.string().trim().max(80).optional(),
+  notes: z.string().trim().optional(),
+});
+
+const scrapSchema = z.object({
+  locationId: z.string().uuid(),
+  sourceNo: z.string().trim().max(80).optional(),
+  notes: z.string().trim().optional(),
 });
 
 function formValue(formData: FormData, key: string) {
@@ -72,6 +86,46 @@ function parseLines(formData: FormData) {
     .filter((line) => line.productId || line.quantity !== 0);
 }
 
+function parseCountLines(formData: FormData) {
+  const productIds = formValues(formData, "productId");
+  const countedQuantities = formValues(formData, "countedQuantity");
+  const unitCosts = formValues(formData, "unitCost");
+  const serialNumbers = formValues(formData, "serialNo");
+  const lotNumbers = formValues(formData, "lotNo");
+  const notes = formValues(formData, "lineNotes");
+
+  return productIds
+    .map((productId, index) => ({
+      productId,
+      countedQuantity: Number(countedQuantities[index] ?? 0),
+      unitCostMinor: majorToMinor(unitCosts[index] ?? "0"),
+      serialNo: serialNumbers[index]?.trim() || null,
+      lotNo: lotNumbers[index]?.trim() || null,
+      notes: notes[index]?.trim() || null,
+    }))
+    .filter((line) => line.productId || line.countedQuantity !== 0 || line.serialNo || line.lotNo);
+}
+
+function parseScrapLines(formData: FormData) {
+  const productIds = formValues(formData, "productId");
+  const quantities = formValues(formData, "quantity");
+  const unitCosts = formValues(formData, "unitCost");
+  const serialNumbers = formValues(formData, "serialNo");
+  const lotNumbers = formValues(formData, "lotNo");
+  const notes = formValues(formData, "lineNotes");
+
+  return productIds
+    .map((productId, index) => ({
+      productId,
+      quantity: Number(quantities[index] ?? 0),
+      unitCostMinor: majorToMinor(unitCosts[index] ?? "0"),
+      serialNo: serialNumbers[index]?.trim() || null,
+      lotNo: lotNumbers[index]?.trim() || null,
+      notes: notes[index]?.trim() || null,
+    }))
+    .filter((line) => line.productId || line.quantity > 0 || line.serialNo || line.lotNo);
+}
+
 function movementPrefix(type: (typeof operationTypes)[number]) {
   const prefixes: Record<(typeof operationTypes)[number], string> = {
     transfer: "INT",
@@ -96,6 +150,30 @@ function sourceType(type: (typeof operationTypes)[number]) {
   return sources[type];
 }
 
+async function validateSelectableLocation(
+  tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
+  companyId: string,
+  locationId: string,
+) {
+  const [location] = await tx
+    .select({ id: locations.id })
+    .from(locations)
+    .where(
+      and(
+        eq(locations.id, locationId),
+        eq(locations.companyId, companyId),
+        eq(locations.isActive, true),
+        isNull(locations.deletedAt),
+        sql`${locations.locationType} in ('warehouse', 'display_shop', 'transit')`,
+      ),
+    )
+    .limit(1);
+
+  if (!location) {
+    throw new Error("Stock location is invalid.");
+  }
+}
+
 function validateHeader(type: (typeof operationTypes)[number], fromLocationId: string | null, toLocationId: string | null) {
   if ((type === "transfer" || type === "scrap" || type === "supplier_return") && !fromLocationId) {
     throw new Error("Source location is required.");
@@ -108,6 +186,101 @@ function validateHeader(type: (typeof operationTypes)[number], fromLocationId: s
   if (type === "transfer" && fromLocationId === toLocationId) {
     throw new Error("Transfer source and destination must be different.");
   }
+}
+
+async function resolveTrackedStock(
+  tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
+  params: {
+    productId: string;
+    trackingMode: string;
+    locationId: string;
+    serialNo: string | null;
+    lotNo: string | null;
+    allowCreateInbound: boolean;
+    unitCostMinor: number;
+  },
+) {
+  let productSerialId: string | null = null;
+  let productLotId: string | null = null;
+  let serialCurrentLocationId: string | null = null;
+
+  if (params.trackingMode === "serial") {
+    if (!params.serialNo) {
+      throw new Error("Serial tracked products require a serial number.");
+    }
+
+    const [serial] = await tx
+      .select({
+        id: productSerials.id,
+        currentLocationId: productSerials.currentLocationId,
+      })
+      .from(productSerials)
+      .where(and(eq(productSerials.productId, params.productId), eq(productSerials.serialNo, params.serialNo), isNull(productSerials.deletedAt)))
+      .limit(1);
+
+    if (!serial && !params.allowCreateInbound) {
+      throw new Error(`Serial ${params.serialNo} does not exist.`);
+    }
+
+    if (!serial) {
+      const [created] = await tx
+        .insert(productSerials)
+        .values({
+          productId: params.productId,
+          serialNo: params.serialNo,
+          status: "available",
+          currentLocationId: params.locationId,
+          landedUnitCostMinor: params.unitCostMinor || null,
+        })
+        .returning({ id: productSerials.id });
+
+      productSerialId = created.id;
+    } else {
+      productSerialId = serial.id;
+      serialCurrentLocationId = serial.currentLocationId;
+    }
+  }
+
+  if (params.trackingMode === "lot") {
+    if (!params.lotNo) {
+      throw new Error("Lot tracked products require a lot number.");
+    }
+
+    const [lot] = await tx
+      .select({
+        id: productLots.id,
+      })
+      .from(productLots)
+      .where(and(eq(productLots.productId, params.productId), eq(productLots.lotNo, params.lotNo), isNull(productLots.deletedAt)))
+      .limit(1);
+
+    if (!lot && !params.allowCreateInbound) {
+      throw new Error(`Lot ${params.lotNo} does not exist.`);
+    }
+
+    if (!lot) {
+      const [created] = await tx
+        .insert(productLots)
+        .values({
+          productId: params.productId,
+          lotNo: params.lotNo,
+          status: "available",
+          currentLocationId: params.locationId,
+          landedUnitCostMinor: params.unitCostMinor || null,
+        })
+        .returning({ id: productLots.id });
+
+      productLotId = created.id;
+    } else {
+      productLotId = lot.id;
+    }
+  }
+
+  return {
+    productSerialId,
+    productLotId,
+    serialCurrentLocationId,
+  };
 }
 
 async function getBalance(
@@ -150,6 +323,41 @@ async function getBalance(
     .limit(1);
 
   return balance;
+}
+
+type PreparedStockOperationLine = {
+  product: {
+    id: string;
+    sku: string;
+    unitId: string;
+    trackingMode: string;
+    currencyCode: string;
+    standardCostMinor: number;
+  };
+  productSerialId: string | null;
+  productLotId: string | null;
+  quantity: number;
+  unitCostMinor: number;
+  fromLocationId: string | null;
+  toLocationId: string | null;
+  notes: string | null;
+  metadata: Record<string, unknown>;
+};
+
+async function getOperationProductMap(tx: Parameters<Parameters<typeof db.transaction>[0]>[0], companyId: string) {
+  const productRows = await tx
+    .select({
+      id: products.id,
+      sku: products.sku,
+      unitId: products.unitId,
+      trackingMode: products.trackingMode,
+      currencyCode: products.currencyCode,
+      standardCostMinor: products.standardCostMinor,
+    })
+    .from(products)
+    .where(and(eq(products.companyId, companyId), isNull(products.deletedAt), eq(products.isActive, true)));
+
+  return new Map(productRows.map((product) => [product.id, product]));
 }
 
 async function addToBalance(
@@ -234,6 +442,381 @@ async function removeFromBalance(
     .where(eq(stockBalances.id, balance.id));
 
   return balance;
+}
+
+export async function createInventoryAdjustment(formData: FormData) {
+  const user = await requirePermission("inventory.receive");
+  const parsed = adjustmentSchema.safeParse({
+    locationId: formValue(formData, "locationId"),
+    sourceNo: formValue(formData, "sourceNo"),
+    notes: formValue(formData, "notes"),
+  });
+  const inputLines = parseCountLines(formData);
+
+  if (!parsed.success) {
+    redirectWithError("/admin/inventory/operations/adjustments/new", parsed.error.issues[0]?.message ?? "Invalid adjustment.");
+  }
+
+  if (inputLines.length === 0) {
+    redirectWithError("/admin/inventory/operations/adjustments/new", "At least one counted line is required.");
+  }
+
+  const company = await getDefaultCompany();
+  const adjustmentLocation = await getOrCreateSystemStockLocation(company.id, "adjustment");
+  const movementNo = documentNo("ADJ");
+  let movementId: string | undefined;
+
+  try {
+    await db.transaction(async (tx) => {
+      await validateSelectableLocation(tx, company.id, parsed.data.locationId);
+
+      const productById = await getOperationProductMap(tx, company.id);
+      const preparedLines: PreparedStockOperationLine[] = [];
+
+      for (const line of inputLines) {
+        const product = productById.get(line.productId);
+
+        if (!product) {
+          throw new Error("One or more products are invalid.");
+        }
+
+        if (!Number.isFinite(line.countedQuantity) || line.countedQuantity < 0) {
+          throw new Error(`Counted quantity for ${product.sku} must be zero or greater.`);
+        }
+
+        if (product.trackingMode === "serial" && ![0, 1].includes(line.countedQuantity)) {
+          throw new Error(`Serialized product ${product.sku} counted quantity must be 0 or 1.`);
+        }
+
+        const tracked = await resolveTrackedStock(tx, {
+          productId: product.id,
+          trackingMode: product.trackingMode,
+          locationId: parsed.data.locationId,
+          serialNo: line.serialNo,
+          lotNo: line.lotNo,
+          allowCreateInbound: true,
+          unitCostMinor: line.unitCostMinor || product.standardCostMinor,
+        });
+        const balance = await getBalance(tx, {
+          companyId: company.id,
+          locationId: parsed.data.locationId,
+          productId: product.id,
+          productSerialId: tracked.productSerialId,
+          productLotId: tracked.productLotId,
+        });
+        const previousQuantity = Number(balance?.quantityOnHand ?? 0);
+        const difference = line.countedQuantity - previousQuantity;
+
+        if (difference === 0) {
+          continue;
+        }
+
+        if (product.trackingMode === "serial" && Math.abs(difference) !== 1) {
+          throw new Error(`Serialized product ${product.sku} adjustment difference must be 1 or -1.`);
+        }
+
+        if (
+          product.trackingMode === "serial" &&
+          difference > 0 &&
+          tracked.serialCurrentLocationId &&
+          tracked.serialCurrentLocationId !== parsed.data.locationId
+        ) {
+          throw new Error(`Serial ${line.serialNo} already belongs to another location.`);
+        }
+
+        const quantity = Math.abs(difference);
+        const unitCostMinor = line.unitCostMinor || balance?.averageCostMinor || product.standardCostMinor;
+        const fromLocationId = difference > 0 ? adjustmentLocation.id : parsed.data.locationId;
+        const toLocationId = difference > 0 ? parsed.data.locationId : adjustmentLocation.id;
+
+        if (difference > 0) {
+          await addToBalance(tx, {
+            companyId: company.id,
+            locationId: parsed.data.locationId,
+            productId: product.id,
+            productSerialId: tracked.productSerialId,
+            productLotId: tracked.productLotId,
+            quantity,
+            unitCostMinor,
+            currencyCode: product.currencyCode,
+          });
+        } else {
+          await removeFromBalance(tx, {
+            companyId: company.id,
+            locationId: parsed.data.locationId,
+            productId: product.id,
+            productSerialId: tracked.productSerialId,
+            productLotId: tracked.productLotId,
+            quantity,
+          });
+        }
+
+        if (tracked.productSerialId) {
+          await tx
+            .update(productSerials)
+            .set({
+              status: difference > 0 ? "available" : "damaged",
+              currentLocationId: difference > 0 ? parsed.data.locationId : adjustmentLocation.id,
+              updatedAt: sql`now()`,
+            })
+            .where(eq(productSerials.id, tracked.productSerialId));
+        }
+
+        if (tracked.productLotId) {
+          await tx
+            .update(productLots)
+            .set({
+              status: difference > 0 ? "available" : "damaged",
+              currentLocationId: difference > 0 ? parsed.data.locationId : adjustmentLocation.id,
+              updatedAt: sql`now()`,
+            })
+            .where(eq(productLots.id, tracked.productLotId));
+        }
+
+        preparedLines.push({
+          product,
+          productSerialId: tracked.productSerialId,
+          productLotId: tracked.productLotId,
+          quantity,
+          unitCostMinor,
+          fromLocationId,
+          toLocationId,
+          notes: line.notes,
+          metadata: {
+            countedQuantity: line.countedQuantity,
+            previousQuantity,
+            difference,
+          },
+        });
+      }
+
+      if (preparedLines.length === 0) {
+        throw new Error("No adjustment needed. Counted quantity matches current on hand.");
+      }
+
+      const [movement] = await tx
+        .insert(stockMovements)
+        .values({
+          companyId: company.id,
+          movementNo,
+          movementType: "adjustment",
+          status: "posted",
+          fromLocationId: null,
+          toLocationId: null,
+          sourceType: "inventory_adjustment",
+          sourceNo: parsed.data.sourceNo || movementNo,
+          postedAt: new Date(),
+          postedBy: user.id,
+          notes: parsed.data.notes || null,
+          metadata: {
+            countedLocationId: parsed.data.locationId,
+            adjustmentLocationId: adjustmentLocation.id,
+          },
+        })
+        .returning({ id: stockMovements.id });
+      movementId = movement.id;
+
+      await tx.insert(stockMovementLines).values(
+        preparedLines.map((line, index) => ({
+          stockMovementId: movement.id,
+          lineNo: index + 1,
+          productId: line.product.id,
+          productSerialId: line.productSerialId,
+          productLotId: line.productLotId,
+          unitId: line.product.unitId,
+          fromLocationId: line.fromLocationId,
+          toLocationId: line.toLocationId,
+          quantity: String(line.quantity),
+          unitCostMinor: line.unitCostMinor,
+          totalCostMinor: Math.round(line.quantity * line.unitCostMinor),
+          currencyCode: line.product.currencyCode,
+          notes: line.notes,
+          metadata: line.metadata,
+        })),
+      );
+
+      await tx.insert(auditLogs).values({
+        companyId: company.id,
+        actorUserId: user.id,
+        action: "inventory_adjustment.post",
+        entityType: "stock_movement",
+        entityId: movement.id,
+        severity: "info",
+        metadata: { movementNo, lineCount: preparedLines.length },
+      });
+    });
+  } catch (error) {
+    redirectWithError("/admin/inventory/operations/adjustments/new", error instanceof Error ? error.message : "Could not post adjustment.");
+  }
+
+  revalidatePath("/admin/inventory");
+  revalidatePath("/admin/inventory/operations");
+  redirect(`/admin/inventory/operations/${movementId}?notice=${encodeURIComponent("Inventory adjustment posted")}`);
+}
+
+export async function createScrapOperation(formData: FormData) {
+  const user = await requirePermission("inventory.receive");
+  const parsed = scrapSchema.safeParse({
+    locationId: formValue(formData, "locationId"),
+    sourceNo: formValue(formData, "sourceNo"),
+    notes: formValue(formData, "notes"),
+  });
+  const inputLines = parseScrapLines(formData);
+
+  if (!parsed.success) {
+    redirectWithError("/admin/inventory/operations/scrap/new", parsed.error.issues[0]?.message ?? "Invalid scrap operation.");
+  }
+
+  if (inputLines.length === 0) {
+    redirectWithError("/admin/inventory/operations/scrap/new", "At least one scrap line is required.");
+  }
+
+  const company = await getDefaultCompany();
+  const scrapLocation = await getOrCreateSystemStockLocation(company.id, "scrap");
+  const movementNo = documentNo("SCR");
+  let movementId: string | undefined;
+
+  try {
+    await db.transaction(async (tx) => {
+      await validateSelectableLocation(tx, company.id, parsed.data.locationId);
+
+      const productById = await getOperationProductMap(tx, company.id);
+      const preparedLines: PreparedStockOperationLine[] = [];
+
+      for (const line of inputLines) {
+        const product = productById.get(line.productId);
+
+        if (!product) {
+          throw new Error("One or more products are invalid.");
+        }
+
+        if (!Number.isFinite(line.quantity) || line.quantity <= 0) {
+          throw new Error(`Scrap quantity for ${product.sku} must be greater than zero.`);
+        }
+
+        if (product.trackingMode === "serial" && line.quantity !== 1) {
+          throw new Error(`Serialized product ${product.sku} scrap quantity must be 1.`);
+        }
+
+        const tracked = await resolveTrackedStock(tx, {
+          productId: product.id,
+          trackingMode: product.trackingMode,
+          locationId: parsed.data.locationId,
+          serialNo: line.serialNo,
+          lotNo: line.lotNo,
+          allowCreateInbound: false,
+          unitCostMinor: line.unitCostMinor || product.standardCostMinor,
+        });
+        const balance = await removeFromBalance(tx, {
+          companyId: company.id,
+          locationId: parsed.data.locationId,
+          productId: product.id,
+          productSerialId: tracked.productSerialId,
+          productLotId: tracked.productLotId,
+          quantity: line.quantity,
+        });
+        const unitCostMinor = line.unitCostMinor || balance.averageCostMinor || product.standardCostMinor;
+
+        await addToBalance(tx, {
+          companyId: company.id,
+          locationId: scrapLocation.id,
+          productId: product.id,
+          productSerialId: tracked.productSerialId,
+          productLotId: tracked.productLotId,
+          quantity: line.quantity,
+          unitCostMinor,
+          currencyCode: product.currencyCode,
+        });
+
+        if (tracked.productSerialId) {
+          await tx
+            .update(productSerials)
+            .set({
+              status: "scrapped",
+              currentLocationId: scrapLocation.id,
+              updatedAt: sql`now()`,
+            })
+            .where(eq(productSerials.id, tracked.productSerialId));
+        }
+
+        if (tracked.productLotId) {
+          await tx
+            .update(productLots)
+            .set({
+              status: "scrapped",
+              currentLocationId: scrapLocation.id,
+              updatedAt: sql`now()`,
+            })
+            .where(eq(productLots.id, tracked.productLotId));
+        }
+
+        preparedLines.push({
+          product,
+          productSerialId: tracked.productSerialId,
+          productLotId: tracked.productLotId,
+          quantity: line.quantity,
+          unitCostMinor,
+          fromLocationId: parsed.data.locationId,
+          toLocationId: scrapLocation.id,
+          notes: line.notes,
+          metadata: {},
+        });
+      }
+
+      const [movement] = await tx
+        .insert(stockMovements)
+        .values({
+          companyId: company.id,
+          movementNo,
+          movementType: "scrap",
+          status: "posted",
+          fromLocationId: parsed.data.locationId,
+          toLocationId: scrapLocation.id,
+          sourceType: "scrap",
+          sourceNo: parsed.data.sourceNo || movementNo,
+          postedAt: new Date(),
+          postedBy: user.id,
+          notes: parsed.data.notes || null,
+        })
+        .returning({ id: stockMovements.id });
+      movementId = movement.id;
+
+      await tx.insert(stockMovementLines).values(
+        preparedLines.map((line, index) => ({
+          stockMovementId: movement.id,
+          lineNo: index + 1,
+          productId: line.product.id,
+          productSerialId: line.productSerialId,
+          productLotId: line.productLotId,
+          unitId: line.product.unitId,
+          fromLocationId: line.fromLocationId,
+          toLocationId: line.toLocationId,
+          quantity: String(line.quantity),
+          unitCostMinor: line.unitCostMinor,
+          totalCostMinor: Math.round(line.quantity * line.unitCostMinor),
+          currencyCode: line.product.currencyCode,
+          notes: line.notes,
+          metadata: line.metadata,
+        })),
+      );
+
+      await tx.insert(auditLogs).values({
+        companyId: company.id,
+        actorUserId: user.id,
+        action: "scrap_operation.post",
+        entityType: "stock_movement",
+        entityId: movement.id,
+        severity: "info",
+        metadata: { movementNo, lineCount: preparedLines.length },
+      });
+    });
+  } catch (error) {
+    redirectWithError("/admin/inventory/operations/scrap/new", error instanceof Error ? error.message : "Could not post scrap operation.");
+  }
+
+  revalidatePath("/admin/inventory");
+  revalidatePath("/admin/inventory/operations");
+  redirect(`/admin/inventory/operations/${movementId}?notice=${encodeURIComponent("Scrap operation posted")}`);
 }
 
 export async function createInventoryOperation(formData: FormData) {

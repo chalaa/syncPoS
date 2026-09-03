@@ -106,6 +106,7 @@ export function SalesOrderForm({
   error,
   order,
   submitLabel = "Create Quotation",
+  defaultDate = "",
 }: {
   action: (formData: FormData) => void | Promise<void>;
   customers: SalesFormOption[];
@@ -115,6 +116,7 @@ export function SalesOrderForm({
   error?: string;
   order?: SalesOrderDetail;
   submitLabel?: string;
+  defaultDate?: string;
 }) {
   const [editingLineKey, setEditingLineKey] = useState<string | null>(null);
   const [paymentTerm, setPaymentTerm] = useState<"cash" | "credit">(order?.paymentTerm ?? "credit");
@@ -250,12 +252,12 @@ export function SalesOrderForm({
         </label>
         <label className="flex flex-col gap-1 text-sm font-medium">
           Order Date
-          <input name="orderDate" type="date" defaultValue={order?.orderDate ?? ""} className={inputClass} />
+          <input name="orderDate" type="date" defaultValue={order?.orderDate ?? defaultDate} className={inputClass} />
         </label>
         {paymentTerm === "credit" ? (
           <label className="flex flex-col gap-1 text-sm font-medium">
             Last Payment Date
-            <input name="validUntil" type="date" defaultValue={order?.validUntil ?? ""} className={inputClass} />
+            <input name="validUntil" type="date" defaultValue={order?.validUntil ?? defaultDate} className={inputClass} />
           </label>
         ) : null}
         <label className="flex flex-col gap-1 text-sm font-medium">

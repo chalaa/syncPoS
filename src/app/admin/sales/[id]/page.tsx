@@ -40,6 +40,15 @@ function statusLabel(value: string) {
   return value.replace(/_/g, " ");
 }
 
+function todayDate() {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Africa/Addis_Ababa",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+}
+
 function paymentStatusLabel(order: NonNullable<Awaited<ReturnType<typeof getSalesOrderDetail>>>) {
   if (order.status === "cancelled") {
     return "Cancelled";
@@ -104,6 +113,7 @@ export default async function SalesOrderDetailPage({ params, searchParams }: Sal
     ["confirmed", "partially_delivered", "delivered", "invoiced"].includes(order.status) &&
     hasRemainingDeliveryQuantity;
   const canRegisterPayment = !isQuotation && order.status !== "cancelled" && order.residualAmountMinor > 0;
+  const canCreateReturn = !isQuotation && order.status !== "cancelled" && order.deliveryCount > 0;
 
   return (
     <PageShell>
@@ -162,6 +172,11 @@ export default async function SalesOrderDetailPage({ params, searchParams }: Sal
               amountMinor={order.residualAmountMinor}
             />
           ) : null}
+          {canCreateReturn ? (
+            <ButtonLink href={`/admin/sales/returns/new?salesOrderId=${order.id}`} variant="outline">
+              Add Return
+            </ButtonLink>
+          ) : null}
         </div>
       </div>
 
@@ -175,6 +190,7 @@ export default async function SalesOrderDetailPage({ params, searchParams }: Sal
           error={query.error}
           order={order}
           submitLabel="Save Quotation"
+          defaultDate={todayDate()}
         />
       ) : (
         <section className="rounded-lg border border-border bg-card p-5">

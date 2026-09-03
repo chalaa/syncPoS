@@ -287,8 +287,8 @@ async function main() {
 
     const adjustmentOperationText = await navigate(client, "/admin/inventory/operations?view=adjustments", "Adjustments");
     assertCondition(
-      adjustmentOperationText.includes("New Operation"),
-      "Adjustment operation page should show New Operation.",
+      adjustmentOperationText.includes("New Adjustment"),
+      "Adjustment operation page should show New Adjustment.",
     );
 
     assertCondition(consoleErrors.length === 0, `Browser console errors:\n${consoleErrors.join("\n")}`);

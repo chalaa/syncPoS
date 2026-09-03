@@ -8,7 +8,7 @@ import { and, eq, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { requirePermission } from "@/server/auth/session";
-import { getDefaultCompany, majorToMinor } from "@/server/catalog/products";
+import { getDefaultCompany } from "@/server/catalog/products";
 import { db } from "@/server/db/client";
 import {
   auditLogs,
@@ -34,13 +34,11 @@ const returnConditionSchema = z.enum(["available", "returned", "damaged", "scrap
 const customerReturnSchema = z.object({
   salesOrderId: z.string().uuid(),
   destinationLocationId: z.string().uuid(),
-  refundAmount: z.string().trim().default("0"),
   notes: z.string().trim().optional(),
 });
 const supplierReturnSchema = z.object({
   goodsReceiptId: z.string().uuid(),
   sourceLocationId: z.string().uuid(),
-  refundAmount: z.string().trim().default("0"),
   notes: z.string().trim().optional(),
 });
 const statusSchema = z.object({
@@ -65,26 +63,36 @@ function redirectWithError(path: string, message: string): never {
   redirect(`${path}?error=${encodeURIComponent(message)}`);
 }
 
-function parseLines(formData: FormData) {
-  const productIds = formValues(formData, "productId");
-  const quantities = formValues(formData, "quantity");
+function parseCustomerLines(formData: FormData) {
+  const deliveryLineIds = formValues(formData, "deliveryLineId");
+  const quantities = formValues(formData, "returnQuantity");
   const conditions = formValues(formData, "condition");
-  const refundAmounts = formValues(formData, "lineRefundAmount");
-  const serialNumbers = formValues(formData, "serialNo");
-  const lotNumbers = formValues(formData, "lotNo");
   const notes = formValues(formData, "lineNotes");
 
-  return productIds
-    .map((productId, index) => ({
-      productId,
+  return deliveryLineIds
+    .map((deliveryLineId, index) => ({
+      deliveryLineId,
       quantity: Number(quantities[index] ?? 0),
       condition: returnConditionSchema.parse(conditions[index] || "returned"),
-      refundAmountMinor: majorToMinor(refundAmounts[index] ?? "0"),
-      serialNo: serialNumbers[index]?.trim() || null,
-      lotNo: lotNumbers[index]?.trim() || null,
       notes: notes[index]?.trim() || null,
     }))
-    .filter((line) => line.productId || line.quantity > 0);
+    .filter((line) => line.deliveryLineId || line.quantity > 0);
+}
+
+function parseSupplierLines(formData: FormData) {
+  const goodsReceiptLineIds = formValues(formData, "goodsReceiptLineId");
+  const quantities = formValues(formData, "returnQuantity");
+  const conditions = formValues(formData, "condition");
+  const notes = formValues(formData, "lineNotes");
+
+  return goodsReceiptLineIds
+    .map((goodsReceiptLineId, index) => ({
+      goodsReceiptLineId,
+      quantity: Number(quantities[index] ?? 0),
+      condition: returnConditionSchema.parse(conditions[index] || "returned"),
+      notes: notes[index]?.trim() || null,
+    }))
+    .filter((line) => line.goodsReceiptLineId || line.quantity > 0);
 }
 
 async function addBalance(tx: Parameters<Parameters<typeof db.transaction>[0]>[0], params: {
@@ -185,10 +193,9 @@ export async function createCustomerReturn(formData: FormData) {
   const parsed = customerReturnSchema.safeParse({
     salesOrderId: formValue(formData, "salesOrderId"),
     destinationLocationId: formValue(formData, "destinationLocationId"),
-    refundAmount: formValue(formData, "refundAmount"),
     notes: formValue(formData, "notes"),
   });
-  const lines = parseLines(formData).filter((line) => line.quantity > 0);
+  const lines = parseCustomerLines(formData).filter((line) => line.quantity > 0);
 
   if (!parsed.success) {
     redirectWithError("/admin/sales/returns/new", parsed.error.issues[0]?.message ?? "Invalid customer return.");
@@ -200,7 +207,6 @@ export async function createCustomerReturn(formData: FormData) {
 
   const company = await getDefaultCompany();
   const returnNo = documentNo("CR");
-  const refundAmountMinor = majorToMinor(parsed.data.refundAmount);
   let returnId: string | undefined;
 
   try {
@@ -220,6 +226,96 @@ export async function createCustomerReturn(formData: FormData) {
         throw new Error("Original sales order is required.");
       }
 
+      const sourceLines = await tx.execute<{
+        id: string;
+        salesOrderLineId: string;
+        productId: string;
+        productSerialId: string | null;
+        productLotId: string | null;
+        unitId: string;
+        sku: string;
+        trackingMode: "none" | "lot" | "serial";
+        quantityDelivered: string;
+        quantityReturned: string;
+        quantityRemaining: string;
+        unitRefundMinor: number;
+        currencyCode: string;
+        serialNo: string | null;
+        lotNo: string | null;
+      }>(sql`
+        select
+          dl.id as "id",
+          dl.sales_order_line_id as "salesOrderLineId",
+          dl.product_id as "productId",
+          dl.product_serial_id as "productSerialId",
+          dl.product_lot_id as "productLotId",
+          dl.unit_id as "unitId",
+          pr.sku as "sku",
+          pr.tracking_mode::text as "trackingMode",
+          dl.quantity_delivered::text as "quantityDelivered",
+          coalesce(returned.quantity_returned, 0)::text as "quantityReturned",
+          greatest(dl.quantity_delivered - coalesce(returned.quantity_returned, 0), 0)::text as "quantityRemaining",
+          case
+            when sol.quantity_ordered::numeric > 0
+              then round(sol.line_total_minor::numeric / sol.quantity_ordered::numeric)::bigint
+            else 0::bigint
+          end as "unitRefundMinor",
+          dl.currency_code as "currencyCode",
+          dl.serial_no as "serialNo",
+          dl.lot_no as "lotNo"
+        from delivery_lines dl
+        inner join deliveries d on d.id = dl.delivery_id
+        inner join sales_order_lines sol on sol.id = dl.sales_order_line_id
+        inner join products pr on pr.id = dl.product_id
+        left join lateral (
+          select sum(crl.quantity_returned)::numeric as quantity_returned
+          from customer_return_lines crl
+          inner join customer_returns cr on cr.id = crl.customer_return_id
+          where crl.delivery_line_id = dl.id
+            and crl.deleted_at is null
+            and cr.deleted_at is null
+            and cr.status <> 'cancelled'
+        ) returned on true
+        where d.sales_order_id = ${order.id}
+          and d.company_id = ${company.id}
+          and d.status = 'posted'
+          and d.deleted_at is null
+          and dl.deleted_at is null
+      `);
+      const sourceById = new Map(sourceLines.map((line) => [line.id, line]));
+      const quantityBySourceLine = new Map<string, number>();
+
+      for (const line of lines) {
+        const sourceLine = sourceById.get(line.deliveryLineId);
+
+        if (!sourceLine) {
+          throw new Error("One or more return lines are not from the selected sales order.");
+        }
+
+        if (!Number.isFinite(line.quantity) || line.quantity <= 0) {
+          throw new Error(`${sourceLine.sku} has an invalid return quantity.`);
+        }
+
+        if (sourceLine.trackingMode === "serial" && line.quantity !== 1) {
+          throw new Error(`Serialized item ${sourceLine.sku} must be returned with quantity 1.`);
+        }
+
+        quantityBySourceLine.set(line.deliveryLineId, (quantityBySourceLine.get(line.deliveryLineId) ?? 0) + line.quantity);
+      }
+
+      for (const [deliveryLineId, quantity] of quantityBySourceLine) {
+        const sourceLine = sourceById.get(deliveryLineId);
+
+        if (sourceLine && quantity > Number(sourceLine.quantityRemaining)) {
+          throw new Error(`${sourceLine.sku} return quantity cannot exceed remaining delivered quantity ${sourceLine.quantityRemaining}.`);
+        }
+      }
+
+      const refundAmountMinor = lines.reduce((total, line) => {
+        const sourceLine = sourceById.get(line.deliveryLineId);
+        return total + Math.round((sourceLine?.unitRefundMinor ?? 0) * line.quantity);
+      }, 0);
+
       const paid = await tx.execute<{ amountMinor: number }>(sql`
         select coalesce(sum(pa.amount_minor) filter (
           where p.status = 'posted' and p.deleted_at is null and pa.deleted_at is null
@@ -234,20 +330,6 @@ export async function createCustomerReturn(formData: FormData) {
       if (refundAmountMinor > (paid[0]?.amountMinor ?? 0)) {
         throw new Error("Refund cannot exceed the original paid amount.");
       }
-
-      const productsById = new Map(
-        (await tx
-          .select({
-            id: products.id,
-            sku: products.sku,
-            unitId: products.unitId,
-            trackingMode: products.trackingMode,
-            currencyCode: products.currencyCode,
-          })
-          .from(products)
-          .where(and(eq(products.companyId, company.id), isNull(products.deletedAt), eq(products.isActive, true))))
-          .map((product) => [product.id, product]),
-      );
 
       const [record] = await tx
         .insert(customerReturns)
@@ -267,30 +349,27 @@ export async function createCustomerReturn(formData: FormData) {
 
       await tx.insert(customerReturnLines).values(
         lines.map((line, index) => {
-          const product = productsById.get(line.productId);
-          if (!product) {
-            throw new Error("One or more products are invalid.");
-          }
+          const sourceLine = sourceById.get(line.deliveryLineId);
 
-          if (product.trackingMode === "serial" && (!line.serialNo || line.quantity !== 1)) {
-            throw new Error(`Serialized product ${product.sku} requires quantity 1 and serial number.`);
-          }
-
-          if (product.trackingMode === "lot" && !line.lotNo) {
-            throw new Error(`Lot tracked product ${product.sku} requires lot number.`);
+          if (!sourceLine) {
+            throw new Error("One or more return lines are invalid.");
           }
 
           return {
             customerReturnId: record.id,
+            salesOrderLineId: sourceLine.salesOrderLineId,
+            deliveryLineId: sourceLine.id,
             lineNo: index + 1,
-            productId: product.id,
-            unitId: product.unitId,
+            productId: sourceLine.productId,
+            productSerialId: sourceLine.productSerialId,
+            productLotId: sourceLine.productLotId,
+            unitId: sourceLine.unitId,
             quantityReturned: String(line.quantity),
             condition: line.condition,
-            refundAmountMinor: line.refundAmountMinor,
-            currencyCode: order.currencyCode,
-            serialNo: line.serialNo,
-            lotNo: line.lotNo,
+            refundAmountMinor: Math.round(sourceLine.unitRefundMinor * line.quantity),
+            currencyCode: sourceLine.currencyCode,
+            serialNo: sourceLine.serialNo,
+            lotNo: sourceLine.lotNo,
             notes: line.notes,
           };
         }),
@@ -523,10 +602,9 @@ export async function createSupplierReturn(formData: FormData) {
   const parsed = supplierReturnSchema.safeParse({
     goodsReceiptId: formValue(formData, "goodsReceiptId"),
     sourceLocationId: formValue(formData, "sourceLocationId"),
-    refundAmount: formValue(formData, "refundAmount"),
     notes: formValue(formData, "notes"),
   });
-  const lines = parseLines(formData).filter((line) => line.quantity > 0);
+  const lines = parseSupplierLines(formData).filter((line) => line.quantity > 0);
 
   if (!parsed.success) {
     redirectWithError("/admin/purchasing/returns/new", parsed.error.issues[0]?.message ?? "Invalid supplier return.");
@@ -548,6 +626,7 @@ export async function createSupplierReturn(formData: FormData) {
           receiptNo: goodsReceipts.receiptNo,
           purchaseOrderId: goodsReceipts.purchaseOrderId,
           supplierId: goodsReceipts.supplierId,
+          locationId: goodsReceipts.locationId,
         })
         .from(goodsReceipts)
         .where(and(eq(goodsReceipts.id, parsed.data.goodsReceiptId), eq(goodsReceipts.companyId, company.id), eq(goodsReceipts.status, "posted"), isNull(goodsReceipts.deletedAt)))
@@ -557,26 +636,105 @@ export async function createSupplierReturn(formData: FormData) {
         throw new Error("Posted purchase receipt is required.");
       }
 
+      if (parsed.data.sourceLocationId !== receipt.locationId) {
+        throw new Error("Supplier return source location must match the original receipt location.");
+      }
+
       const [bill] = await tx
         .select({ id: vendorBills.id, currencyCode: vendorBills.currencyCode })
         .from(vendorBills)
         .where(and(eq(vendorBills.goodsReceiptId, receipt.id), eq(vendorBills.companyId, company.id), isNull(vendorBills.deletedAt)))
         .limit(1);
 
-      const productsById = new Map(
-        (await tx
-          .select({
-            id: products.id,
-            sku: products.sku,
-            unitId: products.unitId,
-            trackingMode: products.trackingMode,
-            currencyCode: products.currencyCode,
-          })
-          .from(products)
-          .where(and(eq(products.companyId, company.id), isNull(products.deletedAt), eq(products.isActive, true))))
-          .map((product) => [product.id, product]),
-      );
-      const currencyCode = bill?.currencyCode ?? productsById.get(lines[0]?.productId ?? "")?.currencyCode ?? company.baseCurrencyCode;
+      const sourceLines = await tx.execute<{
+        id: string;
+        purchaseOrderLineId: string | null;
+        productId: string;
+        productSerialId: string | null;
+        productLotId: string | null;
+        unitId: string;
+        sku: string;
+        trackingMode: "none" | "lot" | "serial";
+        quantityReceived: string;
+        quantityReturned: string;
+        quantityRemaining: string;
+        unitRefundMinor: number;
+        currencyCode: string;
+        serialNo: string | null;
+        lotNo: string | null;
+      }>(sql`
+        select
+          grl.id as "id",
+          grl.purchase_order_line_id as "purchaseOrderLineId",
+          grl.product_id as "productId",
+          grl.product_serial_id as "productSerialId",
+          grl.product_lot_id as "productLotId",
+          grl.unit_id as "unitId",
+          pr.sku as "sku",
+          pr.tracking_mode::text as "trackingMode",
+          grl.quantity_received::text as "quantityReceived",
+          coalesce(returned.quantity_returned, 0)::text as "quantityReturned",
+          greatest(grl.quantity_received - coalesce(returned.quantity_returned, 0), 0)::text as "quantityRemaining",
+          case
+            when grl.quantity_received::numeric > 0
+              then round(grl.line_total_minor::numeric / grl.quantity_received::numeric)::bigint
+            else 0::bigint
+          end as "unitRefundMinor",
+          grl.currency_code as "currencyCode",
+          grl.serial_no as "serialNo",
+          grl.lot_no as "lotNo"
+        from goods_receipt_lines grl
+        inner join goods_receipts gr on gr.id = grl.goods_receipt_id
+        inner join products pr on pr.id = grl.product_id
+        left join lateral (
+          select sum(srl.quantity_returned)::numeric as quantity_returned
+          from supplier_return_lines srl
+          inner join supplier_returns sr on sr.id = srl.supplier_return_id
+          where srl.goods_receipt_line_id = grl.id
+            and srl.deleted_at is null
+            and sr.deleted_at is null
+            and sr.status <> 'cancelled'
+        ) returned on true
+        where grl.goods_receipt_id = ${receipt.id}
+          and gr.company_id = ${company.id}
+          and gr.status = 'posted'
+          and gr.deleted_at is null
+          and grl.deleted_at is null
+      `);
+      const sourceById = new Map(sourceLines.map((line) => [line.id, line]));
+      const quantityBySourceLine = new Map<string, number>();
+
+      for (const line of lines) {
+        const sourceLine = sourceById.get(line.goodsReceiptLineId);
+
+        if (!sourceLine) {
+          throw new Error("One or more return lines are not from the selected receipt.");
+        }
+
+        if (!Number.isFinite(line.quantity) || line.quantity <= 0) {
+          throw new Error(`${sourceLine.sku} has an invalid return quantity.`);
+        }
+
+        if (sourceLine.trackingMode === "serial" && line.quantity !== 1) {
+          throw new Error(`Serialized item ${sourceLine.sku} must be returned with quantity 1.`);
+        }
+
+        quantityBySourceLine.set(line.goodsReceiptLineId, (quantityBySourceLine.get(line.goodsReceiptLineId) ?? 0) + line.quantity);
+      }
+
+      for (const [goodsReceiptLineId, quantity] of quantityBySourceLine) {
+        const sourceLine = sourceById.get(goodsReceiptLineId);
+
+        if (sourceLine && quantity > Number(sourceLine.quantityRemaining)) {
+          throw new Error(`${sourceLine.sku} return quantity cannot exceed remaining received quantity ${sourceLine.quantityRemaining}.`);
+        }
+      }
+
+      const refundAmountMinor = lines.reduce((total, line) => {
+        const sourceLine = sourceById.get(line.goodsReceiptLineId);
+        return total + Math.round((sourceLine?.unitRefundMinor ?? 0) * line.quantity);
+      }, 0);
+      const currencyCode = bill?.currencyCode ?? sourceLines[0]?.currencyCode ?? company.baseCurrencyCode;
 
       const [record] = await tx
         .insert(supplierReturns)
@@ -588,7 +746,7 @@ export async function createSupplierReturn(formData: FormData) {
           supplierId: receipt.supplierId,
           returnNo,
           status: "draft",
-          refundAmountMinor: majorToMinor(parsed.data.refundAmount),
+          refundAmountMinor,
           currencyCode,
           sourceLocationId: parsed.data.sourceLocationId,
           notes: parsed.data.notes || null,
@@ -598,22 +756,27 @@ export async function createSupplierReturn(formData: FormData) {
 
       await tx.insert(supplierReturnLines).values(
         lines.map((line, index) => {
-          const product = productsById.get(line.productId);
-          if (!product) {
-            throw new Error("One or more products are invalid.");
+          const sourceLine = sourceById.get(line.goodsReceiptLineId);
+
+          if (!sourceLine) {
+            throw new Error("One or more return lines are invalid.");
           }
 
           return {
             supplierReturnId: record.id,
+            goodsReceiptLineId: sourceLine.id,
+            purchaseOrderLineId: sourceLine.purchaseOrderLineId,
             lineNo: index + 1,
-            productId: product.id,
-            unitId: product.unitId,
+            productId: sourceLine.productId,
+            productSerialId: sourceLine.productSerialId,
+            productLotId: sourceLine.productLotId,
+            unitId: sourceLine.unitId,
             quantityReturned: String(line.quantity),
             condition: line.condition,
-            refundAmountMinor: line.refundAmountMinor,
-            currencyCode,
-            serialNo: line.serialNo,
-            lotNo: line.lotNo,
+            refundAmountMinor: Math.round(sourceLine.unitRefundMinor * line.quantity),
+            currencyCode: sourceLine.currencyCode,
+            serialNo: sourceLine.serialNo,
+            lotNo: sourceLine.lotNo,
             notes: line.notes,
           };
         }),

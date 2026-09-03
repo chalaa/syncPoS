@@ -282,7 +282,9 @@ function PurchaseOrderList({ orders }: { orders: PurchaseOrderListRow[] }) {
                   <td className="px-4 py-3">{order.status.replace(/_/g, " ")}</td>
                   <td className="px-4 py-3">
                     <div>{order.orderDate}</div>
-                    <div className="text-xs text-muted-foreground">ETA {order.expectedDate ?? "-"}</div>
+                    {order.paymentTerm === "credit" ? (
+                      <div className="text-xs text-muted-foreground">Payment {order.paymentDueDate ?? "-"}</div>
+                    ) : null}
                   </td>
                   <td className="px-4 py-3">
                     <div className="capitalize">{order.paymentTerm}</div>
