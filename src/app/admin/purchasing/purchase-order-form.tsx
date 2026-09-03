@@ -18,6 +18,7 @@ import { Notebook } from "@/components/ui/notebook";
 import { cn } from "@/lib/utils";
 import { createSupplierFromPurchasing } from "@/app/admin/purchasing/actions";
 import type { PurchaseFormOption, PurchaseOrderDetail, PurchaseTaxOption } from "@/server/purchasing/types";
+import type { OwnerOption } from "@/server/owners/types";
 
 const inputClass = "h-10 rounded-md border border-input bg-background px-3 text-sm";
 const tableInputClass = "h-9 w-full rounded-md border border-input bg-background px-2 text-sm";
@@ -97,6 +98,7 @@ function calculateTaxes(lineAmount: number, quantity: number, selectedTaxes: Pur
 export function PurchaseOrderForm({
   action,
   suppliers,
+  owners,
   products,
   locations,
   taxes,
@@ -107,6 +109,7 @@ export function PurchaseOrderForm({
 }: {
   action: (formData: FormData) => void | Promise<void>;
   suppliers: PurchaseFormOption[];
+  owners: OwnerOption[];
   products: PurchaseFormOption[];
   locations: PurchaseFormOption[];
   taxes: PurchaseTaxOption[];
@@ -186,6 +189,7 @@ export function PurchaseOrderForm({
   }
 
   const editingLine = lines.find((line) => line.key === editingLineKey);
+  const selectedOwnerId = order?.ownerId ?? owners[0]?.id ?? "";
 
   return (
     <form action={action} className="grid gap-5 rounded-lg border border-border bg-card p-5">
@@ -214,7 +218,18 @@ export function PurchaseOrderForm({
         </label>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-4">
+        <label className="flex flex-col gap-1 text-sm font-medium">
+          Owner
+          <select name="ownerId" defaultValue={selectedOwnerId} className={inputClass} required={owners.length > 0}>
+            <option value="">Select owner</option>
+            {owners.map((owner) => (
+              <option key={owner.id} value={owner.id}>
+                {owner.name}
+              </option>
+            ))}
+          </select>
+        </label>
         <label className="flex flex-col gap-1 text-sm font-medium">
           Payment Term
           <select

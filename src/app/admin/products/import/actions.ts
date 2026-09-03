@@ -1,0 +1,87 @@
+"use server";
+
+import { revalidatePath } from "next/cache";
+
+import { requirePermission } from "@/server/auth/session";
+import {
+  commitProductImport,
+  previewProductImportCsv,
+} from "@/server/catalog/product-import";
+import type {
+  ProductImportCommitPayload,
+  ProductImportPreviewState,
+} from "@/server/catalog/types";
+
+export async function validateProductImport(
+  _previousState: ProductImportPreviewState,
+  formData: FormData,
+): Promise<ProductImportPreviewState> {
+  await requirePermission("product.manage");
+
+  const file = formData.get("file");
+
+  if (!(file instanceof File) || file.size === 0) {
+    return {
+      status: "error",
+      message: "Choose a CSV file before validating.",
+      rows: [],
+    };
+  }
+
+  if (!file.name.toLowerCase().endsWith(".csv")) {
+    return {
+      status: "error",
+      message: "Only CSV files are supported in this step. The template opens cleanly in Excel.",
+      rows: [],
+    };
+  }
+
+  const preview = await previewProductImportCsv(await file.text());
+  const errorCount = preview.rows.reduce((count, row) => count + row.errors.length, 0);
+
+  return {
+    status: "preview",
+    message:
+      errorCount > 0
+        ? `${errorCount} validation issue${errorCount === 1 ? "" : "s"} found.`
+        : `${preview.rows.length} product row${preview.rows.length === 1 ? "" : "s"} ready to import.`,
+    rows: preview.rows,
+    importToken: preview.importToken,
+  };
+}
+
+export async function importProducts(
+  _previousState: ProductImportPreviewState,
+  formData: FormData,
+): Promise<ProductImportPreviewState> {
+  await requirePermission("product.manage");
+  const payloadValue = formData.get("payload");
+
+  if (typeof payloadValue !== "string") {
+    return {
+      status: "error",
+      message: "Import payload is missing. Validate the file again.",
+      rows: [],
+    };
+  }
+
+  try {
+    const payload = JSON.parse(payloadValue) as ProductImportCommitPayload;
+    const result = await commitProductImport(payload);
+
+    revalidatePath("/admin/products");
+    revalidatePath("/admin/products/import");
+
+    return {
+      status: "imported",
+      message: `Product import completed. Created ${result.created}, updated ${result.updated}.`,
+      rows: [],
+    };
+  } catch (error) {
+    return {
+      status: "error",
+      message: error instanceof Error ? error.message : "Could not import products.",
+      rows: [],
+    };
+  }
+}

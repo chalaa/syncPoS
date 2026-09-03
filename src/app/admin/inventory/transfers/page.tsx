@@ -42,11 +42,12 @@ function TransferList({ transfers }: { transfers: TransferListRow[] }) {
   return (
     <section className="rounded-lg border border-border bg-card">
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[1040px] text-left text-sm">
+        <table className="w-full min-w-[1120px] text-left text-sm">
           <thead className="bg-muted text-xs uppercase tracking-wide text-muted-foreground">
             <tr>
               <th className="px-4 py-3">Transfer</th>
               <th className="px-4 py-3">Status</th>
+              <th className="px-4 py-3">Owner</th>
               <th className="px-4 py-3">Date</th>
               <th className="px-4 py-3">From</th>
               <th className="px-4 py-3">Transit</th>
@@ -67,6 +68,7 @@ function TransferList({ transfers }: { transfers: TransferListRow[] }) {
                   </Link>
                 </td>
                 <td className="px-4 py-3 capitalize">{label(transfer.status)}</td>
+                <td className="px-4 py-3">{transfer.ownerName ?? "-"}</td>
                 <td className="px-4 py-3">{transfer.transferDate}</td>
                 <td className="px-4 py-3">{transfer.fromLocationCode}</td>
                 <td className="px-4 py-3">{transfer.transitLocationCode}</td>
@@ -82,7 +84,7 @@ function TransferList({ transfers }: { transfers: TransferListRow[] }) {
             ))}
             {transfers.length === 0 ? (
               <tr>
-                <td colSpan={11} className="px-4 py-10 text-center text-muted-foreground">
+                <td colSpan={12} className="px-4 py-10 text-center text-muted-foreground">
                   No transfers found.
                 </td>
               </tr>

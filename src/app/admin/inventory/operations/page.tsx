@@ -46,6 +46,7 @@ export default async function InventoryOperationsPage({ searchParams }: Inventor
         actions={
           <div className="flex flex-wrap gap-2">
             <ButtonLink href="/admin/inventory" variant="outline">Stock</ButtonLink>
+            <ButtonLink href="/admin/inventory/operations/internal-transfers/new">New Internal Transfer</ButtonLink>
             <ButtonLink href="/admin/inventory/operations/adjustments/new">New Adjustment</ButtonLink>
             <ButtonLink href="/admin/inventory/operations/scrap/new">New Scrap</ButtonLink>
           </div>

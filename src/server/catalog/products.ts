@@ -13,6 +13,7 @@ import {
   goodsReceiptLines,
   goodsReceipts,
   locations,
+  owners,
   productLots,
   productCategories,
   productPurchaseTaxes,
@@ -44,7 +45,6 @@ import type {
   TaxRecord,
 } from "@/server/catalog/types";
 export {
-  priceListTypeOptions,
   taxComputationOptions,
   taxScopeOptions,
   trackingModeOptions,
@@ -446,7 +446,6 @@ export async function getProductDetail(id: string): Promise<ProductDetail | null
         serialNo: productSerials.serialNo,
         lotNo: productLots.lotNo,
         quantity: stockMovementLines.quantity,
-        unitCostMinor: stockMovementLines.unitCostMinor,
         totalCostMinor: stockMovementLines.totalCostMinor,
         currencyCode: stockMovementLines.currencyCode,
       })
@@ -551,22 +550,18 @@ export async function getProductPriceListRows(): Promise<ProductPriceListRow[]> 
   const rows = await db
     .select({
       id: priceLists.id,
-      code: priceLists.code,
       name: priceLists.name,
-      priceListType: priceLists.priceListType,
+      ownerId: priceLists.ownerId,
+      ownerName: owners.name,
       currencyCode: priceLists.currencyCode,
-      locationId: priceLists.locationId,
-      locationCode: locations.code,
       itemCount: sql<number>`count(${priceListItems.id})::int`,
       isActive: priceLists.isActive,
-      validFrom: sql<string | null>`${priceLists.validFrom}::text`,
-      validTo: sql<string | null>`${priceLists.validTo}::text`,
     })
     .from(priceLists)
-    .leftJoin(locations, eq(priceLists.locationId, locations.id))
+    .leftJoin(owners, eq(priceLists.ownerId, owners.id))
     .leftJoin(priceListItems, and(eq(priceListItems.priceListId, priceLists.id), isNull(priceListItems.deletedAt)))
     .where(and(eq(priceLists.companyId, company.id), isNull(priceLists.deletedAt)))
-    .groupBy(priceLists.id, locations.code)
+    .groupBy(priceLists.id, owners.name)
     .orderBy(asc(priceLists.name));
 
   if (rows.length === 0) {
@@ -583,8 +578,6 @@ export async function getProductPriceListRows(): Promise<ProductPriceListRow[]> 
       minimumQuantity: priceListItems.minimumQuantity,
       unitPriceMinor: priceListItems.unitPriceMinor,
       discountMinor: priceListItems.discountMinor,
-      validFrom: sql<string>`${priceListItems.validFrom}::text`,
-      validTo: sql<string | null>`${priceListItems.validTo}::text`,
       isActive: priceListItems.isActive,
     })
     .from(priceListItems)
@@ -608,7 +601,7 @@ export async function getProductPriceListRows(): Promise<ProductPriceListRow[]> 
 
 export async function getPriceListFormOptions(): Promise<PriceListFormOptions> {
   const company = await getDefaultCompany();
-  const [productRows, locationRows] = await Promise.all([
+  const [productRows, ownerRows] = await Promise.all([
     db
       .select({
         id: products.id,
@@ -620,18 +613,17 @@ export async function getPriceListFormOptions(): Promise<PriceListFormOptions> {
       .orderBy(asc(products.name)),
     db
       .select({
-        id: locations.id,
-        code: locations.code,
-        name: locations.name,
+        id: owners.id,
+        name: owners.name,
       })
-      .from(locations)
-      .where(and(eq(locations.companyId, company.id), isNull(locations.deletedAt), eq(locations.isActive, true)))
-      .orderBy(asc(locations.name)),
+      .from(owners)
+      .where(and(eq(owners.companyId, company.id), isNull(owners.deletedAt)))
+      .orderBy(asc(owners.name)),
   ]);
 
   return {
     products: productRows,
-    locations: locationRows,
+    owners: ownerRows,
   };
 }
 

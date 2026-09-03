@@ -36,6 +36,7 @@ export default async function NewSalesOrderPage({ searchParams }: NewSalesOrderP
       <SalesOrderForm
         action={createSalesOrder}
         customers={options.customers}
+        owners={options.owners}
         products={options.products}
         locations={options.locations}
         taxes={options.taxes}

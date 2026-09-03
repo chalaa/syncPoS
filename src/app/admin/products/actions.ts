@@ -9,7 +9,6 @@ import {
   getDefaultCompany,
   majorToMinor,
   normalizeCode,
-  priceListTypeOptions,
   taxComputationOptions,
   taxScopeOptions,
   trackingModeOptions,
@@ -19,6 +18,7 @@ import { db } from "@/server/db/client";
 import { generateCompanyCode } from "@/server/db/code-generator";
 import {
   brands,
+  owners,
   priceListItems,
   priceLists,
   productCategories,
@@ -54,25 +54,16 @@ const priceListItemSchema = z.object({
   minimumQuantity: z.string().trim().default("1"),
   unitPrice: z.string().trim().default("0"),
   discount: z.string().trim().default("0"),
-  validFrom: z.string().trim().min(1, "Item valid from date is required."),
-  validTo: z.string().trim().optional(),
   isActive: z.boolean(),
 });
 
 const priceListSchema = z.object({
   id: z.string().uuid().optional(),
-  code: z.string().trim().max(40).transform(normalizeCode),
   name: z.string().trim().min(1).max(120),
-  priceListType: z.enum(priceListTypeOptions),
-  locationId: optionalUuid,
-  validFrom: z.string().trim().optional(),
-  validTo: z.string().trim().optional(),
+  ownerId: z.string().uuid("Owner is required"),
   isActive: z.boolean(),
   items: z.array(priceListItemSchema),
   returnPath: z.string().trim().startsWith("/admin/products/price-lists").default("/admin/products/price-lists"),
-}).refine((data) => !data.validTo || !data.validFrom || data.validTo >= data.validFrom, {
-  message: "Price list valid-to date must be after valid-from date.",
-  path: ["validTo"],
 });
 
 const referenceSchema = z.object({
@@ -85,7 +76,11 @@ const referenceSchema = z.object({
 });
 
 const unitSchema = referenceSchema.extend({
-  precision: z.coerce.number().int().min(0).max(6).default(0),
+  precision: z.string().trim().refine((value) => {
+    const parsed = Number(value);
+
+    return Number.isFinite(parsed) && parsed > 0;
+  }, "Precision must be a positive decimal number."),
 });
 
 const taxSchema = z.object({
@@ -158,7 +153,7 @@ function referencePayload(formData: FormData) {
 function unitPayload(formData: FormData) {
   return {
     ...referencePayload(formData),
-    precision: formValue(formData, "precision") || "0",
+    precision: formValue(formData, "precision") || "1",
   };
 }
 
@@ -183,18 +178,12 @@ function priceListPayload(formData: FormData) {
   const minimumQuantities = formValues(formData, "itemMinimumQuantity");
   const unitPrices = formValues(formData, "itemUnitPrice");
   const discounts = formValues(formData, "itemDiscount");
-  const validFromValues = formValues(formData, "itemValidFrom");
-  const validToValues = formValues(formData, "itemValidTo");
   const activeValues = formValues(formData, "itemIsActive");
 
   return {
     id: formValue(formData, "id") || undefined,
-    code: formValue(formData, "code"),
     name: formValue(formData, "name"),
-    priceListType: formValue(formData, "priceListType") || "retail",
-    locationId: formValue(formData, "locationId"),
-    validFrom: formValue(formData, "validFrom"),
-    validTo: formValue(formData, "validTo"),
+    ownerId: formValue(formData, "ownerId"),
     isActive: formData.get("isActive") === "on",
     returnPath: formValue(formData, "returnPath") || "/admin/products/price-lists",
     items: productIds
@@ -203,8 +192,6 @@ function priceListPayload(formData: FormData) {
         minimumQuantity: minimumQuantities[index] || "1",
         unitPrice: unitPrices[index] || "0",
         discount: discounts[index] || "0",
-        validFrom: validFromValues[index] || formValue(formData, "validFrom") || new Date().toISOString().slice(0, 10),
-        validTo: validToValues[index] || "",
         isActive: activeValues[index] !== "false",
       }))
       .filter((item) => item.productId),
@@ -521,8 +508,6 @@ async function savePriceListItems(
       minimumQuantity: item.minimumQuantity,
       unitPriceMinor: majorToMinor(item.unitPrice),
       discountMinor: majorToMinor(item.discount),
-      validFrom: item.validFrom,
-      validTo: item.validTo || null,
       isActive: item.isActive,
     })),
   );
@@ -540,22 +525,23 @@ export async function createPriceList(formData: FormData) {
 
   try {
     await db.transaction(async (tx) => {
-      const code = parsed.data.code || await generateCompanyCode(tx, {
-        companyId: company.id,
-        table: "price_lists",
-        prefix: "PL",
-      });
+      const [owner] = await tx
+        .select({ id: owners.id })
+        .from(owners)
+        .where(sql`${owners.id} = ${parsed.data.ownerId} and ${owners.companyId} = ${company.id} and ${owners.deletedAt} is null`)
+        .limit(1);
+
+      if (!owner) {
+        throw new Error("Owner is invalid or inactive.");
+      }
+
       const [created] = await tx
         .insert(priceLists)
         .values({
           companyId: company.id,
-          code,
+          ownerId: owner.id,
           name: parsed.data.name,
-          priceListType: parsed.data.priceListType,
           currencyCode: company.baseCurrencyCode,
-          locationId: parsed.data.locationId,
-          validFrom: parsed.data.validFrom || null,
-          validTo: parsed.data.validTo || null,
           isActive: parsed.data.isActive,
         })
         .returning({ id: priceLists.id });
@@ -574,23 +560,30 @@ export async function updatePriceList(formData: FormData) {
   await requirePermission("product.manage");
 
   const parsed = priceListSchema.safeParse(priceListPayload(formData));
-  if (!parsed.success || !parsed.data.id || !parsed.data.code) {
+  if (!parsed.success || !parsed.data.id) {
     redirectWithMessage("/admin/products/price-lists", "error", parsed.success ? "Price list ID is missing." : (parsed.error.issues[0]?.message ?? "Invalid price list."));
   }
 
   const priceListId = parsed.data.id;
+  const company = await getDefaultCompany();
 
   try {
     await db.transaction(async (tx) => {
+      const [owner] = await tx
+        .select({ id: owners.id })
+        .from(owners)
+        .where(sql`${owners.id} = ${parsed.data.ownerId} and ${owners.companyId} = ${company.id} and ${owners.deletedAt} is null`)
+        .limit(1);
+
+      if (!owner) {
+        throw new Error("Owner is invalid or inactive.");
+      }
+
       await tx
         .update(priceLists)
         .set({
-          code: parsed.data.code,
+          ownerId: owner.id,
           name: parsed.data.name,
-          priceListType: parsed.data.priceListType,
-          locationId: parsed.data.locationId,
-          validFrom: parsed.data.validFrom || null,
-          validTo: parsed.data.validTo || null,
           isActive: parsed.data.isActive,
           updatedAt: sql`now()`,
         })

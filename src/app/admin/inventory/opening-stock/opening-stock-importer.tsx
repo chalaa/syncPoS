@@ -6,11 +6,16 @@ import Link from "next/link";
 
 import {
   importOpeningStock,
-  openingStockInitialState,
   validateOpeningStockImport,
 } from "@/app/admin/inventory/opening-stock/actions";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import type { OpeningStockPreviewState } from "@/server/inventory/types";
+
+const openingStockInitialState: OpeningStockPreviewState = {
+  status: "idle",
+  rows: [],
+};
 
 function hasErrors(rows: { errors: string[] }[]) {
   return rows.some((row) => row.errors.length > 0);
@@ -22,13 +27,13 @@ function csvValue(value: string | number) {
   return `"${text.replace(/"/g, "\"\"")}"`;
 }
 
-function errorReportHref(rows: { rowNumber: number; sku: string; locationCode: string; errors: string[] }[]) {
+function errorReportHref(rows: { rowNumber: number; sku: string; productName: string; ownerName: string; locationCode: string; errors: string[] }[]) {
   const errorRows = rows.flatMap((row) =>
     row.errors.map((error) =>
-      [row.rowNumber, row.sku, row.locationCode, error].map(csvValue).join(","),
+      [row.rowNumber, row.sku, row.productName, row.ownerName, row.locationCode, error].map(csvValue).join(","),
     ),
   );
-  const csv = ["row,item_code,location_code,error", ...errorRows].join("\n");
+  const csv = ["row,item_code,product_name,owner_name,location_code,error", ...errorRows].join("\n");
 
   return `data:text/csv;charset=utf-8,${encodeURIComponent(csv)}`;
 }
@@ -42,13 +47,15 @@ export function OpeningStockImporter() {
     importOpeningStock,
     openingStockInitialState,
   );
-  const previewRows = previewState.rows ?? [];
+  const importCompleted = importState.status === "imported";
+  const previewRows = importCompleted ? [] : previewState.rows ?? [];
+  const hasPreviewErrors = hasErrors(previewRows);
   const canImport =
+    !importCompleted &&
     previewState.status === "preview" &&
     previewRows.length > 0 &&
-    !hasErrors(previewRows) &&
+    !hasPreviewErrors &&
     previewState.importToken;
-  const hasPreviewErrors = hasErrors(previewRows);
   const payload = canImport
     ? JSON.stringify({
         importToken: previewState.importToken,
@@ -58,7 +65,7 @@ export function OpeningStockImporter() {
 
   return (
     <div className="flex flex-col gap-5">
-      {previewState.message ? (
+      {previewState.message && !importCompleted ? (
         <Alert kind={hasPreviewErrors ? "error" : "success"}>
           {previewState.message}
         </Alert>
@@ -74,7 +81,7 @@ export function OpeningStockImporter() {
           <div>
             <h2 className="text-base font-semibold">Import file</h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Upload the CSV template after filling products, locations, quantities, costs, and serial numbers.
+              Upload the CSV template after filling products, owners, locations, quantities, costs, and serial numbers.
             </p>
           </div>
           <Button asChild variant="outline">
@@ -130,12 +137,13 @@ export function OpeningStockImporter() {
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[1080px] text-left text-sm">
+          <table className="w-full min-w-[1160px] text-left text-sm">
             <thead className="bg-muted text-xs uppercase tracking-wide text-muted-foreground">
               <tr>
                 <th className="px-4 py-3">Row</th>
                 <th className="px-4 py-3">Item Code</th>
                 <th className="px-4 py-3">Product</th>
+                <th className="px-4 py-3">Owner</th>
                 <th className="px-4 py-3">Location</th>
                 <th className="px-4 py-3 text-right">Qty</th>
                 <th className="px-4 py-3 text-right">Unit cost</th>
@@ -152,6 +160,7 @@ export function OpeningStockImporter() {
                     <div>{row.productName || "Unknown product"}</div>
                     <div className="text-xs text-muted-foreground">{row.trackingMode}</div>
                   </td>
+                  <td className="px-4 py-3">{row.ownerName || "Missing"}</td>
                   <td className="px-4 py-3">
                     <div>{row.locationCode || "Missing"}</div>
                     <div className="text-xs text-muted-foreground">{row.locationName}</div>
@@ -177,7 +186,7 @@ export function OpeningStockImporter() {
               ))}
               {previewRows.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-4 py-10 text-center text-muted-foreground">
+                  <td colSpan={9} className="px-4 py-10 text-center text-muted-foreground">
                     Upload a CSV file to preview opening stock rows.
                   </td>
                 </tr>

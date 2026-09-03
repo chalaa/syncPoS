@@ -9,6 +9,7 @@ import {
   deliveries,
   deliveryLines,
   locations,
+  owners,
   partners,
   productLots,
   products,
@@ -42,7 +43,7 @@ export function displaySalesMoney(value: number, currencyCode: string) {
 
 export async function getSalesFormOptions(): Promise<SalesFormOptions> {
   const company = await getDefaultCompany();
-  const [customerRows, productRows, locationRows, taxRows] = await Promise.all([
+  const [customerRows, ownerRows, productRows, locationRows, taxRows] = await Promise.all([
     db
       .select({
         id: partners.id,
@@ -52,6 +53,15 @@ export async function getSalesFormOptions(): Promise<SalesFormOptions> {
       .from(partners)
       .where(and(eq(partners.companyId, company.id), eq(partners.isCustomer, true), isNull(partners.deletedAt)))
       .orderBy(asc(partners.displayName)),
+    db
+      .select({
+        id: owners.id,
+        code: owners.name,
+        name: owners.name,
+      })
+      .from(owners)
+      .where(and(eq(owners.companyId, company.id), isNull(owners.deletedAt)))
+      .orderBy(asc(owners.name)),
     db
       .select({
         id: products.id,
@@ -100,6 +110,7 @@ export async function getSalesFormOptions(): Promise<SalesFormOptions> {
   return {
     company,
     customers: customerRows,
+    owners: ownerRows,
     products: productRows,
     locations: locationRows,
     taxes: taxRows satisfies SalesTaxOption[],
@@ -116,6 +127,8 @@ export async function getSalesOrderList(): Promise<SalesOrderListRow[]> {
       so.customer_reference as "customerReference",
       so.fs_number as "fsNumber",
       so.payment_term as "paymentTerm",
+      so.owner_id as "ownerId",
+      own.name as "ownerName",
       customer.display_name as "customerName",
       so.status::text as "status",
       so.order_date::text as "orderDate",
@@ -132,6 +145,7 @@ export async function getSalesOrderList(): Promise<SalesOrderListRow[]> {
       coalesce(sum(sol.quantity_invoiced), 0)::text as "quantityInvoiced"
     from sales_orders so
     inner join partners customer on customer.id = so.customer_id
+    left join owners own on own.id = so.owner_id
     left join locations loc on loc.id = so.source_location_id
     left join sales_order_lines sol on sol.sales_order_id = so.id and sol.deleted_at is null
     left join lateral (
@@ -145,7 +159,7 @@ export async function getSalesOrderList(): Promise<SalesOrderListRow[]> {
     ) pay on true
     where so.company_id = ${company.id}
       and so.deleted_at is null
-    group by so.id, customer.id, loc.id, pay.paid_minor
+    group by so.id, customer.id, own.name, loc.id, pay.paid_minor
     order by so.created_at desc
   `);
 }
@@ -491,6 +505,8 @@ export async function getSalesOrderDetail(id: string): Promise<SalesOrderDetail 
       orderNo: salesOrders.orderNo,
       customerId: salesOrders.customerId,
       customerName: partners.displayName,
+      ownerId: salesOrders.ownerId,
+      ownerName: owners.name,
       sourceLocationId: salesOrders.sourceLocationId,
       customerReference: salesOrders.customerReference,
       fsNumber: salesOrders.fsNumber,
@@ -533,6 +549,7 @@ export async function getSalesOrderDetail(id: string): Promise<SalesOrderDetail 
     })
     .from(salesOrders)
     .innerJoin(partners, eq(salesOrders.customerId, partners.id))
+    .leftJoin(owners, eq(salesOrders.ownerId, owners.id))
     .where(and(eq(salesOrders.id, id), eq(salesOrders.companyId, company.id), isNull(salesOrders.deletedAt)))
     .limit(1);
 
@@ -545,6 +562,8 @@ export async function getSalesOrderDetail(id: string): Promise<SalesOrderDetail 
       select
         sol.id as "id",
         sol.line_no as "lineNo",
+        sol.owner_id as "ownerId",
+        own.name as "ownerName",
         sol.product_id as "productId",
         product.name as "productName",
         product.sku as "sku",
@@ -562,11 +581,12 @@ export async function getSalesOrderDetail(id: string): Promise<SalesOrderDetail 
         string_agg(t.name, ', ' order by t.name) as "taxNames"
       from sales_order_lines sol
       inner join products product on product.id = sol.product_id
+      left join owners own on own.id = sol.owner_id
       left join sales_order_line_taxes solt on solt.sales_order_line_id = sol.id
       left join taxes t on t.id = solt.tax_id
       where sol.sales_order_id = ${id}
         and sol.deleted_at is null
-      group by sol.id, product.id
+      group by sol.id, product.id, own.id
       order by sol.line_no
     `),
     db.select({ count: sql<number>`count(*)::int` }).from(deliveries).where(and(eq(deliveries.salesOrderId, id), isNull(deliveries.deletedAt))),

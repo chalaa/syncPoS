@@ -9,6 +9,7 @@ import { db } from "@/server/db/client";
 import {
   auditLogs,
   locations,
+  owners,
   productSerials,
   products,
   stockBalances,
@@ -20,16 +21,18 @@ import type {
   OpeningStockImportRow,
 } from "@/server/inventory/types";
 
-const templateHeaders = ["item_code", "location_code", "quantity", "unit_cost", "serial_no", "notes"];
+const templateHeaders = ["item_code", "product_name", "owner_name", "location_code", "quantity", "unit_cost", "serial_no", "notes"];
 
 export const openingStockTemplateCsv = `${templateHeaders.join(",")}
-ITEM-00001,WH-001,10,1250.50,,Opening stock for bulk item
-ITEM-00002,SHOP-001,1,85000,SERIAL-001,Opening stock for serialized item
+ITEM-00001,,Main Owner,WH-001,10,1250.50,,Opening stock for bulk item
+,Demo Excavator 320,Main Owner,SHOP-001,1,85000,SERIAL-001,Opening stock for serialized item
 `;
 
 type ParsedCsvRow = {
   rowNumber: number;
   sku: string;
+  productName: string;
+  ownerName: string;
   locationCode: string;
   quantity: string;
   unitCost: string;
@@ -90,6 +93,8 @@ function parseCsv(text: string): ParsedCsvRow[] {
     return {
       rowNumber: index + 2,
       sku: itemCodeIndex === undefined ? "" : values[itemCodeIndex] ?? "",
+      productName: values[headerIndex.product_name] ?? "",
+      ownerName: values[headerIndex.owner_name] ?? "",
       locationCode: values[headerIndex.location_code] ?? "",
       quantity: values[headerIndex.quantity] ?? "",
       unitCost: values[headerIndex.unit_cost] ?? "",
@@ -113,7 +118,7 @@ function nonNegativeNumber(value: string) {
 
 function importToken(rows: OpeningStockImportRow[]) {
   return createHash("sha256")
-    .update(JSON.stringify(rows.map((row) => [row.sku, row.locationCode, row.quantity, row.unitCost, row.serialNo])))
+    .update(JSON.stringify(rows.map((row) => [row.sku, row.productName, row.ownerName, row.locationCode, row.quantity, row.unitCost, row.serialNo])))
     .digest("hex");
 }
 
@@ -128,7 +133,7 @@ export async function previewOpeningStockCsv(text: string) {
     };
   }
 
-  const [productRows, locationRows] = await Promise.all([
+  const [productRows, ownerRows, locationRows] = await Promise.all([
     db
       .select({
         id: products.id,
@@ -142,6 +147,13 @@ export async function previewOpeningStockCsv(text: string) {
       .where(and(eq(products.companyId, company.id), isNull(products.deletedAt), eq(products.isActive, true))),
     db
       .select({
+        id: owners.id,
+        name: owners.name,
+      })
+      .from(owners)
+      .where(and(eq(owners.companyId, company.id), isNull(owners.deletedAt))),
+    db
+      .select({
         id: locations.id,
         code: locations.code,
         name: locations.name,
@@ -151,23 +163,34 @@ export async function previewOpeningStockCsv(text: string) {
   ]);
 
   const productBySku = new Map(productRows.map((product) => [product.sku.toUpperCase(), product]));
+  const productByName = new Map(productRows.map((product) => [product.name.toUpperCase(), product]));
+  const ownerByName = new Map(ownerRows.map((owner) => [owner.name.toUpperCase(), owner]));
   const locationByCode = new Map(locationRows.map((location) => [location.code.toUpperCase(), location]));
   const serialsSeen = new Set<string>();
 
   const rows = parsedRows.map((row): OpeningStockImportRow => {
     const sku = row.sku.trim().toUpperCase();
+    const productName = row.productName.trim();
+    const ownerName = row.ownerName.trim();
     const locationCode = row.locationCode.trim().toUpperCase();
     const serialNo = row.serialNo.trim();
     const quantity = positiveNumber(row.quantity);
     const unitCost = nonNegativeNumber(row.unitCost);
-    const product = productBySku.get(sku);
+    const product = sku ? productBySku.get(sku) : productByName.get(productName.toUpperCase());
+    const owner = ownerByName.get(ownerName.toUpperCase());
     const location = locationByCode.get(locationCode);
     const errors: string[] = [];
 
-    if (!sku) {
-      errors.push("Item code is required.");
+    if (!sku && !productName) {
+      errors.push("Item code or product name is required.");
     } else if (!product) {
-      errors.push("Item code does not match an active product.");
+      errors.push("Item code or product name does not match an active product.");
+    }
+
+    if (!ownerName) {
+      errors.push("Owner name is required.");
+    } else if (!owner) {
+      errors.push("Owner name does not match a registered active owner.");
     }
 
     if (!locationCode) {
@@ -199,7 +222,7 @@ export async function previewOpeningStockCsv(text: string) {
     }
 
     if (serialNo) {
-      const serialKey = `${sku}:${serialNo.toUpperCase()}`;
+      const serialKey = `${product?.id ?? (sku || productName.toUpperCase())}:${serialNo.toUpperCase()}`;
 
       if (serialsSeen.has(serialKey)) {
         errors.push("Duplicate serial number in import file.");
@@ -213,6 +236,7 @@ export async function previewOpeningStockCsv(text: string) {
       sku,
       productName: product?.name ?? "",
       trackingMode: product?.trackingMode ?? "none",
+      ownerName,
       locationCode,
       locationName: location?.name ?? "",
       quantity: quantity ? String(quantity) : row.quantity.trim(),
@@ -262,10 +286,27 @@ export async function commitOpeningStockImport(payload: OpeningStockCommitPayloa
       throw new Error("First import row location no longer exists.");
     }
 
+    const [firstOwner] = await tx
+      .select({ id: owners.id })
+      .from(owners)
+      .where(
+        and(
+          eq(owners.companyId, company.id),
+          eq(owners.name, payload.rows[0].ownerName),
+          isNull(owners.deletedAt),
+        ),
+      )
+      .limit(1);
+
+    if (!firstOwner) {
+      throw new Error("First import row owner no longer exists.");
+    }
+
     const [movement] = await tx
       .insert(stockMovements)
       .values({
         companyId: company.id,
+        ownerId: firstOwner.id,
         movementNo,
         movementType: "opening_balance",
         status: "posted",
@@ -292,7 +333,13 @@ export async function commitOpeningStockImport(payload: OpeningStockCommitPayloa
           currencyCode: products.currencyCode,
         })
         .from(products)
-        .where(and(eq(products.companyId, company.id), eq(products.sku, row.sku), isNull(products.deletedAt)))
+        .where(
+          and(
+            eq(products.companyId, company.id),
+            row.sku ? eq(products.sku, row.sku) : eq(products.name, row.productName),
+            isNull(products.deletedAt),
+          ),
+        )
         .limit(1);
 
       const [location] = await tx
@@ -301,8 +348,14 @@ export async function commitOpeningStockImport(payload: OpeningStockCommitPayloa
         .where(and(eq(locations.companyId, company.id), eq(locations.code, row.locationCode), isNull(locations.deletedAt)))
         .limit(1);
 
-      if (!product || !location) {
-        throw new Error(`Row ${row.rowNumber} no longer matches product or location data.`);
+      const [owner] = await tx
+        .select({ id: owners.id })
+        .from(owners)
+        .where(and(eq(owners.companyId, company.id), eq(owners.name, row.ownerName), isNull(owners.deletedAt)))
+        .limit(1);
+
+      if (!product || !location || !owner) {
+        throw new Error(`Row ${row.rowNumber} no longer matches product, owner, or location data.`);
       }
 
       let productSerialId: string | null = null;
@@ -350,13 +403,13 @@ export async function commitOpeningStockImport(payload: OpeningStockCommitPayloa
 
       await tx.insert(stockMovementLines).values({
         stockMovementId: movement.id,
+        ownerId: owner.id,
         lineNo: index + 1,
         productId: product.id,
         productSerialId,
         toLocationId: location.id,
         unitId: product.unitId,
         quantity: row.quantity,
-        unitCostMinor: row.unitCostMinor,
         totalCostMinor: row.totalCostMinor,
         currencyCode: product.currencyCode,
         notes: row.notes || null,
@@ -378,6 +431,7 @@ export async function commitOpeningStockImport(payload: OpeningStockCommitPayloa
         .where(
           and(
             eq(stockBalances.companyId, company.id),
+            eq(stockBalances.ownerId, owner.id),
             eq(stockBalances.locationId, location.id),
             eq(stockBalances.productId, product.id),
             serialFilter,
@@ -404,6 +458,7 @@ export async function commitOpeningStockImport(payload: OpeningStockCommitPayloa
       } else {
         await tx.insert(stockBalances).values({
           companyId: company.id,
+          ownerId: owner.id,
           locationId: location.id,
           productId: product.id,
           productSerialId,

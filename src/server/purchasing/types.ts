@@ -20,6 +20,8 @@ export type PurchaseOrderListRow = {
   orderNo: string;
   vendorReference: string | null;
   paymentTerm: "cash" | "credit";
+  ownerId: string | null;
+  ownerName: string | null;
   supplierName: string;
   status: string;
   orderDate: string;
@@ -199,6 +201,8 @@ export type PurchaseOrderDetail = {
   orderNo: string;
   supplierId: string;
   supplierName: string;
+  ownerId: string | null;
+  ownerName: string | null;
   deliverToLocationId: string | null;
   vendorReference: string | null;
   paymentTerm: "cash" | "credit";

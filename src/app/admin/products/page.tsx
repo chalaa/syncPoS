@@ -32,7 +32,13 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
       <PageHeader
         eyebrow="Catalog"
         title="Products"
-        actions={<ButtonLink href="/admin/products/new" variant="default">New product</ButtonLink>}
+        actions={
+          <div className="flex flex-wrap gap-2">
+            <ButtonLink href="/admin/products/import" variant="outline">Import</ButtonLink>
+            <ButtonLink href="/admin/products/export" variant="outline">Export</ButtonLink>
+            <ButtonLink href="/admin/products/new" variant="default">New product</ButtonLink>
+          </div>
+        }
       />
 
       {params.notice ? <Alert kind="success">{params.notice}</Alert> : null}

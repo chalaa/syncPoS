@@ -23,6 +23,7 @@ import {
   paymentAllocations,
   paymentMethods,
   payments,
+  owners,
   partnerContacts,
   partners,
   locations,
@@ -46,6 +47,7 @@ import { getCustomerInvoicePaymentSummary, getSalesOrderPaymentSummary } from "@
 const salesOrderHeaderSchema = z.object({
   salesOrderId: z.string().uuid().optional(),
   customerId: z.string().uuid(),
+  ownerId: z.string().uuid().or(z.literal("")).transform((value) => value || null),
   sourceLocationId: z.string().uuid().or(z.literal("")).transform((value) => value || null),
   customerReference: z.string().trim().max(80).optional(),
   fsNumber: z.string().trim().max(80).optional(),
@@ -65,6 +67,7 @@ const salesCustomerCreateSchema = z.object({
 });
 
 const salesOrderLineSchema = z.object({
+  ownerId: z.string().uuid().or(z.literal("")).transform((value) => value || null),
   productId: z.string().uuid(),
   quantity: z.coerce.number().positive(),
   unitPrice: z.string().trim().default("0"),
@@ -283,6 +286,7 @@ function parseSalesOrderForm(formData: FormData, errorPath: string) {
   const parsedHeader = salesOrderHeaderSchema.safeParse({
     salesOrderId: formValue(formData, "salesOrderId") || undefined,
     customerId: formValue(formData, "customerId"),
+    ownerId: formValue(formData, "ownerId"),
     sourceLocationId: formValue(formData, "sourceLocationId"),
     customerReference: formValue(formData, "customerReference"),
     fsNumber: formValue(formData, "fsNumber"),
@@ -293,12 +297,14 @@ function parseSalesOrderForm(formData: FormData, errorPath: string) {
     notes: formValue(formData, "notes"),
   });
   const productIds = formValues(formData, "productId");
+  const ownerIds = formValues(formData, "lineOwnerId");
   const quantities = formValues(formData, "quantity");
   const unitPrices = formValues(formData, "unitPrice");
   const discounts = formValues(formData, "discount");
   const taxIdValues = formValues(formData, "taxIds");
   const parsedLines = productIds
     .map((productId, index) => ({
+      ownerId: ownerIds[index] ?? "",
       productId,
       quantity: quantities[index] ?? "",
       unitPrice: unitPrices[index] ?? "0",
@@ -454,6 +460,7 @@ async function prepareSalesLines(
 
     return {
       lineNo: index + 1,
+      ownerId: line.ownerId,
       product,
       quantityOrdered: String(line.quantity),
       unitPriceMinor,
@@ -472,6 +479,29 @@ async function prepareSalesLines(
     taxAmountMinor: preparedLines.reduce((sum, line) => sum + line.taxAmountMinor, 0),
     totalMinor: preparedLines.reduce((sum, line) => sum + line.lineTotalMinor, 0),
   };
+}
+
+async function normalizeSalesLineOwners(
+  tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
+  companyId: string,
+  defaultOwnerId: string,
+  lines: z.infer<typeof salesOrderLineSchema>[],
+) {
+  const normalizedLines = lines.map((line) => ({
+    ...line,
+    ownerId: line.ownerId ?? defaultOwnerId,
+  }));
+  const uniqueOwnerIds = [...new Set(normalizedLines.map((line) => line.ownerId))];
+  const ownerRows = await tx
+    .select({ id: owners.id })
+    .from(owners)
+    .where(and(inArray(owners.id, uniqueOwnerIds), eq(owners.companyId, companyId), isNull(owners.deletedAt)));
+
+  if (ownerRows.length !== uniqueOwnerIds.length) {
+    throw new Error("One or more line owners are invalid or inactive.");
+  }
+
+  return normalizedLines;
 }
 
 export async function createSalesOrder(formData: FormData) {
@@ -494,12 +524,26 @@ export async function createSalesOrder(formData: FormData) {
         throw new Error("Customer is invalid.");
       }
 
-      const prepared = await prepareSalesLines(tx, company.id, lines);
+      const [owner] = header.ownerId
+        ? await tx
+            .select({ id: owners.id })
+            .from(owners)
+            .where(and(eq(owners.id, header.ownerId), eq(owners.companyId, company.id), isNull(owners.deletedAt)))
+            .limit(1)
+        : [];
+
+      if (!owner) {
+        throw new Error("Owner is required.");
+      }
+
+      const normalizedLines = await normalizeSalesLineOwners(tx, company.id, owner.id, lines);
+      const prepared = await prepareSalesLines(tx, company.id, normalizedLines);
       const [order] = await tx
         .insert(salesOrders)
         .values({
           companyId: company.id,
           customerId: customer.id,
+          ownerId: owner.id,
           sourceLocationId: header.sourceLocationId,
           orderNo,
           customerReference: header.customerReference || reference,
@@ -525,6 +569,7 @@ export async function createSalesOrder(formData: FormData) {
         .values(
           prepared.preparedLines.map((line) => ({
             salesOrderId: order.id,
+            ownerId: line.ownerId,
             lineNo: line.lineNo,
             productId: line.product.id,
             unitId: line.product.unitId,
@@ -615,7 +660,20 @@ export async function updateSalesOrder(formData: FormData) {
         throw new Error("Customer is invalid.");
       }
 
-      const prepared = await prepareSalesLines(tx, company.id, lines);
+      const [owner] = header.ownerId
+        ? await tx
+            .select({ id: owners.id })
+            .from(owners)
+            .where(and(eq(owners.id, header.ownerId), eq(owners.companyId, company.id), isNull(owners.deletedAt)))
+            .limit(1)
+        : [];
+
+      if (!owner) {
+        throw new Error("Owner is required.");
+      }
+
+      const normalizedLines = await normalizeSalesLineOwners(tx, company.id, owner.id, lines);
+      const prepared = await prepareSalesLines(tx, company.id, normalizedLines);
       const existingLines = await tx
         .select({ id: salesOrderLines.id })
         .from(salesOrderLines)
@@ -631,6 +689,7 @@ export async function updateSalesOrder(formData: FormData) {
         .update(salesOrders)
         .set({
           customerId: customer.id,
+          ownerId: owner.id,
           sourceLocationId: header.sourceLocationId,
           fsNumber: header.fsNumber || null,
           paymentTerm: header.paymentTerm,
@@ -652,6 +711,7 @@ export async function updateSalesOrder(formData: FormData) {
         .values(
           prepared.preparedLines.map((line) => ({
             salesOrderId: existingOrder.id,
+            ownerId: line.ownerId,
             lineNo: line.lineNo,
             productId: line.product.id,
             unitId: line.product.unitId,
@@ -721,6 +781,7 @@ export async function confirmSalesOrder(formData: FormData) {
           orderNo: salesOrders.orderNo,
           status: salesOrders.status,
           customerId: salesOrders.customerId,
+          ownerId: salesOrders.ownerId,
           sourceLocationId: salesOrders.sourceLocationId,
           totalMinor: salesOrders.totalMinor,
           reserveOnConfirm: salesOrders.reserveOnConfirm,
@@ -741,6 +802,7 @@ export async function confirmSalesOrder(formData: FormData) {
         .select({
           id: salesOrderLines.id,
           lineNo: salesOrderLines.lineNo,
+          ownerId: salesOrderLines.ownerId,
           productId: salesOrderLines.productId,
           productName: products.name,
           sku: products.sku,
@@ -846,6 +908,12 @@ export async function confirmSalesOrder(formData: FormData) {
           : "the selected source location";
 
         for (const line of lines) {
+          const lineOwnerId = line.ownerId ?? order.ownerId;
+
+          if (!lineOwnerId) {
+            throw new Error(`Owner is required on sales order line ${line.lineNo}.`);
+          }
+
           const balances = await tx
             .select({
               id: stockBalances.id,
@@ -857,6 +925,7 @@ export async function confirmSalesOrder(formData: FormData) {
             .where(
               and(
                 eq(stockBalances.companyId, company.id),
+                eq(stockBalances.ownerId, lineOwnerId),
                 eq(stockBalances.locationId, order.sourceLocationId),
                 eq(stockBalances.productId, line.productId),
                 sql`cast(${stockBalances.quantityAvailable} as numeric) > 0`,
@@ -1041,6 +1110,7 @@ export async function createDeliveryFromSalesOrder(formData: FormData) {
         .select({
           id: salesOrderLines.id,
           lineNo: salesOrderLines.lineNo,
+          ownerId: salesOrderLines.ownerId,
           productId: salesOrderLines.productId,
           unitId: salesOrderLines.unitId,
           quantityOrdered: salesOrderLines.quantityOrdered,
@@ -1163,9 +1233,11 @@ export async function postDelivery(formData: FormData) {
           status: deliveries.status,
           salesOrderId: deliveries.salesOrderId,
           customerId: deliveries.customerId,
+          ownerId: salesOrders.ownerId,
           sourceLocationId: deliveries.sourceLocationId,
         })
         .from(deliveries)
+        .innerJoin(salesOrders, eq(deliveries.salesOrderId, salesOrders.id))
         .where(and(eq(deliveries.id, parsed.data.deliveryId), eq(deliveries.companyId, company.id), isNull(deliveries.deletedAt)))
         .limit(1);
 
@@ -1184,9 +1256,10 @@ export async function postDelivery(formData: FormData) {
         const submittedSalesOrderLineIds = [...new Set(submittedRows.map((line) => line.salesOrderLineId).filter((id): id is string => Boolean(id)))];
         const salesLines = await tx
           .select({
-            id: salesOrderLines.id,
-            lineNo: salesOrderLines.lineNo,
-            productId: salesOrderLines.productId,
+          id: salesOrderLines.id,
+          lineNo: salesOrderLines.lineNo,
+          ownerId: salesOrderLines.ownerId,
+          productId: salesOrderLines.productId,
             unitId: salesOrderLines.unitId,
             quantityOrdered: salesOrderLines.quantityOrdered,
             quantityDelivered: salesOrderLines.quantityDelivered,
@@ -1276,6 +1349,7 @@ export async function postDelivery(formData: FormData) {
           id: deliveryLines.id,
           lineNo: deliveryLines.lineNo,
           salesOrderLineId: deliveryLines.salesOrderLineId,
+          ownerId: salesOrderLines.ownerId,
           productId: deliveryLines.productId,
           unitId: deliveryLines.unitId,
           quantityDelivered: deliveryLines.quantityDelivered,
@@ -1303,6 +1377,7 @@ export async function postDelivery(formData: FormData) {
         .insert(stockMovements)
         .values({
           companyId: company.id,
+          ownerId: delivery.ownerId,
           movementNo,
           movementType: "sale_delivery",
           status: "posted",
@@ -1318,6 +1393,12 @@ export async function postDelivery(formData: FormData) {
         .returning({ id: stockMovements.id });
 
       for (const line of selectedLines) {
+        const lineOwnerId = line.ownerId ?? delivery.ownerId;
+
+        if (!lineOwnerId) {
+          throw new Error(`Owner is required on delivery line ${line.lineNo}.`);
+        }
+
         const deliverQuantity = Number(line.quantityDelivered);
         const remaining = Number(line.quantityOrdered ?? 0) - Number(line.salesQuantityDelivered ?? 0);
 
@@ -1415,6 +1496,7 @@ export async function postDelivery(formData: FormData) {
           .where(
             and(
               eq(stockBalances.companyId, company.id),
+              eq(stockBalances.ownerId, lineOwnerId),
               eq(stockBalances.locationId, delivery.sourceLocationId),
               eq(stockBalances.productId, line.productId),
               serialFilter,
@@ -1449,6 +1531,7 @@ export async function postDelivery(formData: FormData) {
 
         await tx.insert(stockMovementLines).values({
           stockMovementId: movement.id,
+          ownerId: lineOwnerId,
           lineNo: line.lineNo,
           productId: line.productId,
           productSerialId,
@@ -1457,7 +1540,6 @@ export async function postDelivery(formData: FormData) {
           toLocationId: customerLocation.id,
           unitId: line.unitId,
           quantity: String(deliverQuantity),
-          unitCostMinor: balance.averageCostMinor,
           totalCostMinor,
           currencyCode: line.currencyCode,
           notes: `Delivered on ${delivery.deliveryNo}`,
@@ -1485,6 +1567,7 @@ export async function postDelivery(formData: FormData) {
             .where(
               and(
                 eq(stockBalances.companyId, company.id),
+                eq(stockBalances.ownerId, lineOwnerId),
                 eq(stockBalances.locationId, delivery.sourceLocationId),
                 eq(stockBalances.productId, line.productId),
                 isNull(stockBalances.productSerialId),

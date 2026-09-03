@@ -27,7 +27,7 @@ export default async function NewScrapPage({ searchParams }: NewScrapPageProps) 
 
       {query.error ? <Alert kind="error">{query.error}</Alert> : null}
 
-      <InventoryScrapForm action={createScrapOperation} locations={options.locations} products={options.products} balances={options.balances} />
+      <InventoryScrapForm action={createScrapOperation} owners={options.owners} locations={options.locations} products={options.products} balances={options.balances} />
     </PageShell>
   );
 }

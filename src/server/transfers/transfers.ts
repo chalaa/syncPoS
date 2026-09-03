@@ -7,6 +7,7 @@ import { getDefaultCompany } from "@/server/catalog/products";
 import { db } from "@/server/db/client";
 import {
   locations,
+  owners,
   products,
   transferLines,
   transfers,
@@ -20,7 +21,12 @@ import type {
 
 export async function getTransferFormOptions(): Promise<TransferFormOptions> {
   const company = await getDefaultCompany();
-  const [locationRows, transitRows, productRows] = await Promise.all([
+  const [ownerRows, locationRows, transitRows, productRows] = await Promise.all([
+    db
+      .select({ id: owners.id, name: owners.name })
+      .from(owners)
+      .where(and(eq(owners.companyId, company.id), isNull(owners.deletedAt)))
+      .orderBy(asc(owners.name)),
     db
       .select({ id: locations.id, code: locations.code, name: locations.name })
       .from(locations)
@@ -39,6 +45,7 @@ export async function getTransferFormOptions(): Promise<TransferFormOptions> {
   ]);
 
   return {
+    owners: ownerRows,
     locations: locationRows,
     transitLocations: transitRows,
     products: productRows,
@@ -56,6 +63,7 @@ export async function getTransferList(): Promise<TransferListRow[]> {
       id: transfers.id,
       transferNo: transfers.transferNo,
       status: transfers.status,
+      ownerName: owners.name,
       transferDate: sql<string>`${transfers.transferDate}::text`,
       fromLocationCode: fromLocations.code,
       transitLocationCode: transitLocations.code,
@@ -66,12 +74,13 @@ export async function getTransferList(): Promise<TransferListRow[]> {
       quantityReceived: sql<string>`coalesce(sum(${transferLines.quantityReceived}), 0)::text`,
     })
     .from(transfers)
+    .leftJoin(owners, eq(transfers.ownerId, owners.id))
     .innerJoin(fromLocations, eq(transfers.fromLocationId, fromLocations.id))
     .innerJoin(transitLocations, eq(transfers.transitLocationId, transitLocations.id))
     .innerJoin(toLocations, eq(transfers.toLocationId, toLocations.id))
     .leftJoin(transferLines, and(eq(transferLines.transferId, transfers.id), isNull(transferLines.deletedAt)))
     .where(and(eq(transfers.companyId, company.id), isNull(transfers.deletedAt)))
-    .groupBy(transfers.id, fromLocations.id, transitLocations.id, toLocations.id)
+    .groupBy(transfers.id, owners.id, fromLocations.id, transitLocations.id, toLocations.id)
     .orderBy(sql`${transfers.transferDate} desc`, sql`${transfers.transferNo} desc`);
 }
 
@@ -86,6 +95,8 @@ export async function getTransferDetail(id: string): Promise<TransferDetail | nu
       id: transfers.id,
       transferNo: transfers.transferNo,
       status: transfers.status,
+      ownerId: transfers.ownerId,
+      ownerName: owners.name,
       transferDate: sql<string>`${transfers.transferDate}::text`,
       fromLocationId: transfers.fromLocationId,
       transitLocationId: transfers.transitLocationId,
@@ -105,12 +116,13 @@ export async function getTransferDetail(id: string): Promise<TransferDetail | nu
       quantityReceived: sql<string>`coalesce(sum(${transferLines.quantityReceived}), 0)::text`,
     })
     .from(transfers)
+    .leftJoin(owners, eq(transfers.ownerId, owners.id))
     .innerJoin(fromLocations, eq(transfers.fromLocationId, fromLocations.id))
     .innerJoin(transitLocations, eq(transfers.transitLocationId, transitLocations.id))
     .innerJoin(toLocations, eq(transfers.toLocationId, toLocations.id))
     .leftJoin(transferLines, and(eq(transferLines.transferId, transfers.id), isNull(transferLines.deletedAt)))
     .where(and(eq(transfers.id, id), eq(transfers.companyId, company.id), isNull(transfers.deletedAt)))
-    .groupBy(transfers.id, fromLocations.id, transitLocations.id, toLocations.id)
+    .groupBy(transfers.id, owners.id, fromLocations.id, transitLocations.id, toLocations.id)
     .limit(1);
 
   if (!transfer) {
@@ -121,6 +133,7 @@ export async function getTransferDetail(id: string): Promise<TransferDetail | nu
     .select({
       id: transferLines.id,
       lineNo: transferLines.lineNo,
+      ownerName: owners.name,
       productName: products.name,
       sku: products.sku,
       trackingMode: products.trackingMode,
@@ -135,6 +148,7 @@ export async function getTransferDetail(id: string): Promise<TransferDetail | nu
     })
     .from(transferLines)
     .innerJoin(products, eq(transferLines.productId, products.id))
+    .leftJoin(owners, eq(transferLines.ownerId, owners.id))
     .where(and(eq(transferLines.transferId, id), isNull(transferLines.deletedAt)))
     .orderBy(asc(transferLines.lineNo));
 

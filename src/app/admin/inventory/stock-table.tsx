@@ -82,6 +82,7 @@ export function StockByLocationTable({ rows }: { rows: StockByLocationRow[] }) {
         <thead className="bg-muted text-xs uppercase tracking-wide text-muted-foreground">
           <tr>
             <th className="px-4 py-3">Location</th>
+            <th className="px-4 py-3">Owner</th>
             <th className="px-4 py-3">Product</th>
             <th className="px-4 py-3">Tracking</th>
             <th className="px-4 py-3 text-right">On hand</th>
@@ -102,6 +103,7 @@ export function StockByLocationTable({ rows }: { rows: StockByLocationRow[] }) {
                 <div className="font-medium">{row.locationCode}</div>
                 <div className="text-xs text-muted-foreground">{row.locationName}</div>
               </td>
+              <td className="px-4 py-3">{row.ownerName ?? "-"}</td>
               <td className="px-4 py-3">
                 <div className="font-medium">{row.sku}</div>
                 <div className="text-xs text-muted-foreground">{row.productName}</div>
@@ -130,7 +132,7 @@ export function StockByLocationTable({ rows }: { rows: StockByLocationRow[] }) {
           ))}
           {rows.length === 0 ? (
             <tr>
-              <td colSpan={9} className="px-4 py-10 text-center text-muted-foreground">
+              <td colSpan={10} className="px-4 py-10 text-center text-muted-foreground">
                 No stock records found.
               </td>
             </tr>

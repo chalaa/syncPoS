@@ -19,6 +19,8 @@ export type StockByLocationRow = {
   locationId: string;
   locationCode: string;
   locationName: string;
+  ownerId: string | null;
+  ownerName: string | null;
   productId: string;
   sku: string;
   productName: string;
@@ -34,16 +36,18 @@ export type StockByLocationRow = {
 };
 
 export type ProductStockCardRow = {
+  movementLineId: string;
   movementId: string;
   movementNo: string;
   movementType: string;
   movementDate: Date;
   sourceNo: string | null;
+  ownerId: string | null;
+  ownerName: string | null;
   fromLocationCode: string | null;
   toLocationCode: string | null;
   serialNo: string | null;
   quantity: string;
-  unitCostMinor: number;
   totalCostMinor: number;
   notes: string | null;
 };
@@ -86,6 +90,8 @@ export type InventoryOperationListRow = {
 export type InventoryOperationDetailLine = {
   id: string;
   lineNo: number;
+  ownerId: string | null;
+  ownerName: string | null;
   productId: string;
   sku: string;
   productName: string;
@@ -95,7 +101,6 @@ export type InventoryOperationDetailLine = {
   fromLocationCode: string | null;
   toLocationCode: string | null;
   quantity: string;
-  unitCostMinor: number;
   totalCostMinor: number;
   currencyCode: string;
   notes: string | null;
@@ -136,6 +141,7 @@ export type InventoryOperationFormOptions = {
     id: string;
     baseCurrencyCode: string;
   };
+  owners: Omit<InventoryOperationFormOption, "code">[];
   locations: InventoryOperationFormOption[];
   products: InventoryOperationProductOption[];
 };

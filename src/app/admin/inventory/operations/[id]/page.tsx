@@ -135,11 +135,11 @@ export default async function InventoryOperationDetailPage({ params, searchParam
                   <thead className="text-xs uppercase text-muted-foreground">
                     <tr className="border-b border-border">
                       <th className="px-3 py-2">Product</th>
+                      <th className="px-3 py-2">Owner</th>
                       <th className="px-3 py-2">From</th>
                       <th className="px-3 py-2">To</th>
                       <th className="px-3 py-2">Tracking</th>
                       <th className="px-3 py-2 text-right">Quantity</th>
-                      <th className="px-3 py-2 text-right">Unit Cost</th>
                       <th className="px-3 py-2 text-right">Value</th>
                     </tr>
                   </thead>
@@ -152,11 +152,11 @@ export default async function InventoryOperationDetailPage({ params, searchParam
                           </Link>
                           <div className="text-xs text-muted-foreground">{line.productName} / {line.trackingMode}</div>
                         </td>
+                        <td className="px-3 py-3">{line.ownerName ?? "-"}</td>
                         <td className="px-3 py-3">{line.fromLocationCode ?? operation.fromLocationCode ?? "-"}</td>
                         <td className="px-3 py-3">{line.toLocationCode ?? operation.toLocationCode ?? "-"}</td>
                         <td className="px-3 py-3">{line.serialNo ?? line.lotNo ?? "Bulk"}</td>
                         <td className="px-3 py-3 text-right">{displayQuantity(line.quantity)}</td>
-                        <td className="px-3 py-3 text-right">{displayMoneyMinor(line.unitCostMinor, line.currencyCode)}</td>
                         <td className="px-3 py-3 text-right">{displayMoneyMinor(line.totalCostMinor, line.currencyCode)}</td>
                       </tr>
                     ))}

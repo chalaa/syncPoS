@@ -175,6 +175,7 @@ export default async function PurchaseOrderDetailPage({ params, searchParams }: 
         <PurchaseOrderForm
           action={updatePurchaseOrder}
           suppliers={options.suppliers}
+          owners={options.owners}
           products={options.products}
           locations={options.locations}
           taxes={options.taxes}
@@ -189,6 +190,10 @@ export default async function PurchaseOrderDetailPage({ params, searchParams }: 
             <div>
               <p className="text-xs font-medium uppercase text-muted-foreground">Supplier</p>
               <p className="mt-1 text-sm font-medium">{order.supplierName}</p>
+            </div>
+            <div>
+              <p className="text-xs font-medium uppercase text-muted-foreground">Owner</p>
+              <p className="mt-1 text-sm font-medium">{order.ownerName ?? "-"}</p>
             </div>
             <div>
               <p className="text-xs font-medium uppercase text-muted-foreground">Reference</p>

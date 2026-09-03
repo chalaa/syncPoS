@@ -62,12 +62,6 @@ export const compatibilityType = pgEnum("compatibility_type", [
   "bundle",
   "upsell",
 ]);
-export const priceListType = pgEnum("price_list_type", [
-  "retail",
-  "wholesale",
-  "customer_specific",
-  "location_specific",
-]);
 export const partnerStatus = pgEnum("partner_status", ["active", "blocked", "inactive"]);
 export const addressType = pgEnum("address_type", ["billing", "delivery", "office", "warehouse"]);
 export const stockMovementType = pgEnum("stock_movement_type", [
@@ -270,6 +264,26 @@ export const companies = pgTable(
     uniqueIndex("companies_tin_active_uidx")
       .on(table.tin)
       .where(sql`${table.tin} is not null and ${table.deletedAt} is null`),
+  ],
+);
+
+export const owners = pgTable(
+  "owners",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    companyId: uuid("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    name: varchar("name", { length: 160 }).notNull(),
+    ...softDelete,
+    ...timestamps,
+  },
+  (table) => [
+    check("owners_name_not_empty_chk", sql`length(trim(${table.name})) > 0`),
+    uniqueIndex("owners_company_name_active_uidx")
+      .on(table.companyId, table.name)
+      .where(sql`${table.deletedAt} is null`),
+    index("owners_company_name_idx").on(table.companyId, table.name),
   ],
 );
 
@@ -664,13 +678,13 @@ export const unitsOfMeasure = pgTable(
       .references(() => companies.id, { onDelete: "restrict", onUpdate: "cascade" }),
     code: varchar("code", { length: 20 }).notNull(),
     name: varchar("name", { length: 80 }).notNull(),
-    precision: smallint("precision").notNull().default(0),
+    precision: numeric("precision", { precision: 20, scale: 6 }).notNull().default("1"),
     isActive: boolean("is_active").notNull().default(true),
     ...softDelete,
     ...timestamps,
   },
   (table) => [
-    check("units_of_measure_precision_chk", sql`${table.precision} between 0 and 6`),
+    check("units_of_measure_precision_chk", sql`${table.precision} > 0`),
     uniqueIndex("units_of_measure_code_active_uidx")
       .on(table.companyId, table.code)
       .where(sql`${table.deletedAt} is null`),
@@ -811,31 +825,23 @@ export const priceLists = pgTable(
     companyId: uuid("company_id")
       .notNull()
       .references(() => companies.id, { onDelete: "restrict", onUpdate: "cascade" }),
-    locationId: uuid("location_id").references(() => locations.id, {
+    ownerId: uuid("owner_id").references(() => owners.id, {
       onDelete: "restrict",
       onUpdate: "cascade",
     }),
-    code: varchar("code", { length: 40 }).notNull(),
     name: varchar("name", { length: 120 }).notNull(),
-    priceListType: priceListType("price_list_type").notNull().default("retail"),
     currencyCode: char("currency_code", { length: 3 })
       .notNull()
       .references(() => currencies.code, { onDelete: "restrict", onUpdate: "cascade" }),
-    validFrom: date("valid_from"),
-    validTo: date("valid_to"),
     isActive: boolean("is_active").notNull().default(true),
     ...softDelete,
     ...timestamps,
   },
   (table) => [
-    check(
-      "price_lists_date_range_chk",
-      sql`${table.validTo} is null or ${table.validFrom} is null or ${table.validTo} >= ${table.validFrom}`,
-    ),
-    uniqueIndex("price_lists_code_active_uidx")
-      .on(table.companyId, table.code)
+    uniqueIndex("price_lists_name_owner_active_uidx")
+      .on(table.companyId, table.name, table.ownerId)
       .where(sql`${table.deletedAt} is null`),
-    index("price_lists_location_active_idx").on(table.locationId, table.isActive),
+    index("price_lists_owner_active_idx").on(table.companyId, table.ownerId, table.isActive),
   ],
 );
 
@@ -854,8 +860,6 @@ export const priceListItems = pgTable(
       .default("1"),
     unitPriceMinor: bigint("unit_price_minor", { mode: "number" }).notNull(),
     discountMinor: bigint("discount_minor", { mode: "number" }).notNull().default(0),
-    validFrom: date("valid_from").notNull(),
-    validTo: date("valid_to"),
     isActive: boolean("is_active").notNull().default(true),
     ...softDelete,
     ...timestamps,
@@ -864,12 +868,8 @@ export const priceListItems = pgTable(
     check("price_list_items_minimum_quantity_chk", sql`${table.minimumQuantity} > 0`),
     check("price_list_items_unit_price_minor_chk", sql`${table.unitPriceMinor} >= 0`),
     check("price_list_items_discount_minor_chk", sql`${table.discountMinor} >= 0`),
-    check(
-      "price_list_items_date_range_chk",
-      sql`${table.validTo} is null or ${table.validTo} >= ${table.validFrom}`,
-    ),
-    uniqueIndex("price_list_items_product_date_active_uidx")
-      .on(table.priceListId, table.productId, table.minimumQuantity, table.validFrom)
+    uniqueIndex("price_list_items_product_qty_active_uidx")
+      .on(table.priceListId, table.productId, table.minimumQuantity)
       .where(sql`${table.deletedAt} is null`),
     index("price_list_items_product_idx").on(table.productId),
   ],
@@ -949,6 +949,10 @@ export const stockMovements = pgTable(
     companyId: uuid("company_id")
       .notNull()
       .references(() => companies.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    ownerId: uuid("owner_id").references(() => owners.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
     movementNo: varchar("movement_no", { length: 60 }).notNull(),
     movementType: stockMovementType("movement_type").notNull(),
     status: stockMovementStatus("status").notNull().default("draft"),
@@ -1011,6 +1015,7 @@ export const stockMovements = pgTable(
       .where(sql`${table.deletedAt} is null`),
     index("stock_movements_company_date_idx").on(table.companyId, table.movementDate),
     index("stock_movements_status_idx").on(table.companyId, table.status),
+    index("stock_movements_owner_idx").on(table.companyId, table.ownerId),
     index("stock_movements_source_idx").on(table.sourceType, table.sourceId),
     index("stock_movements_from_location_idx").on(table.fromLocationId),
     index("stock_movements_to_location_idx").on(table.toLocationId),
@@ -1024,6 +1029,10 @@ export const stockMovementLines = pgTable(
     stockMovementId: uuid("stock_movement_id")
       .notNull()
       .references(() => stockMovements.id, { onDelete: "cascade", onUpdate: "cascade" }),
+    ownerId: uuid("owner_id").references(() => owners.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
     lineNo: smallint("line_no").notNull(),
     productId: uuid("product_id")
       .notNull()
@@ -1048,7 +1057,6 @@ export const stockMovementLines = pgTable(
       .notNull()
       .references(() => unitsOfMeasure.id, { onDelete: "restrict", onUpdate: "cascade" }),
     quantity: numeric("quantity", { precision: 20, scale: 6 }).notNull(),
-    unitCostMinor: bigint("unit_cost_minor", { mode: "number" }).notNull().default(0),
     totalCostMinor: bigint("total_cost_minor", { mode: "number" }).notNull().default(0),
     currencyCode: char("currency_code", { length: 3 })
       .notNull()
@@ -1061,12 +1069,12 @@ export const stockMovementLines = pgTable(
   (table) => [
     check("stock_movement_lines_line_no_chk", sql`${table.lineNo} > 0`),
     check("stock_movement_lines_quantity_chk", sql`${table.quantity} <> 0`),
-    check("stock_movement_lines_unit_cost_chk", sql`${table.unitCostMinor} >= 0`),
     check("stock_movement_lines_total_cost_chk", sql`${table.totalCostMinor} >= 0`),
     uniqueIndex("stock_movement_lines_no_active_uidx")
       .on(table.stockMovementId, table.lineNo)
       .where(sql`${table.deletedAt} is null`),
     index("stock_movement_lines_product_idx").on(table.productId),
+    index("stock_movement_lines_owner_idx").on(table.ownerId),
     index("stock_movement_lines_serial_idx").on(table.productSerialId),
     index("stock_movement_lines_lot_idx").on(table.productLotId),
     index("stock_movement_lines_from_location_idx").on(table.fromLocationId),
@@ -1081,6 +1089,10 @@ export const stockBalances = pgTable(
     companyId: uuid("company_id")
       .notNull()
       .references(() => companies.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    ownerId: uuid("owner_id").references(() => owners.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
     locationId: uuid("location_id")
       .notNull()
       .references(() => locations.id, { onDelete: "restrict", onUpdate: "cascade" }),
@@ -1124,12 +1136,14 @@ export const stockBalances = pgTable(
         table.companyId,
         table.locationId,
         table.productId,
+        sql`coalesce(${table.ownerId}, '00000000-0000-0000-0000-000000000000'::uuid)`,
         sql`coalesce(${table.productSerialId}, '00000000-0000-0000-0000-000000000000'::uuid)`,
         sql`coalesce(${table.productLotId}, '00000000-0000-0000-0000-000000000000'::uuid)`,
       )
       .where(sql`${table.deletedAt} is null`),
     index("stock_balances_product_idx").on(table.companyId, table.productId),
     index("stock_balances_location_idx").on(table.companyId, table.locationId),
+    index("stock_balances_owner_idx").on(table.companyId, table.ownerId),
     index("stock_balances_serial_idx").on(table.productSerialId),
     index("stock_balances_lot_idx").on(table.productLotId),
   ],
@@ -1532,6 +1546,10 @@ export const purchaseOrders = pgTable(
     supplierId: uuid("supplier_id")
       .notNull()
       .references(() => partners.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    ownerId: uuid("owner_id").references(() => owners.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
     deliverToLocationId: uuid("deliver_to_location_id").references(() => locations.id, {
       onDelete: "restrict",
       onUpdate: "cascade",
@@ -1570,6 +1588,7 @@ export const purchaseOrders = pgTable(
     uniqueIndex("purchase_orders_no_active_uidx")
       .on(table.companyId, table.orderNo)
       .where(sql`${table.deletedAt} is null`),
+    index("purchase_orders_owner_idx").on(table.companyId, table.ownerId),
     index("purchase_orders_supplier_idx").on(table.supplierId),
     index("purchase_orders_deliver_to_idx").on(table.deliverToLocationId),
     index("purchase_orders_status_idx").on(table.companyId, table.status),
@@ -1969,6 +1988,10 @@ export const salesOrders = pgTable(
     customerId: uuid("customer_id")
       .notNull()
       .references(() => partners.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    ownerId: uuid("owner_id").references(() => owners.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
     invoiceAddressId: uuid("invoice_address_id").references(() => partnerAddresses.id, {
       onDelete: "restrict",
       onUpdate: "cascade",
@@ -2027,6 +2050,7 @@ export const salesOrders = pgTable(
     uniqueIndex("sales_orders_no_active_uidx")
       .on(table.companyId, table.orderNo)
       .where(sql`${table.deletedAt} is null`),
+    index("sales_orders_owner_idx").on(table.companyId, table.ownerId),
     index("sales_orders_customer_idx").on(table.customerId),
     index("sales_orders_source_location_idx").on(table.sourceLocationId),
     index("sales_orders_status_idx").on(table.companyId, table.status),
@@ -2041,6 +2065,10 @@ export const salesOrderLines = pgTable(
     salesOrderId: uuid("sales_order_id")
       .notNull()
       .references(() => salesOrders.id, { onDelete: "cascade", onUpdate: "cascade" }),
+    ownerId: uuid("owner_id").references(() => owners.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
     lineNo: smallint("line_no").notNull(),
     productId: uuid("product_id")
       .notNull()
@@ -2077,6 +2105,7 @@ export const salesOrderLines = pgTable(
     uniqueIndex("sales_order_lines_no_active_uidx")
       .on(table.salesOrderId, table.lineNo)
       .where(sql`${table.deletedAt} is null`),
+    index("sales_order_lines_owner_idx").on(table.ownerId),
     index("sales_order_lines_product_idx").on(table.productId),
   ],
 );
@@ -2801,6 +2830,10 @@ export const transfers = pgTable(
       .references(() => companies.id, { onDelete: "restrict", onUpdate: "cascade" }),
     transferNo: varchar("transfer_no", { length: 60 }).notNull(),
     status: transferStatus("status").notNull().default("draft"),
+    ownerId: uuid("owner_id").references(() => owners.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
     fromLocationId: uuid("from_location_id")
       .notNull()
       .references(() => locations.id, { onDelete: "restrict", onUpdate: "cascade" }),
@@ -2862,6 +2895,7 @@ export const transfers = pgTable(
       .on(table.companyId, table.transferNo)
       .where(sql`${table.deletedAt} is null`),
     index("transfers_status_idx").on(table.companyId, table.status),
+    index("transfers_owner_idx").on(table.companyId, table.ownerId),
     index("transfers_from_location_idx").on(table.fromLocationId),
     index("transfers_to_location_idx").on(table.toLocationId),
   ],
@@ -2878,6 +2912,10 @@ export const transferLines = pgTable(
     productId: uuid("product_id")
       .notNull()
       .references(() => products.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    ownerId: uuid("owner_id").references(() => owners.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
     productSerialId: uuid("product_serial_id").references(() => productSerials.id, {
       onDelete: "restrict",
       onUpdate: "cascade",
@@ -2913,6 +2951,7 @@ export const transferLines = pgTable(
       .on(table.transferId, table.lineNo)
       .where(sql`${table.deletedAt} is null`),
     index("transfer_lines_product_idx").on(table.productId),
+    index("transfer_lines_owner_idx").on(table.ownerId),
     index("transfer_lines_serial_idx").on(table.productSerialId),
     index("transfer_lines_lot_idx").on(table.productLotId),
   ],

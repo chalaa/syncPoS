@@ -17,6 +17,7 @@ import {
   goodsReceipts,
   landedCostAllocations,
   landedCosts,
+  owners,
   partnerContacts,
   partners,
   productLots,
@@ -39,6 +40,7 @@ import { getPurchaseOrderReceiptLines } from "@/server/purchasing/purchasing";
 const purchaseOrderHeaderSchema = z.object({
   purchaseOrderId: z.string().uuid().optional(),
   supplierId: z.string().uuid(),
+  ownerId: z.string().uuid().or(z.literal("")).transform((value) => value || null),
   deliverToLocationId: z.string().uuid().or(z.literal("")).transform((value) => value || null),
   vendorReference: z.string().trim().max(80).optional(),
   paymentTerm: z.enum(["cash", "credit"]).default("credit"),
@@ -127,6 +129,7 @@ function parsePurchaseOrderForm(formData: FormData, errorPath: string) {
   const parsedHeader = purchaseOrderHeaderSchema.safeParse({
     purchaseOrderId: formValue(formData, "purchaseOrderId") || undefined,
     supplierId: formValue(formData, "supplierId"),
+    ownerId: formValue(formData, "ownerId"),
     deliverToLocationId: formValue(formData, "deliverToLocationId"),
     vendorReference: formValue(formData, "vendorReference"),
     paymentTerm: formValue(formData, "paymentTerm") || "credit",
@@ -406,6 +409,18 @@ export async function createPurchaseOrder(formData: FormData) {
         throw new Error("Supplier is invalid.");
       }
 
+      const [owner] = header.ownerId
+        ? await tx
+            .select({ id: owners.id })
+            .from(owners)
+            .where(and(eq(owners.id, header.ownerId), eq(owners.companyId, company.id), isNull(owners.deletedAt)))
+            .limit(1)
+        : [];
+
+      if (!owner) {
+        throw new Error("Owner is required.");
+      }
+
       if (productRows.length !== uniqueProductIds.length) {
         throw new Error("One or more products are invalid.");
       }
@@ -458,6 +473,7 @@ export async function createPurchaseOrder(formData: FormData) {
         .values({
           companyId: company.id,
           supplierId: supplier.id,
+          ownerId: owner.id,
           orderNo,
           deliverToLocationId: header.deliverToLocationId,
           vendorReference: header.vendorReference || reference,
@@ -624,6 +640,18 @@ export async function updatePurchaseOrder(formData: FormData) {
         throw new Error("Supplier is invalid.");
       }
 
+      const [owner] = header.ownerId
+        ? await tx
+            .select({ id: owners.id })
+            .from(owners)
+            .where(and(eq(owners.id, header.ownerId), eq(owners.companyId, company.id), isNull(owners.deletedAt)))
+            .limit(1)
+        : [];
+
+      if (!owner) {
+        throw new Error("Owner is required.");
+      }
+
       if (productRows.length !== uniqueProductIds.length) {
         throw new Error("One or more products are invalid.");
       }
@@ -686,6 +714,7 @@ export async function updatePurchaseOrder(formData: FormData) {
         .update(purchaseOrders)
         .set({
           supplierId: supplier.id,
+          ownerId: owner.id,
           deliverToLocationId: header.deliverToLocationId,
           paymentTerm: header.paymentTerm,
           orderDate: header.orderDate || dateOnly(new Date()),
@@ -922,6 +951,7 @@ export async function postGoodsReceipt(formData: FormData) {
         .select({
           id: purchaseOrders.id,
           supplierId: purchaseOrders.supplierId,
+          ownerId: purchaseOrders.ownerId,
           orderNo: purchaseOrders.orderNo,
           status: purchaseOrders.status,
           currencyCode: purchaseOrders.currencyCode,
@@ -991,6 +1021,7 @@ export async function postGoodsReceipt(formData: FormData) {
         .insert(stockMovements)
         .values({
           companyId: company.id,
+          ownerId: order.ownerId,
           movementNo: stockMoveNo,
           movementType: "purchase_receipt",
           status: "posted",
@@ -1128,6 +1159,7 @@ export async function postGoodsReceipt(formData: FormData) {
 
         await tx.insert(stockMovementLines).values({
           stockMovementId: movement.id,
+          ownerId: order.ownerId,
           lineNo: receiptLineNo,
           productId: line.productId,
           productSerialId,
@@ -1136,7 +1168,6 @@ export async function postGoodsReceipt(formData: FormData) {
           toLocationId: parsed.data.locationId,
           unitId: line.unitId,
           quantity: String(receiveQuantity),
-          unitCostMinor: line.unitCostMinor,
           totalCostMinor: lineTotalMinor,
           currencyCode: line.currencyCode,
           notes: `Received from ${order.orderNo}`,
@@ -1159,6 +1190,7 @@ export async function postGoodsReceipt(formData: FormData) {
           .where(
             and(
               eq(stockBalances.companyId, company.id),
+              order.ownerId ? eq(stockBalances.ownerId, order.ownerId) : isNull(stockBalances.ownerId),
               eq(stockBalances.locationId, parsed.data.locationId),
               eq(stockBalances.productId, line.productId),
               serialFilter,
@@ -1184,6 +1216,7 @@ export async function postGoodsReceipt(formData: FormData) {
         } else {
           await tx.insert(stockBalances).values({
             companyId: company.id,
+            ownerId: order.ownerId,
             locationId: parsed.data.locationId,
             productId: line.productId,
             productSerialId,

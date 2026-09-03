@@ -66,29 +66,29 @@ export function ProductStockCardTable({ rows }: { rows: ProductStockCardRow[] })
           <tr>
             <th className="px-4 py-3">Date</th>
             <th className="px-4 py-3">Movement</th>
+            <th className="px-4 py-3">Owner</th>
             <th className="px-4 py-3">Type</th>
             <th className="px-4 py-3">From</th>
             <th className="px-4 py-3">To</th>
             <th className="px-4 py-3">Serial</th>
             <th className="px-4 py-3 text-right">Qty</th>
-            <th className="px-4 py-3 text-right">Unit cost</th>
             <th className="px-4 py-3 text-right">Total</th>
           </tr>
         </thead>
         <tbody>
           {rows.map((row) => (
-            <tr key={`${row.movementId}-${row.serialNo ?? row.quantity}`} className="border-t border-border">
+            <tr key={row.movementLineId} className="border-t border-border">
               <td className="px-4 py-3">{row.movementDate.toLocaleDateString()}</td>
               <td className="px-4 py-3">
                 <div className="font-medium">{row.movementNo}</div>
                 <div className="text-xs text-muted-foreground">{row.sourceNo ?? row.notes ?? ""}</div>
               </td>
+              <td className="px-4 py-3">{row.ownerName ?? "-"}</td>
               <td className="px-4 py-3">{row.movementType.replace(/_/g, " ")}</td>
               <td className="px-4 py-3">{row.fromLocationCode ?? "-"}</td>
               <td className="px-4 py-3">{row.toLocationCode ?? "-"}</td>
               <td className="px-4 py-3">{row.serialNo ?? "-"}</td>
               <td className="px-4 py-3 text-right">{displayQuantity(row.quantity)}</td>
-              <td className="px-4 py-3 text-right">{displayMoneyMinor(row.unitCostMinor, "ETB")}</td>
               <td className="px-4 py-3 text-right">{displayMoneyMinor(row.totalCostMinor, "ETB")}</td>
             </tr>
           ))}
@@ -147,23 +147,24 @@ export function SerialHistoryTable({ rows }: { rows: SerialHistoryRow[] }) {
           <tr>
             <th className="px-4 py-3">Serial</th>
             <th className="px-4 py-3">Product</th>
+            <th className="px-4 py-3">Owner</th>
             <th className="px-4 py-3">Current</th>
             <th className="px-4 py-3">Date</th>
             <th className="px-4 py-3">Movement</th>
             <th className="px-4 py-3">From</th>
             <th className="px-4 py-3">To</th>
             <th className="px-4 py-3 text-right">Qty</th>
-            <th className="px-4 py-3 text-right">Cost</th>
           </tr>
         </thead>
         <tbody>
           {rows.map((row) => (
-            <tr key={`${row.movementId}-${row.serialNo}`} className="border-t border-border">
+            <tr key={row.movementLineId} className="border-t border-border">
               <td className="px-4 py-3 font-medium">{row.serialNo}</td>
               <td className="px-4 py-3">
                 <div>{row.sku}</div>
                 <div className="text-xs text-muted-foreground">{row.productName}</div>
               </td>
+              <td className="px-4 py-3">{row.ownerName ?? "-"}</td>
               <td className="px-4 py-3">
                 <div>{row.currentLocationCode ?? "-"}</div>
                 <div className="text-xs text-muted-foreground">{row.serialStatus}</div>
@@ -173,7 +174,6 @@ export function SerialHistoryTable({ rows }: { rows: SerialHistoryRow[] }) {
               <td className="px-4 py-3">{row.fromLocationCode ?? "-"}</td>
               <td className="px-4 py-3">{row.toLocationCode ?? "-"}</td>
               <td className="px-4 py-3 text-right">{displayQuantity(row.quantity)}</td>
-              <td className="px-4 py-3 text-right">{displayMoneyMinor(row.unitCostMinor, "ETB")}</td>
             </tr>
           ))}
           {rows.length === 0 ? (

@@ -31,6 +31,7 @@ export default async function NewPurchaseOrderPage({ searchParams }: NewPurchase
       <PurchaseOrderForm
         action={createPurchaseOrder}
         suppliers={options.suppliers}
+        owners={options.owners}
         products={options.products}
         locations={options.locations}
         taxes={options.taxes}

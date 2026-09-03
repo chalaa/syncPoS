@@ -22,6 +22,8 @@ import type { CatalogReferenceRecord } from "@/server/catalog/types";
 
 const inputClass =
   "h-10 rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring";
+const readonlyInputClass =
+  "h-10 rounded-md border border-input bg-muted px-3 text-sm text-muted-foreground outline-none";
 const textareaClass =
   "min-h-24 rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
@@ -51,15 +53,17 @@ function ReferenceForm({
       {record ? <input type="hidden" name="id" value={record.id} /> : null}
 
       <div className="grid gap-4 sm:grid-cols-2">
-        <label className="flex flex-col gap-1 text-sm font-medium">
-          Code
-          <input
-            name="code"
-            placeholder={record ? undefined : "Auto"}
-            defaultValue={record?.code}
-            className={inputClass}
-          />
-        </label>
+        {record ? (
+          <label className="flex flex-col gap-1 text-sm font-medium">
+            Code
+            <input
+              name="code"
+              defaultValue={record.code}
+              readOnly
+              className={readonlyInputClass}
+            />
+          </label>
+        ) : null}
         <label className="flex flex-col gap-1 text-sm font-medium">
           Name
           <input
@@ -77,9 +81,9 @@ function ReferenceForm({
           <input
             name="precision"
             type="number"
-            min="0"
-            max="6"
-            defaultValue={record?.precision ?? 0}
+            step="0.000001"
+            min="0.000001"
+            defaultValue={record?.precision ?? "1"}
             className={inputClass}
           />
         </label>

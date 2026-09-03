@@ -43,6 +43,34 @@ function isSubmenuActive(item: AdminSubMenuItem, currentHref: string, pathname: 
   );
 }
 
+function getActiveSubmenuLabel(
+  items: AdminSubMenuItem[],
+  currentHref: string,
+  pathname: string,
+) {
+  for (const item of items) {
+    if (currentHref === item.href) {
+      return item.label;
+    }
+
+    const activeChild = item.children?.find((child) => {
+      if (currentHref === child.href) {
+        return true;
+      }
+
+      const childPath = hrefPath(child.href);
+
+      return !child.href.includes("?") && pathname.startsWith(`${childPath}/`);
+    });
+
+    if (activeChild) {
+      return `${item.label} / ${activeChild.label}`;
+    }
+  }
+
+  return items[0]?.label ?? "Menu";
+}
+
 export function AdminShell({
   username,
   permissionCodes,
@@ -66,10 +94,9 @@ export function AdminShell({
   const activeMenu = getActiveMenu(pathname, adminMenuItems);
   const queryString = searchParams.toString();
   const currentHref = queryString ? `${pathname}?${queryString}` : pathname;
-  const activeSubmenuLabel =
-    activeMenu?.submenus.find((item) => isSubmenuActive(item, currentHref, pathname))?.label ??
-    activeMenu?.submenus[0]?.label ??
-    "Menu";
+  const activeSubmenuLabel = activeMenu
+    ? getActiveSubmenuLabel(activeMenu.submenus, currentHref, pathname)
+    : "Menu";
 
   useEffect(() => {
     if (window.matchMedia("(max-width: 767px)").matches) {
@@ -93,7 +120,7 @@ export function AdminShell({
   }, [selectedLocationId, setSelectedLocationId, shopLocations]);
 
   return (
-    <div className="flex min-h-screen bg-background text-foreground">
+    <div className="flex min-h-screen items-stretch bg-background text-foreground">
       {adminNavOpen ? (
         <button
           type="button"
@@ -104,7 +131,7 @@ export function AdminShell({
       ) : null}
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-50 flex h-screen flex-col border-r border-border bg-card text-card-foreground transition-[transform,width] md:sticky md:top-0 md:z-auto",
+          "fixed inset-y-0 left-0 z-50 flex h-dvh flex-col border-r border-border bg-card text-card-foreground transition-[transform,width] md:sticky md:top-0 md:z-auto md:h-auto md:min-h-screen md:self-stretch",
           adminNavOpen ? "w-64 translate-x-0" : "-translate-x-full md:w-20 md:translate-x-0",
         )}
       >
@@ -234,7 +261,7 @@ export function AdminShell({
             </details>
           </div>
 
-          <nav className="hidden min-w-0 flex-1 items-center gap-2 overflow-x-auto whitespace-nowrap pb-1 lg:flex">
+          <nav className="hidden min-w-0 flex-1 items-center gap-2 overflow-visible whitespace-nowrap lg:flex">
             {activeMenu ? (
               <>
                 <span className="shrink-0 font-semibold">{activeMenu.label}</span>

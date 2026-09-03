@@ -25,6 +25,7 @@ const tableInputClass = "h-9 w-full rounded-md border border-input bg-background
 
 type SalesLineDraft = {
   key: string;
+  ownerId: string;
   productId: string;
   quantity: string;
   unitPrice: string;
@@ -32,9 +33,10 @@ type SalesLineDraft = {
   taxIds: string[];
 };
 
-function newLine(): SalesLineDraft {
+function newLine(ownerId = ""): SalesLineDraft {
   return {
     key: crypto.randomUUID(),
+    ownerId,
     productId: "",
     quantity: "1",
     unitPrice: "0",
@@ -100,6 +102,7 @@ function calculateTaxes(lineAmount: number, quantity: number, selectedTaxes: Sal
 export function SalesOrderForm({
   action,
   customers,
+  owners,
   products,
   locations,
   taxes,
@@ -110,6 +113,7 @@ export function SalesOrderForm({
 }: {
   action: (formData: FormData) => void | Promise<void>;
   customers: SalesFormOption[];
+  owners: SalesFormOption[];
   products: SalesFormOption[];
   locations: SalesFormOption[];
   taxes: SalesTaxOption[];
@@ -120,6 +124,8 @@ export function SalesOrderForm({
 }) {
   const [editingLineKey, setEditingLineKey] = useState<string | null>(null);
   const [paymentTerm, setPaymentTerm] = useState<"cash" | "credit">(order?.paymentTerm ?? "credit");
+  const defaultOwnerId = order?.ownerId ?? owners[0]?.id ?? "";
+  const [headerOwnerId, setHeaderOwnerId] = useState(defaultOwnerId);
   const selectedLocationId = useAppStore((state) => state.selectedLocationId);
   const setSelectedLocationId = useAppStore((state) => state.setSelectedLocationId);
   const [sourceLocationId, setSourceLocationId] = useState(order?.sourceLocationId ?? "");
@@ -127,13 +133,14 @@ export function SalesOrderForm({
     order?.lines.length
       ? order.lines.map((line) => ({
           key: line.id,
+          ownerId: line.ownerId ?? defaultOwnerId,
           productId: line.productId,
           quantity: line.quantityOrdered,
           unitPrice: String(line.unitPriceMinor / 100),
           discount: String(line.discountMinor / 100),
           taxIds: line.taxIds,
         }))
-      : [newLine()],
+      : [newLine(defaultOwnerId)],
   );
   const taxById = useMemo(() => new Map(taxes.map((tax) => [tax.id, tax])), [taxes]);
   const productById = useMemo(() => new Map(products.map((product) => [product.id, product])), [products]);
@@ -187,7 +194,7 @@ export function SalesOrderForm({
   }
 
   function addLineForEditing() {
-    const line = newLine();
+    const line = newLine(headerOwnerId);
 
     setLines((current) => [...current, line]);
     setEditingLineKey(line.key);
@@ -237,7 +244,24 @@ export function SalesOrderForm({
         </label>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-4">
+        <label className="flex flex-col gap-1 text-sm font-medium">
+          Owner
+          <select
+            name="ownerId"
+            value={headerOwnerId}
+            onChange={(event) => setHeaderOwnerId(event.target.value)}
+            className={inputClass}
+            required={owners.length > 0}
+          >
+            <option value="">Select owner</option>
+            {owners.map((owner) => (
+              <option key={owner.id} value={owner.id}>
+                {owner.name}
+              </option>
+            ))}
+          </select>
+        </label>
         <label className="flex flex-col gap-1 text-sm font-medium">
           Payment Term
           <select
@@ -299,6 +323,7 @@ export function SalesOrderForm({
                 {lines.map((line) => (
                   <div key={`${line.key}-fields`} className="hidden">
                     <input type="hidden" name="productId" value={line.productId} />
+                    <input type="hidden" name="lineOwnerId" value={line.ownerId || headerOwnerId} />
                     <input type="hidden" name="quantity" value={line.quantity} />
                     <input type="hidden" name="unitPrice" value={line.unitPrice} />
                     <input type="hidden" name="discount" value={line.discount} />
@@ -307,10 +332,11 @@ export function SalesOrderForm({
                 ))}
 
                 <div className="hidden overflow-x-auto lg:block">
-                  <table className="w-full min-w-[1080px] border-collapse text-sm">
+                  <table className="w-full min-w-[1180px] border-collapse text-sm">
                     <thead>
                       <tr className="border-b border-border text-left text-xs font-semibold uppercase text-muted-foreground">
                         <th className="px-2 py-2">Product</th>
+                        <th className="w-44 px-2 py-2">Owner</th>
                         <th className="w-28 px-2 py-2 text-right">Quantity</th>
                         <th className="w-32 px-2 py-2 text-right">Unit Price</th>
                         <th className="w-32 px-2 py-2 text-right">Discount</th>
@@ -333,6 +359,20 @@ export function SalesOrderForm({
                               {products.map((product) => (
                                 <option key={product.id} value={product.id}>
                                   {product.code} / {product.name}
+                                </option>
+                              ))}
+                            </select>
+                          </td>
+                          <td className="px-2 py-3">
+                            <select
+                              value={line.ownerId || headerOwnerId}
+                              className={tableInputClass}
+                              onChange={(event) => updateLine(line.key, { ownerId: event.target.value })}
+                            >
+                              <option value="">Select owner</option>
+                              {owners.map((owner) => (
+                                <option key={owner.id} value={owner.id}>
+                                  {owner.name}
                                 </option>
                               ))}
                             </select>
@@ -397,6 +437,7 @@ export function SalesOrderForm({
                 <div className="grid gap-3 lg:hidden">
                   {lines.map((line, index) => {
                     const product = productById.get(line.productId);
+                    const owner = owners.find((item) => item.id === (line.ownerId || headerOwnerId));
                     const selectedTaxCount = line.taxIds.length;
 
                     return (
@@ -405,7 +446,7 @@ export function SalesOrderForm({
                           <div className="min-w-0">
                             <p className="truncate font-semibold">{product ? `${product.code} / ${product.name}` : "No product selected"}</p>
                             <p className="text-xs text-muted-foreground">
-                              Qty {line.quantity || "0"} / Unit price {line.unitPrice || "0"} / Taxes {selectedTaxCount}
+                              {owner?.name ?? "No owner"} / Qty {line.quantity || "0"} / Unit price {line.unitPrice || "0"} / Taxes {selectedTaxCount}
                             </p>
                           </div>
                           <div className="shrink-0 text-right font-semibold">{money(lineTotals[index]?.total ?? 0)}</div>
@@ -470,6 +511,21 @@ export function SalesOrderForm({
                             {products.map((product) => (
                               <option key={product.id} value={product.id}>
                                 {product.code} / {product.name}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                        <label className="flex flex-col gap-1 text-sm font-medium">
+                          Owner
+                          <select
+                            value={editingLine.ownerId || headerOwnerId}
+                            className={inputClass}
+                            onChange={(event) => updateLine(editingLine.key, { ownerId: event.target.value })}
+                          >
+                            <option value="">Select owner</option>
+                            {owners.map((owner) => (
+                              <option key={owner.id} value={owner.id}>
+                                {owner.name}
                               </option>
                             ))}
                           </select>

@@ -1,17 +1,9 @@
 export const trackingModeOptions = ["none", "lot", "serial"] as const;
 export const taxScopeOptions = ["purchase", "sale", "both"] as const;
 export const taxComputationOptions = ["percent", "fixed"] as const;
-export const priceListTypeOptions = [
-  "retail",
-  "wholesale",
-  "customer_specific",
-  "location_specific",
-] as const;
-
 export type TrackingModeOption = (typeof trackingModeOptions)[number];
 export type TaxScopeOption = (typeof taxScopeOptions)[number];
 export type TaxComputationOption = (typeof taxComputationOptions)[number];
-export type PriceListTypeOption = (typeof priceListTypeOptions)[number];
 
 export type SelectOption = {
   id: string;
@@ -26,7 +18,7 @@ export type CatalogReferenceRecord = {
   code: string;
   name: string;
   description?: string | null;
-  precision?: number;
+  precision?: string;
   isActive: boolean;
   deletedAt: Date | null;
 };
@@ -85,7 +77,6 @@ export type ProductDetailMovementRow = {
   serialNo: string | null;
   lotNo: string | null;
   quantity: string;
-  unitCostMinor: number;
   totalCostMinor: number;
   currencyCode: string;
 };
@@ -108,16 +99,12 @@ export type ProductDetail = ProductFormRecord & {
 
 export type ProductPriceListRow = {
   id: string;
-  code: string;
   name: string;
-  priceListType: string;
+  ownerId: string | null;
+  ownerName: string | null;
   currencyCode: string;
-  locationId: string | null;
-  locationCode: string | null;
   itemCount: number;
   isActive: boolean;
-  validFrom: string | null;
-  validTo: string | null;
   items: ProductPriceListItemRow[];
 };
 
@@ -129,14 +116,12 @@ export type ProductPriceListItemRow = {
   minimumQuantity: string;
   unitPriceMinor: number;
   discountMinor: number;
-  validFrom: string;
-  validTo: string | null;
   isActive: boolean;
 };
 
 export type PriceListFormOptions = {
   products: SelectOption[];
-  locations: SelectOption[];
+  owners: Omit<SelectOption, "code">[];
 };
 
 export type ProductTrackingListRow = {
@@ -150,6 +135,44 @@ export type ProductTrackingListRow = {
   currentLocationCode: string | null;
   landedUnitCostMinor: number | null;
   quantityOnHand: string;
+};
+
+export type ProductImportRow = {
+  rowNumber: number;
+  sku: string;
+  productName: string;
+  category: string;
+  categoryName: string;
+  brand: string;
+  brandName: string;
+  model: string;
+  unit: string;
+  unitName: string;
+  trackingMode: TrackingModeOption | "";
+  salesUnitPrice: string;
+  purchaseUnitCost: string;
+  listPriceMinor: number;
+  standardCostMinor: number;
+  salesTaxes: string;
+  purchaseTaxes: string;
+  saleTaxIds: string[];
+  purchaseTaxIds: string[];
+  description: string;
+  action: "create" | "update";
+  existingProductId: string | null;
+  errors: string[];
+};
+
+export type ProductImportPreviewState = {
+  status: "idle" | "preview" | "error" | "imported";
+  message?: string;
+  rows: ProductImportRow[];
+  importToken?: string;
+};
+
+export type ProductImportCommitPayload = {
+  importToken: string;
+  rows: ProductImportRow[];
 };
 
 export type TaxRecord = {

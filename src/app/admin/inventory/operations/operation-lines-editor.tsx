@@ -10,7 +10,6 @@ type OperationLineDraft = {
   id: string;
   productId: string;
   quantity: string;
-  unitCost: string;
   serialNo: string;
   lotNo: string;
   notes: string;
@@ -25,7 +24,6 @@ function createLine(): OperationLineDraft {
     id: crypto.randomUUID(),
     productId: "",
     quantity: "",
-    unitCost: "0",
     serialNo: "",
     lotNo: "",
     notes: "",
@@ -80,7 +78,6 @@ export function OperationLinesEditor({ products }: { products: InventoryOperatio
           <tr className="border-b border-border">
             <th className="px-2 py-2">Product</th>
             <th className="px-2 py-2 text-right">Quantity</th>
-            <th className="px-2 py-2 text-right">Unit Cost</th>
             <th className="px-2 py-2">Serial</th>
             <th className="px-2 py-2">Lot</th>
             <th className="px-2 py-2">Notes</th>
@@ -122,14 +119,6 @@ export function OperationLinesEditor({ products }: { products: InventoryOperatio
                     value={line.quantity}
                     placeholder={trackingMode === "serial" ? "1 or -1" : "0"}
                     onChange={(event) => updateLine(line.id, { quantity: event.target.value })}
-                    className={`${inputClass()} text-right`}
-                  />
-                </td>
-                <td className="px-2 py-3">
-                  <input
-                    name="unitCost"
-                    value={line.unitCost}
-                    onChange={(event) => updateLine(line.id, { unitCost: event.target.value })}
                     className={`${inputClass()} text-right`}
                   />
                 </td>

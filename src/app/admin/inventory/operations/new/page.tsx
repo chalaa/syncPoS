@@ -34,6 +34,17 @@ export default async function NewInventoryOperationPage({ searchParams }: NewInv
       <form action={createInventoryOperation} className="rounded-lg border border-border bg-card p-5">
         <div className="grid gap-4 md:grid-cols-4">
           <label className="space-y-1">
+            <span className="text-xs font-medium text-muted-foreground">Owner</span>
+            <select name="ownerId" required defaultValue={options.owners[0]?.id ?? ""} className={inputClass()}>
+              <option value="">Select owner</option>
+              {options.owners.map((owner) => (
+                <option key={owner.id} value={owner.id}>
+                  {owner.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="space-y-1">
             <span className="text-xs font-medium text-muted-foreground">Operation Type</span>
             <select name="movementType" required defaultValue="adjustment" className={inputClass()}>
               <option value="adjustment">Adjustment</option>

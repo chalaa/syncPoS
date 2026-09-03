@@ -14,6 +14,7 @@ import {
   customerInvoiceLines,
   expenseCategories,
   expenses,
+  owners,
   partners,
   paymentAccounts,
   paymentAllocations,
@@ -54,6 +55,7 @@ if (!databaseUrl) {
 const foundationIds = {
   company: "11111111-1111-4111-8111-111111111111",
   adminUser: "33333333-3333-4333-8333-333333333333",
+  defaultOwner: "10101010-1010-4101-8101-101010101010",
   warehouse: "77777777-7777-4777-8777-777777777777",
   displayShop: "88888888-8888-4888-8888-888888888888",
 };
@@ -140,6 +142,15 @@ async function main() {
       }
 
       await tx
+        .insert(owners)
+        .values({
+          id: foundationIds.defaultOwner,
+          companyId: foundationIds.company,
+          name: "Main Owner",
+        })
+        .onConflictDoNothing();
+
+      await tx
         .insert(productCategories)
         .values([
           {
@@ -195,7 +206,7 @@ async function main() {
             companyId: foundationIds.company,
             code: "EA",
             name: "Each",
-            precision: 0,
+            precision: "1",
             isActive: true,
           },
           {
@@ -203,7 +214,7 @@ async function main() {
             companyId: foundationIds.company,
             code: "LTR",
             name: "Liter",
-            precision: 2,
+            precision: "0.01",
             isActive: true,
           },
         ])
@@ -501,16 +512,14 @@ async function main() {
         .values({
           id: ids.priceList,
           companyId: foundationIds.company,
-          code: "DEMO-RETAIL",
+          ownerId: foundationIds.defaultOwner,
           name: "Demo Retail Price List",
-          priceListType: "retail",
           currencyCode,
-          validFrom: todayDate,
           isActive: true,
         })
         .onConflictDoUpdate({
           target: priceLists.id,
-          set: { deletedAt: null, isActive: true, updatedAt: sql`now()` },
+          set: { ownerId: foundationIds.defaultOwner, deletedAt: null, isActive: true, updatedAt: sql`now()` },
         });
 
       await tx
@@ -523,7 +532,6 @@ async function main() {
             minimumQuantity: "1",
             unitPriceMinor: 4_250_000_00,
             discountMinor: 0,
-            validFrom: todayDate,
             isActive: true,
           },
           {
@@ -533,7 +541,6 @@ async function main() {
             minimumQuantity: "1",
             unitPriceMinor: 1_950_00,
             discountMinor: 0,
-            validFrom: todayDate,
             isActive: true,
           },
           {
@@ -543,7 +550,6 @@ async function main() {
             minimumQuantity: "1",
             unitPriceMinor: 650_00,
             discountMinor: 0,
-            validFrom: todayDate,
             isActive: true,
           },
         ])
@@ -558,6 +564,7 @@ async function main() {
           id: ids.openingMovement,
           companyId: foundationIds.company,
           movementNo: "DEMO-OPENING-001",
+          ownerId: foundationIds.defaultOwner,
           movementType: "opening_balance",
           status: "posted",
           movementDate: today,
@@ -572,7 +579,7 @@ async function main() {
         })
         .onConflictDoUpdate({
           target: stockMovements.id,
-          set: { status: "posted", postedAt: today, updatedAt: sql`now()` },
+          set: { ownerId: foundationIds.defaultOwner, status: "posted", postedAt: today, updatedAt: sql`now()` },
         });
 
       await tx
@@ -581,13 +588,13 @@ async function main() {
           {
             id: uuidFromSeed("demo:stock-movement-line:excavator"),
             stockMovementId: ids.openingMovement,
+            ownerId: foundationIds.defaultOwner,
             lineNo: 1,
             productId: ids.excavator,
             productSerialId: ids.excavatorSerial,
             toLocationId: foundationIds.displayShop,
             unitId: ids.unitEach,
             quantity: "1",
-            unitCostMinor: 3_500_000_00,
             totalCostMinor: 3_500_000_00,
             currencyCode,
             metadata: { seed: "demo" },
@@ -595,12 +602,12 @@ async function main() {
           {
             id: uuidFromSeed("demo:stock-movement-line:filter"),
             stockMovementId: ids.openingMovement,
+            ownerId: foundationIds.defaultOwner,
             lineNo: 2,
             productId: ids.filter,
             toLocationId: foundationIds.warehouse,
             unitId: ids.unitEach,
             quantity: "24",
-            unitCostMinor: 1_200_00,
             totalCostMinor: 28_800_00,
             currencyCode,
             metadata: { seed: "demo" },
@@ -608,13 +615,13 @@ async function main() {
           {
             id: uuidFromSeed("demo:stock-movement-line:oil"),
             stockMovementId: ids.openingMovement,
+            ownerId: foundationIds.defaultOwner,
             lineNo: 3,
             productId: ids.oil,
             productLotId: ids.oilLot,
             toLocationId: foundationIds.warehouse,
             unitId: ids.unitLiter,
             quantity: "120",
-            unitCostMinor: 450_00,
             totalCostMinor: 54_000_00,
             currencyCode,
             metadata: { seed: "demo" },
@@ -622,7 +629,7 @@ async function main() {
         ])
         .onConflictDoUpdate({
           target: stockMovementLines.id,
-          set: { deletedAt: null, updatedAt: sql`now()` },
+          set: { ownerId: foundationIds.defaultOwner, deletedAt: null, updatedAt: sql`now()` },
         });
 
       await tx
@@ -631,6 +638,7 @@ async function main() {
           {
             id: uuidFromSeed("demo:stock-balance:excavator"),
             companyId: foundationIds.company,
+            ownerId: foundationIds.defaultOwner,
             locationId: foundationIds.displayShop,
             productId: ids.excavator,
             productSerialId: ids.excavatorSerial,
@@ -644,6 +652,7 @@ async function main() {
           {
             id: uuidFromSeed("demo:stock-balance:filter"),
             companyId: foundationIds.company,
+            ownerId: foundationIds.defaultOwner,
             locationId: foundationIds.warehouse,
             productId: ids.filter,
             quantityOnHand: "24",
@@ -656,6 +665,7 @@ async function main() {
           {
             id: uuidFromSeed("demo:stock-balance:oil"),
             companyId: foundationIds.company,
+            ownerId: foundationIds.defaultOwner,
             locationId: foundationIds.warehouse,
             productId: ids.oil,
             productLotId: ids.oilLot,
@@ -669,7 +679,7 @@ async function main() {
         ])
         .onConflictDoUpdate({
           target: stockBalances.id,
-          set: { deletedAt: null, updatedAt: sql`now()` },
+          set: { ownerId: foundationIds.defaultOwner, deletedAt: null, updatedAt: sql`now()` },
         });
 
       const salesSubtotal = 1_950_00 * 4;
@@ -682,6 +692,7 @@ async function main() {
           id: ids.salesOrder,
           companyId: foundationIds.company,
           customerId: ids.customer,
+          ownerId: foundationIds.defaultOwner,
           sourceLocationId: foundationIds.warehouse,
           priceListId: ids.priceList,
           orderNo: "DEMO-SO-001",
@@ -700,7 +711,7 @@ async function main() {
         })
         .onConflictDoUpdate({
           target: salesOrders.id,
-          set: { deletedAt: null, updatedAt: sql`now()` },
+          set: { ownerId: foundationIds.defaultOwner, deletedAt: null, updatedAt: sql`now()` },
         });
 
       await tx
@@ -828,6 +839,7 @@ async function main() {
           id: ids.purchaseOrder,
           companyId: foundationIds.company,
           supplierId: ids.supplier,
+          ownerId: foundationIds.defaultOwner,
           deliverToLocationId: foundationIds.warehouse,
           orderNo: "DEMO-PO-001",
           vendorReference: "DEMO-SUP-QUOTE-001",
@@ -844,7 +856,7 @@ async function main() {
         })
         .onConflictDoUpdate({
           target: purchaseOrders.id,
-          set: { deletedAt: null, updatedAt: sql`now()` },
+          set: { ownerId: foundationIds.defaultOwner, deletedAt: null, updatedAt: sql`now()` },
         });
 
       await tx

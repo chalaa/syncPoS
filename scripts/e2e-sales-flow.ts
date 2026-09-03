@@ -394,7 +394,6 @@ async function main() {
           to_location_id,
           unit_id,
           quantity,
-          unit_cost_minor,
           total_cost_minor,
           currency_code,
           notes
@@ -407,7 +406,6 @@ async function main() {
           ${customerLocationId},
           ${unit.id},
           ${quantity},
-          ${unitCostMinor},
           ${totalCostMinor},
           ${company.base_currency_code},
           'E2E delivered stock'

@@ -9,6 +9,8 @@ export type SalesOrderListRow = {
   customerReference: string | null;
   fsNumber: string | null;
   paymentTerm: "cash" | "credit";
+  ownerId: string | null;
+  ownerName: string | null;
   customerName: string;
   status: string;
   orderDate: string;
@@ -28,6 +30,8 @@ export type SalesOrderListRow = {
 export type SalesOrderDetailLine = {
   id: string;
   lineNo: number;
+  ownerId: string | null;
+  ownerName: string | null;
   productId: string;
   productName: string;
   sku: string;
@@ -50,6 +54,8 @@ export type SalesOrderDetail = {
   orderNo: string;
   customerId: string;
   customerName: string;
+  ownerId: string | null;
+  ownerName: string | null;
   sourceLocationId: string | null;
   customerReference: string | null;
   fsNumber: string | null;
@@ -81,6 +87,7 @@ export type SalesFormOptions = {
     baseCurrencyCode: string;
   };
   customers: SalesFormOption[];
+  owners: SalesFormOption[];
   products: SalesFormOption[];
   locations: SalesFormOption[];
   taxes: SalesTaxOption[];

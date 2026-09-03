@@ -12,6 +12,7 @@ import { getDefaultCompany } from "@/server/catalog/products";
 import { db } from "@/server/db/client";
 import {
   auditLogs,
+  owners,
   productLots,
   productSerials,
   products,
@@ -23,6 +24,7 @@ import {
 } from "@/server/db/schema";
 
 const createTransferSchema = z.object({
+  ownerId: z.string().uuid(),
   fromLocationId: z.string().uuid(),
   transitLocationId: z.string().uuid(),
   toLocationId: z.string().uuid(),
@@ -95,6 +97,7 @@ async function getBalance(
   params: {
     companyId: string;
     locationId: string;
+    ownerId: string;
     productId: string;
     productSerialId: string | null;
     productLotId: string | null;
@@ -113,7 +116,7 @@ async function getBalance(
       currencyCode: stockBalances.currencyCode,
     })
     .from(stockBalances)
-    .where(and(eq(stockBalances.companyId, params.companyId), eq(stockBalances.locationId, params.locationId), eq(stockBalances.productId, params.productId), serialFilter, lotFilter, isNull(stockBalances.deletedAt)))
+    .where(and(eq(stockBalances.companyId, params.companyId), eq(stockBalances.locationId, params.locationId), eq(stockBalances.ownerId, params.ownerId), eq(stockBalances.productId, params.productId), serialFilter, lotFilter, isNull(stockBalances.deletedAt)))
     .limit(1);
 
   return balance;
@@ -124,6 +127,7 @@ async function addBalance(
   params: {
     companyId: string;
     locationId: string;
+    ownerId: string;
     productId: string;
     productSerialId: string | null;
     productLotId: string | null;
@@ -152,6 +156,7 @@ async function addBalance(
   await tx.insert(stockBalances).values({
     companyId: params.companyId,
     locationId: params.locationId,
+    ownerId: params.ownerId,
     productId: params.productId,
     productSerialId: params.productSerialId,
     productLotId: params.productLotId,
@@ -169,6 +174,7 @@ async function removeBalance(
   params: {
     companyId: string;
     locationId: string;
+    ownerId: string;
     productId: string;
     productSerialId: string | null;
     productLotId: string | null;
@@ -198,6 +204,7 @@ async function removeBalance(
 export async function createTransfer(formData: FormData) {
   const user = await requirePermission("inventory.receive");
   const parsed = createTransferSchema.safeParse({
+    ownerId: formValue(formData, "ownerId"),
     fromLocationId: formValue(formData, "fromLocationId"),
     transitLocationId: formValue(formData, "transitLocationId"),
     toLocationId: formValue(formData, "toLocationId"),
@@ -223,6 +230,16 @@ export async function createTransfer(formData: FormData) {
 
   try {
     await db.transaction(async (tx) => {
+      const [owner] = await tx
+        .select({ id: owners.id })
+        .from(owners)
+        .where(and(eq(owners.id, parsed.data.ownerId), eq(owners.companyId, company.id), isNull(owners.deletedAt)))
+        .limit(1);
+
+      if (!owner) {
+        throw new Error("Owner is invalid.");
+      }
+
       const productRows = await tx
         .select({
           id: products.id,
@@ -241,6 +258,7 @@ export async function createTransfer(formData: FormData) {
           companyId: company.id,
           transferNo,
           status: "draft",
+          ownerId: owner.id,
           fromLocationId: parsed.data.fromLocationId,
           transitLocationId: parsed.data.transitLocationId,
           toLocationId: parsed.data.toLocationId,
@@ -268,6 +286,7 @@ export async function createTransfer(formData: FormData) {
           return {
             transferId: transfer.id,
             lineNo: index + 1,
+            ownerId: owner.id,
             productId: product.id,
             unitId: product.unitId,
             quantityRequested: String(line.quantity),
@@ -354,6 +373,7 @@ export async function dispatchTransfer(formData: FormData) {
           id: transfers.id,
           transferNo: transfers.transferNo,
           status: transfers.status,
+          ownerId: transfers.ownerId,
           fromLocationId: transfers.fromLocationId,
           transitLocationId: transfers.transitLocationId,
         })
@@ -372,6 +392,7 @@ export async function dispatchTransfer(formData: FormData) {
           productId: transferLines.productId,
           unitId: transferLines.unitId,
           quantityRequested: transferLines.quantityRequested,
+          ownerId: transferLines.ownerId,
           currencyCode: transferLines.currencyCode,
           serialNo: transferLines.serialNo,
           lotNo: transferLines.lotNo,
@@ -391,6 +412,7 @@ export async function dispatchTransfer(formData: FormData) {
           status: "posted",
           fromLocationId: transfer.fromLocationId,
           toLocationId: transfer.transitLocationId,
+          ownerId: transfer.ownerId,
           sourceType: "transfer_dispatch",
           sourceId: transfer.id,
           sourceNo: transfer.transferNo,
@@ -402,8 +424,13 @@ export async function dispatchTransfer(formData: FormData) {
 
       for (const line of lines) {
         const quantity = Number(line.quantityRequested);
+        const ownerId = line.ownerId ?? transfer.ownerId;
         let productSerialId: string | null = null;
         let productLotId: string | null = null;
+
+        if (!ownerId) {
+          throw new Error(`Owner is required on transfer line ${line.lineNo}.`);
+        }
 
         if (line.trackingMode === "serial" && line.serialNo) {
           const [serial] = await tx
@@ -436,6 +463,7 @@ export async function dispatchTransfer(formData: FormData) {
         const balance = await removeBalance(tx, {
           companyId: company.id,
           locationId: transfer.fromLocationId,
+          ownerId,
           productId: line.productId,
           productSerialId,
           productLotId,
@@ -445,6 +473,7 @@ export async function dispatchTransfer(formData: FormData) {
         await addBalance(tx, {
           companyId: company.id,
           locationId: transfer.transitLocationId,
+          ownerId,
           productId: line.productId,
           productSerialId,
           productLotId,
@@ -457,13 +486,13 @@ export async function dispatchTransfer(formData: FormData) {
           stockMovementId: movement.id,
           lineNo: line.lineNo,
           productId: line.productId,
+          ownerId,
           productSerialId,
           productLotId,
           fromLocationId: transfer.fromLocationId,
           toLocationId: transfer.transitLocationId,
           unitId: line.unitId,
           quantity: String(quantity),
-          unitCostMinor: balance.averageCostMinor,
           totalCostMinor: Math.round(quantity * balance.averageCostMinor),
           currencyCode: line.currencyCode,
           notes: "Dispatched to transit",
@@ -474,6 +503,7 @@ export async function dispatchTransfer(formData: FormData) {
           .set({
             productSerialId,
             productLotId,
+            ownerId,
             quantityDispatched: String(quantity),
             unitCostMinor: balance.averageCostMinor,
             updatedAt: sql`now()`,
@@ -531,6 +561,7 @@ export async function receiveTransfer(formData: FormData) {
           id: transfers.id,
           transferNo: transfers.transferNo,
           status: transfers.status,
+          ownerId: transfers.ownerId,
           transitLocationId: transfers.transitLocationId,
           toLocationId: transfers.toLocationId,
         })
@@ -547,6 +578,7 @@ export async function receiveTransfer(formData: FormData) {
           id: transferLines.id,
           lineNo: transferLines.lineNo,
           productId: transferLines.productId,
+          ownerId: transferLines.ownerId,
           productSerialId: transferLines.productSerialId,
           productLotId: transferLines.productLotId,
           unitId: transferLines.unitId,
@@ -569,6 +601,7 @@ export async function receiveTransfer(formData: FormData) {
           status: "posted",
           fromLocationId: transfer.transitLocationId,
           toLocationId: transfer.toLocationId,
+          ownerId: transfer.ownerId,
           sourceType: "transfer_receipt",
           sourceId: transfer.id,
           sourceNo: transfer.transferNo,
@@ -586,6 +619,12 @@ export async function receiveTransfer(formData: FormData) {
         }
 
         const remaining = Number(line.quantityDispatched) - Number(line.quantityReceived);
+        const ownerId = line.ownerId ?? transfer.ownerId;
+
+        if (!ownerId) {
+          throw new Error(`Owner is required on transfer line ${line.lineNo}.`);
+        }
+
         if (input.quantity > remaining) {
           throw new Error("Received quantity cannot exceed the remaining in-transit quantity.");
         }
@@ -593,6 +632,7 @@ export async function receiveTransfer(formData: FormData) {
         const balance = await removeBalance(tx, {
           companyId: company.id,
           locationId: transfer.transitLocationId,
+          ownerId,
           productId: line.productId,
           productSerialId: line.productSerialId,
           productLotId: line.productLotId,
@@ -602,6 +642,7 @@ export async function receiveTransfer(formData: FormData) {
         await addBalance(tx, {
           companyId: company.id,
           locationId: transfer.toLocationId,
+          ownerId,
           productId: line.productId,
           productSerialId: line.productSerialId,
           productLotId: line.productLotId,
@@ -613,6 +654,7 @@ export async function receiveTransfer(formData: FormData) {
         await tx.insert(stockMovementLines).values({
           stockMovementId: movement.id,
           lineNo: line.lineNo,
+          ownerId,
           productId: line.productId,
           productSerialId: line.productSerialId,
           productLotId: line.productLotId,
@@ -620,7 +662,6 @@ export async function receiveTransfer(formData: FormData) {
           toLocationId: transfer.toLocationId,
           unitId: line.unitId,
           quantity: String(input.quantity),
-          unitCostMinor: balance.averageCostMinor,
           totalCostMinor: Math.round(input.quantity * balance.averageCostMinor),
           currencyCode: line.currencyCode,
           notes: input.discrepancy === "none" ? "Received from transit" : `Received with ${input.discrepancy}`,

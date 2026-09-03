@@ -3,6 +3,7 @@ export type OpeningStockImportRow = {
   sku: string;
   productName: string;
   trackingMode: "none" | "lot" | "serial";
+  ownerName: string;
   locationCode: string;
   locationName: string;
   quantity: string;

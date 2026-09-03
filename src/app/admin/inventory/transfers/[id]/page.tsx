@@ -12,7 +12,6 @@ import { Button, ButtonLink } from "@/components/ui/button";
 import { Notebook } from "@/components/ui/notebook";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
 import { requirePermission } from "@/server/auth/session";
-import { minorToDisplay } from "@/server/catalog/products";
 import { getTransferDetail } from "@/server/transfers/transfers";
 import type { TransferDetail, TransferDetailLine } from "@/server/transfers/types";
 
@@ -29,10 +28,6 @@ function label(value: string) {
 
 function remaining(line: TransferDetailLine) {
   return Math.max(Number(line.quantityDispatched) - Number(line.quantityReceived), 0);
-}
-
-function money(value: number, currencyCode: string) {
-  return `${currencyCode} ${minorToDisplay(value)}`;
 }
 
 function Actions({ transfer }: { transfer: TransferDetail }) {
@@ -82,6 +77,7 @@ function DetailGrid({ transfer }: { transfer: TransferDetail }) {
       <Field label="From" value={transfer.fromLocationCode} />
       <Field label="Transit" value={transfer.transitLocationCode} />
       <Field label="To" value={transfer.toLocationCode} />
+      <Field label="Owner" value={transfer.ownerName ?? "-"} />
       <Field label="Transfer Date" value={transfer.transferDate} />
       <Field label="Approved" value={transfer.approvedAt ?? "-"} />
       <Field label="Dispatched" value={transfer.dispatchedAt ?? "-"} />
@@ -124,13 +120,13 @@ function LinesTable({ lines }: { lines: TransferDetailLine[] }) {
         <thead className="text-xs uppercase text-muted-foreground">
           <tr className="border-b border-border">
             <th className="px-3 py-2">Product</th>
+            <th className="px-3 py-2">Owner</th>
             <th className="px-3 py-2">Tracking</th>
             <th className="px-3 py-2">Serial / Lot</th>
             <th className="px-3 py-2 text-right">Requested</th>
             <th className="px-3 py-2 text-right">Dispatched</th>
             <th className="px-3 py-2 text-right">Received</th>
             <th className="px-3 py-2 text-right">Remaining</th>
-            <th className="px-3 py-2 text-right">Unit Cost</th>
             <th className="px-3 py-2">Discrepancy</th>
           </tr>
         </thead>
@@ -141,13 +137,13 @@ function LinesTable({ lines }: { lines: TransferDetailLine[] }) {
                 <div className="font-medium">{line.productName}</div>
                 <div className="text-xs text-muted-foreground">{line.sku}</div>
               </td>
+              <td className="px-3 py-3">{line.ownerName ?? "-"}</td>
               <td className="px-3 py-3 capitalize">{line.trackingMode}</td>
               <td className="px-3 py-3">{line.serialNo ?? line.lotNo ?? "-"}</td>
               <td className="px-3 py-3 text-right">{line.quantityRequested}</td>
               <td className="px-3 py-3 text-right">{line.quantityDispatched}</td>
               <td className="px-3 py-3 text-right">{line.quantityReceived}</td>
               <td className="px-3 py-3 text-right">{remaining(line)}</td>
-              <td className="px-3 py-3 text-right">{money(line.unitCostMinor, line.currencyCode)}</td>
               <td className="px-3 py-3 capitalize">{label(line.discrepancy)}</td>
             </tr>
           ))}

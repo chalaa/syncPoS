@@ -12,11 +12,6 @@ import type {
   OpeningStockPreviewState,
 } from "@/server/inventory/types";
 
-export const openingStockInitialState: OpeningStockPreviewState = {
-  status: "idle",
-  rows: [],
-};
-
 export async function validateOpeningStockImport(
   _previousState: OpeningStockPreviewState,
   formData: FormData,

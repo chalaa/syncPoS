@@ -27,7 +27,7 @@ export default async function NewAdjustmentPage({ searchParams }: NewAdjustmentP
 
       {query.error ? <Alert kind="error">{query.error}</Alert> : null}
 
-      <InventoryAdjustmentForm action={createInventoryAdjustment} locations={options.locations} products={options.products} balances={options.balances} />
+      <InventoryAdjustmentForm action={createInventoryAdjustment} owners={options.owners} locations={options.locations} products={options.products} balances={options.balances} />
     </PageShell>
   );
 }

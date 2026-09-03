@@ -32,7 +32,16 @@ export default async function NewTransferPage({ searchParams }: NewTransferPageP
       {query.error ? <Alert kind="error">{query.error}</Alert> : null}
 
       <form action={createTransfer} className="rounded-lg border border-border bg-card p-5">
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-4">
+          <label className="space-y-1">
+            <span className="text-xs font-medium text-muted-foreground">Owner</span>
+            <select name="ownerId" required defaultValue={options.owners[0]?.id ?? ""} className={inputClass()}>
+              <option value="" disabled>Select owner</option>
+              {options.owners.map((owner) => (
+                <option key={owner.id} value={owner.id}>{owner.name}</option>
+              ))}
+            </select>
+          </label>
           <label className="space-y-1">
             <span className="text-xs font-medium text-muted-foreground">From</span>
             <select name="fromLocationId" required defaultValue="" className={inputClass()}>

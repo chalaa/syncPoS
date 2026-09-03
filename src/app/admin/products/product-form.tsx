@@ -22,6 +22,7 @@ type ProductFormProps = {
 };
 
 const inputClass = "h-10 rounded-md border border-input bg-background px-3 text-sm";
+const readonlyInputClass = "h-10 rounded-md border border-input bg-muted px-3 text-sm text-muted-foreground";
 const textareaClass = "min-h-28 rounded-md border border-input bg-background px-3 py-2 text-sm";
 
 export function ProductForm({
@@ -86,16 +87,18 @@ export function ProductForm({
               className={inputClass}
             />
           </label>
-          <label className="grid gap-1 text-sm font-medium">
-            Item Code
-            <input
-              name="sku"
-              defaultValue={product?.sku}
-              placeholder={mode === "create" ? "Auto" : undefined}
-              maxLength={60}
-              className={inputClass}
-            />
-          </label>
+          {mode === "edit" ? (
+            <label className="grid gap-1 text-sm font-medium">
+              Item Code
+              <input
+                name="sku"
+                defaultValue={product?.sku}
+                maxLength={60}
+                readOnly
+                className={readonlyInputClass}
+              />
+            </label>
+          ) : null}
         </div>
 
         <Notebook

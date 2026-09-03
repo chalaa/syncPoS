@@ -10,6 +10,7 @@ import {
   landedCostAllocations,
   landedCosts,
   locations,
+  owners,
   productLots,
   productSerials,
   partners,
@@ -50,7 +51,7 @@ export function displayPurchaseMoney(value: number, currencyCode: string) {
 
 export async function getPurchaseFormOptions() {
   const company = await getDefaultCompany();
-  const [supplierRows, productRows, locationRows, taxRows] = await Promise.all([
+  const [supplierRows, ownerRows, productRows, locationRows, taxRows] = await Promise.all([
     db
       .select({
         id: partners.id,
@@ -66,6 +67,14 @@ export async function getPurchaseFormOptions() {
         ),
       )
       .orderBy(asc(partners.displayName)),
+    db
+      .select({
+        id: owners.id,
+        name: owners.name,
+      })
+      .from(owners)
+      .where(and(eq(owners.companyId, company.id), isNull(owners.deletedAt)))
+      .orderBy(asc(owners.name)),
     db
       .select({
         id: products.id,
@@ -121,6 +130,7 @@ export async function getPurchaseFormOptions() {
   return {
     company,
     suppliers: supplierRows satisfies PurchaseFormOption[],
+    owners: ownerRows,
     products: productRows satisfies PurchaseFormOption[],
     locations: locationRows satisfies PurchaseFormOption[],
     taxes: taxRows satisfies PurchaseTaxOption[],
@@ -136,6 +146,8 @@ export async function getPurchaseOrderList(): Promise<PurchaseOrderListRow[]> {
       po.order_no as "orderNo",
       po.vendor_reference as "vendorReference",
       po.payment_term as "paymentTerm",
+      po.owner_id as "ownerId",
+      own.name as "ownerName",
       p.display_name as "supplierName",
       po.status as "status",
       po.order_date::text as "orderDate",
@@ -151,6 +163,7 @@ export async function getPurchaseOrderList(): Promise<PurchaseOrderListRow[]> {
       coalesce(sum(pol.quantity_received), 0)::text as "quantityReceived"
     from purchase_orders po
     inner join partners p on p.id = po.supplier_id
+    left join owners own on own.id = po.owner_id
     left join locations l on l.id = po.deliver_to_location_id
     left join purchase_order_lines pol on pol.purchase_order_id = po.id and pol.deleted_at is null
     left join lateral (
@@ -164,7 +177,7 @@ export async function getPurchaseOrderList(): Promise<PurchaseOrderListRow[]> {
     ) pay on true
     where po.company_id = ${company.id}
       and po.deleted_at is null
-    group by po.id, p.display_name, l.code, pay.paid_minor
+    group by po.id, p.display_name, own.name, l.code, pay.paid_minor
     order by po.created_at desc
   `);
 
@@ -665,6 +678,8 @@ export async function getPurchaseOrderDetail(id: string): Promise<PurchaseOrderD
       orderNo: purchaseOrders.orderNo,
       supplierId: purchaseOrders.supplierId,
       supplierName: partners.displayName,
+      ownerId: purchaseOrders.ownerId,
+      ownerName: owners.name,
       deliverToLocationId: purchaseOrders.deliverToLocationId,
       vendorReference: purchaseOrders.vendorReference,
       paymentTerm: purchaseOrders.paymentTerm,
@@ -704,6 +719,7 @@ export async function getPurchaseOrderDetail(id: string): Promise<PurchaseOrderD
     })
     .from(purchaseOrders)
     .innerJoin(partners, eq(purchaseOrders.supplierId, partners.id))
+    .leftJoin(owners, eq(purchaseOrders.ownerId, owners.id))
     .where(and(eq(purchaseOrders.id, id), eq(purchaseOrders.companyId, company.id), isNull(purchaseOrders.deletedAt)))
     .limit(1);
 

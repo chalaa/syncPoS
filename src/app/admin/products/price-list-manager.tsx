@@ -19,7 +19,7 @@ import {
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
 import { minorToDisplay } from "@/lib/catalog-utils";
 import { cn } from "@/lib/utils";
-import { priceListTypeOptions, type PriceListFormOptions, type ProductPriceListItemRow, type ProductPriceListRow } from "@/server/catalog/types";
+import type { PriceListFormOptions, ProductPriceListItemRow, ProductPriceListRow } from "@/server/catalog/types";
 
 type PriceListMutation = (formData: FormData) => Promise<void>;
 
@@ -29,17 +29,11 @@ type PriceListLineDraft = {
   minimumQuantity: string;
   unitPrice: string;
   discount: string;
-  validFrom: string;
-  validTo: string;
   isActive: boolean;
 };
 
 const inputClass = "h-10 rounded-md border border-input bg-background px-3 text-sm";
 const tableInputClass = "h-9 w-full rounded-md border border-input bg-background px-2 text-sm";
-
-function today() {
-  return new Date().toISOString().slice(0, 10);
-}
 
 function newLine(): PriceListLineDraft {
   return {
@@ -48,8 +42,6 @@ function newLine(): PriceListLineDraft {
     minimumQuantity: "1",
     unitPrice: "0.00",
     discount: "0.00",
-    validFrom: today(),
-    validTo: "",
     isActive: true,
   };
 }
@@ -61,8 +53,6 @@ function lineFromItem(item: ProductPriceListItemRow): PriceListLineDraft {
     minimumQuantity: item.minimumQuantity,
     unitPrice: minorToDisplay(item.unitPriceMinor),
     discount: minorToDisplay(item.discountMinor),
-    validFrom: item.validFrom,
-    validTo: item.validTo ?? "",
     isActive: item.isActive,
   };
 }
@@ -94,52 +84,27 @@ function PriceListForm({
     <form action={action} className="grid gap-4">
       <DialogHeader>
         <DialogTitle>{title}</DialogTitle>
-        <DialogDescription>Set product prices by customer group, location, date, and quantity break.</DialogDescription>
+      <DialogDescription>Set product prices by owner and quantity break.</DialogDescription>
       </DialogHeader>
 
       <input type="hidden" name="returnPath" value={returnPath} />
       {record ? <input type="hidden" name="id" value={record.id} /> : null}
 
-      <div className="grid gap-4 md:grid-cols-[0.7fr_1fr_0.9fr]">
-        <label className="grid gap-1 text-sm font-medium">
-          Code
-          <input name="code" placeholder={record ? undefined : "Auto"} defaultValue={record?.code} className={inputClass} />
-        </label>
+      <div className="grid gap-4 md:grid-cols-2">
         <label className="grid gap-1 text-sm font-medium">
           Name
           <input name="name" required defaultValue={record?.name} className={inputClass} />
         </label>
         <label className="grid gap-1 text-sm font-medium">
-          Type
-          <select name="priceListType" defaultValue={record?.priceListType ?? "retail"} className={inputClass}>
-            {priceListTypeOptions.map((type) => (
-              <option key={type} value={type}>
-                {type.replace(/_/g, " ")}
+          Owner
+          <select name="ownerId" defaultValue={record?.ownerId ?? options.owners[0]?.id ?? ""} className={inputClass} required={options.owners.length > 0}>
+            <option value="">Select owner</option>
+            {options.owners.map((owner) => (
+              <option key={owner.id} value={owner.id}>
+                {owner.name}
               </option>
             ))}
           </select>
-        </label>
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-3">
-        <label className="grid gap-1 text-sm font-medium">
-          Location
-          <select name="locationId" defaultValue={record?.locationId ?? ""} className={inputClass}>
-            <option value="">All locations</option>
-            {options.locations.map((location) => (
-              <option key={location.id} value={location.id}>
-                {location.code} / {location.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="grid gap-1 text-sm font-medium">
-          Valid From
-          <input name="validFrom" type="date" defaultValue={record?.validFrom ?? ""} className={inputClass} />
-        </label>
-        <label className="grid gap-1 text-sm font-medium">
-          Valid To
-          <input name="validTo" type="date" defaultValue={record?.validTo ?? ""} className={inputClass} />
         </label>
       </div>
 
@@ -157,15 +122,13 @@ function PriceListForm({
           </Button>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[980px] text-left text-sm">
+          <table className="w-full min-w-[720px] text-left text-sm">
             <thead className="text-xs uppercase text-muted-foreground">
               <tr className="border-b border-border">
                 <th className="px-2 py-2">Product</th>
                 <th className="w-28 px-2 py-2 text-right">Min Qty</th>
                 <th className="w-32 px-2 py-2 text-right">Unit Price</th>
                 <th className="w-32 px-2 py-2 text-right">Discount</th>
-                <th className="w-36 px-2 py-2">Valid From</th>
-                <th className="w-36 px-2 py-2">Valid To</th>
                 <th className="w-24 px-2 py-2">Active</th>
                 <th className="w-12 px-2 py-2"></th>
               </tr>
@@ -196,12 +159,6 @@ function PriceListForm({
                   </td>
                   <td className="px-2 py-2">
                     <input name="itemDiscount" type="number" min="0" step="0.01" value={line.discount} className={cn(tableInputClass, "text-right")} onChange={(event) => updateLine(line.key, { discount: event.target.value })} />
-                  </td>
-                  <td className="px-2 py-2">
-                    <input name="itemValidFrom" type="date" value={line.validFrom} className={tableInputClass} onChange={(event) => updateLine(line.key, { validFrom: event.target.value })} />
-                  </td>
-                  <td className="px-2 py-2">
-                    <input name="itemValidTo" type="date" value={line.validTo} className={tableInputClass} onChange={(event) => updateLine(line.key, { validTo: event.target.value })} />
                   </td>
                   <td className="px-2 py-2">
                     <select name="itemIsActive" value={line.isActive ? "true" : "false"} className={tableInputClass} onChange={(event) => updateLine(line.key, { isActive: event.target.value === "true" })}>
@@ -293,13 +250,10 @@ export function PriceListManager({
           <table className="w-full min-w-[980px] text-left text-sm">
             <thead className="bg-muted text-xs uppercase tracking-wide text-muted-foreground">
               <tr>
-                <th className="px-4 py-3">Code</th>
                 <th className="px-4 py-3">Price List</th>
-                <th className="px-4 py-3">Type</th>
+                <th className="px-4 py-3">Owner</th>
                 <th className="px-4 py-3">Currency</th>
-                <th className="px-4 py-3">Location</th>
                 <th className="px-4 py-3 text-right">Items</th>
-                <th className="px-4 py-3">Validity</th>
                 <th className="px-4 py-3">Status</th>
                 <th className="px-4 py-3 text-right">Actions</th>
               </tr>
@@ -307,18 +261,15 @@ export function PriceListManager({
             <tbody>
               {rows.map((row) => (
                 <tr key={row.id} className="border-t border-border">
-                  <td className="px-4 py-3 font-medium">{row.code}</td>
                   <td className="px-4 py-3">
                     <div>{row.name}</div>
                     <div className="text-xs text-muted-foreground">
                       {row.items.slice(0, 2).map((item) => `${item.sku} ${minorToDisplay(item.unitPriceMinor)}`).join(", ") || "No items"}
                     </div>
                   </td>
-                  <td className="px-4 py-3 capitalize">{row.priceListType.replace(/_/g, " ")}</td>
+                  <td className="px-4 py-3">{row.ownerName ?? "-"}</td>
                   <td className="px-4 py-3">{row.currencyCode}</td>
-                  <td className="px-4 py-3">{row.locationCode ?? "-"}</td>
                   <td className="px-4 py-3 text-right">{row.itemCount}</td>
-                  <td className="px-4 py-3">{row.validFrom ?? "-"} / {row.validTo ?? "-"}</td>
                   <td className="px-4 py-3">{row.isActive ? "Active" : "Inactive"}</td>
                   <td className="px-4 py-3">
                     <div className="flex justify-end gap-2">
@@ -341,7 +292,7 @@ export function PriceListManager({
               ))}
               {rows.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="px-4 py-10 text-center text-muted-foreground">
+                  <td colSpan={6} className="px-4 py-10 text-center text-muted-foreground">
                     No price lists found.
                   </td>
                 </tr>

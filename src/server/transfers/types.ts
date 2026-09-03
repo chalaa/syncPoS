@@ -12,6 +12,7 @@ export type TransferListRow = {
   id: string;
   transferNo: string;
   status: string;
+  ownerName: string | null;
   transferDate: string;
   fromLocationCode: string;
   transitLocationCode: string;
@@ -25,6 +26,7 @@ export type TransferListRow = {
 export type TransferDetailLine = {
   id: string;
   lineNo: number;
+  ownerName: string | null;
   productName: string;
   sku: string;
   trackingMode: "none" | "lot" | "serial";
@@ -39,6 +41,7 @@ export type TransferDetailLine = {
 };
 
 export type TransferDetail = TransferListRow & {
+  ownerId: string | null;
   fromLocationId: string;
   transitLocationId: string;
   toLocationId: string;
@@ -52,6 +55,7 @@ export type TransferDetail = TransferListRow & {
 };
 
 export type TransferFormOptions = {
+  owners: Omit<TransferOption, "code">[];
   locations: TransferOption[];
   transitLocations: TransferOption[];
   products: TransferProductOption[];

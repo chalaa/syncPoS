@@ -7,6 +7,7 @@ import { getDefaultCompany, minorToDisplay } from "@/server/catalog/products";
 import { db } from "@/server/db/client";
 import {
   locations,
+  owners,
   productLots,
   productSerials,
   products,
@@ -127,7 +128,15 @@ export async function getInventoryFilterOptions() {
 
 export async function getInventoryOperationFormOptions(): Promise<InventoryOperationFormOptions> {
   const company = await getDefaultCompany();
-  const [locationRows, productRows] = await Promise.all([
+  const [ownerRows, locationRows, productRows] = await Promise.all([
+    db
+      .select({
+        id: owners.id,
+        name: owners.name,
+      })
+      .from(owners)
+      .where(and(eq(owners.companyId, company.id), isNull(owners.deletedAt)))
+      .orderBy(asc(owners.name)),
     db
       .select({
         id: locations.id,
@@ -158,6 +167,7 @@ export async function getInventoryOperationFormOptions(): Promise<InventoryOpera
 
   return {
     company,
+    owners: ownerRows,
     locations: locationRows,
     products: productRows,
   };
@@ -215,6 +225,8 @@ export async function getInventoryAdjustmentFormOptions() {
     ...options,
     balances: balances.map((balance) => ({
       locationId: balance.locationId,
+      ownerId: balance.ownerId,
+      ownerName: balance.ownerName,
       productId: balance.productId,
       serialNo: balance.serialNo,
       lotNo: balance.lotNo,
@@ -262,6 +274,8 @@ export async function getInventoryOperationDetail(id: string): Promise<Inventory
     .select({
       id: stockMovementLines.id,
       lineNo: stockMovementLines.lineNo,
+      ownerId: stockMovementLines.ownerId,
+      ownerName: owners.name,
       productId: products.id,
       sku: products.sku,
       productName: products.name,
@@ -271,13 +285,13 @@ export async function getInventoryOperationDetail(id: string): Promise<Inventory
       fromLocationCode: lineFromLocations.code,
       toLocationCode: lineToLocations.code,
       quantity: stockMovementLines.quantity,
-      unitCostMinor: stockMovementLines.unitCostMinor,
       totalCostMinor: stockMovementLines.totalCostMinor,
       currencyCode: stockMovementLines.currencyCode,
       notes: stockMovementLines.notes,
     })
     .from(stockMovementLines)
     .innerJoin(products, eq(stockMovementLines.productId, products.id))
+    .leftJoin(owners, eq(stockMovementLines.ownerId, owners.id))
     .leftJoin(productSerials, eq(stockMovementLines.productSerialId, productSerials.id))
     .leftJoin(productLots, eq(stockMovementLines.productLotId, productLots.id))
     .leftJoin(lineFromLocations, eq(stockMovementLines.fromLocationId, lineFromLocations.id))
@@ -341,6 +355,8 @@ export async function getStockByLocation(params: {
       stockBalanceId: stockBalances.id,
       locationCode: locations.code,
       locationName: locations.name,
+      ownerId: owners.id,
+      ownerName: owners.name,
       productId: products.id,
       sku: products.sku,
       productName: products.name,
@@ -357,6 +373,7 @@ export async function getStockByLocation(params: {
     .from(stockBalances)
     .innerJoin(locations, eq(stockBalances.locationId, locations.id))
     .innerJoin(products, eq(stockBalances.productId, products.id))
+    .leftJoin(owners, eq(stockBalances.ownerId, owners.id))
     .leftJoin(productSerials, eq(stockBalances.productSerialId, productSerials.id))
     .leftJoin(productLots, eq(stockBalances.productLotId, productLots.id))
     .where(and(...filters))
@@ -376,11 +393,12 @@ async function getStockByLocationAsOf(params: {
     with ledger as (
       select
         sml.to_location_id as location_id,
+        sml.owner_id,
         sml.product_id,
         sml.product_serial_id,
         sml.product_lot_id,
         cast(sml.quantity as numeric) as quantity,
-        sml.unit_cost_minor,
+        sml.total_cost_minor,
         sml.currency_code,
         sm.movement_date
       from stock_movement_lines sml
@@ -394,11 +412,12 @@ async function getStockByLocationAsOf(params: {
       union all
       select
         sml.from_location_id as location_id,
+        sml.owner_id,
         sml.product_id,
         sml.product_serial_id,
         sml.product_lot_id,
         cast(sml.quantity as numeric) * -1 as quantity,
-        sml.unit_cost_minor,
+        sml.total_cost_minor,
         sml.currency_code,
         sm.movement_date
       from stock_movement_lines sml
@@ -414,20 +433,28 @@ async function getStockByLocationAsOf(params: {
       select
         location_id,
         product_id,
+        owner_id,
         product_serial_id,
         product_lot_id,
         sum(quantity) as quantity_on_hand,
-        max(unit_cost_minor) as average_cost_minor,
+        max(
+          case
+            when quantity = 0 then 0
+            else abs(total_cost_minor / quantity)
+          end
+        )::bigint as average_cost_minor,
         max(currency_code) as currency_code,
         max(movement_date) as last_movement_at
       from ledger
-      group by location_id, product_id, product_serial_id, product_lot_id
+      group by location_id, owner_id, product_id, product_serial_id, product_lot_id
     )
     select
-      concat(grouped.location_id, '-', grouped.product_id, '-', coalesce(grouped.product_serial_id::text, 'bulk'), '-', coalesce(grouped.product_lot_id::text, 'bulk')) as "stockBalanceId",
+      concat(grouped.location_id, '-', coalesce(grouped.owner_id::text, 'no-owner'), '-', grouped.product_id, '-', coalesce(grouped.product_serial_id::text, 'bulk'), '-', coalesce(grouped.product_lot_id::text, 'bulk')) as "stockBalanceId",
       l.id as "locationId",
       l.code as "locationCode",
       l.name as "locationName",
+      o.id as "ownerId",
+      o.name as "ownerName",
       p.id as "productId",
       p.sku as "sku",
       p.name as "productName",
@@ -443,6 +470,7 @@ async function getStockByLocationAsOf(params: {
     from grouped
     inner join locations l on l.id = grouped.location_id
     inner join products p on p.id = grouped.product_id
+    left join owners o on o.id = grouped.owner_id
     left join product_serials ps on ps.id = grouped.product_serial_id
     left join product_lots pl on pl.id = grouped.product_lot_id
     where (${params.locationId ?? ""} = '' or l.id = ${params.locationId ?? ""})
@@ -491,22 +519,25 @@ export async function getProductStockCard(params: {
 
   return db
     .select({
+      movementLineId: stockMovementLines.id,
       movementId: stockMovements.id,
       movementNo: stockMovements.movementNo,
       movementType: stockMovements.movementType,
       movementDate: stockMovements.movementDate,
       sourceNo: stockMovements.sourceNo,
+      ownerId: stockMovementLines.ownerId,
+      ownerName: owners.name,
       fromLocationCode: fromLocations.code,
       toLocationCode: toLocations.code,
       serialNo: productSerials.serialNo,
       quantity: stockMovementLines.quantity,
-      unitCostMinor: stockMovementLines.unitCostMinor,
       totalCostMinor: stockMovementLines.totalCostMinor,
       notes: stockMovementLines.notes,
     })
     .from(stockMovementLines)
     .innerJoin(stockMovements, eq(stockMovementLines.stockMovementId, stockMovements.id))
     .innerJoin(products, eq(stockMovementLines.productId, products.id))
+    .leftJoin(owners, eq(stockMovementLines.ownerId, owners.id))
     .leftJoin(productSerials, eq(stockMovementLines.productSerialId, productSerials.id))
     .leftJoin(fromLocations, eq(stockMovementLines.fromLocationId, fromLocations.id))
     .leftJoin(toLocations, eq(stockMovementLines.toLocationId, toLocations.id))
@@ -543,16 +574,18 @@ export async function getSerialHistory(params: {
 
   return db
     .select({
+      movementLineId: stockMovementLines.id,
       movementId: stockMovements.id,
       movementNo: stockMovements.movementNo,
       movementType: stockMovements.movementType,
       movementDate: stockMovements.movementDate,
       sourceNo: stockMovements.sourceNo,
+      ownerId: stockMovementLines.ownerId,
+      ownerName: owners.name,
       fromLocationCode: fromLocations.code,
       toLocationCode: toLocations.code,
       serialNo: productSerials.serialNo,
       quantity: stockMovementLines.quantity,
-      unitCostMinor: stockMovementLines.unitCostMinor,
       totalCostMinor: stockMovementLines.totalCostMinor,
       notes: stockMovementLines.notes,
       productName: products.name,
@@ -564,6 +597,7 @@ export async function getSerialHistory(params: {
     .innerJoin(stockMovements, eq(stockMovementLines.stockMovementId, stockMovements.id))
     .innerJoin(productSerials, eq(stockMovementLines.productSerialId, productSerials.id))
     .innerJoin(products, eq(productSerials.productId, products.id))
+    .leftJoin(owners, eq(stockMovementLines.ownerId, owners.id))
     .leftJoin(fromLocations, eq(stockMovementLines.fromLocationId, fromLocations.id))
     .leftJoin(toLocations, eq(stockMovementLines.toLocationId, toLocations.id))
     .leftJoin(currentLocations, eq(productSerials.currentLocationId, currentLocations.id))

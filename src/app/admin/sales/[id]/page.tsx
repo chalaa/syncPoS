@@ -184,6 +184,7 @@ export default async function SalesOrderDetailPage({ params, searchParams }: Sal
         <SalesOrderForm
           action={updateSalesOrder}
           customers={options.customers}
+          owners={options.owners}
           products={options.products}
           locations={options.locations}
           taxes={options.taxes}
@@ -196,6 +197,7 @@ export default async function SalesOrderDetailPage({ params, searchParams }: Sal
         <section className="rounded-lg border border-border bg-card p-5">
           <div className="mb-5 grid gap-4 md:grid-cols-4">
             <Info label="Customer" value={order.customerName} />
+            <Info label="Owner" value={order.ownerName ?? "-"} />
             <Info label="Reference" value={order.customerReference ?? "-"} />
             <Info label="FS Number" value={order.fsNumber ?? "-"} />
             <Info label="Payment Term" value={statusLabel(order.paymentTerm)} />

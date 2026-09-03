@@ -8,11 +8,12 @@ import { and, eq, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { requirePermission } from "@/server/auth/session";
-import { getDefaultCompany, majorToMinor } from "@/server/catalog/products";
+import { getDefaultCompany } from "@/server/catalog/products";
 import { db } from "@/server/db/client";
 import {
   auditLogs,
   locations,
+  owners,
   productLots,
   productSerials,
   products,
@@ -26,6 +27,7 @@ const operationTypes = ["transfer", "adjustment", "scrap", "customer_return", "s
 
 const createOperationSchema = z.object({
   movementType: z.enum(operationTypes),
+  ownerId: z.string().uuid("Owner is required"),
   fromLocationId: z.string().uuid().or(z.literal("")).transform((value) => value || null),
   toLocationId: z.string().uuid().or(z.literal("")).transform((value) => value || null),
   sourceNo: z.string().trim().max(80).optional(),
@@ -37,13 +39,23 @@ const statusSchema = z.object({
 });
 
 const adjustmentSchema = z.object({
+  ownerId: z.string().uuid("Owner is required"),
   locationId: z.string().uuid(),
   sourceNo: z.string().trim().max(80).optional(),
   notes: z.string().trim().optional(),
 });
 
 const scrapSchema = z.object({
+  ownerId: z.string().uuid("Owner is required"),
   locationId: z.string().uuid(),
+  sourceNo: z.string().trim().max(80).optional(),
+  notes: z.string().trim().optional(),
+});
+
+const internalTransferSchema = z.object({
+  ownerId: z.string().uuid("Owner is required"),
+  fromLocationId: z.string().uuid("Source location is required"),
+  toLocationId: z.string().uuid("Destination location is required"),
   sourceNo: z.string().trim().max(80).optional(),
   notes: z.string().trim().optional(),
 });
@@ -69,7 +81,6 @@ function redirectWithError(path: string, message: string): never {
 function parseLines(formData: FormData) {
   const productIds = formValues(formData, "productId");
   const quantities = formValues(formData, "quantity");
-  const unitCosts = formValues(formData, "unitCost");
   const serialNumbers = formValues(formData, "serialNo");
   const lotNumbers = formValues(formData, "lotNo");
   const notes = formValues(formData, "lineNotes");
@@ -78,7 +89,6 @@ function parseLines(formData: FormData) {
     .map((productId, index) => ({
       productId,
       quantity: Number(quantities[index] ?? 0),
-      unitCostMinor: majorToMinor(unitCosts[index] ?? "0"),
       serialNo: serialNumbers[index]?.trim() || null,
       lotNo: lotNumbers[index]?.trim() || null,
       notes: notes[index]?.trim() || null,
@@ -89,7 +99,6 @@ function parseLines(formData: FormData) {
 function parseCountLines(formData: FormData) {
   const productIds = formValues(formData, "productId");
   const countedQuantities = formValues(formData, "countedQuantity");
-  const unitCosts = formValues(formData, "unitCost");
   const serialNumbers = formValues(formData, "serialNo");
   const lotNumbers = formValues(formData, "lotNo");
   const notes = formValues(formData, "lineNotes");
@@ -98,7 +107,6 @@ function parseCountLines(formData: FormData) {
     .map((productId, index) => ({
       productId,
       countedQuantity: Number(countedQuantities[index] ?? 0),
-      unitCostMinor: majorToMinor(unitCosts[index] ?? "0"),
       serialNo: serialNumbers[index]?.trim() || null,
       lotNo: lotNumbers[index]?.trim() || null,
       notes: notes[index]?.trim() || null,
@@ -109,7 +117,6 @@ function parseCountLines(formData: FormData) {
 function parseScrapLines(formData: FormData) {
   const productIds = formValues(formData, "productId");
   const quantities = formValues(formData, "quantity");
-  const unitCosts = formValues(formData, "unitCost");
   const serialNumbers = formValues(formData, "serialNo");
   const lotNumbers = formValues(formData, "lotNo");
   const notes = formValues(formData, "lineNotes");
@@ -118,7 +125,6 @@ function parseScrapLines(formData: FormData) {
     .map((productId, index) => ({
       productId,
       quantity: Number(quantities[index] ?? 0),
-      unitCostMinor: majorToMinor(unitCosts[index] ?? "0"),
       serialNo: serialNumbers[index]?.trim() || null,
       lotNo: lotNumbers[index]?.trim() || null,
       notes: notes[index]?.trim() || null,
@@ -172,6 +178,24 @@ async function validateSelectableLocation(
   if (!location) {
     throw new Error("Stock location is invalid.");
   }
+}
+
+async function validateOwner(
+  tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
+  companyId: string,
+  ownerId: string,
+) {
+  const [owner] = await tx
+    .select({ id: owners.id })
+    .from(owners)
+    .where(and(eq(owners.id, ownerId), eq(owners.companyId, companyId), isNull(owners.deletedAt)))
+    .limit(1);
+
+  if (!owner) {
+    throw new Error("Owner is invalid or inactive.");
+  }
+
+  return owner;
 }
 
 function validateHeader(type: (typeof operationTypes)[number], fromLocationId: string | null, toLocationId: string | null) {
@@ -287,6 +311,7 @@ async function getBalance(
   tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
   params: {
     companyId: string;
+    ownerId: string;
     locationId: string;
     productId: string;
     productSerialId: string | null;
@@ -313,6 +338,7 @@ async function getBalance(
     .where(
       and(
         eq(stockBalances.companyId, params.companyId),
+        eq(stockBalances.ownerId, params.ownerId),
         eq(stockBalances.locationId, params.locationId),
         eq(stockBalances.productId, params.productId),
         serialFilter,
@@ -326,6 +352,7 @@ async function getBalance(
 }
 
 type PreparedStockOperationLine = {
+  ownerId: string;
   product: {
     id: string;
     sku: string;
@@ -364,6 +391,7 @@ async function addToBalance(
   tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
   params: {
     companyId: string;
+    ownerId: string;
     locationId: string;
     productId: string;
     productSerialId: string | null;
@@ -394,6 +422,7 @@ async function addToBalance(
 
   await tx.insert(stockBalances).values({
     companyId: params.companyId,
+    ownerId: params.ownerId,
     locationId: params.locationId,
     productId: params.productId,
     productSerialId: params.productSerialId,
@@ -411,6 +440,7 @@ async function removeFromBalance(
   tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
   params: {
     companyId: string;
+    ownerId: string;
     locationId: string;
     productId: string;
     productSerialId: string | null;
@@ -447,6 +477,7 @@ async function removeFromBalance(
 export async function createInventoryAdjustment(formData: FormData) {
   const user = await requirePermission("inventory.receive");
   const parsed = adjustmentSchema.safeParse({
+    ownerId: formValue(formData, "ownerId"),
     locationId: formValue(formData, "locationId"),
     sourceNo: formValue(formData, "sourceNo"),
     notes: formValue(formData, "notes"),
@@ -468,6 +499,7 @@ export async function createInventoryAdjustment(formData: FormData) {
 
   try {
     await db.transaction(async (tx) => {
+      const owner = await validateOwner(tx, company.id, parsed.data.ownerId);
       await validateSelectableLocation(tx, company.id, parsed.data.locationId);
 
       const productById = await getOperationProductMap(tx, company.id);
@@ -495,10 +527,11 @@ export async function createInventoryAdjustment(formData: FormData) {
           serialNo: line.serialNo,
           lotNo: line.lotNo,
           allowCreateInbound: true,
-          unitCostMinor: line.unitCostMinor || product.standardCostMinor,
+          unitCostMinor: product.standardCostMinor,
         });
         const balance = await getBalance(tx, {
           companyId: company.id,
+          ownerId: owner.id,
           locationId: parsed.data.locationId,
           productId: product.id,
           productSerialId: tracked.productSerialId,
@@ -525,13 +558,14 @@ export async function createInventoryAdjustment(formData: FormData) {
         }
 
         const quantity = Math.abs(difference);
-        const unitCostMinor = line.unitCostMinor || balance?.averageCostMinor || product.standardCostMinor;
+        const unitCostMinor = balance?.averageCostMinor || product.standardCostMinor;
         const fromLocationId = difference > 0 ? adjustmentLocation.id : parsed.data.locationId;
         const toLocationId = difference > 0 ? parsed.data.locationId : adjustmentLocation.id;
 
         if (difference > 0) {
           await addToBalance(tx, {
             companyId: company.id,
+            ownerId: owner.id,
             locationId: parsed.data.locationId,
             productId: product.id,
             productSerialId: tracked.productSerialId,
@@ -543,6 +577,7 @@ export async function createInventoryAdjustment(formData: FormData) {
         } else {
           await removeFromBalance(tx, {
             companyId: company.id,
+            ownerId: owner.id,
             locationId: parsed.data.locationId,
             productId: product.id,
             productSerialId: tracked.productSerialId,
@@ -574,6 +609,7 @@ export async function createInventoryAdjustment(formData: FormData) {
         }
 
         preparedLines.push({
+          ownerId: owner.id,
           product,
           productSerialId: tracked.productSerialId,
           productLotId: tracked.productLotId,
@@ -598,6 +634,7 @@ export async function createInventoryAdjustment(formData: FormData) {
         .insert(stockMovements)
         .values({
           companyId: company.id,
+          ownerId: owner.id,
           movementNo,
           movementType: "adjustment",
           status: "posted",
@@ -619,6 +656,7 @@ export async function createInventoryAdjustment(formData: FormData) {
       await tx.insert(stockMovementLines).values(
         preparedLines.map((line, index) => ({
           stockMovementId: movement.id,
+          ownerId: line.ownerId,
           lineNo: index + 1,
           productId: line.product.id,
           productSerialId: line.productSerialId,
@@ -627,7 +665,6 @@ export async function createInventoryAdjustment(formData: FormData) {
           fromLocationId: line.fromLocationId,
           toLocationId: line.toLocationId,
           quantity: String(line.quantity),
-          unitCostMinor: line.unitCostMinor,
           totalCostMinor: Math.round(line.quantity * line.unitCostMinor),
           currencyCode: line.product.currencyCode,
           notes: line.notes,
@@ -657,6 +694,7 @@ export async function createInventoryAdjustment(formData: FormData) {
 export async function createScrapOperation(formData: FormData) {
   const user = await requirePermission("inventory.receive");
   const parsed = scrapSchema.safeParse({
+    ownerId: formValue(formData, "ownerId"),
     locationId: formValue(formData, "locationId"),
     sourceNo: formValue(formData, "sourceNo"),
     notes: formValue(formData, "notes"),
@@ -678,6 +716,7 @@ export async function createScrapOperation(formData: FormData) {
 
   try {
     await db.transaction(async (tx) => {
+      const owner = await validateOwner(tx, company.id, parsed.data.ownerId);
       await validateSelectableLocation(tx, company.id, parsed.data.locationId);
 
       const productById = await getOperationProductMap(tx, company.id);
@@ -705,20 +744,22 @@ export async function createScrapOperation(formData: FormData) {
           serialNo: line.serialNo,
           lotNo: line.lotNo,
           allowCreateInbound: false,
-          unitCostMinor: line.unitCostMinor || product.standardCostMinor,
+          unitCostMinor: product.standardCostMinor,
         });
         const balance = await removeFromBalance(tx, {
           companyId: company.id,
+          ownerId: owner.id,
           locationId: parsed.data.locationId,
           productId: product.id,
           productSerialId: tracked.productSerialId,
           productLotId: tracked.productLotId,
           quantity: line.quantity,
         });
-        const unitCostMinor = line.unitCostMinor || balance.averageCostMinor || product.standardCostMinor;
+        const unitCostMinor = balance.averageCostMinor || product.standardCostMinor;
 
         await addToBalance(tx, {
           companyId: company.id,
+          ownerId: owner.id,
           locationId: scrapLocation.id,
           productId: product.id,
           productSerialId: tracked.productSerialId,
@@ -751,6 +792,7 @@ export async function createScrapOperation(formData: FormData) {
         }
 
         preparedLines.push({
+          ownerId: owner.id,
           product,
           productSerialId: tracked.productSerialId,
           productLotId: tracked.productLotId,
@@ -767,6 +809,7 @@ export async function createScrapOperation(formData: FormData) {
         .insert(stockMovements)
         .values({
           companyId: company.id,
+          ownerId: owner.id,
           movementNo,
           movementType: "scrap",
           status: "posted",
@@ -784,6 +827,7 @@ export async function createScrapOperation(formData: FormData) {
       await tx.insert(stockMovementLines).values(
         preparedLines.map((line, index) => ({
           stockMovementId: movement.id,
+          ownerId: line.ownerId,
           lineNo: index + 1,
           productId: line.product.id,
           productSerialId: line.productSerialId,
@@ -792,7 +836,6 @@ export async function createScrapOperation(formData: FormData) {
           fromLocationId: line.fromLocationId,
           toLocationId: line.toLocationId,
           quantity: String(line.quantity),
-          unitCostMinor: line.unitCostMinor,
           totalCostMinor: Math.round(line.quantity * line.unitCostMinor),
           currencyCode: line.product.currencyCode,
           notes: line.notes,
@@ -819,10 +862,196 @@ export async function createScrapOperation(formData: FormData) {
   redirect(`/admin/inventory/operations/${movementId}?notice=${encodeURIComponent("Scrap operation posted")}`);
 }
 
+export async function createInternalTransferOperation(formData: FormData) {
+  const user = await requirePermission("inventory.receive");
+  const parsed = internalTransferSchema.safeParse({
+    ownerId: formValue(formData, "ownerId"),
+    fromLocationId: formValue(formData, "fromLocationId"),
+    toLocationId: formValue(formData, "toLocationId"),
+    sourceNo: formValue(formData, "sourceNo"),
+    notes: formValue(formData, "notes"),
+  });
+  const inputLines = parseScrapLines(formData);
+
+  if (!parsed.success) {
+    redirectWithError("/admin/inventory/operations/internal-transfers/new", parsed.error.issues[0]?.message ?? "Invalid internal transfer.");
+  }
+
+  if (parsed.data.fromLocationId === parsed.data.toLocationId) {
+    redirectWithError("/admin/inventory/operations/internal-transfers/new", "Source and destination locations must be different.");
+  }
+
+  if (inputLines.length === 0) {
+    redirectWithError("/admin/inventory/operations/internal-transfers/new", "At least one transfer line is required.");
+  }
+
+  const company = await getDefaultCompany();
+  const movementNo = documentNo("INT");
+  let movementId: string | undefined;
+
+  try {
+    await db.transaction(async (tx) => {
+      const owner = await validateOwner(tx, company.id, parsed.data.ownerId);
+      await validateSelectableLocation(tx, company.id, parsed.data.fromLocationId);
+      await validateSelectableLocation(tx, company.id, parsed.data.toLocationId);
+
+      const productById = await getOperationProductMap(tx, company.id);
+      const preparedLines: PreparedStockOperationLine[] = [];
+
+      for (const line of inputLines) {
+        const product = productById.get(line.productId);
+
+        if (!product) {
+          throw new Error("One or more products are invalid.");
+        }
+
+        if (!Number.isFinite(line.quantity) || line.quantity <= 0) {
+          throw new Error(`Transfer quantity for ${product.sku} must be greater than zero.`);
+        }
+
+        if (product.trackingMode === "serial" && line.quantity !== 1) {
+          throw new Error(`Serialized product ${product.sku} transfer quantity must be 1.`);
+        }
+
+        const tracked = await resolveTrackedStock(tx, {
+          productId: product.id,
+          trackingMode: product.trackingMode,
+          locationId: parsed.data.fromLocationId,
+          serialNo: line.serialNo,
+          lotNo: line.lotNo,
+          allowCreateInbound: false,
+          unitCostMinor: product.standardCostMinor,
+        });
+
+        if (
+          product.trackingMode === "serial" &&
+          tracked.serialCurrentLocationId &&
+          tracked.serialCurrentLocationId !== parsed.data.fromLocationId
+        ) {
+          throw new Error(`Serial ${line.serialNo} is not in the source location.`);
+        }
+
+        const sourceBalance = await removeFromBalance(tx, {
+          companyId: company.id,
+          ownerId: owner.id,
+          locationId: parsed.data.fromLocationId,
+          productId: product.id,
+          productSerialId: tracked.productSerialId,
+          productLotId: tracked.productLotId,
+          quantity: line.quantity,
+        });
+        const unitCostMinor = sourceBalance.averageCostMinor || product.standardCostMinor;
+
+        await addToBalance(tx, {
+          companyId: company.id,
+          ownerId: owner.id,
+          locationId: parsed.data.toLocationId,
+          productId: product.id,
+          productSerialId: tracked.productSerialId,
+          productLotId: tracked.productLotId,
+          quantity: line.quantity,
+          unitCostMinor,
+          currencyCode: product.currencyCode,
+        });
+
+        if (tracked.productSerialId) {
+          await tx
+            .update(productSerials)
+            .set({
+              status: "available",
+              currentLocationId: parsed.data.toLocationId,
+              updatedAt: sql`now()`,
+            })
+            .where(eq(productSerials.id, tracked.productSerialId));
+        }
+
+        if (tracked.productLotId) {
+          await tx
+            .update(productLots)
+            .set({
+              status: "available",
+              currentLocationId: parsed.data.toLocationId,
+              updatedAt: sql`now()`,
+            })
+            .where(eq(productLots.id, tracked.productLotId));
+        }
+
+        preparedLines.push({
+          ownerId: owner.id,
+          product,
+          productSerialId: tracked.productSerialId,
+          productLotId: tracked.productLotId,
+          quantity: line.quantity,
+          unitCostMinor,
+          fromLocationId: parsed.data.fromLocationId,
+          toLocationId: parsed.data.toLocationId,
+          notes: line.notes,
+          metadata: {},
+        });
+      }
+
+      const [movement] = await tx
+        .insert(stockMovements)
+        .values({
+          companyId: company.id,
+          ownerId: owner.id,
+          movementNo,
+          movementType: "transfer",
+          status: "posted",
+          fromLocationId: parsed.data.fromLocationId,
+          toLocationId: parsed.data.toLocationId,
+          sourceType: "internal_transfer",
+          sourceNo: parsed.data.sourceNo || movementNo,
+          postedAt: new Date(),
+          postedBy: user.id,
+          notes: parsed.data.notes || null,
+        })
+        .returning({ id: stockMovements.id });
+      movementId = movement.id;
+
+      await tx.insert(stockMovementLines).values(
+        preparedLines.map((line, index) => ({
+          stockMovementId: movement.id,
+          ownerId: line.ownerId,
+          lineNo: index + 1,
+          productId: line.product.id,
+          productSerialId: line.productSerialId,
+          productLotId: line.productLotId,
+          unitId: line.product.unitId,
+          fromLocationId: line.fromLocationId,
+          toLocationId: line.toLocationId,
+          quantity: String(line.quantity),
+          totalCostMinor: Math.round(line.quantity * line.unitCostMinor),
+          currencyCode: line.product.currencyCode,
+          notes: line.notes,
+          metadata: line.metadata,
+        })),
+      );
+
+      await tx.insert(auditLogs).values({
+        companyId: company.id,
+        actorUserId: user.id,
+        action: "internal_transfer.post",
+        entityType: "stock_movement",
+        entityId: movement.id,
+        severity: "info",
+        metadata: { movementNo, lineCount: preparedLines.length },
+      });
+    });
+  } catch (error) {
+    redirectWithError("/admin/inventory/operations/internal-transfers/new", error instanceof Error ? error.message : "Could not post internal transfer.");
+  }
+
+  revalidatePath("/admin/inventory");
+  revalidatePath("/admin/inventory/operations");
+  redirect(`/admin/inventory/operations/${movementId}?notice=${encodeURIComponent("Internal transfer posted")}`);
+}
+
 export async function createInventoryOperation(formData: FormData) {
   const user = await requirePermission("inventory.receive");
   const parsed = createOperationSchema.safeParse({
     movementType: formValue(formData, "movementType"),
+    ownerId: formValue(formData, "ownerId"),
     fromLocationId: formValue(formData, "fromLocationId"),
     toLocationId: formValue(formData, "toLocationId"),
     sourceNo: formValue(formData, "sourceNo"),
@@ -844,6 +1073,7 @@ export async function createInventoryOperation(formData: FormData) {
 
   try {
     await db.transaction(async (tx) => {
+      const owner = await validateOwner(tx, company.id, parsed.data.ownerId);
       validateHeader(parsed.data.movementType, parsed.data.fromLocationId, parsed.data.toLocationId);
 
       if (parsed.data.movementType === "adjustment") {
@@ -863,6 +1093,7 @@ export async function createInventoryOperation(formData: FormData) {
           unitId: products.unitId,
           trackingMode: products.trackingMode,
           currencyCode: products.currencyCode,
+          standardCostMinor: products.standardCostMinor,
         })
         .from(products)
         .where(and(eq(products.companyId, company.id), isNull(products.deletedAt), eq(products.isActive, true)));
@@ -872,6 +1103,7 @@ export async function createInventoryOperation(formData: FormData) {
         .insert(stockMovements)
         .values({
           companyId: company.id,
+          ownerId: owner.id,
           movementNo,
           movementType: parsed.data.movementType,
           status: "draft",
@@ -899,9 +1131,11 @@ export async function createInventoryOperation(formData: FormData) {
           if (product.trackingMode === "lot" && !line.lotNo) {
             throw new Error(`Lot tracked product ${product.sku} requires a lot number.`);
           }
+          const unitCostMinor = product.standardCostMinor;
 
           return {
             stockMovementId: movement.id,
+            ownerId: owner.id,
             lineNo: index + 1,
             productId: product.id,
             unitId: product.unitId,
@@ -918,8 +1152,7 @@ export async function createInventoryOperation(formData: FormData) {
                   ? parsed.data.toLocationId
                   : null,
             quantity: String(Math.abs(line.quantity)),
-            unitCostMinor: line.unitCostMinor,
-            totalCostMinor: Math.round(Math.abs(line.quantity) * line.unitCostMinor),
+            totalCostMinor: Math.round(Math.abs(line.quantity) * unitCostMinor),
             currencyCode: product.currencyCode,
             notes: line.notes,
             metadata: {
@@ -967,6 +1200,7 @@ export async function postInventoryOperation(formData: FormData) {
           id: stockMovements.id,
           movementNo: stockMovements.movementNo,
           movementType: stockMovements.movementType,
+          ownerId: stockMovements.ownerId,
           status: stockMovements.status,
           fromLocationId: stockMovements.fromLocationId,
           toLocationId: stockMovements.toLocationId,
@@ -994,13 +1228,15 @@ export async function postInventoryOperation(formData: FormData) {
         .select({
           id: stockMovementLines.id,
           lineNo: stockMovementLines.lineNo,
+          ownerId: stockMovementLines.ownerId,
           productId: stockMovementLines.productId,
           quantity: stockMovementLines.quantity,
-          unitCostMinor: stockMovementLines.unitCostMinor,
+          totalCostMinor: stockMovementLines.totalCostMinor,
           currencyCode: stockMovementLines.currencyCode,
           metadata: stockMovementLines.metadata,
           trackingMode: products.trackingMode,
           sku: products.sku,
+          standardCostMinor: products.standardCostMinor,
         })
         .from(stockMovementLines)
         .innerJoin(products, eq(stockMovementLines.productId, products.id))
@@ -1012,6 +1248,12 @@ export async function postInventoryOperation(formData: FormData) {
       }
 
       for (const line of lines) {
+        const lineOwnerId = line.ownerId ?? movement.ownerId;
+
+        if (!lineOwnerId) {
+          throw new Error(`Owner is required on operation line ${line.lineNo}.`);
+        }
+
         const quantity = Math.abs(Number(line.quantity));
         const metadata = line.metadata as { requestedSerialNo?: string | null; requestedLotNo?: string | null; adjustmentDirection?: string | null };
         const serialNo = metadata.requestedSerialNo?.trim() || null;
@@ -1075,9 +1317,15 @@ export async function postInventoryOperation(formData: FormData) {
           productLotId = lot.id;
         }
 
+        let operationUnitCostMinor =
+          quantity > 0 && line.totalCostMinor > 0
+            ? Math.round(line.totalCostMinor / quantity)
+            : line.standardCostMinor;
+
         if (outboundLocationId) {
           const balance = await removeFromBalance(tx, {
             companyId: company.id,
+            ownerId: lineOwnerId,
             locationId: outboundLocationId,
             productId: line.productId,
             productSerialId,
@@ -1085,11 +1333,11 @@ export async function postInventoryOperation(formData: FormData) {
             quantity,
           });
 
-          if (line.unitCostMinor === 0 && balance.averageCostMinor > 0) {
+          if (balance.averageCostMinor > 0) {
+            operationUnitCostMinor = balance.averageCostMinor;
             await tx
               .update(stockMovementLines)
               .set({
-                unitCostMinor: balance.averageCostMinor,
                 totalCostMinor: Math.round(quantity * balance.averageCostMinor),
                 updatedAt: sql`now()`,
               })
@@ -1100,12 +1348,13 @@ export async function postInventoryOperation(formData: FormData) {
         if (inboundLocationId) {
           await addToBalance(tx, {
             companyId: company.id,
+            ownerId: lineOwnerId,
             locationId: inboundLocationId,
             productId: line.productId,
             productSerialId,
             productLotId,
             quantity,
-            unitCostMinor: line.unitCostMinor,
+            unitCostMinor: operationUnitCostMinor,
             currencyCode: line.currencyCode,
           });
         }
@@ -1115,6 +1364,7 @@ export async function postInventoryOperation(formData: FormData) {
           .set({
             productSerialId,
             productLotId,
+            ownerId: lineOwnerId,
             fromLocationId: outboundLocationId,
             toLocationId: inboundLocationId,
             updatedAt: sql`now()`,
