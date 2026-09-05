@@ -87,6 +87,16 @@ async function main() {
     `;
     assertCondition(adminUser, "No admin user found. Run pnpm db:seed first.");
 
+    const [owner] = await sql<{ id: string }[]>`
+      select id
+      from owners
+      where company_id = ${company.id}
+        and deleted_at is null
+      order by created_at asc
+      limit 1
+    `;
+    assertCondition(owner, "No owner found. Run pnpm db:seed first.");
+
     const [location] = await sql<{ id: string; code: string }[]>`
       select id, code
       from locations
@@ -173,6 +183,7 @@ async function main() {
         insert into purchase_orders (
           company_id,
           supplier_id,
+          owner_id,
           deliver_to_location_id,
           order_no,
           vendor_reference,
@@ -189,6 +200,7 @@ async function main() {
         values (
           ${company.id},
           ${supplier.id},
+          ${owner.id},
           ${location.id},
           ${testNo("PO-E2E")},
           ${`REF-${suffix}`},
@@ -211,6 +223,7 @@ async function main() {
           purchase_order_id,
           line_no,
           product_id,
+          owner_id,
           description,
           unit_id,
           quantity_ordered,
@@ -224,6 +237,7 @@ async function main() {
           ${purchaseOrder.id},
           1,
           ${product.id},
+          ${owner.id},
           'E2E purchase line',
           ${unit.id},
           ${quantity},

@@ -36,6 +36,8 @@ type ManyToOneCreateSelectProps = {
   placeholder?: string;
   entityLabel?: string;
   onCreate: (input: CreateCustomerInput) => Promise<ManyToOneOption>;
+  onValueChange?: (value: string) => void;
+  error?: string;
 };
 
 const inputClass = "h-10 rounded-md border border-input bg-background px-3 text-sm";
@@ -48,6 +50,8 @@ export function ManyToOneCreateSelect({
   placeholder = "Search or create",
   entityLabel = "Customer",
   onCreate,
+  onValueChange,
+  error: fieldError,
 }: ManyToOneCreateSelectProps) {
   const [items, setItems] = useState(options);
   const [selectedId, setSelectedId] = useState(defaultValue ?? "");
@@ -73,6 +77,7 @@ export function ManyToOneCreateSelect({
 
   function selectItem(option: ManyToOneOption) {
     setSelectedId(option.id);
+    onValueChange?.(option.id);
     setQuery("");
     setIsOpen(false);
     setError(null);
@@ -92,6 +97,7 @@ export function ManyToOneCreateSelect({
           return [...current, created].sort((a, b) => a.name.localeCompare(b.name));
         });
         setSelectedId(created.id);
+        onValueChange?.(created.id);
         setQuery("");
         setIsOpen(false);
         setIsDialogOpen(false);
@@ -115,9 +121,11 @@ export function ManyToOneCreateSelect({
           }}
           onFocus={() => setIsOpen(true)}
           placeholder={placeholder}
-          className={cn(inputClass, "w-full pl-9")}
+          className={cn(inputClass, "w-full pl-9", fieldError ? "border-destructive focus-visible:border-destructive" : "")}
         />
       </div>
+
+      {fieldError ? <p className="text-sm font-normal text-destructive">{fieldError}</p> : null}
 
       {isOpen ? (
         <div className="absolute left-0 right-0 top-[4.25rem] z-20 max-h-72 overflow-y-auto rounded-md border border-border bg-popover p-1 shadow-lg">

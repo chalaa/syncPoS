@@ -246,6 +246,20 @@
       "when": 1788466209247,
       "tag": "0034_tired_multiple_man",
       "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1788542743671,
+      "tag": "0035_freezing_stingray",
+      "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1788549248231,
+      "tag": "0036_amazing_korvac",
+      "breakpoints": true
     }
   ]
 }

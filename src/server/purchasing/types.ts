@@ -91,6 +91,8 @@ export type PurchaseLandedCostListRow = {
 
 export type PurchaseOrderReceiptLine = {
   id: string;
+  ownerId: string | null;
+  ownerName: string | null;
   productId: string;
   productName: string;
   sku: string;
@@ -105,6 +107,8 @@ export type PurchaseOrderReceiptLine = {
 export type PurchaseOrderDetailLine = {
   id: string;
   lineNo: number;
+  ownerId: string | null;
+  ownerName: string | null;
   productId: string;
   productName: string;
   sku: string;

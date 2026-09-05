@@ -17,6 +17,7 @@ type ProductFormProps = {
   categories: SelectOption[];
   brands: SelectOption[];
   units: SelectOption[];
+  templates: SelectOption[];
   taxes: { id: string; label: string; scope: "purchase" | "sale" | "both" }[];
   error?: string;
 };
@@ -31,6 +32,7 @@ export function ProductForm({
   categories,
   brands,
   units,
+  templates,
   taxes,
   error,
 }: ProductFormProps) {
@@ -109,6 +111,21 @@ export function ProductForm({
               label: "General Information",
               content: (
                 <div className="grid gap-4">
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <label className="grid gap-1 text-sm font-medium">
+                      Product Template
+                      <select name="templateId" defaultValue={product?.templateId ?? ""} className={inputClass}>
+                        <option value="">None</option>
+                        {templates.map((template) => (
+                          <option key={template.id} value={template.id}>
+                            {template.name}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <div />
+                  </div>
+
                   <div className="grid gap-4 md:grid-cols-2">
                     <label className="grid gap-1 text-sm font-medium">
                       Category

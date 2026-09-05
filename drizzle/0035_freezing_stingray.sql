@@ -1,0 +1,3 @@
+ALTER TABLE "purchase_order_lines" ADD COLUMN "owner_id" uuid;--> statement-breakpoint
+ALTER TABLE "purchase_order_lines" ADD CONSTRAINT "purchase_order_lines_owner_id_owners_id_fk" FOREIGN KEY ("owner_id") REFERENCES "public"."owners"("id") ON DELETE restrict ON UPDATE cascade;--> statement-breakpoint
+CREATE INDEX "purchase_order_lines_owner_idx" ON "purchase_order_lines" USING btree ("owner_id");

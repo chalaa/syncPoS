@@ -1,0 +1,204 @@
+"use client";
+
+import { useActionState } from "react";
+import { AlertTriangleIcon, CheckCircleIcon, DownloadIcon, UploadIcon } from "lucide-react";
+import Link from "next/link";
+
+import {
+  importProductTemplates,
+  validateProductTemplateImport,
+} from "@/app/admin/products/import/templates/actions";
+import { Alert } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import type { ProductTemplateImportPreviewState } from "@/server/catalog/types";
+
+const initialState: ProductTemplateImportPreviewState = {
+  status: "idle",
+  rows: [],
+};
+
+function hasErrors(rows: { errors: string[] }[]) {
+  return rows.some((row) => row.errors.length > 0);
+}
+
+function csvValue(value: string | number) {
+  const text = String(value);
+
+  return `"${text.replace(/"/g, "\"\"")}"`;
+}
+
+function errorReportHref(
+  rows: { rowNumber: number; productTemplate: string; errors: string[] }[],
+) {
+  const errorRows = rows.flatMap((row) =>
+    row.errors.map((error) =>
+      [row.rowNumber, row.productTemplate, error].map(csvValue).join(","),
+    ),
+  );
+  const csv = ["row,product_template,error", ...errorRows].join("\n");
+
+  return `data:text/csv;charset=utf-8,${encodeURIComponent(csv)}`;
+}
+
+export function ProductTemplateImporter() {
+  const [previewState, validateAction, isValidating] = useActionState(validateProductTemplateImport, initialState);
+  const [importState, importAction, isImporting] = useActionState(importProductTemplates, initialState);
+  const importCompleted = importState.status === "imported";
+  const previewRows = importCompleted ? [] : previewState.rows ?? [];
+  const hasPreviewErrors = hasErrors(previewRows);
+  const canImport =
+    !importCompleted &&
+    previewState.status === "preview" &&
+    previewRows.length > 0 &&
+    !hasPreviewErrors &&
+    previewState.importToken;
+  const payload = canImport
+    ? JSON.stringify({
+        importToken: previewState.importToken,
+        rows: previewRows,
+      })
+    : "";
+
+  return (
+    <div className="flex flex-col gap-5">
+      {previewState.message ? (
+        <Alert kind={hasPreviewErrors ? "error" : "success"}>
+          {previewState.message}
+        </Alert>
+      ) : null}
+      {importState.message ? (
+        <Alert kind={importState.status === "imported" ? "success" : "error"}>
+          {importState.message}
+        </Alert>
+      ) : null}
+
+      <section className="rounded-lg border border-border bg-card p-5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="text-base font-semibold">Import file</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Upload product template fields and selected attribute values. Missing attributes, values, and category links are created during import.
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Attribute values can use comma format: Power=3.2 kW, 5 kW; Fuel Type=Gasoline, Inverter.
+            </p>
+          </div>
+          <Button asChild variant="outline">
+            <Link href="/admin/products/import/templates/template">
+              <DownloadIcon data-icon="inline-start" />
+              Template
+            </Link>
+          </Button>
+        </div>
+
+        <form action={validateAction} className="mt-5 flex flex-col gap-4 sm:flex-row">
+          <input
+            type="file"
+            name="file"
+            accept=".csv,text/csv"
+            className="min-h-10 flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm"
+          />
+          <Button disabled={isValidating}>
+            <UploadIcon data-icon="inline-start" />
+            {isValidating ? "Validating..." : "Validate preview"}
+          </Button>
+        </form>
+      </section>
+
+      <section className="rounded-lg border border-border bg-card">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border p-4">
+          <div>
+            <h2 className="text-base font-semibold">Validation preview</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Template rows are imported only after every validation issue is fixed.
+            </p>
+          </div>
+          <form action={importAction}>
+            <input type="hidden" name="payload" value={payload} />
+            <div className="flex flex-wrap justify-end gap-2">
+              {hasPreviewErrors ? (
+                <Button asChild variant="outline">
+                  <a href={errorReportHref(previewRows)} download="product-template-import-error-report.csv">
+                    <DownloadIcon data-icon="inline-start" />
+                    Error report
+                  </a>
+                </Button>
+              ) : null}
+              <Button disabled={!canImport || isImporting}>
+                <CheckCircleIcon data-icon="inline-start" />
+                {isImporting ? "Importing..." : "Import product templates"}
+              </Button>
+            </div>
+          </form>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[1120px] text-left text-sm">
+            <thead className="bg-muted text-xs uppercase tracking-wide text-muted-foreground">
+              <tr>
+                <th className="px-4 py-3">Row</th>
+                <th className="px-4 py-3">Action</th>
+                <th className="px-4 py-3">Template</th>
+                <th className="px-4 py-3">Category</th>
+                <th className="px-4 py-3">Brand</th>
+                <th className="px-4 py-3">Unit</th>
+                <th className="px-4 py-3">Tracking</th>
+                <th className="px-4 py-3">Active</th>
+                <th className="px-4 py-3">Attribute Values</th>
+                <th className="px-4 py-3">Errors</th>
+              </tr>
+            </thead>
+            <tbody>
+              {previewRows.map((row) => (
+                <tr key={`${row.rowNumber}-${row.productTemplate}`} className="border-t border-border">
+                  <td className="px-4 py-3">{row.rowNumber}</td>
+                  <td className="px-4 py-3 capitalize">{row.action}</td>
+                  <td className="px-4 py-3">{row.productTemplate || "Missing"}</td>
+                  <td className="px-4 py-3">{row.categoryName || row.category || "-"}</td>
+                  <td className="px-4 py-3">{row.brandName || row.brand || "-"}</td>
+                  <td className="px-4 py-3">{row.unitName || row.unit || "Missing"}</td>
+                  <td className="px-4 py-3">{row.trackingMode || "Missing"}</td>
+                  <td className="px-4 py-3">{row.isActive ? "Yes" : "No"}</td>
+                  <td className="px-4 py-3">
+                    {row.variantAttributes.length > 0 ? (
+                      <div className="flex flex-wrap gap-1">
+                        {row.variantAttributes.map((attribute) => (
+                          <span key={`${attribute.attribute}-${attribute.value}`} className="rounded-md border border-border px-2 py-1 text-xs">
+                            {attribute.attribute}: {attribute.value}
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <span className="text-muted-foreground">Missing</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3">
+                    {row.errors.length > 0 ? (
+                      <div className="flex flex-col gap-1 text-destructive">
+                        {row.errors.map((error) => (
+                          <span key={error} className="inline-flex items-center gap-1">
+                            <AlertTriangleIcon data-icon="inline-start" />
+                            {error}
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <span className="text-muted-foreground">Ready</span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+              {previewRows.length === 0 ? (
+                <tr>
+                  <td colSpan={9} className="px-4 py-10 text-center text-muted-foreground">
+                    Upload a CSV file to preview product template rows.
+                  </td>
+                </tr>
+              ) : null}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  );
+}

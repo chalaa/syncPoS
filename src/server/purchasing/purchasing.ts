@@ -745,6 +745,8 @@ export async function getPurchaseOrderDetail(id: string): Promise<PurchaseOrderD
       select
         pol.id as "id",
         pol.line_no as "lineNo",
+        pol.owner_id as "ownerId",
+        own.name as "ownerName",
         pol.product_id as "productId",
         pr.name as "productName",
         pr.sku as "sku",
@@ -759,11 +761,12 @@ export async function getPurchaseOrderDetail(id: string): Promise<PurchaseOrderD
         string_agg(t.name, ', ' order by t.name) as "taxNames"
       from purchase_order_lines pol
       inner join products pr on pr.id = pol.product_id
+      left join owners own on own.id = pol.owner_id
       left join purchase_order_line_taxes polt on polt.purchase_order_line_id = pol.id
       left join taxes t on t.id = polt.tax_id
       where pol.purchase_order_id = ${id}
         and pol.deleted_at is null
-      group by pol.id, pr.id
+      group by pol.id, pr.id, own.id
       order by pol.line_no
     `),
     db
@@ -977,6 +980,8 @@ export async function getPurchaseOrderReceiptLines(purchaseOrderId: string): Pro
   return db
     .select({
       id: purchaseOrderLines.id,
+      ownerId: purchaseOrderLines.ownerId,
+      ownerName: owners.name,
       productId: products.id,
       productName: products.name,
       sku: products.sku,
@@ -989,6 +994,7 @@ export async function getPurchaseOrderReceiptLines(purchaseOrderId: string): Pro
     })
     .from(purchaseOrderLines)
     .innerJoin(products, eq(purchaseOrderLines.productId, products.id))
+    .leftJoin(owners, eq(purchaseOrderLines.ownerId, owners.id))
     .where(and(eq(purchaseOrderLines.purchaseOrderId, purchaseOrderId), isNull(purchaseOrderLines.deletedAt)))
     .orderBy(asc(purchaseOrderLines.lineNo));
 }

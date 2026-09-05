@@ -159,6 +159,7 @@ export function CatalogReferenceManager({
   notice,
   error,
   returnPath,
+  afterContent,
   eyebrow,
   title,
   description,
@@ -300,6 +301,8 @@ export function CatalogReferenceManager({
           </table>
         </div>
       </section>
+
+      {afterContent}
     </PageShell>
   );
 }

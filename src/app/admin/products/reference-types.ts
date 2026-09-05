@@ -1,3 +1,5 @@
+import type { ReactNode } from "react";
+
 import type { CatalogReferenceKind, CatalogReferenceRecord } from "@/server/catalog/types";
 
 export type ReferenceMutation = (formData: FormData) => Promise<void>;
@@ -23,4 +25,5 @@ export type ReferenceManagerProps = ReferenceManagerConfig & {
   notice?: string;
   error?: string;
   returnPath: string;
+  afterContent?: ReactNode;
 };

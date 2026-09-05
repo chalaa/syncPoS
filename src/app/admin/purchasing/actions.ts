@@ -59,6 +59,7 @@ const purchaseSupplierCreateSchema = z.object({
 
 const purchaseOrderLineSchema = z.object({
   productId: z.string().uuid(),
+  ownerId: z.string().uuid().or(z.literal("")).transform((value) => value || null),
   quantity: z.coerce.number().positive(),
   unitCost: z.string().trim().default("0"),
   taxIds: z.array(z.string().uuid()).default([]),
@@ -138,12 +139,14 @@ function parsePurchaseOrderForm(formData: FormData, errorPath: string) {
     notes: formValue(formData, "notes"),
   });
   const productIds = formValues(formData, "productId");
+  const ownerIds = formValues(formData, "lineOwnerId");
   const quantities = formValues(formData, "quantity");
   const unitCosts = formValues(formData, "unitCost");
   const taxIdValues = formValues(formData, "taxIds");
   const parsedLines = productIds
     .map((productId, index) => ({
       productId,
+      ownerId: ownerIds[index] ?? "",
       quantity: quantities[index] ?? "",
       unitCost: unitCosts[index] || "0",
       taxIds: parseTaxIds(taxIdValues[index] ?? ""),
@@ -173,6 +176,29 @@ function parsePurchaseOrderForm(formData: FormData, errorPath: string) {
   });
 
   return { header: parsedHeader.data, lines };
+}
+
+async function normalizePurchaseLineOwners(
+  tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
+  companyId: string,
+  defaultOwnerId: string,
+  lines: z.infer<typeof purchaseOrderLineSchema>[],
+) {
+  const normalizedLines = lines.map((line) => ({
+    ...line,
+    ownerId: line.ownerId ?? defaultOwnerId,
+  }));
+  const uniqueOwnerIds = [...new Set(normalizedLines.map((line) => line.ownerId))];
+  const ownerRows = await tx
+    .select({ id: owners.id })
+    .from(owners)
+    .where(and(inArray(owners.id, uniqueOwnerIds), eq(owners.companyId, companyId), isNull(owners.deletedAt)));
+
+  if (ownerRows.length !== uniqueOwnerIds.length) {
+    throw new Error("One or more line owners are invalid or inactive.");
+  }
+
+  return normalizedLines;
 }
 
 function parseReceiptLines(formData: FormData) {
@@ -351,6 +377,7 @@ export async function createPurchaseOrder(formData: FormData) {
   const company = await getDefaultCompany();
   const orderNo = movementNo("PO");
   const reference = movementNo("REF");
+  let createdOrderId: string | undefined;
 
   try {
     await db.transaction(async (tx) => {
@@ -437,7 +464,8 @@ export async function createPurchaseOrder(formData: FormData) {
         throw new Error("All purchase order lines must use the same currency.");
       }
 
-      const preparedLines = lines.map((line, index) => {
+      const normalizedLines = await normalizePurchaseLineOwners(tx, company.id, owner.id, lines);
+      const preparedLines = normalizedLines.map((line, index) => {
         const product = productById.get(line.productId);
 
         if (!product) {
@@ -455,6 +483,7 @@ export async function createPurchaseOrder(formData: FormData) {
 
         return {
           lineNo: index + 1,
+          ownerId: line.ownerId,
           product,
           quantityOrdered: String(line.quantity),
           unitCostMinor,
@@ -489,12 +518,14 @@ export async function createPurchaseOrder(formData: FormData) {
           createdBy: user.id,
         })
         .returning({ id: purchaseOrders.id });
+      createdOrderId = order.id;
 
       const insertedLines = await tx
         .insert(purchaseOrderLines)
         .values(
           preparedLines.map((line) => ({
             purchaseOrderId: order.id,
+            ownerId: line.ownerId,
             lineNo: line.lineNo,
             productId: line.product.id,
             unitId: line.product.unitId,
@@ -539,11 +570,11 @@ export async function createPurchaseOrder(formData: FormData) {
       error,
       error instanceof Error ? error.message : "Could not create purchase order.",
     );
-    redirectWithError("/admin/purchasing/new", message);
+    return { error: message };
   }
 
   revalidatePath("/admin/purchasing");
-  redirect("/admin/purchasing?notice=RFQ created");
+  redirect(`/admin/purchasing/${createdOrderId}?notice=${encodeURIComponent("RFQ created")}`);
 }
 
 export async function updatePurchaseOrder(formData: FormData) {
@@ -668,7 +699,8 @@ export async function updatePurchaseOrder(formData: FormData) {
         throw new Error("All purchase order lines must use the same currency.");
       }
 
-      const preparedLines = lines.map((line, index) => {
+      const normalizedLines = await normalizePurchaseLineOwners(tx, company.id, owner.id, lines);
+      const preparedLines = normalizedLines.map((line, index) => {
         const product = productById.get(line.productId);
 
         if (!product) {
@@ -686,6 +718,7 @@ export async function updatePurchaseOrder(formData: FormData) {
 
         return {
           lineNo: index + 1,
+          ownerId: line.ownerId,
           product,
           quantityOrdered: String(line.quantity),
           unitCostMinor,
@@ -733,6 +766,7 @@ export async function updatePurchaseOrder(formData: FormData) {
         .values(
           preparedLines.map((line) => ({
             purchaseOrderId: existingOrder.id,
+            ownerId: line.ownerId,
             lineNo: line.lineNo,
             productId: line.product.id,
             unitId: line.product.unitId,
@@ -777,7 +811,7 @@ export async function updatePurchaseOrder(formData: FormData) {
       error,
       error instanceof Error ? error.message : "Could not update purchase order.",
     );
-    redirectWithError(errorPath, message);
+    return { error: message };
   }
 
   revalidatePath("/admin/purchasing");
@@ -797,118 +831,314 @@ export async function confirmPurchaseOrder(formData: FormData) {
   }
 
   const company = await getDefaultCompany();
+  const supplierLocation = await getOrCreatePartnerStockLocation(company.id, "supplier");
+  let notice = "Purchase order confirmed";
 
   try {
     await db.transaction(async (tx) => {
-    const [order] = await tx
-      .select({
-        id: purchaseOrders.id,
-        orderNo: purchaseOrders.orderNo,
-        supplierId: purchaseOrders.supplierId,
-        deliverToLocationId: purchaseOrders.deliverToLocationId,
-        status: purchaseOrders.status,
-      })
-      .from(purchaseOrders)
-      .where(
-        and(
-          eq(purchaseOrders.id, parsed.data.purchaseOrderId),
-          eq(purchaseOrders.companyId, company.id),
-          isNull(purchaseOrders.deletedAt),
-        ),
-      )
-      .limit(1);
-
-    if (!order) {
-      throw new Error("Purchase order does not exist.");
-    }
-
-    if (order.status !== "draft") {
-      return;
-    }
-
-    if (!order.deliverToLocationId) {
-      throw new Error("Select a receiving location before confirming the purchase order.");
-    }
-
-    await tx
-      .update(purchaseOrders)
-      .set({
-        status: "confirmed",
-        confirmedAt: new Date(),
-        confirmedBy: user.id,
-        updatedAt: sql`now()`,
-      })
-      .where(eq(purchaseOrders.id, order.id));
-
-    const [existingReceipt] = await tx
-      .select({ id: goodsReceipts.id })
-      .from(goodsReceipts)
-      .where(and(eq(goodsReceipts.purchaseOrderId, order.id), isNull(goodsReceipts.deletedAt)))
-      .limit(1);
-
-    if (!existingReceipt) {
-      const receiptNo = movementNo("GR");
-
-      const [receipt] = await tx
-        .insert(goodsReceipts)
-        .values({
-          companyId: company.id,
-          purchaseOrderId: order.id,
-          supplierId: order.supplierId,
-          locationId: order.deliverToLocationId,
-          receiptNo,
-          status: "draft",
-          notes: `Draft receipt generated from ${order.orderNo}.`,
+      const [order] = await tx
+        .select({
+          id: purchaseOrders.id,
+          orderNo: purchaseOrders.orderNo,
+          supplierId: purchaseOrders.supplierId,
+          ownerId: purchaseOrders.ownerId,
+          deliverToLocationId: purchaseOrders.deliverToLocationId,
+          status: purchaseOrders.status,
         })
-        .returning({ id: goodsReceipts.id });
+        .from(purchaseOrders)
+        .where(
+          and(
+            eq(purchaseOrders.id, parsed.data.purchaseOrderId),
+            eq(purchaseOrders.companyId, company.id),
+            isNull(purchaseOrders.deletedAt),
+          ),
+        )
+        .limit(1);
+
+      if (!order) {
+        throw new Error("Purchase order does not exist.");
+      }
+
+      if (order.status !== "draft") {
+        return;
+      }
+
+      if (!order.ownerId) {
+        throw new Error("Owner is required before confirming the purchase order.");
+      }
+
+      if (!order.deliverToLocationId) {
+        throw new Error("Select a receiving location before confirming the purchase order.");
+      }
 
       const expectedLines = await tx
         .select({
           id: purchaseOrderLines.id,
           lineNo: purchaseOrderLines.lineNo,
+          ownerId: purchaseOrderLines.ownerId,
           productId: purchaseOrderLines.productId,
           unitId: purchaseOrderLines.unitId,
           quantityOrdered: purchaseOrderLines.quantityOrdered,
           quantityReceived: purchaseOrderLines.quantityReceived,
           unitCostMinor: purchaseOrderLines.unitCostMinor,
           currencyCode: purchaseOrderLines.currencyCode,
+          sku: products.sku,
+          trackingMode: products.trackingMode,
         })
         .from(purchaseOrderLines)
+        .innerJoin(products, eq(purchaseOrderLines.productId, products.id))
         .where(and(eq(purchaseOrderLines.purchaseOrderId, order.id), isNull(purchaseOrderLines.deletedAt)))
         .orderBy(purchaseOrderLines.lineNo);
 
-      const receiptLines = expectedLines
-        .map((line) => {
-          const quantityRemaining = Number(line.quantityOrdered) - Number(line.quantityReceived);
-          return {
-            goodsReceiptId: receipt.id,
-            purchaseOrderLineId: line.id,
-            lineNo: line.lineNo,
-            productId: line.productId,
-            unitId: line.unitId,
-            quantityReceived: String(quantityRemaining),
-            unitCostMinor: line.unitCostMinor,
-            landedUnitCostMinor: line.unitCostMinor,
-            lineTotalMinor: Math.round(quantityRemaining * line.unitCostMinor),
-            currencyCode: line.currencyCode,
-          };
-        })
-        .filter((line) => Number(line.quantityReceived) > 0);
-
-      if (receiptLines.length > 0) {
-        await tx.insert(goodsReceiptLines).values(receiptLines);
+      if (expectedLines.length === 0) {
+        throw new Error("Purchase order has no lines.");
       }
-    }
 
-    await tx.insert(auditLogs).values({
-      companyId: company.id,
-      actorUserId: user.id,
-      action: "purchase_order.confirm",
-      entityType: "purchase_order",
-      entityId: order.id,
-      severity: "info",
-      metadata: { orderNo: order.orderNo },
-    });
+      const remainingLines = expectedLines
+        .map((line) => ({
+          ...line,
+          ownerId: line.ownerId ?? order.ownerId,
+          quantityRemaining: Number(line.quantityOrdered) - Number(line.quantityReceived),
+        }))
+        .filter((line) => line.quantityRemaining > 0);
+
+      if (remainingLines.some((line) => !line.ownerId)) {
+        throw new Error("Every purchase order line must have an owner.");
+      }
+
+      await tx
+        .update(purchaseOrders)
+        .set({
+          status: "confirmed",
+          confirmedAt: new Date(),
+          confirmedBy: user.id,
+          updatedAt: sql`now()`,
+        })
+        .where(eq(purchaseOrders.id, order.id));
+
+      const [existingReceipt] = await tx
+        .select({ id: goodsReceipts.id })
+        .from(goodsReceipts)
+        .where(and(eq(goodsReceipts.purchaseOrderId, order.id), isNull(goodsReceipts.deletedAt)))
+        .limit(1);
+
+      if (!existingReceipt && remainingLines.length > 0) {
+        const receiptNo = movementNo("GR");
+        const hasSerialLines = remainingLines.some((line) => line.trackingMode === "serial");
+
+        if (hasSerialLines) {
+          const [receipt] = await tx
+            .insert(goodsReceipts)
+            .values({
+              companyId: company.id,
+              purchaseOrderId: order.id,
+              supplierId: order.supplierId,
+              locationId: order.deliverToLocationId,
+              receiptNo,
+              status: "draft",
+              notes: `Draft receipt generated from ${order.orderNo}. Assign serial numbers before posting.`,
+            })
+            .returning({ id: goodsReceipts.id });
+
+          await tx.insert(goodsReceiptLines).values(
+            remainingLines.map((line) => ({
+              goodsReceiptId: receipt.id,
+              purchaseOrderLineId: line.id,
+              lineNo: line.lineNo,
+              productId: line.productId,
+              unitId: line.unitId,
+              quantityReceived: String(line.quantityRemaining),
+              unitCostMinor: line.unitCostMinor,
+              landedUnitCostMinor: line.unitCostMinor,
+              lineTotalMinor: Math.round(line.quantityRemaining * line.unitCostMinor),
+              currencyCode: line.currencyCode,
+            })),
+          );
+          notice = "Purchase order confirmed. Draft receipt created for serial assignment.";
+        } else {
+          const stockMoveNo = movementNo("PR");
+          const [movement] = await tx
+            .insert(stockMovements)
+            .values({
+              companyId: company.id,
+              ownerId: order.ownerId,
+              movementNo: stockMoveNo,
+              movementType: "purchase_receipt",
+              status: "posted",
+              fromLocationId: supplierLocation.id,
+              toLocationId: order.deliverToLocationId,
+              sourceType: "goods_receipt",
+              sourceNo: receiptNo,
+              postedAt: new Date(),
+              postedBy: user.id,
+              notes: `Goods receipt ${receiptNo}`,
+            })
+            .returning({ id: stockMovements.id });
+
+          const [receipt] = await tx
+            .insert(goodsReceipts)
+            .values({
+              companyId: company.id,
+              purchaseOrderId: order.id,
+              supplierId: order.supplierId,
+              locationId: order.deliverToLocationId,
+              receiptNo,
+              status: "posted",
+              postedAt: new Date(),
+              postedBy: user.id,
+              stockMovementId: movement.id,
+              notes: `Posted automatically from ${order.orderNo}.`,
+            })
+            .returning({ id: goodsReceipts.id });
+
+          let receiptLineNo = 1;
+          for (const line of remainingLines) {
+            const lineOwnerId = line.ownerId;
+
+            if (!lineOwnerId) {
+              throw new Error(`Owner is required for ${line.sku}.`);
+            }
+
+            let productLotId: string | null = null;
+            const lotNo = line.trackingMode === "lot" ? `${receiptNo}-${line.lineNo}` : null;
+            const lineTotalMinor = Math.round(line.quantityRemaining * line.unitCostMinor);
+
+            if (lotNo) {
+              const [createdLot] = await tx
+                .insert(productLots)
+                .values({
+                  productId: line.productId,
+                  lotNo,
+                  status: "available",
+                  currentLocationId: order.deliverToLocationId,
+                  landedUnitCostMinor: line.unitCostMinor,
+                })
+                .returning({ id: productLots.id });
+
+              productLotId = createdLot.id;
+            }
+
+            await tx.insert(goodsReceiptLines).values({
+              goodsReceiptId: receipt.id,
+              purchaseOrderLineId: line.id,
+              lineNo: receiptLineNo,
+              productId: line.productId,
+              productLotId,
+              unitId: line.unitId,
+              quantityReceived: String(line.quantityRemaining),
+              unitCostMinor: line.unitCostMinor,
+              landedUnitCostMinor: line.unitCostMinor,
+              lineTotalMinor,
+              currencyCode: line.currencyCode,
+              lotNo,
+            });
+
+            await tx.insert(stockMovementLines).values({
+              stockMovementId: movement.id,
+              ownerId: lineOwnerId,
+              lineNo: receiptLineNo,
+              productId: line.productId,
+              productLotId,
+              fromLocationId: supplierLocation.id,
+              toLocationId: order.deliverToLocationId,
+              unitId: line.unitId,
+              quantity: String(line.quantityRemaining),
+              totalCostMinor: lineTotalMinor,
+              currencyCode: line.currencyCode,
+              notes: `Received from ${order.orderNo}`,
+            });
+
+            const lotFilter = productLotId ? eq(stockBalances.productLotId, productLotId) : isNull(stockBalances.productLotId);
+            const [balance] = await tx
+              .select({
+                id: stockBalances.id,
+                quantityOnHand: stockBalances.quantityOnHand,
+                quantityReserved: stockBalances.quantityReserved,
+              })
+              .from(stockBalances)
+              .where(
+                and(
+                  eq(stockBalances.companyId, company.id),
+                  eq(stockBalances.ownerId, lineOwnerId),
+                  eq(stockBalances.locationId, order.deliverToLocationId),
+                  eq(stockBalances.productId, line.productId),
+                  isNull(stockBalances.productSerialId),
+                  lotFilter,
+                  isNull(stockBalances.deletedAt),
+                ),
+              )
+              .limit(1);
+
+            if (balance) {
+              const nextOnHand = Number(balance.quantityOnHand) + line.quantityRemaining;
+              const nextAvailable = nextOnHand - Number(balance.quantityReserved);
+              await tx
+                .update(stockBalances)
+                .set({
+                  quantityOnHand: String(nextOnHand),
+                  quantityAvailable: String(nextAvailable),
+                  averageCostMinor: line.unitCostMinor,
+                  lastMovementAt: new Date(),
+                  updatedAt: sql`now()`,
+                })
+                .where(eq(stockBalances.id, balance.id));
+            } else {
+              await tx.insert(stockBalances).values({
+                companyId: company.id,
+                ownerId: lineOwnerId,
+                locationId: order.deliverToLocationId,
+                productId: line.productId,
+                productLotId,
+                quantityOnHand: String(line.quantityRemaining),
+                quantityReserved: "0",
+                quantityAvailable: String(line.quantityRemaining),
+                averageCostMinor: line.unitCostMinor,
+                currencyCode: line.currencyCode,
+                lastMovementAt: new Date(),
+              });
+            }
+
+            await tx
+              .update(purchaseOrderLines)
+              .set({
+                quantityReceived: String(Number(line.quantityReceived) + line.quantityRemaining),
+                updatedAt: sql`now()`,
+              })
+              .where(eq(purchaseOrderLines.id, line.id));
+
+            receiptLineNo += 1;
+          }
+
+          await tx
+            .update(purchaseOrders)
+            .set({
+              status: "received",
+              updatedAt: sql`now()`,
+            })
+            .where(eq(purchaseOrders.id, order.id));
+
+          await tx.insert(auditLogs).values({
+            companyId: company.id,
+            actorUserId: user.id,
+            action: "goods_receipt.post",
+            entityType: "goods_receipt",
+            entityId: receipt.id,
+            severity: "info",
+            metadata: { receiptNo, orderNo: order.orderNo, stockMoveNo, automatic: true },
+          });
+          notice = "Purchase order confirmed and receipt posted";
+        }
+      }
+
+      await tx.insert(auditLogs).values({
+        companyId: company.id,
+        actorUserId: user.id,
+        action: "purchase_order.confirm",
+        entityType: "purchase_order",
+        entityId: order.id,
+        severity: "info",
+        metadata: { orderNo: order.orderNo },
+      });
     });
   } catch (error) {
     redirectWithError(
@@ -919,7 +1149,7 @@ export async function confirmPurchaseOrder(formData: FormData) {
 
   revalidatePath("/admin/purchasing");
   revalidatePath(`/admin/purchasing/${parsed.data.purchaseOrderId}`);
-  redirect(`${parsed.data.returnPath ?? "/admin/purchasing"}?notice=Purchase order confirmed`);
+  redirect(`${parsed.data.returnPath ?? "/admin/purchasing"}?notice=${encodeURIComponent(notice)}`);
 }
 
 export async function postGoodsReceipt(formData: FormData) {
@@ -1085,6 +1315,11 @@ export async function postGoodsReceipt(formData: FormData) {
           if (receiveQuantity <= 0) {
             continue;
           }
+          const lineOwnerId = line.ownerId ?? order.ownerId;
+
+          if (!lineOwnerId) {
+            throw new Error(`Owner is required for ${line.sku}.`);
+          }
 
         let productSerialId: string | null = null;
         let productLotId: string | null = null;
@@ -1159,7 +1394,7 @@ export async function postGoodsReceipt(formData: FormData) {
 
         await tx.insert(stockMovementLines).values({
           stockMovementId: movement.id,
-          ownerId: order.ownerId,
+          ownerId: lineOwnerId,
           lineNo: receiptLineNo,
           productId: line.productId,
           productSerialId,
@@ -1190,7 +1425,7 @@ export async function postGoodsReceipt(formData: FormData) {
           .where(
             and(
               eq(stockBalances.companyId, company.id),
-              order.ownerId ? eq(stockBalances.ownerId, order.ownerId) : isNull(stockBalances.ownerId),
+              eq(stockBalances.ownerId, lineOwnerId),
               eq(stockBalances.locationId, parsed.data.locationId),
               eq(stockBalances.productId, line.productId),
               serialFilter,
@@ -1216,7 +1451,7 @@ export async function postGoodsReceipt(formData: FormData) {
         } else {
           await tx.insert(stockBalances).values({
             companyId: company.id,
-            ownerId: order.ownerId,
+            ownerId: lineOwnerId,
             locationId: parsed.data.locationId,
             productId: line.productId,
             productSerialId,
