@@ -15,6 +15,7 @@ import {
 import { ManyToManyTags } from "@/components/ui/many-to-many-tags";
 import { ManyToOneCreateSelect } from "@/components/ui/many-to-one-create-select";
 import { Notebook } from "@/components/ui/notebook";
+import { RelatedModelSelect } from "@/components/ui/related-model-select";
 import { useFormValidation, type FormValidationResult } from "@/hooks/use-form-validation";
 import { cn } from "@/lib/utils";
 import { createSupplierFromPurchasing } from "@/app/admin/purchasing/actions";
@@ -353,24 +354,17 @@ export function PurchaseOrderForm({
       </div>
 
       <div className="grid gap-4 md:grid-cols-4">
-        <label className="flex flex-col gap-1 text-sm font-medium">
-          Owner
-          <select
-            name="ownerId"
-            value={headerOwnerId}
-            onChange={(event) => changeHeaderOwner(event.target.value)}
-            className={cn(inputClass, showFieldError("ownerId") ? "border-destructive focus-visible:border-destructive" : "")}
-            required={owners.length > 0}
-          >
-            <option value="">Select owner</option>
-            {owners.map((owner) => (
-              <option key={owner.id} value={owner.id}>
-                {owner.name}
-              </option>
-            ))}
-          </select>
-          {showFieldError("ownerId") ? <span className="text-sm font-normal text-destructive">{showFieldError("ownerId")}</span> : null}
-        </label>
+        <RelatedModelSelect
+          name="ownerId"
+          label="Owner"
+          options={owners}
+          value={headerOwnerId}
+          onValueChange={changeHeaderOwner}
+          required={owners.length > 0}
+          placeholder="Select owner"
+          emptyLabel="No owners found."
+          error={showFieldError("ownerId")}
+        />
         <label className="flex flex-col gap-1 text-sm font-medium">
           Payment Term
           <select
@@ -407,25 +401,16 @@ export function PurchaseOrderForm({
             {showFieldError("paymentDueDate") ? <span className="text-sm font-normal text-destructive">{showFieldError("paymentDueDate")}</span> : null}
           </label>
         ) : null}
-        <label className="flex flex-col gap-1 text-sm font-medium">
-          Deliver to
-          <select
-            name="deliverToLocationId"
-            value={deliverToLocationId}
-            onChange={(event) => setDeliverToLocationId(event.target.value)}
-            className={cn(inputClass, showFieldError("deliverToLocationId") ? "border-destructive focus-visible:border-destructive" : "")}
-          >
-            <option value="">Select on receipt</option>
-            {locations.map((location) => (
-              <option key={location.id} value={location.id}>
-                {location.code} / {location.name}
-              </option>
-            ))}
-          </select>
-          {showFieldError("deliverToLocationId") ? (
-            <span className="text-sm font-normal text-destructive">{showFieldError("deliverToLocationId")}</span>
-          ) : null}
-        </label>
+        <RelatedModelSelect
+          name="deliverToLocationId"
+          label="Deliver to"
+          options={locations}
+          value={deliverToLocationId}
+          onValueChange={setDeliverToLocationId}
+          placeholder="Select on receipt"
+          emptyLabel="No locations found."
+          error={showFieldError("deliverToLocationId")}
+        />
       </div>
 
       <Notebook
@@ -464,35 +449,29 @@ export function PurchaseOrderForm({
                       {lines.map((line, index) => (
                         <tr key={line.key} className="border-b border-border/70">
                           <td className="px-2 py-3">
-                            <select
+                            <RelatedModelSelect
                               value={line.productId}
-                              className={cn(tableInputClass, showFieldError(fieldKey("productId", line.key)) ? "border-destructive focus-visible:border-destructive" : "")}
-                              onChange={(event) => updateLineProduct(line.key, event.target.value)}
-                            >
-                              <option value="">Select product</option>
-                              {products.map((product) => (
-                                <option key={product.id} value={product.id}>
-                                  {product.code} / {product.name}
-                                </option>
-                              ))}
-                            </select>
+                              options={products}
+                              onValueChange={(productId) => updateLineProduct(line.key, productId)}
+                              placeholder="Select product"
+                              emptyLabel="No products found."
+                              inputClassName={tableInputClass}
+                              error={showFieldError(fieldKey("productId", line.key))}
+                            />
                             {showFieldError(fieldKey("productId", line.key)) ? (
                               <p className="mt-1 text-xs text-destructive">{showFieldError(fieldKey("productId", line.key))}</p>
                             ) : null}
                           </td>
                           <td className="px-2 py-3">
-                            <select
+                            <RelatedModelSelect
                               value={line.ownerId || headerOwnerId}
-                              className={cn(tableInputClass, showFieldError(fieldKey("ownerId", line.key)) ? "border-destructive focus-visible:border-destructive" : "")}
-                              onChange={(event) => updateLine(line.key, { ownerId: event.target.value })}
-                            >
-                              <option value="">Select owner</option>
-                              {owners.map((owner) => (
-                                <option key={owner.id} value={owner.id}>
-                                  {owner.name}
-                                </option>
-                              ))}
-                            </select>
+                              options={owners}
+                              onValueChange={(ownerId) => updateLine(line.key, { ownerId })}
+                              placeholder="Select owner"
+                              emptyLabel="No owners found."
+                              inputClassName={tableInputClass}
+                              error={showFieldError(fieldKey("ownerId", line.key))}
+                            />
                             {showFieldError(fieldKey("ownerId", line.key)) ? (
                               <p className="mt-1 text-xs text-destructive">{showFieldError(fieldKey("ownerId", line.key))}</p>
                             ) : null}
@@ -628,36 +607,28 @@ export function PurchaseOrderForm({
                       <div className="grid gap-4">
                         <label className="flex flex-col gap-1 text-sm font-medium">
                           Product
-                          <select
+                          <RelatedModelSelect
                             value={editingLine.productId}
-                            className={cn(inputClass, showFieldError(fieldKey("productId", editingLine.key)) ? "border-destructive focus-visible:border-destructive" : "")}
-                            onChange={(event) => updateLineProduct(editingLine.key, event.target.value)}
-                          >
-                            <option value="">Select product</option>
-                            {products.map((product) => (
-                              <option key={product.id} value={product.id}>
-                                {product.code} / {product.name}
-                              </option>
-                            ))}
-                          </select>
+                            options={products}
+                            onValueChange={(productId) => updateLineProduct(editingLine.key, productId)}
+                            placeholder="Select product"
+                            emptyLabel="No products found."
+                            error={showFieldError(fieldKey("productId", editingLine.key))}
+                          />
                           {showFieldError(fieldKey("productId", editingLine.key)) ? (
                             <span className="text-sm font-normal text-destructive">{showFieldError(fieldKey("productId", editingLine.key))}</span>
                           ) : null}
                         </label>
                         <label className="flex flex-col gap-1 text-sm font-medium">
                           Owner
-                          <select
+                          <RelatedModelSelect
                             value={editingLine.ownerId || headerOwnerId}
-                            className={cn(inputClass, showFieldError(fieldKey("ownerId", editingLine.key)) ? "border-destructive focus-visible:border-destructive" : "")}
-                            onChange={(event) => updateLine(editingLine.key, { ownerId: event.target.value })}
-                          >
-                            <option value="">Select owner</option>
-                            {owners.map((owner) => (
-                              <option key={owner.id} value={owner.id}>
-                                {owner.name}
-                              </option>
-                            ))}
-                          </select>
+                            options={owners}
+                            onValueChange={(ownerId) => updateLine(editingLine.key, { ownerId })}
+                            placeholder="Select owner"
+                            emptyLabel="No owners found."
+                            error={showFieldError(fieldKey("ownerId", editingLine.key))}
+                          />
                           {showFieldError(fieldKey("ownerId", editingLine.key)) ? (
                             <span className="text-sm font-normal text-destructive">{showFieldError(fieldKey("ownerId", editingLine.key))}</span>
                           ) : null}

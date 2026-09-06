@@ -17,6 +17,26 @@ function trackingLabel(value: string) {
   return value.replace(/_/g, " ");
 }
 
+function specificationLabel(key: string) {
+  return key
+    .split("_")
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+function specificationValue(value: string | number | boolean | null) {
+  if (value === null || value === "") {
+    return "-";
+  }
+
+  if (typeof value === "boolean") {
+    return value ? "Yes" : "No";
+  }
+
+  return String(value);
+}
+
 export default async function ProductDetailPage({ params }: ProductDetailPageProps) {
   await requirePermission("product.view");
 
@@ -123,6 +143,20 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
               <section className="grid gap-3 text-sm md:grid-cols-2">
                 <InfoRow label="Purchase Unit Cost" value={`${product.currencyCode} ${minorToDisplay(product.standardCostMinor)}`} />
                 <InfoRow label="Vendor Taxes" value={product.purchaseTaxNames || "-"} />
+              </section>
+            ),
+          },
+          {
+            value: "specifications",
+            label: "Specifications",
+            content: (
+              <section className="grid gap-3 text-sm md:grid-cols-2">
+                {Object.entries(product.specifications).map(([key, value]) => (
+                  <InfoRow key={key} label={specificationLabel(key)} value={specificationValue(value)} />
+                ))}
+                {Object.keys(product.specifications).length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No specifications saved.</p>
+                ) : null}
               </section>
             ),
           },

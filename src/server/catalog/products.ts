@@ -9,8 +9,6 @@ import {
 } from "@/lib/catalog-utils";
 import {
   brands,
-  catalogAttributes,
-  catalogAttributeValues,
   companies,
   goodsReceiptLines,
   goodsReceipts,
@@ -18,12 +16,9 @@ import {
   owners,
   productLots,
   productCategories,
-  productCategoryAttributes,
   productPurchaseTaxes,
   productSerials,
   productSaleTaxes,
-  productTemplates,
-  productTemplateAttributeValues,
   products,
   priceListItems,
   priceLists,
@@ -38,13 +33,9 @@ import {
 import type {
   CatalogReferenceKind,
   CatalogReferenceRecord,
-  CatalogAttributeRecord,
-  CategoryAttributeRecord,
   PriceListFormOptions,
   ProductDetail,
   ProductDetailMovementRow,
-  ProductTemplateDetail,
-  ProductTemplateListRow,
   ProductPriceListItemRow,
   ProductDetailStockRow,
   ProductDetailTrackingRow,
@@ -80,12 +71,13 @@ export async function getDefaultCompany() {
 export async function getCatalogFormOptions() {
   const company = await getDefaultCompany();
 
-  const [categoryRows, brandRows, unitRows, taxRows, templateRows] = await Promise.all([
+  const [categoryRows, brandRows, unitRows, taxRows] = await Promise.all([
     db
       .select({
         id: productCategories.id,
         code: productCategories.code,
         name: productCategories.name,
+        specificationSchema: productCategories.specificationSchema,
       })
       .from(productCategories)
       .where(and(eq(productCategories.companyId, company.id), isNull(productCategories.deletedAt)))
@@ -125,15 +117,6 @@ export async function getCatalogFormOptions() {
       .from(taxes)
       .where(and(eq(taxes.companyId, company.id), isNull(taxes.deletedAt), eq(taxes.isActive, true)))
       .orderBy(asc(taxes.name)),
-    db
-      .select({
-        id: productTemplates.id,
-        code: productTemplates.name,
-        name: productTemplates.name,
-      })
-      .from(productTemplates)
-      .where(and(eq(productTemplates.companyId, company.id), isNull(productTemplates.deletedAt), eq(productTemplates.isActive, true)))
-      .orderBy(asc(productTemplates.name)),
   ]);
 
   return {
@@ -142,79 +125,7 @@ export async function getCatalogFormOptions() {
     brands: brandRows,
     units: unitRows,
     taxes: taxRows.map((tax) => ({ ...tax, label: `${tax.code} / ${tax.name}` })) satisfies ProductTaxOption[],
-    templates: templateRows,
   };
-}
-
-export async function getCatalogAttributeList(): Promise<CatalogAttributeRecord[]> {
-  const company = await getDefaultCompany();
-  const [attributeRows, valueRows] = await Promise.all([
-    db
-      .select({
-        id: catalogAttributes.id,
-        code: catalogAttributes.code,
-        name: catalogAttributes.name,
-        isActive: catalogAttributes.isActive,
-        deletedAt: catalogAttributes.deletedAt,
-      })
-      .from(catalogAttributes)
-      .where(and(eq(catalogAttributes.companyId, company.id), isNull(catalogAttributes.deletedAt)))
-      .orderBy(asc(catalogAttributes.name)),
-    db
-      .select({
-        id: catalogAttributeValues.id,
-        attributeId: catalogAttributeValues.attributeId,
-        value: catalogAttributeValues.value,
-        sortOrder: catalogAttributeValues.sortOrder,
-        isActive: catalogAttributeValues.isActive,
-      })
-      .from(catalogAttributeValues)
-      .where(and(eq(catalogAttributeValues.companyId, company.id), isNull(catalogAttributeValues.deletedAt)))
-      .orderBy(asc(catalogAttributeValues.sortOrder), asc(catalogAttributeValues.value)),
-  ]);
-  const valuesByAttribute = new Map<string, CatalogAttributeRecord["values"]>();
-
-  for (const value of valueRows) {
-    valuesByAttribute.set(value.attributeId, [
-      ...(valuesByAttribute.get(value.attributeId) ?? []),
-      {
-        id: value.id,
-        value: value.value,
-        sortOrder: value.sortOrder,
-        isActive: value.isActive,
-      },
-    ]);
-  }
-
-  return attributeRows.map((attribute) => ({
-    ...attribute,
-    values: valuesByAttribute.get(attribute.id) ?? [],
-  }));
-}
-
-export async function getCategoryAttributeList(categoryId?: string): Promise<CategoryAttributeRecord[]> {
-  const company = await getDefaultCompany();
-  const filters = [
-    eq(productCategoryAttributes.companyId, company.id),
-    isNull(productCategoryAttributes.deletedAt),
-    categoryId ? eq(productCategoryAttributes.categoryId, categoryId) : undefined,
-  ].filter(Boolean);
-
-  return db
-    .select({
-      id: productCategoryAttributes.id,
-      categoryId: productCategoryAttributes.categoryId,
-      categoryName: productCategories.name,
-      attributeId: productCategoryAttributes.attributeId,
-      attributeName: catalogAttributes.name,
-      isRequired: productCategoryAttributes.isRequired,
-      sortOrder: productCategoryAttributes.sortOrder,
-    })
-    .from(productCategoryAttributes)
-    .innerJoin(productCategories, eq(productCategoryAttributes.categoryId, productCategories.id))
-    .innerJoin(catalogAttributes, eq(productCategoryAttributes.attributeId, catalogAttributes.id))
-    .where(and(...filters))
-    .orderBy(asc(productCategories.name), asc(productCategoryAttributes.sortOrder), asc(catalogAttributes.name));
 }
 
 export async function getProductList(params: { query?: string; showDeleted?: boolean }) {
@@ -235,9 +146,9 @@ export async function getProductList(params: { query?: string; showDeleted?: boo
     .select({
       id: products.id,
       sku: products.sku,
-      templateId: products.templateId,
       name: products.name,
       model: products.model,
+      specifications: products.specifications,
       trackingMode: products.trackingMode,
       standardCostMinor: products.standardCostMinor,
       listPriceMinor: products.listPriceMinor,
@@ -283,6 +194,7 @@ export async function getCatalogReferenceList(params: {
         code: productCategories.code,
         name: productCategories.name,
         description: productCategories.description,
+        specificationSchema: productCategories.specificationSchema,
         isActive: productCategories.isActive,
         deletedAt: productCategories.deletedAt,
       })
@@ -378,119 +290,17 @@ export async function getTaxList(params: {
     .orderBy(asc(taxes.name));
 }
 
-export async function getProductTemplateList(): Promise<ProductTemplateListRow[]> {
-  const company = await getDefaultCompany();
-
-  return db
-    .select({
-      id: productTemplates.id,
-      name: productTemplates.name,
-      categoryName: productCategories.name,
-      brandName: brands.name,
-      unitCode: unitsOfMeasure.code,
-      trackingMode: productTemplates.trackingMode,
-      variantCount: sql<number>`count(${products.id})::int`,
-      isActive: productTemplates.isActive,
-    })
-    .from(productTemplates)
-    .leftJoin(productCategories, eq(productTemplates.categoryId, productCategories.id))
-    .leftJoin(brands, eq(productTemplates.brandId, brands.id))
-    .leftJoin(unitsOfMeasure, eq(productTemplates.unitId, unitsOfMeasure.id))
-    .leftJoin(products, and(eq(products.templateId, productTemplates.id), isNull(products.deletedAt)))
-    .where(and(eq(productTemplates.companyId, company.id), isNull(productTemplates.deletedAt)))
-    .groupBy(productTemplates.id, productCategories.id, brands.id, unitsOfMeasure.id)
-    .orderBy(asc(productTemplates.name));
-}
-
-export async function getProductTemplateDetail(id: string): Promise<ProductTemplateDetail | null> {
-  const company = await getDefaultCompany();
-  const [template] = await db
-    .select({
-      id: productTemplates.id,
-      name: productTemplates.name,
-      categoryId: productTemplates.categoryId,
-      brandId: productTemplates.brandId,
-      unitId: productTemplates.unitId,
-      trackingMode: productTemplates.trackingMode,
-      description: productTemplates.description,
-      isActive: productTemplates.isActive,
-    })
-    .from(productTemplates)
-    .where(and(eq(productTemplates.id, id), eq(productTemplates.companyId, company.id), isNull(productTemplates.deletedAt)))
-    .limit(1);
-
-  if (!template) {
-    return null;
-  }
-
-  const [categoryAttributes, selectedValues, variants] = await Promise.all([
-    template.categoryId ? getCategoryAttributeList(template.categoryId) : Promise.resolve([]),
-    db
-      .select({
-        attributeId: productTemplateAttributeValues.attributeId,
-        attributeValueId: productTemplateAttributeValues.attributeValueId,
-      })
-      .from(productTemplateAttributeValues)
-      .where(and(eq(productTemplateAttributeValues.templateId, template.id), isNull(productTemplateAttributeValues.deletedAt))),
-    db.execute<ProductTemplateDetail["variants"][number]>(sql`
-      select
-        p.id as "id",
-        p.sku as "sku",
-        p.name as "name",
-        p.model as "model",
-        p.list_price_minor as "listPriceMinor",
-        p.standard_cost_minor as "standardCostMinor",
-        p.currency_code as "currencyCode",
-        p.is_active as "isActive",
-        string_agg(ca.name || ': ' || cav.value, ', ' order by ca.name, cav.sort_order, cav.value) as "attributeSummary"
-      from products p
-      left join product_variant_attribute_values pvav on pvav.product_id = p.id and pvav.deleted_at is null
-      left join catalog_attributes ca on ca.id = pvav.attribute_id
-      left join catalog_attribute_values cav on cav.id = pvav.attribute_value_id
-      where p.template_id = ${template.id}
-        and p.company_id = ${company.id}
-        and p.deleted_at is null
-      group by p.id
-      order by p.name
-    `),
-  ]);
-
-  const selectedByAttribute = new Map<string, string[]>();
-  for (const selected of selectedValues) {
-    selectedByAttribute.set(selected.attributeId, [
-      ...(selectedByAttribute.get(selected.attributeId) ?? []),
-      selected.attributeValueId,
-    ]);
-  }
-
-  const allAttributes = await getCatalogAttributeList();
-  const valuesByAttribute = new Map(allAttributes.map((attribute) => [attribute.id, attribute.values.filter((value) => value.isActive)]));
-
-  return {
-    ...template,
-    attributes: categoryAttributes.map((attribute) => ({
-      attributeId: attribute.attributeId,
-      attributeName: attribute.attributeName,
-      isRequired: attribute.isRequired,
-      sortOrder: attribute.sortOrder,
-      values: valuesByAttribute.get(attribute.attributeId) ?? [],
-      selectedValueIds: selectedByAttribute.get(attribute.attributeId) ?? [],
-    })),
-    variants,
-  };
-}
-
 export async function getProductById(id: string) {
   const [product] = await db
     .select({
       id: products.id,
       sku: products.sku,
-      templateId: products.templateId,
       name: products.name,
       categoryId: products.categoryId,
       brandId: products.brandId,
       model: products.model,
       description: products.description,
+      specifications: products.specifications,
       unitId: products.unitId,
       trackingMode: products.trackingMode,
       standardCostMinor: products.standardCostMinor,
@@ -540,7 +350,6 @@ export async function getProductDetail(id: string): Promise<ProductDetail | null
     .select({
       id: products.id,
       sku: products.sku,
-      templateId: products.templateId,
       name: products.name,
       categoryId: products.categoryId,
       categoryName: productCategories.name,
@@ -548,6 +357,7 @@ export async function getProductDetail(id: string): Promise<ProductDetail | null
       brandName: brands.name,
       model: products.model,
       description: products.description,
+      specifications: products.specifications,
       unitId: products.unitId,
       unitCode: unitsOfMeasure.code,
       unitName: unitsOfMeasure.name,

@@ -1,0 +1,2 @@
+ALTER TABLE "product_categories" ADD COLUMN "specification_schema" jsonb DEFAULT '[]'::jsonb NOT NULL;--> statement-breakpoint
+ALTER TABLE "products" ADD COLUMN "specifications" jsonb DEFAULT '{}'::jsonb NOT NULL;

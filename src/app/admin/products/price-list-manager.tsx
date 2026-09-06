@@ -17,6 +17,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
+import { RelatedModelSelect } from "@/components/ui/related-model-select";
 import { minorToDisplay } from "@/lib/catalog-utils";
 import { cn } from "@/lib/utils";
 import type { PriceListFormOptions, ProductPriceListItemRow, ProductPriceListRow } from "@/server/catalog/types";
@@ -95,17 +96,15 @@ function PriceListForm({
           Name
           <input name="name" required defaultValue={record?.name} className={inputClass} />
         </label>
-        <label className="grid gap-1 text-sm font-medium">
-          Owner
-          <select name="ownerId" defaultValue={record?.ownerId ?? options.owners[0]?.id ?? ""} className={inputClass} required={options.owners.length > 0}>
-            <option value="">Select owner</option>
-            {options.owners.map((owner) => (
-              <option key={owner.id} value={owner.id}>
-                {owner.name}
-              </option>
-            ))}
-          </select>
-        </label>
+        <RelatedModelSelect
+          name="ownerId"
+          label="Owner"
+          options={options.owners}
+          defaultValue={record?.ownerId ?? options.owners[0]?.id ?? ""}
+          required={options.owners.length > 0}
+          placeholder="Select owner"
+          emptyLabel="No owners found."
+        />
       </div>
 
       <label className="flex items-center gap-2 text-sm font-medium">
@@ -137,19 +136,15 @@ function PriceListForm({
               {lines.map((line) => (
                 <tr key={line.key} className="border-b border-border/70">
                   <td className="px-2 py-2">
-                    <select
+                    <RelatedModelSelect
                       name="itemProductId"
                       value={line.productId}
-                      className={tableInputClass}
-                      onChange={(event) => updateLine(line.key, { productId: event.target.value })}
-                    >
-                      <option value="">Select product</option>
-                      {options.products.map((product) => (
-                        <option key={product.id} value={product.id}>
-                          {product.code} / {product.name}
-                        </option>
-                      ))}
-                    </select>
+                      options={options.products}
+                      onValueChange={(productId) => updateLine(line.key, { productId })}
+                      placeholder="Select product"
+                      emptyLabel="No products found."
+                      inputClassName={tableInputClass}
+                    />
                   </td>
                   <td className="px-2 py-2">
                     <input name="itemMinimumQuantity" type="number" min="0.000001" step="0.000001" value={line.minimumQuantity} className={cn(tableInputClass, "text-right")} onChange={(event) => updateLine(line.key, { minimumQuantity: event.target.value })} />

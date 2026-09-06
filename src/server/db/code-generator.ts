@@ -4,7 +4,6 @@ import { type SQL, sql } from "drizzle-orm";
 
 type CodeTable =
   | "brands"
-  | "catalog_attributes"
   | "expense_categories"
   | "locations"
   | "partners"
@@ -23,7 +22,6 @@ type QueryExecutor = {
 
 const tableNames: Record<CodeTable, string> = {
   brands: "brands",
-  catalog_attributes: "catalog_attributes",
   expense_categories: "expense_categories",
   locations: "locations",
   partners: "partners",

@@ -12,6 +12,8 @@ import {
 import type {
   ProductImportCommitPayload,
   ProductImportRow,
+  ProductSpecificationField,
+  ProductSpecifications,
   TrackingModeOption,
 } from "@/server/catalog/types";
 import { db } from "@/server/db/client";
@@ -38,12 +40,13 @@ const productTemplateHeaders = [
   "sales_taxes",
   "purchase_taxes",
   "description",
+  "specifications",
 ];
 
 export const productImportTemplateCsv = `${productTemplateHeaders.join(",")}
-,Hydraulic Filter,Parts,Perkins,HF-204,Each,none,1950,1200,VAT15,VAT15,Standard replacement filter
-,Engine Oil 20W-50,Consumables,,20W-50,Liter,lot,650,450,VAT15,VAT15,Lot tracked engine oil
-,Mini Excavator 320,Machinery,Caterpillar,320,Each,serial,4200000,3500000,VAT15,VAT15,Serial tracked machine
+,Hydraulic Filter,Parts,Perkins,HF-204,Each,none,1950,1200,VAT15,VAT15,Standard replacement filter,"{""Type"":""Filter""}"
+,Engine Oil 20W-50,Consumables,,20W-50,Liter,lot,650,450,VAT15,VAT15,Lot tracked engine oil,"{""Type"":""Engine Oil"",""Viscosity"":""20W-50""}"
+,Mini Excavator 320,Machinery,Caterpillar,320,Each,serial,4200000,3500000,VAT15,VAT15,Serial tracked machine,"{""Power"":""52 kW"",""Voltage"":""220V""}"
 `;
 
 type ParsedProductCsvRow = {
@@ -60,6 +63,8 @@ type ParsedProductCsvRow = {
   salesTaxes: string;
   purchaseTaxes: string;
   description: string;
+  specifications: ProductSpecifications;
+  specificationParseError?: string;
 };
 
 function parseCsvLine(line: string) {
@@ -107,6 +112,9 @@ function parseCsv(text: string): ParsedProductCsvRow[] {
 
   const headers = parseCsvLine(lines[0]).map((header) => header.toLowerCase());
   const headerIndex = Object.fromEntries(headers.map((header, index) => [header, index]));
+  const specificationHeaders = headers
+    .map((header, index) => ({ header, index }))
+    .filter(({ header }) => header.startsWith("spec_"));
 
   return lines
     .slice(1)
@@ -126,6 +134,13 @@ function parseCsv(text: string): ParsedProductCsvRow[] {
         salesTaxes: values[headerIndex.sales_taxes] ?? "",
         purchaseTaxes: values[headerIndex.purchase_taxes] ?? "",
         description: values[headerIndex.description] ?? "",
+        ...parseSpecificationColumns(
+          values[headerIndex.specifications] ?? "",
+          specificationHeaders.map(({ header, index }) => [
+            header.slice(5),
+            values[index]?.trim() || null,
+          ]),
+        ),
       };
 
       return row;
@@ -133,6 +148,57 @@ function parseCsv(text: string): ParsedProductCsvRow[] {
     .filter((row) =>
       Object.entries(row).some(([key, value]) => key !== "rowNumber" && String(value).trim()),
     );
+}
+
+function parseJsonSpecifications(value: string): {
+  specifications: ProductSpecifications;
+  error?: string;
+} {
+  const text = value.trim();
+
+  if (!text) {
+    return { specifications: {} };
+  }
+
+  try {
+    const parsed: unknown = JSON.parse(text);
+
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return {
+        specifications: {},
+        error: "Specifications JSON must be an object like {\"Power\":\"3.2 kW\"}.",
+      };
+    }
+
+    return {
+      specifications: Object.fromEntries(
+        Object.entries(parsed).map(([key, parsedValue]) => [
+          key.trim(),
+          parsedValue === null || parsedValue === undefined ? null : String(parsedValue).trim() || null,
+        ]),
+      ),
+    };
+  } catch {
+    return {
+      specifications: {},
+      error: "Specifications JSON is invalid.",
+    };
+  }
+}
+
+function parseSpecificationColumns(
+  jsonValue: string,
+  dynamicSpecifications: [string, string | null][],
+): Pick<ParsedProductCsvRow, "specifications" | "specificationParseError"> {
+  const parsedJson = parseJsonSpecifications(jsonValue);
+
+  return {
+    specifications: {
+      ...parsedJson.specifications,
+      ...Object.fromEntries(dynamicSpecifications),
+    },
+    specificationParseError: parsedJson.error,
+  };
 }
 
 function nonNegativeDecimal(value: string) {
@@ -159,6 +225,42 @@ function mapReference<T extends { code: string; name: string }>(rows: T[]) {
   return map;
 }
 
+function formatSpecLabel(key: string) {
+  return key
+    .split("_")
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+function normalizeImportedSpecifications(
+  input: ProductSpecifications,
+  schema: ProductSpecificationField[],
+  errors: string[],
+) {
+  const normalized: ProductSpecifications = {};
+  const schemaByRef = new Map<string, ProductSpecificationField>();
+
+  for (const field of schema) {
+    schemaByRef.set(field.key.trim().toUpperCase(), field);
+    schemaByRef.set(field.label.trim().toUpperCase(), field);
+  }
+
+  for (const [key, value] of Object.entries(input)) {
+    const schemaField = schemaByRef.get(key.trim().toUpperCase());
+
+    if (!schemaField) {
+      errors.push(`Specification ${formatSpecLabel(key)} is not configured for this category.`);
+      continue;
+    }
+
+    const text = value === null || value === undefined ? "" : String(value).trim();
+    normalized[schemaField.key] = text || null;
+  }
+
+  return normalized;
+}
+
 function importToken(rows: ProductImportRow[]) {
   return createHash("sha256")
     .update(
@@ -176,6 +278,7 @@ function importToken(rows: ProductImportRow[]) {
           row.salesTaxes,
           row.purchaseTaxes,
           row.description,
+          row.specifications,
         ]),
       ),
     )
@@ -237,7 +340,12 @@ export async function previewProductImportCsv(text: string) {
     taxRows,
     productRows,
   ] = await Promise.all([
-    db.select({ id: productCategories.id, code: productCategories.code, name: productCategories.name })
+    db.select({
+      id: productCategories.id,
+      code: productCategories.code,
+      name: productCategories.name,
+      specificationSchema: productCategories.specificationSchema,
+    })
       .from(productCategories)
       .where(and(eq(productCategories.companyId, company.id), isNull(productCategories.deletedAt))),
     db.select({ id: brands.id, code: brands.code, name: brands.name })
@@ -319,6 +427,10 @@ export async function previewProductImportCsv(text: string) {
       errors.push("Purchase unit cost must be 0 or greater.");
     }
 
+    if (row.specificationParseError) {
+      errors.push(row.specificationParseError);
+    }
+
     for (const [index, tax] of saleTaxRows.entries()) {
       if (!tax) {
         errors.push(`Sales tax ${saleTaxRefs[index]} does not exist.`);
@@ -334,6 +446,9 @@ export async function previewProductImportCsv(text: string) {
         errors.push(`Purchase tax ${purchaseTaxRefs[index]} is not valid for purchases.`);
       }
     }
+    const specifications = category
+      ? normalizeImportedSpecifications(row.specifications, category.specificationSchema, errors)
+      : {};
 
     return {
       rowNumber: row.rowNumber,
@@ -356,6 +471,7 @@ export async function previewProductImportCsv(text: string) {
       saleTaxIds: saleTaxRows.filter((tax): tax is NonNullable<typeof tax> => Boolean(tax)).map((tax) => tax.id),
       purchaseTaxIds: purchaseTaxRows.filter((tax): tax is NonNullable<typeof tax> => Boolean(tax)).map((tax) => tax.id),
       description: row.description.trim(),
+      specifications,
       action: sku && productsBySku.has(sku) ? "update" : "create",
       existingProductId: sku ? productsBySku.get(sku)?.id ?? null : null,
       errors,
@@ -416,6 +532,7 @@ export async function commitProductImport(payload: ProductImportCommitPayload) {
         brandId: brand?.id ?? null,
         model: row.model || null,
         description: row.description || null,
+        specifications: row.specifications,
         unitId: unit.id,
         trackingMode: row.trackingMode || "none",
         standardCostMinor: row.standardCostMinor,

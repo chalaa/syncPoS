@@ -2,7 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { and, asc, eq, isNull, sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import {
@@ -14,22 +14,17 @@ import {
   trackingModeOptions,
   uniqueViolationMessage,
 } from "@/server/catalog/products";
+import type { ProductSpecificationField, ProductSpecifications } from "@/server/catalog/types";
 import { db } from "@/server/db/client";
 import { generateCompanyCode } from "@/server/db/code-generator";
 import {
   brands,
-  catalogAttributes,
-  catalogAttributeValues,
   owners,
   priceListItems,
   priceLists,
   productCategories,
-  productCategoryAttributes,
   productPurchaseTaxes,
   productSaleTaxes,
-  productTemplates,
-  productTemplateAttributeValues,
-  productVariantAttributeValues,
   products,
   taxes,
   unitsOfMeasure,
@@ -37,10 +32,13 @@ import {
 import { requirePermission } from "@/server/auth/session";
 
 const optionalUuid = z.string().uuid().or(z.literal("")).transform((value) => value || null);
+const specificationFieldSchema = z.object({
+  key: z.string().trim().min(1).max(80),
+  label: z.string().trim().min(1).max(120),
+});
 
 const productFormSchema = z.object({
   id: z.string().uuid().optional(),
-  templateId: optionalUuid,
   sku: z.string().trim().max(60),
   name: z.string().trim().min(1, "Name is required").max(200),
   categoryId: optionalUuid,
@@ -78,6 +76,7 @@ const referenceSchema = z.object({
   code: z.string().trim().max(40),
   name: z.string().trim().min(1).max(120),
   description: z.string().trim().optional(),
+  specificationSchema: z.array(specificationFieldSchema).default([]),
   isActive: z.enum(["on"]).optional(),
   returnPath: z.string().trim().startsWith("/admin/products").default("/admin/products"),
 });
@@ -104,41 +103,6 @@ const taxSchema = z.object({
   returnPath: z.string().trim().startsWith("/admin/products").default("/admin/products/taxes"),
 });
 
-const attributeSchema = z.object({
-  id: z.string().uuid().optional(),
-  code: z.string().trim().max(40),
-  name: z.string().trim().min(1, "Attribute name is required").max(120),
-  isActive: z.enum(["on"]).optional(),
-  returnPath: z.string().trim().startsWith("/admin/products").default("/admin/products/attributes"),
-});
-
-const attributeValueSchema = z.object({
-  attributeId: z.string().uuid(),
-  value: z.string().trim().min(1, "Value is required").max(120),
-  sortOrder: z.coerce.number().int().min(0).default(0),
-  returnPath: z.string().trim().startsWith("/admin/products").default("/admin/products/attributes"),
-});
-
-const categoryAttributeSchema = z.object({
-  categoryId: z.string().uuid(),
-  attributeId: z.string().uuid(),
-  isRequired: z.enum(["on"]).optional(),
-  sortOrder: z.coerce.number().int().min(0).default(0),
-  returnPath: z.string().trim().startsWith("/admin/products").default("/admin/products/categories"),
-});
-
-const productTemplateSchema = z.object({
-  id: z.string().uuid().optional(),
-  name: z.string().trim().min(1, "Template name is required").max(200),
-  categoryId: optionalUuid,
-  brandId: optionalUuid,
-  unitId: optionalUuid,
-  trackingMode: z.enum(trackingModeOptions),
-  description: z.string().trim().optional(),
-  attributeValueIds: z.array(z.string().uuid()),
-  isActive: z.enum(["on"]).optional(),
-});
-
 function formValue(formData: FormData, key: string) {
   const value = formData.get(key);
 
@@ -148,7 +112,6 @@ function formValue(formData: FormData, key: string) {
 function formPayload(formData: FormData) {
   return {
     id: formValue(formData, "id") || undefined,
-    templateId: formValue(formData, "templateId"),
     sku: formValue(formData, "sku"),
     name: formValue(formData, "name"),
     categoryId: formValue(formData, "categoryId"),
@@ -165,32 +128,67 @@ function formPayload(formData: FormData) {
   };
 }
 
-function attributePayload(formData: FormData) {
-  return {
-    id: formValue(formData, "id") || undefined,
-    code: normalizeCode(formValue(formData, "code")),
-    name: formValue(formData, "name"),
-    isActive: formData.get("isActive") === "on" ? "on" : undefined,
-    returnPath: formValue(formData, "returnPath") || "/admin/products/attributes",
-  };
-}
-
-function productTemplatePayload(formData: FormData) {
-  return {
-    id: formValue(formData, "id") || undefined,
-    name: formValue(formData, "name"),
-    categoryId: formValue(formData, "categoryId"),
-    brandId: formValue(formData, "brandId"),
-    unitId: formValue(formData, "unitId"),
-    trackingMode: formValue(formData, "trackingMode") || "none",
-    description: formValue(formData, "description"),
-    attributeValueIds: formValues(formData, "attributeValueId"),
-    isActive: formData.get("isActive") === "on" ? "on" : undefined,
-  };
-}
-
 function formValues(formData: FormData, key: string) {
   return formData.getAll(key).filter((value): value is string => typeof value === "string");
+}
+
+function specificationKey(label: string) {
+  return normalizeCode(label)
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, 80);
+}
+
+function specificationSchemaPayload(formData: FormData): ProductSpecificationField[] {
+  const labels = formValues(formData, "specificationLabel");
+  const usedKeys = new Set<string>();
+  const fields: ProductSpecificationField[] = [];
+
+  labels.forEach((rawLabel) => {
+    const label = rawLabel.trim();
+
+    if (!label) {
+      return;
+    }
+
+    const baseKey = specificationKey(label);
+    if (!baseKey) {
+      return;
+    }
+
+    let key = baseKey;
+    let suffix = 2;
+    while (usedKeys.has(key)) {
+      key = `${baseKey}_${suffix}`;
+      suffix += 1;
+    }
+
+    usedKeys.add(key);
+    fields.push({
+      key,
+      label,
+    });
+  });
+
+  return fields;
+}
+
+function productSpecificationsPayload(formData: FormData): ProductSpecifications {
+  const specifications: ProductSpecifications = {};
+  const keys = formValues(formData, "specificationKey");
+
+  keys.forEach((key) => {
+    const normalizedKey = key.trim();
+    if (!normalizedKey) {
+      return;
+    }
+
+    const value = formValue(formData, `specificationValue:${normalizedKey}`).trim();
+    specifications[normalizedKey] = value || null;
+  });
+
+  return specifications;
 }
 
 function parseCsvIds(value: string) {
@@ -212,6 +210,7 @@ function referencePayload(formData: FormData) {
     code: normalizeCode(formValue(formData, "code")),
     name: formValue(formData, "name"),
     description: formValue(formData, "description"),
+    specificationSchema: specificationSchemaPayload(formData),
     isActive: formData.get("isActive") === "on" ? "on" : undefined,
     returnPath: formValue(formData, "returnPath") || "/admin/products",
   };
@@ -303,19 +302,21 @@ export async function createProduct(formData: FormData) {
   }
 
   const company = await getDefaultCompany();
+  const specifications = productSpecificationsPayload(formData);
+  let productId: string | undefined;
 
   try {
     await db.transaction(async (tx) => {
       const sku = parsed.data.sku || await generateProductSku(tx, company.id);
       const [product] = await tx.insert(products).values({
         companyId: company.id,
-        templateId: parsed.data.templateId,
         sku,
         name: parsed.data.name,
         categoryId: parsed.data.categoryId,
         brandId: parsed.data.brandId,
         model: parsed.data.model || null,
         description: parsed.data.description || null,
+        specifications,
         unitId: parsed.data.unitId,
         trackingMode: parsed.data.trackingMode,
         standardCostMinor: majorToMinor(parsed.data.standardCost),
@@ -323,6 +324,7 @@ export async function createProduct(formData: FormData) {
         currencyCode: company.baseCurrencyCode,
         isActive: true,
       }).returning({ id: products.id });
+      productId = product.id;
 
       if (parsed.data.saleTaxIds.length > 0) {
         await tx.insert(productSaleTaxes).values(parsed.data.saleTaxIds.map((taxId) => ({ productId: product.id, taxId })));
@@ -341,7 +343,10 @@ export async function createProduct(formData: FormData) {
   }
 
   revalidatePath("/admin/products");
-  redirect("/admin/products?notice=Product created");
+  if (!productId) {
+    redirect(`/admin/products/new?error=${encodeURIComponent("Product could not be created.")}`);
+  }
+  redirect(`/admin/products/${productId}/edit?notice=${encodeURIComponent("Product created")}`);
 }
 
 export async function updateProduct(formData: FormData) {
@@ -354,6 +359,7 @@ export async function updateProduct(formData: FormData) {
   }
 
   const productId = parsed.data.id;
+  const specifications = productSpecificationsPayload(formData);
 
   try {
     await db.transaction(async (tx) => {
@@ -361,12 +367,12 @@ export async function updateProduct(formData: FormData) {
         .update(products)
         .set({
           sku: parsed.data.sku,
-          templateId: parsed.data.templateId,
           name: parsed.data.name,
           categoryId: parsed.data.categoryId,
           brandId: parsed.data.brandId,
           model: parsed.data.model || null,
           description: parsed.data.description || null,
+          specifications,
           unitId: parsed.data.unitId,
           trackingMode: parsed.data.trackingMode,
           standardCostMinor: majorToMinor(parsed.data.standardCost),
@@ -395,7 +401,9 @@ export async function updateProduct(formData: FormData) {
   }
 
   revalidatePath("/admin/products");
-  redirect("/admin/products?notice=Product updated");
+  revalidatePath(`/admin/products/${productId}`);
+  revalidatePath(`/admin/products/${productId}/edit`);
+  redirect(`/admin/products/${productId}/edit?notice=${encodeURIComponent("Product updated")}`);
 }
 
 export async function softDeleteProduct(formData: FormData) {
@@ -441,318 +449,6 @@ export async function restoreProduct(formData: FormData) {
 
   revalidatePath("/admin/products");
   redirect("/admin/products?show=deleted&notice=Product restored");
-}
-
-export async function createCatalogAttribute(formData: FormData) {
-  await requirePermission("product.manage");
-  const parsed = attributeSchema.safeParse(attributePayload(formData));
-
-  if (!parsed.success) {
-    redirectWithMessage("/admin/products/attributes", "error", parsed.error.issues[0]?.message ?? "Attribute details are required");
-  }
-
-  const company = await getDefaultCompany();
-
-  try {
-    await db.insert(catalogAttributes).values({
-      companyId: company.id,
-      code: parsed.data.code || await generateCompanyCode(db, { companyId: company.id, table: "catalog_attributes", prefix: "ATTR" }),
-      name: parsed.data.name,
-      isActive: parsed.data.isActive === "on",
-    });
-  } catch (error) {
-    redirectWithMessage(parsed.data.returnPath, "error", uniqueViolationMessage(error, "Could not create attribute."));
-  }
-
-  revalidatePath("/admin/products/attributes");
-  redirectWithMessage(parsed.data.returnPath, "notice", "Attribute created");
-}
-
-export async function updateCatalogAttribute(formData: FormData) {
-  await requirePermission("product.manage");
-  const parsed = attributeSchema.safeParse(attributePayload(formData));
-
-  if (!parsed.success || !parsed.data.id) {
-    redirectWithMessage("/admin/products/attributes", "error", parsed.success ? "Attribute ID is missing" : parsed.error.issues[0]?.message ?? "Attribute details are required");
-  }
-
-  try {
-    await db
-      .update(catalogAttributes)
-      .set({
-        code: parsed.data.code,
-        name: parsed.data.name,
-        isActive: parsed.data.isActive === "on",
-        updatedAt: sql`now()`,
-      })
-      .where(eq(catalogAttributes.id, parsed.data.id));
-  } catch (error) {
-    redirectWithMessage(parsed.data.returnPath, "error", uniqueViolationMessage(error, "Could not update attribute."));
-  }
-
-  revalidatePath("/admin/products/attributes");
-  redirectWithMessage(parsed.data.returnPath, "notice", "Attribute updated");
-}
-
-export async function createCatalogAttributeValue(formData: FormData) {
-  await requirePermission("product.manage");
-  const parsed = attributeValueSchema.safeParse({
-    attributeId: formValue(formData, "attributeId"),
-    value: formValue(formData, "value"),
-    sortOrder: formValue(formData, "sortOrder") || "0",
-    returnPath: formValue(formData, "returnPath") || "/admin/products/attributes",
-  });
-
-  if (!parsed.success) {
-    redirectWithMessage("/admin/products/attributes", "error", parsed.error.issues[0]?.message ?? "Attribute value details are required");
-  }
-
-  const company = await getDefaultCompany();
-
-  try {
-    await db.insert(catalogAttributeValues).values({
-      companyId: company.id,
-      attributeId: parsed.data.attributeId,
-      value: parsed.data.value,
-      sortOrder: parsed.data.sortOrder,
-      isActive: true,
-    });
-  } catch (error) {
-    redirectWithMessage(parsed.data.returnPath, "error", uniqueViolationMessage(error, "Could not create attribute value."));
-  }
-
-  revalidatePath("/admin/products/attributes");
-  redirectWithMessage(parsed.data.returnPath, "notice", "Attribute value created");
-}
-
-export async function assignCategoryAttribute(formData: FormData) {
-  await requirePermission("product.manage");
-  const parsed = categoryAttributeSchema.safeParse({
-    categoryId: formValue(formData, "categoryId"),
-    attributeId: formValue(formData, "attributeId"),
-    isRequired: formData.get("isRequired") === "on" ? "on" : undefined,
-    sortOrder: formValue(formData, "sortOrder") || "0",
-    returnPath: formValue(formData, "returnPath") || "/admin/products/categories",
-  });
-
-  if (!parsed.success) {
-    redirectWithMessage("/admin/products/categories", "error", parsed.error.issues[0]?.message ?? "Category attribute details are required");
-  }
-
-  const company = await getDefaultCompany();
-
-  try {
-    await db.insert(productCategoryAttributes).values({
-      companyId: company.id,
-      categoryId: parsed.data.categoryId,
-      attributeId: parsed.data.attributeId,
-      isRequired: parsed.data.isRequired === "on",
-      sortOrder: parsed.data.sortOrder,
-    });
-  } catch (error) {
-    redirectWithMessage(parsed.data.returnPath, "error", uniqueViolationMessage(error, "Could not assign category attribute."));
-  }
-
-  revalidatePath("/admin/products/categories");
-  redirectWithMessage(parsed.data.returnPath, "notice", "Category attribute assigned");
-}
-
-async function saveTemplateAttributeValues(
-  tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
-  companyId: string,
-  templateId: string,
-  attributeValueIds: string[],
-) {
-  await tx.delete(productTemplateAttributeValues).where(eq(productTemplateAttributeValues.templateId, templateId));
-
-  if (attributeValueIds.length === 0) {
-    return;
-  }
-
-  const values = await tx
-    .select({
-      id: catalogAttributeValues.id,
-      attributeId: catalogAttributeValues.attributeId,
-    })
-    .from(catalogAttributeValues)
-    .where(sql`${catalogAttributeValues.id} in (${sql.join(attributeValueIds.map((id) => sql`${id}`), sql`, `)})`);
-
-  if (values.length !== new Set(attributeValueIds).size) {
-    throw new Error("One or more attribute values are invalid.");
-  }
-
-  await tx.insert(productTemplateAttributeValues).values(
-    values.map((value) => ({
-      companyId,
-      templateId,
-      attributeId: value.attributeId,
-      attributeValueId: value.id,
-    })),
-  );
-}
-
-export async function createProductTemplate(formData: FormData) {
-  await requirePermission("product.manage");
-  const parsed = productTemplateSchema.safeParse(productTemplatePayload(formData));
-
-  if (!parsed.success) {
-    redirectWithMessage("/admin/products/templates/new", "error", parsed.error.issues[0]?.message ?? "Template details are required");
-  }
-
-  const company = await getDefaultCompany();
-  let templateId: string | undefined;
-
-  try {
-    await db.transaction(async (tx) => {
-      const [template] = await tx
-        .insert(productTemplates)
-        .values({
-          companyId: company.id,
-          name: parsed.data.name,
-          categoryId: parsed.data.categoryId,
-          brandId: parsed.data.brandId,
-          unitId: parsed.data.unitId,
-          trackingMode: parsed.data.trackingMode,
-          description: parsed.data.description || null,
-          isActive: parsed.data.isActive === "on",
-        })
-        .returning({ id: productTemplates.id });
-      templateId = template.id;
-      await saveTemplateAttributeValues(tx, company.id, template.id, parsed.data.attributeValueIds);
-    });
-  } catch (error) {
-    redirectWithMessage("/admin/products/templates/new", "error", uniqueViolationMessage(error, "Could not create product template."));
-  }
-
-  revalidatePath("/admin/products/templates");
-  redirect(`/admin/products/templates/${templateId}?notice=${encodeURIComponent("Product template created")}`);
-}
-
-export async function updateProductTemplate(formData: FormData) {
-  await requirePermission("product.manage");
-  const parsed = productTemplateSchema.safeParse(productTemplatePayload(formData));
-
-  if (!parsed.success || !parsed.data.id) {
-    redirectWithMessage("/admin/products/templates", "error", parsed.success ? "Template ID is missing" : parsed.error.issues[0]?.message ?? "Template details are required");
-  }
-
-  try {
-    const company = await getDefaultCompany();
-    await db.transaction(async (tx) => {
-      await tx
-        .update(productTemplates)
-        .set({
-          name: parsed.data.name,
-          categoryId: parsed.data.categoryId,
-          brandId: parsed.data.brandId,
-          unitId: parsed.data.unitId,
-          trackingMode: parsed.data.trackingMode,
-          description: parsed.data.description || null,
-          isActive: parsed.data.isActive === "on",
-          updatedAt: sql`now()`,
-        })
-        .where(eq(productTemplates.id, parsed.data.id!));
-      await saveTemplateAttributeValues(tx, company.id, parsed.data.id!, parsed.data.attributeValueIds);
-    });
-  } catch (error) {
-    redirectWithMessage(`/admin/products/templates/${parsed.data.id}`, "error", uniqueViolationMessage(error, "Could not update product template."));
-  }
-
-  revalidatePath("/admin/products/templates");
-  revalidatePath(`/admin/products/templates/${parsed.data.id}`);
-  redirectWithMessage(`/admin/products/templates/${parsed.data.id}`, "notice", "Product template updated");
-}
-
-export async function generateTemplateVariants(formData: FormData) {
-  await requirePermission("product.manage");
-  const templateId = formValue(formData, "templateId");
-
-  if (!templateId) {
-    redirectWithMessage("/admin/products/templates", "error", "Template ID is missing");
-  }
-
-  const company = await getDefaultCompany();
-
-  try {
-    await db.transaction(async (tx) => {
-      const [template] = await tx
-        .select({
-          id: productTemplates.id,
-          name: productTemplates.name,
-          categoryId: productTemplates.categoryId,
-          brandId: productTemplates.brandId,
-          unitId: productTemplates.unitId,
-          trackingMode: productTemplates.trackingMode,
-          description: productTemplates.description,
-        })
-        .from(productTemplates)
-        .where(eq(productTemplates.id, templateId))
-        .limit(1);
-
-      if (!template || !template.unitId) {
-        throw new Error("Template must have a unit before generating variants.");
-      }
-
-      const valueRows = await tx
-        .select({
-          attributeId: productTemplateAttributeValues.attributeId,
-          attributeValueId: productTemplateAttributeValues.attributeValueId,
-          attributeName: catalogAttributes.name,
-          value: catalogAttributeValues.value,
-        })
-        .from(productTemplateAttributeValues)
-        .innerJoin(catalogAttributes, eq(productTemplateAttributeValues.attributeId, catalogAttributes.id))
-        .innerJoin(catalogAttributeValues, eq(productTemplateAttributeValues.attributeValueId, catalogAttributeValues.id))
-        .where(and(eq(productTemplateAttributeValues.templateId, template.id), isNull(productTemplateAttributeValues.deletedAt)))
-        .orderBy(asc(catalogAttributes.name), asc(catalogAttributeValues.sortOrder), asc(catalogAttributeValues.value));
-
-      for (const value of valueRows) {
-        const name = `${value.attributeName} ${template.name} ${value.value}`;
-        const existing = await tx
-          .select({ id: products.id })
-          .from(products)
-          .where(and(eq(products.templateId, template.id), eq(products.name, name), isNull(products.deletedAt)))
-          .limit(1);
-
-        if (existing.length > 0) {
-          continue;
-        }
-
-        const [product] = await tx
-          .insert(products)
-          .values({
-            companyId: company.id,
-            templateId: template.id,
-            sku: await generateProductSku(tx, company.id),
-            name,
-            categoryId: template.categoryId,
-            brandId: template.brandId,
-            model: value.value,
-            description: template.description,
-            unitId: template.unitId,
-            trackingMode: template.trackingMode,
-            standardCostMinor: 0,
-            listPriceMinor: 0,
-            currencyCode: company.baseCurrencyCode,
-            isActive: true,
-          })
-          .returning({ id: products.id });
-
-        await tx.insert(productVariantAttributeValues).values({
-          companyId: company.id,
-          productId: product.id,
-          attributeId: value.attributeId,
-          attributeValueId: value.attributeValueId,
-        });
-      }
-    });
-  } catch (error) {
-    redirectWithMessage(`/admin/products/templates/${templateId}`, "error", uniqueViolationMessage(error, "Could not generate variants."));
-  }
-
-  revalidatePath("/admin/products");
-  revalidatePath("/admin/products/templates");
-  redirectWithMessage(`/admin/products/templates/${templateId}`, "notice", "Variants generated");
 }
 
 export async function createTax(formData: FormData) {
@@ -1023,6 +719,7 @@ export async function createCategory(formData: FormData) {
       }),
       name: parsed.data.name,
       description: parsed.data.description || null,
+      specificationSchema: parsed.data.specificationSchema,
       isActive: parsed.data.isActive === "on",
     });
   } catch (error) {
@@ -1114,6 +811,7 @@ export async function updateCategory(formData: FormData) {
         code: parsed.data.code,
         name: parsed.data.name,
         description: parsed.data.description || null,
+        specificationSchema: parsed.data.specificationSchema,
         isActive: parsed.data.isActive === "on",
         updatedAt: sql`now()`,
       })

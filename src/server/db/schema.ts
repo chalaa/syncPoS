@@ -625,6 +625,10 @@ export const productCategories = pgTable(
     code: varchar("code", { length: 40 }).notNull(),
     name: varchar("name", { length: 120 }).notNull(),
     description: text("description"),
+    specificationSchema: jsonb("specification_schema")
+      .$type<{ key: string; label: string }[]>()
+      .notNull()
+      .default(sql`'[]'::jsonb`),
     isActive: boolean("is_active").notNull().default(true),
     ...softDelete,
     ...timestamps,
@@ -691,111 +695,6 @@ export const unitsOfMeasure = pgTable(
   ],
 );
 
-export const catalogAttributes = pgTable(
-  "catalog_attributes",
-  {
-    id: uuid("id").primaryKey().defaultRandom(),
-    companyId: uuid("company_id")
-      .notNull()
-      .references(() => companies.id, { onDelete: "restrict", onUpdate: "cascade" }),
-    code: varchar("code", { length: 40 }).notNull(),
-    name: varchar("name", { length: 120 }).notNull(),
-    isActive: boolean("is_active").notNull().default(true),
-    ...softDelete,
-    ...timestamps,
-  },
-  (table) => [
-    uniqueIndex("catalog_attributes_code_active_uidx")
-      .on(table.companyId, table.code)
-      .where(sql`${table.deletedAt} is null`),
-    uniqueIndex("catalog_attributes_name_active_uidx")
-      .on(table.companyId, table.name)
-      .where(sql`${table.deletedAt} is null`),
-  ],
-);
-
-export const catalogAttributeValues = pgTable(
-  "catalog_attribute_values",
-  {
-    id: uuid("id").primaryKey().defaultRandom(),
-    companyId: uuid("company_id")
-      .notNull()
-      .references(() => companies.id, { onDelete: "restrict", onUpdate: "cascade" }),
-    attributeId: uuid("attribute_id")
-      .notNull()
-      .references(() => catalogAttributes.id, { onDelete: "cascade", onUpdate: "cascade" }),
-    value: varchar("value", { length: 120 }).notNull(),
-    sortOrder: smallint("sort_order").notNull().default(0),
-    isActive: boolean("is_active").notNull().default(true),
-    ...softDelete,
-    ...timestamps,
-  },
-  (table) => [
-    uniqueIndex("catalog_attribute_values_active_uidx")
-      .on(table.attributeId, table.value)
-      .where(sql`${table.deletedAt} is null`),
-    index("catalog_attribute_values_attribute_idx").on(table.attributeId, table.sortOrder),
-  ],
-);
-
-export const productCategoryAttributes = pgTable(
-  "product_category_attributes",
-  {
-    id: uuid("id").primaryKey().defaultRandom(),
-    companyId: uuid("company_id")
-      .notNull()
-      .references(() => companies.id, { onDelete: "restrict", onUpdate: "cascade" }),
-    categoryId: uuid("category_id")
-      .notNull()
-      .references(() => productCategories.id, { onDelete: "cascade", onUpdate: "cascade" }),
-    attributeId: uuid("attribute_id")
-      .notNull()
-      .references(() => catalogAttributes.id, { onDelete: "restrict", onUpdate: "cascade" }),
-    isRequired: boolean("is_required").notNull().default(false),
-    sortOrder: smallint("sort_order").notNull().default(0),
-    ...softDelete,
-    ...timestamps,
-  },
-  (table) => [
-    uniqueIndex("product_category_attributes_active_uidx")
-      .on(table.categoryId, table.attributeId)
-      .where(sql`${table.deletedAt} is null`),
-    index("product_category_attributes_category_idx").on(table.categoryId, table.sortOrder),
-  ],
-);
-
-export const productTemplates = pgTable(
-  "product_templates",
-  {
-    id: uuid("id").primaryKey().defaultRandom(),
-    companyId: uuid("company_id")
-      .notNull()
-      .references(() => companies.id, { onDelete: "restrict", onUpdate: "cascade" }),
-    categoryId: uuid("category_id").references(() => productCategories.id, {
-      onDelete: "restrict",
-      onUpdate: "cascade",
-    }),
-    brandId: uuid("brand_id").references(() => brands.id, {
-      onDelete: "restrict",
-      onUpdate: "cascade",
-    }),
-    name: varchar("name", { length: 200 }).notNull(),
-    description: text("description"),
-    unitId: uuid("unit_id").references(() => unitsOfMeasure.id, { onDelete: "restrict", onUpdate: "cascade" }),
-    trackingMode: trackingMode("tracking_mode").notNull().default("none"),
-    isActive: boolean("is_active").notNull().default(true),
-    ...softDelete,
-    ...timestamps,
-  },
-  (table) => [
-    uniqueIndex("product_templates_name_active_uidx")
-      .on(table.companyId, table.name)
-      .where(sql`${table.deletedAt} is null`),
-    index("product_templates_category_idx").on(table.categoryId),
-    index("product_templates_brand_idx").on(table.brandId),
-  ],
-);
-
 export const products = pgTable(
   "products",
   {
@@ -803,10 +702,6 @@ export const products = pgTable(
     companyId: uuid("company_id")
       .notNull()
       .references(() => companies.id, { onDelete: "restrict", onUpdate: "cascade" }),
-    templateId: uuid("template_id").references(() => productTemplates.id, {
-      onDelete: "restrict",
-      onUpdate: "cascade",
-    }),
     sku: varchar("sku", { length: 60 }).notNull(),
     name: varchar("name", { length: 200 }).notNull(),
     categoryId: uuid("category_id").references(() => productCategories.id, {
@@ -819,6 +714,10 @@ export const products = pgTable(
     }),
     model: varchar("model", { length: 100 }),
     description: text("description"),
+    specifications: jsonb("specifications")
+      .$type<Record<string, string | null>>()
+      .notNull()
+      .default(sql`'{}'::jsonb`),
     unitId: uuid("unit_id")
       .notNull()
       .references(() => unitsOfMeasure.id, { onDelete: "restrict", onUpdate: "cascade" }),
@@ -840,82 +739,6 @@ export const products = pgTable(
       .where(sql`${table.deletedAt} is null`),
     index("products_company_name_idx").on(table.companyId, table.name),
     index("products_category_active_idx").on(table.categoryId, table.isActive),
-    index("products_template_idx").on(table.templateId),
-  ],
-);
-
-export const productTemplateAttributeValues = pgTable(
-  "product_template_attribute_values",
-  {
-    id: uuid("id").primaryKey().defaultRandom(),
-    companyId: uuid("company_id")
-      .notNull()
-      .references(() => companies.id, { onDelete: "restrict", onUpdate: "cascade" }),
-    templateId: uuid("template_id")
-      .notNull()
-      .references(() => productTemplates.id, { onDelete: "cascade", onUpdate: "cascade" }),
-    attributeId: uuid("attribute_id")
-      .notNull()
-      .references(() => catalogAttributes.id, { onDelete: "restrict", onUpdate: "cascade" }),
-    attributeValueId: uuid("attribute_value_id")
-      .notNull()
-      .references(() => catalogAttributeValues.id, { onDelete: "restrict", onUpdate: "cascade" }),
-    ...softDelete,
-    ...timestamps,
-  },
-  (table) => [
-    uniqueIndex("product_template_attribute_values_active_uidx")
-      .on(table.templateId, table.attributeValueId)
-      .where(sql`${table.deletedAt} is null`),
-    index("product_template_attribute_values_template_idx").on(table.templateId, table.attributeId),
-  ],
-);
-
-export const productVariantAttributeValues = pgTable(
-  "product_variant_attribute_values",
-  {
-    id: uuid("id").primaryKey().defaultRandom(),
-    companyId: uuid("company_id")
-      .notNull()
-      .references(() => companies.id, { onDelete: "restrict", onUpdate: "cascade" }),
-    productId: uuid("product_id")
-      .notNull()
-      .references(() => products.id, { onDelete: "cascade", onUpdate: "cascade" }),
-    attributeId: uuid("attribute_id")
-      .notNull()
-      .references(() => catalogAttributes.id, { onDelete: "restrict", onUpdate: "cascade" }),
-    attributeValueId: uuid("attribute_value_id")
-      .notNull()
-      .references(() => catalogAttributeValues.id, { onDelete: "restrict", onUpdate: "cascade" }),
-    ...softDelete,
-    ...timestamps,
-  },
-  (table) => [
-    uniqueIndex("product_variant_attribute_values_active_uidx")
-      .on(table.productId, table.attributeId)
-      .where(sql`${table.deletedAt} is null`),
-    index("product_variant_attribute_values_product_idx").on(table.productId),
-    index("product_variant_attribute_values_value_idx").on(table.attributeValueId),
-  ],
-);
-
-export const productAttributes = pgTable(
-  "product_attributes",
-  {
-    id: uuid("id").primaryKey().defaultRandom(),
-    productId: uuid("product_id")
-      .notNull()
-      .references(() => products.id, { onDelete: "cascade", onUpdate: "cascade" }),
-    attributeName: varchar("attribute_name", { length: 80 }).notNull(),
-    attributeValue: varchar("attribute_value", { length: 200 }).notNull(),
-    sortOrder: smallint("sort_order").notNull().default(0),
-    ...softDelete,
-    ...timestamps,
-  },
-  (table) => [
-    uniqueIndex("product_attributes_name_active_uidx")
-      .on(table.productId, table.attributeName)
-      .where(sql`${table.deletedAt} is null`),
   ],
 );
 

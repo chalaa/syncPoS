@@ -11,6 +11,17 @@ export type SelectOption = {
   name: string;
 };
 
+export type ProductSpecificationField = {
+  key: string;
+  label: string;
+};
+
+export type ProductSpecifications = Record<string, string | null>;
+
+export type CategorySelectOption = SelectOption & {
+  specificationSchema: ProductSpecificationField[];
+};
+
 export type CatalogReferenceKind = "category" | "brand" | "unit";
 
 export type CatalogReferenceRecord = {
@@ -19,6 +30,7 @@ export type CatalogReferenceRecord = {
   name: string;
   description?: string | null;
   precision?: string;
+  specificationSchema?: ProductSpecificationField[];
   isActive: boolean;
   deletedAt: Date | null;
 };
@@ -26,12 +38,12 @@ export type CatalogReferenceRecord = {
 export type ProductFormRecord = {
   id: string;
   sku: string;
-  templateId: string | null;
   name: string;
   categoryId: string | null;
   brandId: string | null;
   model: string | null;
   description: string | null;
+  specifications: ProductSpecifications;
   unitId: string;
   trackingMode: TrackingModeOption;
   standardCostMinor: number;
@@ -42,75 +54,6 @@ export type ProductFormRecord = {
   purchaseTaxIds: string[];
   saleTaxNames?: string;
   purchaseTaxNames?: string;
-};
-
-export type CatalogAttributeValueRecord = {
-  id: string;
-  value: string;
-  sortOrder: number;
-  isActive: boolean;
-};
-
-export type CatalogAttributeRecord = {
-  id: string;
-  code: string;
-  name: string;
-  isActive: boolean;
-  deletedAt: Date | null;
-  values: CatalogAttributeValueRecord[];
-};
-
-export type CategoryAttributeRecord = {
-  id: string;
-  categoryId: string;
-  categoryName: string;
-  attributeId: string;
-  attributeName: string;
-  isRequired: boolean;
-  sortOrder: number;
-};
-
-export type ProductTemplateListRow = {
-  id: string;
-  name: string;
-  categoryName: string | null;
-  brandName: string | null;
-  unitCode: string | null;
-  trackingMode: TrackingModeOption;
-  variantCount: number;
-  isActive: boolean;
-};
-
-export type ProductTemplateAttributeOption = {
-  attributeId: string;
-  attributeName: string;
-  isRequired: boolean;
-  sortOrder: number;
-  values: CatalogAttributeValueRecord[];
-  selectedValueIds: string[];
-};
-
-export type ProductTemplateDetail = {
-  id: string;
-  name: string;
-  categoryId: string | null;
-  brandId: string | null;
-  unitId: string | null;
-  trackingMode: TrackingModeOption;
-  description: string | null;
-  isActive: boolean;
-  attributes: ProductTemplateAttributeOption[];
-  variants: {
-    id: string;
-    sku: string;
-    name: string;
-    model: string | null;
-    listPriceMinor: number;
-    standardCostMinor: number;
-    currencyCode: string;
-    isActive: boolean;
-    attributeSummary: string | null;
-  }[];
 };
 
 export type ProductDetailStockRow = {
@@ -228,6 +171,7 @@ export type ProductImportRow = {
   saleTaxIds: string[];
   purchaseTaxIds: string[];
   description: string;
+  specifications: ProductSpecifications;
   action: "create" | "update";
   existingProductId: string | null;
   errors: string[];
@@ -245,62 +189,27 @@ export type ProductImportCommitPayload = {
   rows: ProductImportRow[];
 };
 
-export type ProductTemplateImportRow = {
+export type CategoryImportRow = {
   rowNumber: number;
-  productTemplate: string;
-  category: string;
-  categoryName: string;
-  brand: string;
-  brandName: string;
-  unit: string;
-  unitName: string;
-  trackingMode: TrackingModeOption | "";
+  code: string;
+  name: string;
   description: string;
-  isActive: boolean;
-  attributeValuesText: string;
-  variantAttributes: {
-    attribute: string;
-    value: string;
-  }[];
+  specificationSchema: ProductSpecificationField[];
   action: "create" | "update";
+  existingCategoryId: string | null;
   errors: string[];
 };
 
-export type ProductTemplateImportPreviewState = {
+export type CategoryImportPreviewState = {
   status: "idle" | "preview" | "error" | "imported";
   message?: string;
-  rows: ProductTemplateImportRow[];
+  rows: CategoryImportRow[];
   importToken?: string;
 };
 
-export type ProductTemplateImportCommitPayload = {
+export type CategoryImportCommitPayload = {
   importToken: string;
-  rows: ProductTemplateImportRow[];
-};
-
-export type CategoryAttributeImportRow = {
-  rowNumber: number;
-  categoryCode: string;
-  categoryName: string;
-  attributeCode: string;
-  attributeName: string;
-  value: string;
-  isRequired: boolean;
-  sortOrder: number;
-  action: "create" | "update";
-  errors: string[];
-};
-
-export type CategoryAttributeImportPreviewState = {
-  status: "idle" | "preview" | "error" | "imported";
-  message?: string;
-  rows: CategoryAttributeImportRow[];
-  importToken?: string;
-};
-
-export type CategoryAttributeImportCommitPayload = {
-  importToken: string;
-  rows: CategoryAttributeImportRow[];
+  rows: CategoryImportRow[];
 };
 
 export type TaxRecord = {

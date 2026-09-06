@@ -260,6 +260,34 @@
       "when": 1788549248231,
       "tag": "0036_amazing_korvac",
       "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1788691144801,
+      "tag": "0037_simple_mentor",
+      "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1788692006815,
+      "tag": "0038_absent_whizzer",
+      "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1788692574199,
+      "tag": "0039_chunky_zaladane",
+      "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1788771600000,
+      "tag": "0040_clean_category_specification_tags",
+      "breakpoints": true
     }
   ]
 }

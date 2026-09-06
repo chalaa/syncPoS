@@ -2,23 +2,24 @@
 
 import { minorToDisplay } from "@/lib/catalog-utils";
 import { trackingModeOptions } from "@/server/catalog/types";
-import type { ProductFormRecord, SelectOption } from "@/server/catalog/types";
+import type { CategorySelectOption, ProductFormRecord, SelectOption } from "@/server/catalog/types";
 import { createProduct, updateProduct } from "./actions";
 import { Alert } from "@/components/ui/alert";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { ManyToManyTags } from "@/components/ui/many-to-many-tags";
 import { Notebook } from "@/components/ui/notebook";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
+import { RelatedModelSelect } from "@/components/ui/related-model-select";
 import { useMemo, useState } from "react";
 
 type ProductFormProps = {
   mode: "create" | "edit";
   product?: ProductFormRecord;
-  categories: SelectOption[];
+  categories: CategorySelectOption[];
   brands: SelectOption[];
   units: SelectOption[];
-  templates: SelectOption[];
   taxes: { id: string; label: string; scope: "purchase" | "sale" | "both" }[];
+  notice?: string;
   error?: string;
 };
 
@@ -32,8 +33,8 @@ export function ProductForm({
   categories,
   brands,
   units,
-  templates,
   taxes,
+  notice,
   error,
 }: ProductFormProps) {
   const action = mode === "create" ? createProduct : updateProduct;
@@ -41,6 +42,40 @@ export function ProductForm({
   const submitLabel = mode === "create" ? "Create product" : "Save changes";
   const [saleTaxIds, setSaleTaxIds] = useState(product?.saleTaxIds ?? []);
   const [purchaseTaxIds, setPurchaseTaxIds] = useState(product?.purchaseTaxIds ?? []);
+  const [brandId, setBrandId] = useState(product?.brandId ?? "");
+  const [model, setModel] = useState(product?.model ?? "");
+  const [categoryId, setCategoryId] = useState(product?.categoryId ?? "");
+  const [specificationValues, setSpecificationValues] = useState<Record<string, string>>(() =>
+    Object.fromEntries(
+      Object.entries(product?.specifications ?? {}).map(([key, value]) => [
+        key,
+        value === null || value === undefined ? "" : String(value),
+      ]),
+    ),
+  );
+  const selectedCategory = useMemo(
+    () => categories.find((category) => category.id === categoryId),
+    [categories, categoryId],
+  );
+  const selectedBrand = useMemo(
+    () => brands.find((brand) => brand.id === brandId),
+    [brands, brandId],
+  );
+  const specificationFields = useMemo(
+    () => selectedCategory?.specificationSchema ?? [],
+    [selectedCategory?.specificationSchema],
+  );
+  const generatedStandardName = useMemo(() => {
+    const parts = [
+      selectedBrand?.name,
+      model.trim(),
+      selectedCategory?.name,
+      ...specificationFields.map((field) => specificationValues[field.key]?.trim()).filter(Boolean),
+    ].filter(Boolean);
+
+    return parts.join(" ");
+  }, [model, selectedBrand?.name, selectedCategory?.name, specificationFields, specificationValues]);
+  const standardName = generatedStandardName || product?.name || "";
   const saleTaxOptions = useMemo(
     () => taxes.filter((tax) => tax.scope === "sale" || tax.scope === "both").map((tax) => ({ id: tax.id, label: tax.label })),
     [taxes],
@@ -69,6 +104,7 @@ export function ProductForm({
         }
       />
 
+      {notice ? <Alert kind="success">{notice}</Alert> : null}
       {error ? <Alert kind="error">{error}</Alert> : null}
       {units.length === 0 ? (
         <Alert kind="warning">Create at least one unit of measure before creating a product.</Alert>
@@ -77,18 +113,15 @@ export function ProductForm({
       <form action={action} className="grid gap-5 rounded-lg border border-border bg-card p-5">
         {product ? <input type="hidden" name="id" value={product.id} /> : null}
         <input type="hidden" name="isActive" value="on" />
+        <input type="hidden" name="name" value={standardName} />
 
         <div className="grid gap-4 md:grid-cols-2">
-          <label className="grid gap-1 text-sm font-medium">
-            Product Name
-            <input
-              name="name"
-              defaultValue={product?.name}
-              required
-              maxLength={200}
-              className={inputClass}
-            />
-          </label>
+          {generatedStandardName ? (
+            <div className="grid gap-1 rounded-md border border-border bg-muted/60 px-3 py-2 text-sm md:col-span-2">
+              <span className="text-xs font-semibold uppercase text-muted-foreground">Standard Name</span>
+              <span className="min-h-6 break-words text-base font-semibold text-foreground">{generatedStandardName}</span>
+            </div>
+          ) : null}
           {mode === "edit" ? (
             <label className="grid gap-1 text-sm font-medium">
               Item Code
@@ -112,65 +145,46 @@ export function ProductForm({
               content: (
                 <div className="grid gap-4">
                   <div className="grid gap-4 md:grid-cols-2">
-                    <label className="grid gap-1 text-sm font-medium">
-                      Product Template
-                      <select name="templateId" defaultValue={product?.templateId ?? ""} className={inputClass}>
-                        <option value="">None</option>
-                        {templates.map((template) => (
-                          <option key={template.id} value={template.id}>
-                            {template.name}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <div />
-                  </div>
-
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <label className="grid gap-1 text-sm font-medium">
-                      Category
-                      <select name="categoryId" defaultValue={product?.categoryId ?? ""} className={inputClass}>
-                        <option value="">None</option>
-                        {categories.map((category) => (
-                          <option key={category.id} value={category.id}>
-                            {category.name}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <label className="grid gap-1 text-sm font-medium">
-                      Brand
-                      <select name="brandId" defaultValue={product?.brandId ?? ""} className={inputClass}>
-                        <option value="">None</option>
-                        {brands.map((brand) => (
-                          <option key={brand.id} value={brand.id}>
-                            {brand.name}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
+                    <RelatedModelSelect
+                      name="categoryId"
+                      label="Category"
+                      options={categories}
+                      value={categoryId}
+                      onValueChange={setCategoryId}
+                      placeholder="Select category"
+                      emptyLabel="No categories found."
+                    />
+                    <RelatedModelSelect
+                      name="brandId"
+                      label="Brand"
+                      options={brands}
+                      value={brandId}
+                      onValueChange={setBrandId}
+                      placeholder="Select brand"
+                      emptyLabel="No brands found."
+                    />
                   </div>
 
                   <div className="grid gap-4 md:grid-cols-2">
                     <label className="grid gap-1 text-sm font-medium">
                       Model
-                      <input name="model" defaultValue={product?.model ?? ""} maxLength={100} className={inputClass} />
-                    </label>
-                    <label className="grid gap-1 text-sm font-medium">
-                      Unit
-                      <select
-                        name="unitId"
-                        defaultValue={product?.unitId ?? units[0]?.id ?? ""}
-                        required
+                      <input
+                        name="model"
+                        value={model}
+                        onChange={(event) => setModel(event.target.value)}
+                        maxLength={100}
                         className={inputClass}
-                      >
-                        {units.map((unit) => (
-                          <option key={unit.id} value={unit.id}>
-                            {unit.code} / {unit.name}
-                          </option>
-                        ))}
-                      </select>
+                      />
                     </label>
+                    <RelatedModelSelect
+                      name="unitId"
+                      label="Unit"
+                      options={units}
+                      defaultValue={product?.unitId ?? units[0]?.id ?? ""}
+                      required
+                      placeholder="Select unit"
+                      emptyLabel="No units found."
+                    />
                   </div>
 
                   <label className="grid gap-1 text-sm font-medium">
@@ -257,6 +271,40 @@ export function ProductForm({
                       placeholder="Select purchase tax"
                     />
                   </label>
+                </div>
+              ),
+            },
+            {
+              value: "specifications",
+              label: "Specifications",
+              content: (
+                <div className="grid gap-4 md:grid-cols-2">
+                  {specificationFields.map((field) => {
+                    const value = product?.specifications?.[field.key];
+
+                    return (
+                      <label key={field.key} className="grid gap-1 text-sm font-medium">
+                        <span>{field.label}</span>
+                        <input type="hidden" name="specificationKey" value={field.key} />
+                        <input
+                          name={`specificationValue:${field.key}`}
+                          value={specificationValues[field.key] ?? (value === null || value === undefined ? "" : String(value))}
+                          onChange={(event) =>
+                            setSpecificationValues((current) => ({
+                              ...current,
+                              [field.key]: event.target.value,
+                            }))
+                          }
+                          className={inputClass}
+                        />
+                      </label>
+                    );
+                  })}
+                  {specificationFields.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">
+                      Select a category with configured specifications to fill product details.
+                    </p>
+                  ) : null}
                 </div>
               ),
             },

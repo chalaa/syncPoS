@@ -34,16 +34,10 @@ export const adminMenuItems: AdminMenuItem[] = [
     permission: PERMISSIONS.PRODUCTS.VIEW,
     submenus: [
       { label: "Products", href: "/admin/products", permission: PERMISSIONS.PRODUCTS.VIEW },
-      { label: "Templates", href: "/admin/products/templates", permission: PERMISSIONS.PRODUCTS.VIEW },
       {
         label: "Import",
         href: "/admin/products/import",
         permission: PERMISSIONS.PRODUCTS.MANAGE,
-        children: [
-          { label: "Products", href: "/admin/products/import", permission: PERMISSIONS.PRODUCTS.MANAGE },
-          { label: "Category Attributes", href: "/admin/products/import/category-attributes", permission: PERMISSIONS.PRODUCTS.MANAGE },
-          { label: "Product Templates", href: "/admin/products/import/templates", permission: PERMISSIONS.PRODUCTS.MANAGE },
-        ],
       },
       {
         label: "Configuration",
@@ -51,7 +45,6 @@ export const adminMenuItems: AdminMenuItem[] = [
         permission: PERMISSIONS.PRODUCTS.VIEW,
         children: [
           { label: "Categories", href: "/admin/products/categories", permission: PERMISSIONS.PRODUCTS.VIEW },
-          { label: "Attributes", href: "/admin/products/attributes", permission: PERMISSIONS.PRODUCTS.VIEW },
           { label: "Brands", href: "/admin/products/brands", permission: PERMISSIONS.PRODUCTS.VIEW },
           { label: "Units", href: "/admin/products/units", permission: PERMISSIONS.PRODUCTS.VIEW },
           { label: "Taxes", href: "/admin/products/taxes", permission: PERMISSIONS.PRODUCTS.VIEW },

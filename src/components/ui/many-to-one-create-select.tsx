@@ -1,7 +1,7 @@
 "use client";
 
 import { PlusIcon, SearchIcon } from "lucide-react";
-import { useMemo, useState, useTransition } from "react";
+import { useMemo, useRef, useState, useTransition } from "react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -60,8 +60,10 @@ export function ManyToOneCreateSelect({
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const selected = items.find((item) => item.id === selectedId);
+  const selectedLabel = selected ? `${selected.code} / ${selected.name}` : "";
   const trimmedQuery = query.trim();
   const filteredItems = useMemo(() => {
     const normalized = trimmedQuery.toLowerCase();
@@ -74,6 +76,7 @@ export function ManyToOneCreateSelect({
       `${item.code} ${item.name}`.toLowerCase().includes(normalized),
     );
   }, [items, trimmedQuery]);
+  const visibleItems = filteredItems.slice(0, 5);
 
   function selectItem(option: ManyToOneOption) {
     setSelectedId(option.id);
@@ -81,6 +84,12 @@ export function ManyToOneCreateSelect({
     setQuery("");
     setIsOpen(false);
     setError(null);
+  }
+
+  function openSelectionList() {
+    setQuery("");
+    setIsOpen(true);
+    requestAnimationFrame(() => inputRef.current?.focus());
   }
 
   function createCustomer(input: CreateCustomerInput) {
@@ -114,13 +123,14 @@ export function ManyToOneCreateSelect({
       <div className="relative">
         <SearchIcon className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
         <input
-          value={isOpen ? query : selected ? `${selected.code} / ${selected.name}` : ""}
+          ref={inputRef}
+          value={isOpen ? query : selectedLabel}
           onChange={(event) => {
             setQuery(event.target.value);
             setIsOpen(true);
           }}
-          onFocus={() => setIsOpen(true)}
-          placeholder={placeholder}
+          onFocus={openSelectionList}
+          placeholder={selectedLabel || placeholder}
           className={cn(inputClass, "w-full pl-9", fieldError ? "border-destructive focus-visible:border-destructive" : "")}
         />
       </div>
@@ -128,8 +138,13 @@ export function ManyToOneCreateSelect({
       {fieldError ? <p className="text-sm font-normal text-destructive">{fieldError}</p> : null}
 
       {isOpen ? (
-        <div className="absolute left-0 right-0 top-[4.25rem] z-20 max-h-72 overflow-y-auto rounded-md border border-border bg-popover p-1 shadow-lg">
-          {filteredItems.map((item) => (
+        <div className="absolute left-0 right-0 top-full z-50 mt-1 max-h-72 overflow-y-auto rounded-md border border-border bg-popover p-1 shadow-lg">
+          {!trimmedQuery && filteredItems.length > 0 ? (
+            <div className="px-3 py-2 text-xs font-normal text-muted-foreground">
+              Select {entityLabel.toLowerCase()}
+            </div>
+          ) : null}
+          {visibleItems.map((item) => (
             <button
               key={item.id}
               type="button"

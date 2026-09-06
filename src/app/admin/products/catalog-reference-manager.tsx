@@ -1,6 +1,6 @@
 "use client";
 
-import { EditIcon, PlusIcon, RotateCcwIcon, SearchIcon, Trash2Icon } from "lucide-react";
+import { EditIcon, PlusIcon, RotateCcwIcon, SearchIcon, Trash2Icon, XIcon } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
@@ -18,7 +18,8 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
-import type { CatalogReferenceRecord } from "@/server/catalog/types";
+import type { CatalogReferenceRecord, ProductSpecificationField } from "@/server/catalog/types";
+import { useState } from "react";
 
 const inputClass =
   "h-10 rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring";
@@ -27,6 +28,81 @@ const readonlyInputClass =
 const textareaClass =
   "min-h-24 rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
+function SpecificationTags({
+  fields,
+}: {
+  fields: ProductSpecificationField[];
+}) {
+  const [tags, setTags] = useState(() => fields.map((field) => field.label).filter(Boolean));
+  const [draft, setDraft] = useState("");
+
+  function addTag(value = draft) {
+    const label = value.trim();
+
+    if (!label) {
+      return;
+    }
+
+    setTags((currentTags) => {
+      const exists = currentTags.some((tag) => tag.toLowerCase() === label.toLowerCase());
+
+      return exists ? currentTags : [...currentTags, label];
+    });
+    setDraft("");
+  }
+
+  function removeTag(index: number) {
+    setTags((currentTags) => currentTags.filter((_, tagIndex) => tagIndex !== index));
+  }
+
+  return (
+    <div className="grid gap-2">
+      {tags.map((tag) => (
+        <input key={tag} type="hidden" name="specificationLabel" value={tag} />
+      ))}
+      <div className="flex min-h-10 flex-wrap items-center gap-1 rounded-md border border-input bg-background px-2 py-1">
+        {tags.map((tag, index) => (
+          <span
+            key={`${tag}-${index}`}
+            className="inline-flex h-7 max-w-56 items-center gap-1 rounded-md border border-border bg-muted px-2 text-xs font-medium"
+          >
+            <span className="truncate">{tag}</span>
+            <button
+              type="button"
+              aria-label={`Remove ${tag}`}
+              className="rounded-sm text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              onClick={() => removeTag(index)}
+            >
+              <XIcon className="size-3" />
+            </button>
+          </span>
+        ))}
+        {tags.length === 0 ? (
+          <span className="px-1 text-xs text-muted-foreground">No specifications added</span>
+        ) : null}
+      </div>
+      <div className="flex gap-2">
+        <input
+          value={draft}
+          onChange={(event) => setDraft(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" || event.key === ",") {
+              event.preventDefault();
+              addTag();
+            }
+          }}
+          placeholder="Power"
+          className="h-9 min-w-0 flex-1 rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        />
+        <Button type="button" variant="outline" size="sm" onClick={() => addTag()} disabled={!draft.trim()}>
+          <PlusIcon data-icon="inline-start" />
+          Add
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 function ReferenceForm({
   title,
   description,
@@ -34,6 +110,7 @@ function ReferenceForm({
   record,
   returnPath,
   showPrecision,
+  showSpecifications,
 }: {
   title: string;
   description: string;
@@ -41,6 +118,7 @@ function ReferenceForm({
   record?: CatalogReferenceRecord;
   returnPath: string;
   showPrecision: boolean;
+  showSpecifications?: boolean;
 }) {
   return (
     <form action={action} className="flex flex-col gap-4">
@@ -87,6 +165,18 @@ function ReferenceForm({
             className={inputClass}
           />
         </label>
+      ) : showSpecifications ? (
+        <div className="grid gap-3">
+          <label className="flex flex-col gap-1 text-sm font-medium">
+            Description
+            <textarea
+              name="description"
+              defaultValue={record?.description ?? ""}
+              className={textareaClass}
+            />
+          </label>
+          <SpecificationTags fields={record?.specificationSchema ?? []} />
+        </div>
       ) : (
         <label className="flex flex-col gap-1 text-sm font-medium">
           Description
@@ -126,6 +216,7 @@ function ReferenceDialog({
   record,
   returnPath,
   showPrecision,
+  showSpecifications,
   children,
 }: {
   label: string;
@@ -133,6 +224,7 @@ function ReferenceDialog({
   record?: CatalogReferenceRecord;
   returnPath: string;
   showPrecision: boolean;
+  showSpecifications?: boolean;
   children: ReactNode;
 }) {
   return (
@@ -146,6 +238,7 @@ function ReferenceDialog({
           record={record}
           returnPath={returnPath}
           showPrecision={showPrecision}
+          showSpecifications={showSpecifications}
         />
       </DialogContent>
     </Dialog>
@@ -165,6 +258,7 @@ export function CatalogReferenceManager({
   description,
   createLabel,
   showPrecision,
+  showSpecifications,
   basePath,
   createAction,
   updateAction,
@@ -182,6 +276,7 @@ export function CatalogReferenceManager({
             action={createAction}
             returnPath={returnPath}
             showPrecision={showPrecision}
+            showSpecifications={showSpecifications}
           >
             <Button>
               <PlusIcon data-icon="inline-start" />
@@ -258,6 +353,7 @@ export function CatalogReferenceManager({
                             record={record}
                             returnPath={returnPath}
                             showPrecision={showPrecision}
+                            showSpecifications={showSpecifications}
                           >
                             <Button variant="outline" size="sm">
                               <EditIcon data-icon="inline-start" />

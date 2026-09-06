@@ -11,6 +11,9 @@ export async function GET() {
   await requirePermission("product.view");
 
   const products = await getProductList({ showDeleted: false });
+  const specificationKeys = Array.from(
+    new Set(products.flatMap((product) => Object.keys(product.specifications ?? {}))),
+  ).sort();
   const rows = products.map((product) => [
     product.sku,
     product.name,
@@ -23,6 +26,7 @@ export async function GET() {
     minorToDisplay(product.standardCostMinor),
     minorToDisplay(product.listPriceMinor),
     product.isActive ? "Active" : "Inactive",
+    ...specificationKeys.map((key) => product.specifications?.[key] ?? ""),
   ]);
   const csv = [
     [
@@ -37,6 +41,7 @@ export async function GET() {
       "purchase_unit_cost",
       "sales_unit_price",
       "status",
+      ...specificationKeys.map((key) => `spec_${key}`),
     ],
     ...rows,
   ]

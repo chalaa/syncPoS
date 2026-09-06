@@ -6,6 +6,7 @@ export const dynamic = "force-dynamic";
 
 type NewProductPageProps = {
   searchParams: Promise<{
+    notice?: string;
     error?: string;
   }>;
 };
@@ -21,8 +22,8 @@ export default async function NewProductPage({ searchParams }: NewProductPagePro
       categories={options.categories}
       brands={options.brands}
       units={options.units}
-      templates={options.templates}
       taxes={options.taxes}
+      notice={params.notice}
       error={params.error}
     />
   );

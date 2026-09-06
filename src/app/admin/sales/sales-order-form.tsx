@@ -15,6 +15,7 @@ import {
 import { ManyToManyTags } from "@/components/ui/many-to-many-tags";
 import { ManyToOneCreateSelect } from "@/components/ui/many-to-one-create-select";
 import { Notebook } from "@/components/ui/notebook";
+import { RelatedModelSelect } from "@/components/ui/related-model-select";
 import { cn } from "@/lib/utils";
 import { createCustomerFromSales } from "@/app/admin/sales/actions";
 import type { SalesFormOption, SalesOrderDetail, SalesTaxOption } from "@/server/sales/types";
@@ -245,23 +246,16 @@ export function SalesOrderForm({
       </div>
 
       <div className="grid gap-4 md:grid-cols-4">
-        <label className="flex flex-col gap-1 text-sm font-medium">
-          Owner
-          <select
-            name="ownerId"
-            value={headerOwnerId}
-            onChange={(event) => setHeaderOwnerId(event.target.value)}
-            className={inputClass}
-            required={owners.length > 0}
-          >
-            <option value="">Select owner</option>
-            {owners.map((owner) => (
-              <option key={owner.id} value={owner.id}>
-                {owner.name}
-              </option>
-            ))}
-          </select>
-        </label>
+        <RelatedModelSelect
+          name="ownerId"
+          label="Owner"
+          options={owners}
+          value={headerOwnerId}
+          onValueChange={setHeaderOwnerId}
+          required={owners.length > 0}
+          placeholder="Select owner"
+          emptyLabel="No owners found."
+        />
         <label className="flex flex-col gap-1 text-sm font-medium">
           Payment Term
           <select
@@ -284,22 +278,15 @@ export function SalesOrderForm({
             <input name="validUntil" type="date" defaultValue={order?.validUntil ?? defaultDate} className={inputClass} />
           </label>
         ) : null}
-        <label className="flex flex-col gap-1 text-sm font-medium">
-          Source location
-          <select
-            name="sourceLocationId"
-            value={effectiveSourceLocationId}
-            onChange={(event) => changeSourceLocation(event.target.value)}
-            className={inputClass}
-          >
-            <option value="">Select when delivering/reserving</option>
-            {locations.map((location) => (
-              <option key={location.id} value={location.id}>
-                {location.code} / {location.name}
-              </option>
-            ))}
-          </select>
-        </label>
+        <RelatedModelSelect
+          name="sourceLocationId"
+          label="Source location"
+          options={locations}
+          value={effectiveSourceLocationId}
+          onValueChange={changeSourceLocation}
+          placeholder="Select when delivering/reserving"
+          emptyLabel="No locations found."
+        />
       </div>
 
       <label className="flex items-center gap-2 rounded-md border border-border bg-muted/30 px-3 py-2 text-sm font-medium">
@@ -350,32 +337,24 @@ export function SalesOrderForm({
                       {lines.map((line, index) => (
                         <tr key={line.key} className="border-b border-border/70">
                           <td className="px-2 py-3">
-                            <select
+                            <RelatedModelSelect
                               value={line.productId}
-                              className={tableInputClass}
-                              onChange={(event) => updateLineProduct(line.key, event.target.value)}
-                            >
-                              <option value="">Select product</option>
-                              {products.map((product) => (
-                                <option key={product.id} value={product.id}>
-                                  {product.code} / {product.name}
-                                </option>
-                              ))}
-                            </select>
+                              options={products}
+                              onValueChange={(productId) => updateLineProduct(line.key, productId)}
+                              placeholder="Select product"
+                              emptyLabel="No products found."
+                              inputClassName={tableInputClass}
+                            />
                           </td>
                           <td className="px-2 py-3">
-                            <select
+                            <RelatedModelSelect
                               value={line.ownerId || headerOwnerId}
-                              className={tableInputClass}
-                              onChange={(event) => updateLine(line.key, { ownerId: event.target.value })}
-                            >
-                              <option value="">Select owner</option>
-                              {owners.map((owner) => (
-                                <option key={owner.id} value={owner.id}>
-                                  {owner.name}
-                                </option>
-                              ))}
-                            </select>
+                              options={owners}
+                              onValueChange={(ownerId) => updateLine(line.key, { ownerId })}
+                              placeholder="Select owner"
+                              emptyLabel="No owners found."
+                              inputClassName={tableInputClass}
+                            />
                           </td>
                           <td className="px-2 py-3">
                             <input
@@ -502,33 +481,23 @@ export function SalesOrderForm({
                       <div className="grid gap-4">
                         <label className="flex flex-col gap-1 text-sm font-medium">
                           Product
-                          <select
+                          <RelatedModelSelect
                             value={editingLine.productId}
-                            className={inputClass}
-                            onChange={(event) => updateLineProduct(editingLine.key, event.target.value)}
-                          >
-                            <option value="">Select product</option>
-                            {products.map((product) => (
-                              <option key={product.id} value={product.id}>
-                                {product.code} / {product.name}
-                              </option>
-                            ))}
-                          </select>
+                            options={products}
+                            onValueChange={(productId) => updateLineProduct(editingLine.key, productId)}
+                            placeholder="Select product"
+                            emptyLabel="No products found."
+                          />
                         </label>
                         <label className="flex flex-col gap-1 text-sm font-medium">
                           Owner
-                          <select
+                          <RelatedModelSelect
                             value={editingLine.ownerId || headerOwnerId}
-                            className={inputClass}
-                            onChange={(event) => updateLine(editingLine.key, { ownerId: event.target.value })}
-                          >
-                            <option value="">Select owner</option>
-                            {owners.map((owner) => (
-                              <option key={owner.id} value={owner.id}>
-                                {owner.name}
-                              </option>
-                            ))}
-                          </select>
+                            options={owners}
+                            onValueChange={(ownerId) => updateLine(editingLine.key, { ownerId })}
+                            placeholder="Select owner"
+                            emptyLabel="No owners found."
+                          />
                         </label>
                         <div className="grid gap-4 sm:grid-cols-3">
                           <label className="flex flex-col gap-1 text-sm font-medium">

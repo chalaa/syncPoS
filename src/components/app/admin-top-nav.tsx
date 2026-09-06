@@ -3,7 +3,7 @@
 import { ChevronDownIcon, LogOutIcon, MenuIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useState, type MouseEvent, type ReactNode } from "react";
 
 import { logout } from "@/app/login/actions";
 import { filterAdminMenuItems } from "@/components/app/admin-navigation";
@@ -90,6 +90,8 @@ export function AdminShell({
   const selectedLocationId = useAppStore((state) => state.selectedLocationId);
   const setSelectedLocationId = useAppStore((state) => state.setSelectedLocationId);
   const syncStatus = useAppStore((state) => state.syncStatus);
+  const [openSubmenuHref, setOpenSubmenuHref] = useState<string | null>(null);
+  const [mobileOpenSubmenuHref, setMobileOpenSubmenuHref] = useState<string | null>(null);
   const adminMenuItems = filterAdminMenuItems(permissionCodes);
   const activeMenu = getActiveMenu(pathname, adminMenuItems);
   const queryString = searchParams.toString();
@@ -118,6 +120,10 @@ export function AdminShell({
       setSelectedLocationId(shopLocations[0]?.id ?? null);
     }
   }, [selectedLocationId, setSelectedLocationId, shopLocations]);
+
+  function closeMobileSubmenu(event: MouseEvent<HTMLAnchorElement>) {
+    event.currentTarget.closest("details")?.removeAttribute("open");
+  }
 
   return (
     <div className="flex min-h-screen items-stretch bg-background text-foreground">
@@ -222,17 +228,44 @@ export function AdminShell({
 
                   return (
                     <div key={item.href}>
-                      <Link
-                        href={item.href}
-                        className={cn(
-                          "block rounded-sm px-3 py-2 text-sm hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground focus:outline-none",
-                          isActive && "bg-accent text-accent-foreground",
-                        )}
-                      >
-                        {item.label}
-                      </Link>
                       {item.children?.length ? (
-                        <div className="ml-3 border-l border-border pl-2">
+                        <button
+                          type="button"
+                          className={cn(
+                            "flex w-full items-center justify-between rounded-sm px-3 py-2 text-left text-sm hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground focus:outline-none",
+                            isActive && "bg-accent text-accent-foreground",
+                          )}
+                          onClick={() =>
+                            setMobileOpenSubmenuHref((current) => (current === item.href ? null : item.href))
+                          }
+                        >
+                          <span>{item.label}</span>
+                          <ChevronDownIcon
+                            className={cn(
+                              "size-4 transition-transform",
+                              mobileOpenSubmenuHref === item.href && "rotate-180",
+                            )}
+                          />
+                        </button>
+                      ) : (
+                        <Link
+                          href={item.href}
+                          onClick={closeMobileSubmenu}
+                          className={cn(
+                            "block rounded-sm px-3 py-2 text-sm hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground focus:outline-none",
+                            isActive && "bg-accent text-accent-foreground",
+                          )}
+                        >
+                          {item.label}
+                        </Link>
+                      )}
+                      {item.children?.length ? (
+                        <div
+                          className={cn(
+                            "ml-3 border-l border-border pl-2",
+                            mobileOpenSubmenuHref !== item.href && "hidden",
+                          )}
+                        >
                           {item.children.map((child) => {
                             const childPath = hrefPath(child.href);
                             const isChildActive =
@@ -243,6 +276,7 @@ export function AdminShell({
                               <Link
                                 key={child.href}
                                 href={child.href}
+                                onClick={closeMobileSubmenu}
                                 className={cn(
                                   "block rounded-sm px-3 py-2 text-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground focus:outline-none",
                                   isChildActive && "bg-accent text-accent-foreground",
@@ -275,16 +309,28 @@ export function AdminShell({
                 return (
                   <div key={item.href} className="group relative">
                     <Button
-                      asChild
                       variant={isActive ? "secondary" : "ghost"}
                       size="sm"
+                      type="button"
+                      aria-haspopup="menu"
+                      aria-expanded={openSubmenuHref === item.href}
+                      onMouseEnter={() => setOpenSubmenuHref(item.href)}
+                      onFocus={() => setOpenSubmenuHref(item.href)}
+                      onClick={() =>
+                        setOpenSubmenuHref((current) => (current === item.href ? null : item.href))
+                      }
                     >
-                      <Link href={item.href} aria-haspopup="menu">
-                        {item.label}
-                        <ChevronDownIcon data-icon="inline-end" />
-                      </Link>
+                      {item.label}
+                      <ChevronDownIcon data-icon="inline-end" />
                     </Button>
-                    <div className="invisible absolute left-0 top-full z-50 min-w-48 pt-2 opacity-0 transition group-focus-within:visible group-focus-within:opacity-100 group-hover:visible group-hover:opacity-100">
+                    <div
+                      className={cn(
+                        "absolute left-0 top-full z-50 min-w-48 pt-2 transition",
+                        openSubmenuHref === item.href ? "visible opacity-100" : "invisible opacity-0",
+                      )}
+                      onMouseEnter={() => setOpenSubmenuHref(item.href)}
+                      onMouseLeave={() => setOpenSubmenuHref(null)}
+                    >
                       <div className="rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-md">
                         {item.children.map((child) => {
                           const childPath = hrefPath(child.href);
@@ -296,6 +342,7 @@ export function AdminShell({
                             <Link
                               key={child.href}
                               href={child.href}
+                              onClick={() => setOpenSubmenuHref(null)}
                               className={cn(
                                 "block rounded-sm px-3 py-2 text-sm hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground focus:outline-none",
                                 isChildActive && "bg-accent text-accent-foreground",

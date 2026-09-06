@@ -1,12 +1,21 @@
-import { ProductImporter } from "@/app/admin/products/import/product-importer";
+import { CategoryImporter, ProductImporter } from "@/app/admin/products/import/product-importer";
 import { ButtonLink } from "@/components/ui/button";
+import { Notebook } from "@/components/ui/notebook";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
 import { requirePermission } from "@/server/auth/session";
 
 export const dynamic = "force-dynamic";
 
-export default async function ProductImportPage() {
+type ProductImportPageProps = {
+  searchParams: Promise<{
+    tab?: string;
+  }>;
+};
+
+export default async function ProductImportPage({ searchParams }: ProductImportPageProps) {
   await requirePermission("product.manage");
+  const params = await searchParams;
+  const defaultTab = params.tab === "categories" ? "categories" : "products";
 
   return (
     <PageShell>
@@ -15,19 +24,27 @@ export default async function ProductImportPage() {
         title="Product Import"
         actions={
           <div className="flex flex-wrap gap-2">
-            <ButtonLink href="/admin/products/import/category-attributes" variant="outline">
-              Category attribute import
-            </ButtonLink>
-            <ButtonLink href="/admin/products/import/templates" variant="outline">
-              Product template import
-            </ButtonLink>
             <ButtonLink href="/admin/products" variant="outline">
               Back to products
             </ButtonLink>
           </div>
         }
       />
-      <ProductImporter />
+      <Notebook
+        defaultValue={defaultTab}
+        items={[
+          {
+            value: "products",
+            label: "Products",
+            content: <ProductImporter />,
+          },
+          {
+            value: "categories",
+            label: "Categories",
+            content: <CategoryImporter />,
+          },
+        ]}
+      />
     </PageShell>
   );
 }

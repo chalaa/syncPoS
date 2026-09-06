@@ -11,6 +11,7 @@ type EditProductPageProps = {
     id: string;
   }>;
   searchParams: Promise<{
+    notice?: string;
     error?: string;
   }>;
 };
@@ -32,8 +33,8 @@ export default async function EditProductPage({ params, searchParams }: EditProd
       categories={options.categories}
       brands={options.brands}
       units={options.units}
-      templates={options.templates}
       taxes={options.taxes}
+      notice={queryParams.notice}
       error={queryParams.error}
     />
   );
