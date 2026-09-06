@@ -288,6 +288,13 @@
       "when": 1788771600000,
       "tag": "0040_clean_category_specification_tags",
       "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1788771700000,
+      "tag": "0041_sleepy_revanche",
+      "breakpoints": true
     }
   ]
 }

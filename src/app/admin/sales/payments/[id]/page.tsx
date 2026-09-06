@@ -60,6 +60,7 @@ export default async function CustomerPaymentPage({ params, searchParams }: Cust
                 paymentAccountId={payment.paymentAccountId}
                 reference={payment.reference}
                 notes={payment.notes}
+                paymentLines={payment.lines}
               />
             ) : null}
             {payment.status === "draft" ? (
@@ -122,6 +123,31 @@ export default async function CustomerPaymentPage({ params, searchParams }: Cust
               <p className="mt-1 text-sm font-medium">-</p>
             )}
           </div>
+        </div>
+
+        <div className="mb-6 overflow-x-auto">
+          <table className="w-full min-w-[760px] text-left text-sm">
+            <thead className="text-xs uppercase text-muted-foreground">
+              <tr className="border-b border-border">
+                <th className="px-3 py-2">Method</th>
+                <th className="px-3 py-2">Account</th>
+                <th className="px-3 py-2">Reference</th>
+                <th className="px-3 py-2">Note</th>
+                <th className="px-3 py-2 text-right">Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              {payment.lines.map((line) => (
+                <tr key={line.id} className="border-b border-border/70">
+                  <td className="px-3 py-3">{line.paymentMethodName}</td>
+                  <td className="px-3 py-3">{line.paymentAccountName}</td>
+                  <td className="px-3 py-3">{line.reference ?? "-"}</td>
+                  <td className="px-3 py-3">{line.note ?? "-"}</td>
+                  <td className="px-3 py-3 text-right">{displayPaymentMoney(line.amountMinor, line.currencyCode)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
 
         <div className="overflow-x-auto">

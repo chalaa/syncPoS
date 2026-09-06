@@ -4,6 +4,7 @@ import { and, asc, eq, isNull, or, sql } from "drizzle-orm";
 
 import { db } from "@/server/db/client";
 import { locations, userLocationAccess } from "@/server/db/schema";
+import { PERMISSIONS, userHasPermission } from "@/server/iam/permissions";
 
 export type ShopOption = {
   id: string;
@@ -11,7 +12,37 @@ export type ShopOption = {
   name: string;
 };
 
-export async function getUserShopOptions(userId: string, companyId: string): Promise<ShopOption[]> {
+async function getAllActiveDisplayShops(companyId: string) {
+  return db
+    .select({
+      id: locations.id,
+      code: locations.code,
+      name: locations.name,
+    })
+    .from(locations)
+    .where(
+      and(
+        eq(locations.companyId, companyId),
+        eq(locations.locationType, "display_shop"),
+        eq(locations.isActive, true),
+        isNull(locations.deletedAt),
+      ),
+    )
+    .orderBy(asc(locations.name));
+}
+
+export async function getUserShopOptions(
+  userId: string,
+  companyId: string,
+  permissionCodes: Iterable<string> = [],
+): Promise<ShopOption[]> {
+  if (
+    userHasPermission(permissionCodes, PERMISSIONS.LOCATIONS.MANAGE) ||
+    userHasPermission(permissionCodes, PERMISSIONS.COMPANY.MANAGE)
+  ) {
+    return getAllActiveDisplayShops(companyId);
+  }
+
   const accessibleShops = await db
     .select({
       id: locations.id,
@@ -38,20 +69,5 @@ export async function getUserShopOptions(userId: string, companyId: string): Pro
     return accessibleShops;
   }
 
-  return db
-    .select({
-      id: locations.id,
-      code: locations.code,
-      name: locations.name,
-    })
-    .from(locations)
-    .where(
-      and(
-        eq(locations.companyId, companyId),
-        eq(locations.locationType, "display_shop"),
-        eq(locations.isActive, true),
-        isNull(locations.deletedAt),
-      ),
-    )
-    .orderBy(asc(locations.name));
+  return getAllActiveDisplayShops(companyId);
 }

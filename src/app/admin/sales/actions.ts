@@ -19,9 +19,7 @@ import {
   customerInvoices,
   deliveries,
   deliveryLines,
-  paymentAccounts,
   paymentAllocations,
-  paymentMethods,
   payments,
   owners,
   partnerContacts,
@@ -42,6 +40,7 @@ import {
   warrantyRegistrations,
 } from "@/server/db/schema";
 import { getOrCreatePartnerStockLocation } from "@/server/inventory/partner-locations";
+import { paymentLinesTotal, replacePaymentLines, resolvePaymentLines } from "@/server/payments/payment-lines";
 import { getCustomerInvoicePaymentSummary, getSalesOrderPaymentSummary } from "@/server/payments/payments";
 
 const salesOrderHeaderSchema = z.object({
@@ -111,17 +110,13 @@ const optionalUuid = z.string().uuid().or(z.literal("")).optional().transform((v
 const customerPaymentFormSchema = z.object({
   customerInvoiceId: optionalUuid,
   salesOrderId: optionalUuid,
-  paymentAccountId: z.string().uuid(),
-  amount: z.string().trim(),
-  reference: z.string().trim().max(120).optional(),
-  notes: z.string().trim().optional(),
 });
 
 const registerCustomerPaymentSchema = customerPaymentFormSchema.refine((data) => Boolean(data.customerInvoiceId) !== Boolean(data.salesOrderId), {
   message: "Select either a customer invoice or sales order for payment.",
 });
 
-const updateCustomerPaymentSchema = customerPaymentFormSchema.omit({ customerInvoiceId: true, salesOrderId: true }).extend({
+const updateCustomerPaymentSchema = z.object({
   paymentId: z.string().uuid(),
 });
 
@@ -2426,22 +2421,13 @@ export async function registerCustomerPayment(formData: FormData) {
   const parsed = registerCustomerPaymentSchema.safeParse({
     customerInvoiceId: formValue(formData, "customerInvoiceId"),
     salesOrderId: formValue(formData, "salesOrderId"),
-    paymentAccountId: formValue(formData, "paymentAccountId"),
-    amount: formValue(formData, "amount"),
-    reference: formValue(formData, "reference"),
-    notes: formValue(formData, "notes"),
   });
 
   if (!parsed.success) {
     redirectWithError("/admin/sales?view=payments", parsed.error.issues[0]?.message ?? "Invalid customer payment.");
   }
 
-  const amountMinor = majorToMinor(parsed.data.amount);
   const returnPath = parsed.data.salesOrderId ? `/admin/sales/${parsed.data.salesOrderId}` : `/admin/sales/invoices/${parsed.data.customerInvoiceId}`;
-
-  if (amountMinor <= 0) {
-    redirectWithError(returnPath, "Payment amount must be greater than zero.");
-  }
 
   const company = await getDefaultCompany();
   let paymentId: string | undefined;
@@ -2514,43 +2500,17 @@ export async function registerCustomerPayment(formData: FormData) {
         throw new Error("Customer invoice is already paid.");
       }
 
-      const [account] = await tx
-        .select({
-          id: paymentAccounts.id,
-          currencyCode: paymentAccounts.currencyCode,
-          methodId: paymentMethods.id,
-          requiresReference: paymentMethods.requiresReference,
-          allowInbound: paymentMethods.allowInbound,
-        })
-        .from(paymentAccounts)
-        .innerJoin(paymentMethods, eq(paymentAccounts.paymentMethodId, paymentMethods.id))
-        .where(
-          and(
-            eq(paymentAccounts.id, parsed.data.paymentAccountId),
-            eq(paymentAccounts.companyId, company.id),
-            eq(paymentAccounts.isActive, true),
-            eq(paymentMethods.isActive, true),
-            isNull(paymentAccounts.deletedAt),
-            isNull(paymentMethods.deletedAt),
-          ),
-        )
-        .limit(1);
-
-      if (!account || !account.allowInbound) {
-        throw new Error("Select an active inbound payment account.");
-      }
-
       const currencyCode = target?.currencyCode ?? invoice.currencyCode;
       const customerId = target?.customerId ?? invoice.customerId;
       const residualAmountMinor = target?.residualAmountMinor;
-
-      if (account.currencyCode !== currencyCode) {
-        throw new Error("Payment account currency must match the sale currency.");
-      }
-
-      if (account.requiresReference && !parsed.data.reference) {
-        throw new Error("This payment method requires a reference.");
-      }
+      const paymentLineRows = await resolvePaymentLines(tx, {
+        formData,
+        companyId: company.id,
+        currencyCode,
+        direction: "inbound",
+      });
+      const amountMinor = paymentLinesTotal(paymentLineRows);
+      const firstLine = paymentLineRows[0];
 
       const [summary] = target ? [{ residualAmountMinor }] : await tx.execute<{ residualAmountMinor: number }>(sql`
         select greatest(
@@ -2580,15 +2540,21 @@ export async function registerCustomerPayment(formData: FormData) {
           paymentNo: documentNo("PAY-IN"),
           paymentType: "inbound",
           status: "draft",
-          paymentMethodId: account.methodId,
-          paymentAccountId: account.id,
+          paymentMethodId: firstLine.paymentMethodId,
+          paymentAccountId: firstLine.paymentAccountId,
           amountMinor,
           currencyCode,
-          reference: parsed.data.reference || null,
-          notes: parsed.data.notes || null,
+          reference: firstLine.reference,
+          notes: firstLine.note,
         })
         .returning({ id: payments.id, paymentNo: payments.paymentNo });
       paymentId = payment.id;
+
+      await replacePaymentLines(tx, {
+        companyId: company.id,
+        paymentId: payment.id,
+        lines: paymentLineRows,
+      });
 
       await tx.insert(paymentAllocations).values({
         paymentId: payment.id,
@@ -2788,19 +2754,10 @@ export async function updateCustomerPayment(formData: FormData) {
   const user = await requirePermission("sales:orders:create");
   const parsed = updateCustomerPaymentSchema.safeParse({
     paymentId: formValue(formData, "paymentId"),
-    paymentAccountId: formValue(formData, "paymentAccountId"),
-    amount: formValue(formData, "amount"),
-    reference: formValue(formData, "reference"),
-    notes: formValue(formData, "notes"),
   });
 
   if (!parsed.success) {
     redirectWithError("/admin/sales?view=payments", parsed.error.issues[0]?.message ?? "Invalid customer payment.");
-  }
-
-  const amountMinor = majorToMinor(parsed.data.amount);
-  if (amountMinor <= 0) {
-    redirectWithError(`/admin/sales/payments/${parsed.data.paymentId}`, "Payment amount must be greater than zero.");
   }
 
   const company = await getDefaultCompany();
@@ -2878,41 +2835,20 @@ export async function updateCustomerPayment(formData: FormData) {
         throw new Error("Sales order must be confirmed before editing payment.");
       }
 
-      const [account] = await tx
-        .select({
-          id: paymentAccounts.id,
-          currencyCode: paymentAccounts.currencyCode,
-          methodId: paymentMethods.id,
-          requiresReference: paymentMethods.requiresReference,
-          allowInbound: paymentMethods.allowInbound,
-        })
-        .from(paymentAccounts)
-        .innerJoin(paymentMethods, eq(paymentAccounts.paymentMethodId, paymentMethods.id))
-        .where(
-          and(
-            eq(paymentAccounts.id, parsed.data.paymentAccountId),
-            eq(paymentAccounts.companyId, company.id),
-            eq(paymentAccounts.isActive, true),
-            eq(paymentMethods.isActive, true),
-            isNull(paymentAccounts.deletedAt),
-            isNull(paymentMethods.deletedAt),
-          ),
-        )
-        .limit(1);
-
-      if (!account || !account.allowInbound) {
-        throw new Error("Select an active inbound payment account.");
-      }
-
       const currencyCode = order?.currencyCode ?? invoice?.currencyCode;
 
-      if (account.currencyCode !== currencyCode) {
-        throw new Error("Payment account currency must match the sale currency.");
+      if (!currencyCode) {
+        throw new Error("Payment currency could not be resolved.");
       }
 
-      if (account.requiresReference && !parsed.data.reference) {
-        throw new Error("This payment method requires a reference.");
-      }
+      const paymentLineRows = await resolvePaymentLines(tx, {
+        formData,
+        companyId: company.id,
+        currencyCode,
+        direction: "inbound",
+      });
+      const amountMinor = paymentLinesTotal(paymentLineRows);
+      const firstLine = paymentLineRows[0];
 
       const [summary] = salesOrderId && order ? await tx.execute<{ residualAmountMinor: number }>(sql`
         select greatest(
@@ -2951,14 +2887,20 @@ export async function updateCustomerPayment(formData: FormData) {
       await tx
         .update(payments)
         .set({
-          paymentMethodId: account.methodId,
-          paymentAccountId: account.id,
+          paymentMethodId: firstLine.paymentMethodId,
+          paymentAccountId: firstLine.paymentAccountId,
           amountMinor,
-          reference: parsed.data.reference || null,
-          notes: parsed.data.notes || null,
+          reference: firstLine.reference,
+          notes: firstLine.note,
           updatedAt: sql`now()`,
         })
         .where(eq(payments.id, payment.id));
+
+      await replacePaymentLines(tx, {
+        companyId: company.id,
+        paymentId: payment.id,
+        lines: paymentLineRows,
+      });
 
       await tx
         .update(paymentAllocations)

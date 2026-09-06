@@ -1,7 +1,8 @@
 "use client";
 
 import { SearchIcon } from "lucide-react";
-import { useMemo, useRef, useState, type FocusEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type FocusEvent } from "react";
+import { createPortal } from "react-dom";
 
 import { cn } from "@/lib/utils";
 
@@ -55,6 +56,7 @@ export function RelatedModelSelect({
   const [internalValue, setInternalValue] = useState(defaultValue ?? "");
   const [query, setQuery] = useState("");
   const [isOpen, setIsOpen] = useState(false);
+  const [dropdownStyle, setDropdownStyle] = useState<CSSProperties | undefined>();
   const inputRef = useRef<HTMLInputElement>(null);
   const selectedId = value ?? internalValue;
   const selected = options.find((option) => option.id === selectedId);
@@ -71,12 +73,55 @@ export function RelatedModelSelect({
   }, [options, trimmedQuery]);
   const visibleOptions = filteredOptions.slice(0, maxVisible);
 
+  function floatingDropdownStyle() {
+    const inputRect = inputRef.current?.getBoundingClientRect();
+
+    if (!inputRect) {
+      return undefined;
+    }
+
+    const viewportPadding = 8;
+    const maxWidth = Math.max(window.innerWidth - viewportPadding * 2, inputRect.width);
+    const width = Math.min(Math.max(inputRect.width, 240), 512, maxWidth);
+    const left = Math.min(
+      Math.max(inputRect.left, viewportPadding),
+      Math.max(window.innerWidth - width - viewportPadding, viewportPadding),
+    );
+
+    return {
+      left,
+      top: inputRect.bottom + 4,
+      width,
+    };
+  }
+
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    function closeFloatingList() {
+      setIsOpen(false);
+      setQuery("");
+      setDropdownStyle(undefined);
+    }
+
+    window.addEventListener("resize", closeFloatingList);
+    window.addEventListener("scroll", closeFloatingList, true);
+
+    return () => {
+      window.removeEventListener("resize", closeFloatingList);
+      window.removeEventListener("scroll", closeFloatingList, true);
+    };
+  }, [isOpen]);
+
   function openList() {
     if (disabled) {
       return;
     }
 
     setQuery("");
+    setDropdownStyle(floatingDropdownStyle());
     setIsOpen(true);
     requestAnimationFrame(() => inputRef.current?.focus());
   }
@@ -86,6 +131,7 @@ export function RelatedModelSelect({
     onValueChange?.(optionId);
     setQuery("");
     setIsOpen(false);
+    setDropdownStyle(undefined);
   }
 
   function closeWhenFocusLeaves(event: FocusEvent<HTMLElement>) {
@@ -95,12 +141,52 @@ export function RelatedModelSelect({
 
     setIsOpen(false);
     setQuery("");
+    setDropdownStyle(undefined);
   }
+
+  const dropdown = isOpen && dropdownStyle
+    ? createPortal(
+        <div
+          className="fixed z-[1000] max-h-72 overflow-y-auto rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-lg"
+          style={dropdownStyle}
+        >
+          {!trimmedQuery && visibleOptions.length > 0 ? (
+            <div className="px-3 py-2 text-xs font-normal text-muted-foreground">{placeholder}</div>
+          ) : null}
+          {!required && !trimmedQuery && selectedId ? (
+            <button
+              type="button"
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={() => selectOption("")}
+              className="flex w-full rounded px-3 py-2 text-left text-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+            >
+              {clearLabel}
+            </button>
+          ) : null}
+          {visibleOptions.map((option) => (
+            <button
+              key={option.id}
+              type="button"
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={() => selectOption(option.id)}
+              className="flex w-full min-w-0 flex-col rounded px-3 py-2 text-left text-sm hover:bg-accent"
+            >
+              <span className="max-w-full truncate font-medium">{option.name}</span>
+              {option.code ? <span className="max-w-full truncate text-xs text-muted-foreground">{option.code}</span> : null}
+            </button>
+          ))}
+          {filteredOptions.length === 0 ? (
+            <p className="px-3 py-4 text-sm font-normal text-muted-foreground">{emptyLabel}</p>
+          ) : null}
+        </div>,
+        document.body,
+      )
+    : null;
 
   const control = (
     <>
       {name ? <input type="hidden" name={name} value={selectedId} required={required} /> : null}
-      <div className="relative">
+      <div>
         <SearchIcon className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
         <input
           ref={inputRef}
@@ -108,6 +194,7 @@ export function RelatedModelSelect({
           disabled={disabled}
           onChange={(event) => {
             setQuery(event.target.value);
+            setDropdownStyle(floatingDropdownStyle());
             setIsOpen(true);
           }}
           onFocus={openList}
@@ -120,40 +207,8 @@ export function RelatedModelSelect({
             disabled ? "bg-muted text-muted-foreground" : "",
           )}
         />
-
-        {isOpen ? (
-          <div className="absolute left-0 top-full z-50 mt-1 max-h-72 w-max min-w-full max-w-[min(32rem,calc(100vw-2rem))] overflow-y-auto rounded-md border border-border bg-popover p-1 shadow-lg">
-            {!trimmedQuery && visibleOptions.length > 0 ? (
-              <div className="px-3 py-2 text-xs font-normal text-muted-foreground">{placeholder}</div>
-            ) : null}
-            {!required && !trimmedQuery && selectedId ? (
-              <button
-                type="button"
-                onMouseDown={(event) => event.preventDefault()}
-                onClick={() => selectOption("")}
-                className="flex w-full rounded px-3 py-2 text-left text-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-              >
-                {clearLabel}
-              </button>
-            ) : null}
-            {visibleOptions.map((option) => (
-              <button
-                key={option.id}
-                type="button"
-                onMouseDown={(event) => event.preventDefault()}
-                onClick={() => selectOption(option.id)}
-                className="flex w-full min-w-0 flex-col rounded px-3 py-2 text-left text-sm hover:bg-accent"
-              >
-                <span className="max-w-full truncate font-medium">{option.name}</span>
-                {option.code ? <span className="max-w-full truncate text-xs text-muted-foreground">{option.code}</span> : null}
-              </button>
-            ))}
-            {filteredOptions.length === 0 ? (
-              <p className="px-3 py-4 text-sm font-normal text-muted-foreground">{emptyLabel}</p>
-            ) : null}
-          </div>
-        ) : null}
       </div>
+      {dropdown}
       {error ? <p className="text-sm font-normal text-destructive">{error}</p> : null}
     </>
   );

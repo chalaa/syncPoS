@@ -1890,6 +1890,42 @@ export const payments = pgTable(
   ],
 );
 
+export const paymentLines = pgTable(
+  "payment_lines",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    companyId: uuid("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    paymentId: uuid("payment_id")
+      .notNull()
+      .references(() => payments.id, { onDelete: "cascade", onUpdate: "cascade" }),
+    lineNo: smallint("line_no").notNull(),
+    paymentMethodId: uuid("payment_method_id")
+      .notNull()
+      .references(() => paymentMethods.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    paymentAccountId: uuid("payment_account_id")
+      .notNull()
+      .references(() => paymentAccounts.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    amountMinor: bigint("amount_minor", { mode: "number" }).notNull().default(0),
+    reference: varchar("reference", { length: 120 }),
+    note: text("note"),
+    ...softDelete,
+    ...timestamps,
+  },
+  (table) => [
+    check("payment_lines_no_chk", sql`${table.lineNo} > 0`),
+    check("payment_lines_amount_chk", sql`${table.amountMinor} > 0`),
+    uniqueIndex("payment_lines_no_active_uidx")
+      .on(table.paymentId, table.lineNo)
+      .where(sql`${table.deletedAt} is null`),
+    index("payment_lines_company_idx").on(table.companyId),
+    index("payment_lines_payment_idx").on(table.paymentId),
+    index("payment_lines_method_idx").on(table.paymentMethodId),
+    index("payment_lines_account_idx").on(table.paymentAccountId),
+  ],
+);
+
 export const expenseCategories = pgTable(
   "expense_categories",
   {

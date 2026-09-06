@@ -45,6 +45,8 @@ export type PaymentAccountOption = {
   code: string;
   name: string;
   paymentMethodId: string;
+  paymentMethodName: string;
+  requiresReference: boolean;
   currencyCode: string;
 };
 
@@ -80,10 +82,24 @@ export type PaymentAllocationRow = {
   currencyCode: string;
 };
 
+export type PaymentLineRow = {
+  id: string;
+  lineNo: number;
+  paymentMethodId: string;
+  paymentMethodName: string;
+  paymentAccountId: string;
+  paymentAccountName: string;
+  amountMinor: number;
+  currencyCode: string;
+  reference: string | null;
+  note: string | null;
+};
+
 export type PaymentDetail = PaymentListRow & {
   notes: string | null;
   postedAt: string | null;
   cancelledAt: string | null;
+  lines: PaymentLineRow[];
   allocations: PaymentAllocationRow[];
 };
 

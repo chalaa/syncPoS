@@ -126,7 +126,7 @@ export function AdminShell({
   }
 
   return (
-    <div className="flex min-h-screen items-stretch bg-background text-foreground">
+    <div className="flex h-dvh items-stretch overflow-hidden bg-background text-foreground">
       {adminNavOpen ? (
         <button
           type="button"
@@ -137,7 +137,7 @@ export function AdminShell({
       ) : null}
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-50 flex h-dvh flex-col border-r border-border bg-card text-card-foreground transition-[transform,width] md:sticky md:top-0 md:z-auto md:h-auto md:min-h-screen md:self-stretch",
+          "fixed inset-y-0 left-0 z-50 flex h-dvh flex-col border-r border-border bg-card text-card-foreground transition-[transform,width] md:sticky md:top-0 md:z-40 md:self-stretch",
           adminNavOpen ? "w-64 translate-x-0" : "-translate-x-full md:w-20 md:translate-x-0",
         )}
       >
@@ -199,8 +199,8 @@ export function AdminShell({
         </form>
       </aside>
 
-      <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex min-h-16 items-center justify-between gap-2 border-b border-border bg-card px-3 py-3 text-sm text-card-foreground sm:gap-3 sm:px-6">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+        <header className="sticky top-0 z-30 flex min-h-16 shrink-0 items-center justify-between gap-2 border-b border-border bg-card px-3 py-3 text-sm text-card-foreground sm:gap-3 sm:px-6">
           <Button
             type="button"
             variant="ghost"
@@ -392,7 +392,7 @@ export function AdminShell({
           </form>
         </header>
 
-        <div className="min-w-0 flex-1">{children}</div>
+        <div className="min-h-0 min-w-0 flex-1 overflow-y-auto">{children}</div>
       </div>
     </div>
   );

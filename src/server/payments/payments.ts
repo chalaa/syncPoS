@@ -10,6 +10,7 @@ import {
   expenses,
   paymentAccounts,
   paymentAllocations,
+  paymentLines,
   paymentMethods,
   payments,
   purchaseOrders,
@@ -21,6 +22,7 @@ import type {
   PaymentAccountRow,
   PaymentDetail,
   PaymentDirection,
+  PaymentLineRow,
   PaymentListRow,
   PaymentMethodOption,
   PaymentMethodRow,
@@ -164,6 +166,8 @@ export async function getActivePaymentAccounts(
       code: paymentAccounts.code,
       name: paymentAccounts.name,
       paymentMethodId: paymentAccounts.paymentMethodId,
+      paymentMethodName: paymentMethods.name,
+      requiresReference: paymentMethods.requiresReference,
       currencyCode: paymentAccounts.currencyCode,
     })
     .from(paymentAccounts)
@@ -272,7 +276,7 @@ export async function getPaymentList(params: {
 export async function getPaymentDetail(id: string): Promise<PaymentDetail | null> {
   const company = await getDefaultCompany();
 
-  const [payment] = await db.execute<Omit<PaymentDetail, "allocations">>(sql`
+  const [payment] = await db.execute<Omit<PaymentDetail, "allocations" | "lines">>(sql`
     select
       p.id as "id",
       p.payment_no as "paymentNo",
@@ -306,6 +310,48 @@ export async function getPaymentDetail(id: string): Promise<PaymentDetail | null
     return null;
   }
 
+  let lines: PaymentLineRow[];
+  try {
+    lines = await db
+      .select({
+        id: paymentLines.id,
+        lineNo: paymentLines.lineNo,
+        paymentMethodId: paymentLines.paymentMethodId,
+        paymentMethodName: paymentMethods.name,
+        paymentAccountId: paymentLines.paymentAccountId,
+        paymentAccountName: paymentAccounts.name,
+        amountMinor: paymentLines.amountMinor,
+        currencyCode: payments.currencyCode,
+        reference: paymentLines.reference,
+        note: paymentLines.note,
+      })
+      .from(paymentLines)
+      .innerJoin(payments, eq(paymentLines.paymentId, payments.id))
+      .innerJoin(paymentMethods, eq(paymentLines.paymentMethodId, paymentMethods.id))
+      .innerJoin(paymentAccounts, eq(paymentLines.paymentAccountId, paymentAccounts.id))
+      .where(and(eq(paymentLines.paymentId, id), isNull(paymentLines.deletedAt)))
+      .orderBy(asc(paymentLines.lineNo));
+  } catch {
+    lines = [];
+  }
+
+  if (lines.length === 0) {
+    lines = [
+      {
+        id: `${payment.id}-legacy-line`,
+        lineNo: 1,
+        paymentMethodId: "",
+        paymentMethodName: payment.paymentMethodName,
+        paymentAccountId: payment.paymentAccountId,
+        paymentAccountName: payment.paymentAccountName,
+        amountMinor: payment.amountMinor,
+        currencyCode: payment.currencyCode,
+        reference: payment.reference,
+        note: payment.notes,
+      },
+    ];
+  }
+
   const allocations = await db
     .select({
       id: paymentAllocations.id,
@@ -332,7 +378,7 @@ export async function getPaymentDetail(id: string): Promise<PaymentDetail | null
     .where(and(eq(paymentAllocations.paymentId, id), isNull(paymentAllocations.deletedAt)))
     .orderBy(asc(vendorBills.billNo), asc(purchaseOrders.orderNo), asc(expenses.expenseNo), asc(customerInvoices.invoiceNo), asc(salesOrders.orderNo));
 
-  return { ...payment, allocations };
+  return { ...payment, lines, allocations };
 }
 
 export async function getPurchaseOrderPaymentSummary(purchaseOrderId: string): Promise<PurchaseOrderPaymentSummary> {

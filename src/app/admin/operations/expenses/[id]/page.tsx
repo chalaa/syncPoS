@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { cancelExpense, registerExpensePayment } from "@/app/admin/operations/expenses/actions";
+import { PaymentFormDialog } from "@/components/app/payment-form-dialog";
 import { Alert } from "@/components/ui/alert";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
@@ -18,10 +19,6 @@ type ExpenseDetailPageProps = {
 
 function statusLabel(value: string) {
   return value.replace(/_/g, " ");
-}
-
-function minorToInputValue(value: number) {
-  return (value / 100).toFixed(2);
 }
 
 export default async function ExpenseDetailPage({ params, searchParams }: ExpenseDetailPageProps) {
@@ -120,42 +117,18 @@ export default async function ExpenseDetailPage({ params, searchParams }: Expens
       {canPay ? (
         <section className="mt-5 rounded-lg border border-border bg-card p-5">
           <h2 className="mb-4 text-lg font-semibold">Register Expense Payment</h2>
-          <form action={registerExpensePayment} className="grid gap-4">
-            <input type="hidden" name="expenseId" value={expense.id} />
-            <div className="grid gap-4 md:grid-cols-4">
-              <label className="flex flex-col gap-1 text-sm font-medium md:col-span-2">
-                Payment Account
-                <select
-                  name="paymentAccountId"
-                  required
-                  defaultValue={outboundAccounts[0]?.id ?? ""}
-                  className="h-10 rounded-md border border-input bg-background px-3 text-sm"
-                >
-                  <option value="">No outbound account configured</option>
-                  {outboundAccounts.map((account) => (
-                    <option key={account.id} value={account.id}>
-                      {account.code} / {account.name} / {account.currencyCode}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="flex flex-col gap-1 text-sm font-medium md:col-span-2">
-                Amount
-                <input
-                  name="amount"
-                  type="number"
-                  min="0.01"
-                  step="0.01"
-                  required
-                  defaultValue={minorToInputValue(expense.residualAmountMinor)}
-                  className="h-10 rounded-md border border-input bg-background px-3 text-sm"
-                />
-              </label>
-            </div>
-            <div className="flex justify-end">
-              <Button disabled={outboundAccounts.length === 0}>Register Payment</Button>
-            </div>
-          </form>
+          <PaymentFormDialog
+            title="Register Expense Payment"
+            description={`Register payment for ${expense.expenseNo}.`}
+            triggerLabel="Register Payment"
+            submitLabel="Register Payment"
+            action={registerExpensePayment}
+            hiddenFieldName="expenseId"
+            hiddenFieldValue={expense.id}
+            paymentAccounts={outboundAccounts}
+            currencyCode={expense.currencyCode}
+            amountMinor={expense.residualAmountMinor}
+          />
         </section>
       ) : null}
 

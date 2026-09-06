@@ -6,10 +6,8 @@ import { getUserShopOptions } from "@/server/locations/shop-options";
 
 export default async function AdminLayout({ children }: { children: ReactNode }) {
   const user = await requireUser();
-  const [permissionCodes, shopLocations] = await Promise.all([
-    getUserPermissionCodes(user.id),
-    getUserShopOptions(user.id, user.companyId),
-  ]);
+  const permissionCodes = await getUserPermissionCodes(user.id);
+  const shopLocations = await getUserShopOptions(user.id, user.companyId, permissionCodes);
 
   return (
     <AdminShell username={user.username} permissionCodes={Array.from(permissionCodes)} shopLocations={shopLocations}>

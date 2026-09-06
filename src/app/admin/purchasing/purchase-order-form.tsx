@@ -276,11 +276,10 @@ export function PurchaseOrderForm({
     });
   }
 
-  function addLineForEditing() {
+  function addLine() {
     const line = newLine(headerOwnerId);
 
     setLines((current) => [...current, line]);
-    setEditingLineKey(line.key);
   }
 
   const editingLine = lines.find((line) => line.key === editingLineKey);
@@ -577,7 +576,7 @@ export function PurchaseOrderForm({
                 </div>
 
                 <div className="flex flex-wrap items-start justify-between gap-4">
-                  <Button type="button" variant="outline" onClick={addLineForEditing}>
+                  <Button type="button" variant="outline" onClick={addLine}>
                     <PlusIcon data-icon="inline-start" />
                     Add line
                   </Button>

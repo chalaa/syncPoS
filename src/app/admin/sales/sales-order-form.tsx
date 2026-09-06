@@ -194,11 +194,10 @@ export function SalesOrderForm({
     });
   }
 
-  function addLineForEditing() {
+  function addLine() {
     const line = newLine(headerOwnerId);
 
     setLines((current) => [...current, line]);
-    setEditingLineKey(line.key);
   }
 
   const editingLine = lines.find((line) => line.key === editingLineKey);
@@ -319,15 +318,15 @@ export function SalesOrderForm({
                 ))}
 
                 <div className="hidden overflow-x-auto lg:block">
-                  <table className="w-full min-w-[1180px] border-collapse text-sm">
+                  <table className="w-full min-w-[1380px] border-collapse text-sm">
                     <thead>
                       <tr className="border-b border-border text-left text-xs font-semibold uppercase text-muted-foreground">
-                        <th className="px-2 py-2">Product</th>
-                        <th className="w-44 px-2 py-2">Owner</th>
+                        <th className="w-80 px-2 py-2">Product</th>
+                        <th className="w-56 px-2 py-2">Owner</th>
                         <th className="w-28 px-2 py-2 text-right">Quantity</th>
                         <th className="w-32 px-2 py-2 text-right">Unit Price</th>
                         <th className="w-32 px-2 py-2 text-right">Discount</th>
-                        <th className="w-56 px-2 py-2">Tax</th>
+                        <th className="w-64 px-2 py-2">Tax</th>
                         <th className="w-32 px-2 py-2 text-right">Subtotal</th>
                         <th className="w-32 px-2 py-2 text-right">Total</th>
                         <th className="w-12 px-2 py-2 text-right"></th>
@@ -336,7 +335,7 @@ export function SalesOrderForm({
                     <tbody>
                       {lines.map((line, index) => (
                         <tr key={line.key} className="border-b border-border/70">
-                          <td className="px-2 py-3">
+                          <td className="w-80 px-2 py-3">
                             <RelatedModelSelect
                               value={line.productId}
                               options={products}
@@ -346,7 +345,7 @@ export function SalesOrderForm({
                               inputClassName={tableInputClass}
                             />
                           </td>
-                          <td className="px-2 py-3">
+                          <td className="w-56 px-2 py-3">
                             <RelatedModelSelect
                               value={line.ownerId || headerOwnerId}
                               options={owners}
@@ -386,7 +385,7 @@ export function SalesOrderForm({
                               onChange={(event) => updateLine(line.key, { discount: event.target.value })}
                             />
                           </td>
-                          <td className="px-2 py-3">
+                          <td className="w-64 px-2 py-3">
                             <ManyToManyTags
                               options={taxTagOptions}
                               value={line.taxIds}
@@ -451,7 +450,7 @@ export function SalesOrderForm({
                 </div>
 
                 <div className="flex flex-wrap items-center justify-between gap-4">
-                  <Button type="button" variant="outline" onClick={addLineForEditing}>
+                  <Button type="button" variant="outline" onClick={addLine}>
                     <PlusIcon data-icon="inline-start" />
                     Add line
                   </Button>

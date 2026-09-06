@@ -15,11 +15,10 @@ import {
   auditLogs,
   expenseCategories,
   expenses,
-  paymentAccounts,
   paymentAllocations,
-  paymentMethods,
   payments,
 } from "@/server/db/schema";
+import { paymentLinesTotal, replacePaymentLines, resolvePaymentLines, type PaymentLineInput } from "@/server/payments/payment-lines";
 
 const optionalUuid = z.string().uuid().or(z.literal("")).transform((value) => value || null);
 
@@ -42,8 +41,6 @@ const expenseSchema = z.object({
 
 const payExpenseSchema = z.object({
   expenseId: z.string().uuid(),
-  paymentAccountId: z.string().uuid(),
-  amount: z.string().trim().min(1),
 });
 
 const idSchema = z.object({
@@ -96,36 +93,6 @@ function expensePayload(formData: FormData) {
   };
 }
 
-async function getOutboundPaymentAccount(accountId: string, companyId: string, currencyCode: string) {
-  const [account] = await db
-    .select({
-      id: paymentAccounts.id,
-      currencyCode: paymentAccounts.currencyCode,
-      methodId: paymentMethods.id,
-      requiresReference: paymentMethods.requiresReference,
-      allowOutbound: paymentMethods.allowOutbound,
-    })
-    .from(paymentAccounts)
-    .innerJoin(paymentMethods, eq(paymentAccounts.paymentMethodId, paymentMethods.id))
-    .where(
-      and(
-        eq(paymentAccounts.id, accountId),
-        eq(paymentAccounts.companyId, companyId),
-        eq(paymentAccounts.isActive, true),
-        eq(paymentMethods.isActive, true),
-        isNull(paymentAccounts.deletedAt),
-        isNull(paymentMethods.deletedAt),
-      ),
-    )
-    .limit(1);
-
-  if (!account || !account.allowOutbound || account.currencyCode !== currencyCode) {
-    throw new Error("Select an active outbound payment account with matching currency.");
-  }
-
-  return account;
-}
-
 async function updateExpensePaymentStatus(expenseId: string) {
   const [summary] = await db.execute<{ amountMinor: number; paidMinor: number }>(sql`
     select
@@ -153,33 +120,27 @@ async function updateExpensePaymentStatus(expenseId: string) {
 }
 
 async function createPostedExpensePayment({
+  tx,
   companyId,
   userId,
   expenseId,
   partnerId,
-  paymentAccountId,
   amountMinor,
   currencyCode,
-  reference,
-  notes,
+  lines,
 }: {
+  tx: Parameters<Parameters<typeof db.transaction>[0]>[0];
   companyId: string;
   userId: string;
   expenseId: string;
   partnerId: string | null;
-  paymentAccountId: string;
   amountMinor: number;
   currencyCode: string;
-  reference?: string | null;
-  notes?: string | null;
+  lines: PaymentLineInput[];
 }) {
-  const account = await getOutboundPaymentAccount(paymentAccountId, companyId, currencyCode);
+  const firstLine = lines[0];
 
-  if (account.requiresReference && !reference) {
-    throw new Error("This payment method requires a reference.");
-  }
-
-  const [payment] = await db
+  const [payment] = await tx
     .insert(payments)
     .values({
       companyId,
@@ -187,18 +148,24 @@ async function createPostedExpensePayment({
       paymentNo: paymentNo(),
       paymentType: "outbound",
       status: "posted",
-      paymentMethodId: account.methodId,
-      paymentAccountId: account.id,
+      paymentMethodId: firstLine.paymentMethodId,
+      paymentAccountId: firstLine.paymentAccountId,
       amountMinor,
       currencyCode,
-      reference: reference || null,
-      notes: notes || "Expense payment.",
+      reference: firstLine.reference,
+      notes: firstLine.note || "Expense payment.",
       postedAt: new Date(),
       postedBy: userId,
     })
     .returning({ id: payments.id, paymentNo: payments.paymentNo });
 
-  await db.insert(paymentAllocations).values({
+  await replacePaymentLines(tx, {
+    companyId,
+    paymentId: payment.id,
+    lines,
+  });
+
+  await tx.insert(paymentAllocations).values({
     paymentId: payment.id,
     expenseId,
     amountMinor,
@@ -368,64 +335,68 @@ export async function registerExpensePayment(formData: FormData) {
   const user = await requirePermission("company.manage");
   const parsed = payExpenseSchema.safeParse({
     expenseId: formValue(formData, "expenseId"),
-    paymentAccountId: formValue(formData, "paymentAccountId"),
-    amount: formValue(formData, "amount"),
   });
 
   if (!parsed.success) {
     redirectWithMessage("/admin/operations/expenses", "error", parsed.error.issues[0]?.message ?? "Invalid payment.");
   }
 
-  const amountMinor = majorToMinor(parsed.data.amount);
-  if (amountMinor <= 0) {
-    redirectWithMessage(`/admin/operations/expenses/${parsed.data.expenseId}`, "error", "Payment amount must be greater than zero.");
-  }
-
   const company = await getDefaultCompany();
 
   try {
-    const [expense] = await db.execute<{ id: string; vendorId: string | null; amountMinor: number; residualAmountMinor: number; currencyCode: string; status: string }>(sql`
-      select
-        e.id as "id",
-        e.vendor_id as "vendorId",
-        e.amount_minor as "amountMinor",
-        greatest(e.amount_minor - coalesce(sum(pa.amount_minor) filter (
-          where p.status = 'posted'
-            and p.deleted_at is null
-            and pa.deleted_at is null
-        ), 0), 0)::bigint as "residualAmountMinor",
-        e.currency_code as "currencyCode",
-        e.status::text as "status"
-      from expenses e
-      left join payment_allocations pa on pa.expense_id = e.id
-      left join payments p on p.id = pa.payment_id
-      where e.id = ${parsed.data.expenseId}
-        and e.company_id = ${company.id}
-        and e.deleted_at is null
-      group by e.id
-      limit 1
-    `);
+    let paidExpenseId = parsed.data.expenseId;
+    await db.transaction(async (tx) => {
+      const [expense] = await tx.execute<{ id: string; vendorId: string | null; amountMinor: number; residualAmountMinor: number; currencyCode: string; status: string }>(sql`
+        select
+          e.id as "id",
+          e.vendor_id as "vendorId",
+          e.amount_minor as "amountMinor",
+          greatest(e.amount_minor - coalesce(sum(pa.amount_minor) filter (
+            where p.status = 'posted'
+              and p.deleted_at is null
+              and pa.deleted_at is null
+          ), 0), 0)::bigint as "residualAmountMinor",
+          e.currency_code as "currencyCode",
+          e.status::text as "status"
+        from expenses e
+        left join payment_allocations pa on pa.expense_id = e.id
+        left join payments p on p.id = pa.payment_id
+        where e.id = ${parsed.data.expenseId}
+          and e.company_id = ${company.id}
+          and e.deleted_at is null
+        group by e.id
+        limit 1
+      `);
 
-    if (!expense || expense.status === "cancelled") {
-      throw new Error("Expense does not exist or is cancelled.");
-    }
+      if (!expense || expense.status === "cancelled") {
+        throw new Error("Expense does not exist or is cancelled.");
+      }
+      paidExpenseId = expense.id;
 
-    if (amountMinor > expense.residualAmountMinor) {
-      throw new Error("Payment amount cannot exceed the expense residual.");
-    }
+      const paymentLineRows = await resolvePaymentLines(tx, {
+        formData,
+        companyId: company.id,
+        currencyCode: expense.currencyCode,
+        direction: "outbound",
+      });
+      const amountMinor = paymentLinesTotal(paymentLineRows);
 
-    await createPostedExpensePayment({
-      companyId: company.id,
-      userId: user.id,
-      expenseId: expense.id,
-      partnerId: expense.vendorId,
-      paymentAccountId: parsed.data.paymentAccountId,
-      amountMinor,
-      currencyCode: expense.currencyCode,
-      reference: null,
-      notes: "Expense payment.",
+      if (amountMinor > expense.residualAmountMinor) {
+        throw new Error("Payment amount cannot exceed the expense residual.");
+      }
+
+      await createPostedExpensePayment({
+        tx,
+        companyId: company.id,
+        userId: user.id,
+        expenseId: expense.id,
+        partnerId: expense.vendorId,
+        amountMinor,
+        currencyCode: expense.currencyCode,
+        lines: paymentLineRows,
+      });
     });
-    await updateExpensePaymentStatus(expense.id);
+    await updateExpensePaymentStatus(paidExpenseId);
   } catch (error) {
     redirectWithMessage(`/admin/operations/expenses/${parsed.data.expenseId}`, "error", error instanceof Error ? error.message : "Could not register expense payment.");
   }

@@ -7,18 +7,17 @@ import { redirect } from "next/navigation";
 import { and, eq, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
 
-import { getDefaultCompany, majorToMinor } from "@/server/catalog/products";
+import { getDefaultCompany } from "@/server/catalog/products";
 import { requirePermission } from "@/server/auth/session";
 import { db } from "@/server/db/client";
 import {
   auditLogs,
-  paymentAccounts,
   paymentAllocations,
-  paymentMethods,
   payments,
   purchaseOrders,
   vendorBills,
 } from "@/server/db/schema";
+import { paymentLinesTotal, replacePaymentLines, resolvePaymentLines } from "@/server/payments/payment-lines";
 import { getPurchaseOrderPaymentSummary, getVendorBillPaymentSummary } from "@/server/payments/payments";
 
 const optionalUuid = z.string().uuid().or(z.literal("")).optional().transform((value) => value || undefined);
@@ -26,17 +25,13 @@ const optionalUuid = z.string().uuid().or(z.literal("")).optional().transform((v
 const supplierPaymentFormSchema = z.object({
   vendorBillId: optionalUuid,
   purchaseOrderId: optionalUuid,
-  paymentAccountId: z.string().uuid(),
-  amount: z.string().trim(),
-  reference: z.string().trim().max(120).optional(),
-  notes: z.string().trim().optional(),
 });
 
 const registerSupplierPaymentSchema = supplierPaymentFormSchema.refine((data) => Boolean(data.vendorBillId) !== Boolean(data.purchaseOrderId), {
   message: "Select either a vendor bill or purchase order for payment.",
 });
 
-const updateSupplierPaymentSchema = supplierPaymentFormSchema.omit({ vendorBillId: true, purchaseOrderId: true }).extend({
+const updateSupplierPaymentSchema = z.object({
   paymentId: z.string().uuid(),
 });
 
@@ -77,22 +72,10 @@ export async function registerSupplierPayment(formData: FormData) {
   const parsed = registerSupplierPaymentSchema.safeParse({
     vendorBillId: formValue(formData, "vendorBillId"),
     purchaseOrderId: formValue(formData, "purchaseOrderId"),
-    paymentAccountId: formValue(formData, "paymentAccountId"),
-    amount: formValue(formData, "amount"),
-    reference: formValue(formData, "reference"),
-    notes: formValue(formData, "notes"),
   });
 
   if (!parsed.success) {
     redirectWithError("/admin/purchasing?view=payments", parsed.error.issues[0]?.message ?? "Invalid supplier payment.");
-  }
-
-  const amountMinor = majorToMinor(parsed.data.amount);
-  if (amountMinor <= 0) {
-    redirectWithError(
-      parsed.data.purchaseOrderId ? `/admin/purchasing/${parsed.data.purchaseOrderId}` : `/admin/purchasing/vendor-bills/vendor_bill/${parsed.data.vendorBillId}`,
-      "Payment amount must be greater than zero.",
-    );
   }
 
   const company = await getDefaultCompany();
@@ -169,43 +152,17 @@ export async function registerSupplierPayment(formData: FormData) {
         throw new Error("Vendor bill is already paid.");
       }
 
-      const [account] = await tx
-        .select({
-          id: paymentAccounts.id,
-          currencyCode: paymentAccounts.currencyCode,
-          methodId: paymentMethods.id,
-          requiresReference: paymentMethods.requiresReference,
-          allowOutbound: paymentMethods.allowOutbound,
-        })
-        .from(paymentAccounts)
-        .innerJoin(paymentMethods, eq(paymentAccounts.paymentMethodId, paymentMethods.id))
-        .where(
-          and(
-            eq(paymentAccounts.id, parsed.data.paymentAccountId),
-            eq(paymentAccounts.companyId, company.id),
-            eq(paymentAccounts.isActive, true),
-            eq(paymentMethods.isActive, true),
-            isNull(paymentAccounts.deletedAt),
-            isNull(paymentMethods.deletedAt),
-          ),
-        )
-        .limit(1);
-
-      if (!account || !account.allowOutbound) {
-        throw new Error("Select an active outbound payment account.");
-      }
-
       const currencyCode = target?.currencyCode ?? bill.currencyCode;
       const supplierId = target?.supplierId ?? bill.supplierId;
       const residualAmountMinor = target?.residualAmountMinor;
-
-      if (account.currencyCode !== currencyCode) {
-        throw new Error("Payment account currency must match the purchase currency.");
-      }
-
-      if (account.requiresReference && !parsed.data.reference) {
-        throw new Error("This payment method requires a reference.");
-      }
+      const paymentLineRows = await resolvePaymentLines(tx, {
+        formData,
+        companyId: company.id,
+        currencyCode,
+        direction: "outbound",
+      });
+      const amountMinor = paymentLinesTotal(paymentLineRows);
+      const firstLine = paymentLineRows[0];
 
       const [summary] = target ? [{ residualAmountMinor }] : await tx.execute<{ residualAmountMinor: number }>(sql`
         select greatest(
@@ -235,15 +192,21 @@ export async function registerSupplierPayment(formData: FormData) {
           paymentNo: paymentNo("PAY-OUT"),
           paymentType: "outbound",
           status: "draft",
-          paymentMethodId: account.methodId,
-          paymentAccountId: account.id,
+          paymentMethodId: firstLine.paymentMethodId,
+          paymentAccountId: firstLine.paymentAccountId,
           amountMinor,
           currencyCode,
-          reference: parsed.data.reference || null,
-          notes: parsed.data.notes || null,
+          reference: firstLine.reference,
+          notes: firstLine.note,
         })
         .returning({ id: payments.id, paymentNo: payments.paymentNo });
       paymentId = payment.id;
+
+      await replacePaymentLines(tx, {
+        companyId: company.id,
+        paymentId: payment.id,
+        lines: paymentLineRows,
+      });
 
       await tx.insert(paymentAllocations).values({
         paymentId: payment.id,
@@ -443,19 +406,10 @@ export async function updateSupplierPayment(formData: FormData) {
   const user = await requirePermission("inventory.receive");
   const parsed = updateSupplierPaymentSchema.safeParse({
     paymentId: formValue(formData, "paymentId"),
-    paymentAccountId: formValue(formData, "paymentAccountId"),
-    amount: formValue(formData, "amount"),
-    reference: formValue(formData, "reference"),
-    notes: formValue(formData, "notes"),
   });
 
   if (!parsed.success) {
     redirectWithError("/admin/purchasing?view=payments", parsed.error.issues[0]?.message ?? "Invalid supplier payment.");
-  }
-
-  const amountMinor = majorToMinor(parsed.data.amount);
-  if (amountMinor <= 0) {
-    redirectWithError(`/admin/purchasing/payments/${parsed.data.paymentId}`, "Payment amount must be greater than zero.");
   }
 
   const company = await getDefaultCompany();
@@ -533,41 +487,20 @@ export async function updateSupplierPayment(formData: FormData) {
         throw new Error("Purchase order must be confirmed before editing payment.");
       }
 
-      const [account] = await tx
-        .select({
-          id: paymentAccounts.id,
-          currencyCode: paymentAccounts.currencyCode,
-          methodId: paymentMethods.id,
-          requiresReference: paymentMethods.requiresReference,
-          allowOutbound: paymentMethods.allowOutbound,
-        })
-        .from(paymentAccounts)
-        .innerJoin(paymentMethods, eq(paymentAccounts.paymentMethodId, paymentMethods.id))
-        .where(
-          and(
-            eq(paymentAccounts.id, parsed.data.paymentAccountId),
-            eq(paymentAccounts.companyId, company.id),
-            eq(paymentAccounts.isActive, true),
-            eq(paymentMethods.isActive, true),
-            isNull(paymentAccounts.deletedAt),
-            isNull(paymentMethods.deletedAt),
-          ),
-        )
-        .limit(1);
-
-      if (!account || !account.allowOutbound) {
-        throw new Error("Select an active outbound payment account.");
-      }
-
       const currencyCode = order?.currencyCode ?? bill?.currencyCode;
 
-      if (account.currencyCode !== currencyCode) {
-        throw new Error("Payment account currency must match the purchase currency.");
+      if (!currencyCode) {
+        throw new Error("Payment currency could not be resolved.");
       }
 
-      if (account.requiresReference && !parsed.data.reference) {
-        throw new Error("This payment method requires a reference.");
-      }
+      const paymentLineRows = await resolvePaymentLines(tx, {
+        formData,
+        companyId: company.id,
+        currencyCode,
+        direction: "outbound",
+      });
+      const amountMinor = paymentLinesTotal(paymentLineRows);
+      const firstLine = paymentLineRows[0];
 
       const [summary] = purchaseOrderId && order ? await tx.execute<{ residualAmountMinor: number }>(sql`
         select greatest(
@@ -606,14 +539,20 @@ export async function updateSupplierPayment(formData: FormData) {
       await tx
         .update(payments)
         .set({
-          paymentMethodId: account.methodId,
-          paymentAccountId: account.id,
+          paymentMethodId: firstLine.paymentMethodId,
+          paymentAccountId: firstLine.paymentAccountId,
           amountMinor,
-          reference: parsed.data.reference || null,
-          notes: parsed.data.notes || null,
+          reference: firstLine.reference,
+          notes: firstLine.note,
           updatedAt: sql`now()`,
         })
         .where(eq(payments.id, payment.id));
+
+      await replacePaymentLines(tx, {
+        companyId: company.id,
+        paymentId: payment.id,
+        lines: paymentLineRows,
+      });
 
       await tx
         .update(paymentAllocations)
