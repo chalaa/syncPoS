@@ -67,6 +67,7 @@ const salesCustomerCreateSchema = z.object({
 
 const salesOrderLineSchema = z.object({
   ownerId: z.string().uuid().or(z.literal("")).transform((value) => value || null),
+  sourceLocationId: z.string().uuid().or(z.literal("")).transform((value) => value || null),
   productId: z.string().uuid(),
   quantity: z.coerce.number().positive(),
   unitPrice: z.string().trim().default("0"),
@@ -140,6 +141,33 @@ function checkboxValue(formData: FormData, key: string) {
 
 function documentNo(prefix: string) {
   return `${prefix}-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${randomUUID().slice(0, 8).toUpperCase()}`;
+}
+
+function currentYear() {
+  return new Intl.DateTimeFormat("en", {
+    timeZone: "Africa/Addis_Ababa",
+    year: "numeric",
+  }).format(new Date());
+}
+
+async function nextSalesOrderNo(tx: Parameters<Parameters<typeof db.transaction>[0]>[0], companyId: string) {
+  const year = currentYear();
+  const pattern = `^SO/([0-9]{5})/${year}$`;
+  const filterPattern = `^SO/[0-9]{5}/${year}$`;
+  const [row] = await tx.execute<{ orderNo: string }>(sql`
+    select (
+      'SO/'
+      || lpad((coalesce(max((substring(order_no from ${pattern}))::int), 0) + 1)::text, 5, '0')
+      || '/'
+      || ${year}
+    ) as "orderNo"
+    from sales_orders
+    where company_id = ${companyId}
+      and deleted_at is null
+      and order_no ~ ${filterPattern}
+  `);
+
+  return row?.orderNo ?? `SO/00001/${year}`;
 }
 
 function dateOnly(value: Date) {
@@ -293,6 +321,7 @@ function parseSalesOrderForm(formData: FormData, errorPath: string) {
   });
   const productIds = formValues(formData, "productId");
   const ownerIds = formValues(formData, "lineOwnerId");
+  const sourceLocationIds = formValues(formData, "lineSourceLocationId");
   const quantities = formValues(formData, "quantity");
   const unitPrices = formValues(formData, "unitPrice");
   const discounts = formValues(formData, "discount");
@@ -300,6 +329,7 @@ function parseSalesOrderForm(formData: FormData, errorPath: string) {
   const parsedLines = productIds
     .map((productId, index) => ({
       ownerId: ownerIds[index] ?? "",
+      sourceLocationId: sourceLocationIds[index] ?? "",
       productId,
       quantity: quantities[index] ?? "",
       unitPrice: unitPrices[index] ?? "0",
@@ -456,6 +486,7 @@ async function prepareSalesLines(
     return {
       lineNo: index + 1,
       ownerId: line.ownerId,
+      sourceLocationId: line.sourceLocationId,
       product,
       quantityOrdered: String(line.quantity),
       unitPriceMinor,
@@ -476,24 +507,84 @@ async function prepareSalesLines(
   };
 }
 
-async function normalizeSalesLineOwners(
+async function normalizeSalesLineScope(
   tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
   companyId: string,
   defaultOwnerId: string,
+  defaultSourceLocationId: string,
   lines: z.infer<typeof salesOrderLineSchema>[],
 ) {
+  if (!defaultOwnerId) {
+    throw new Error("Owner is required.");
+  }
+
+  if (!defaultSourceLocationId) {
+    throw new Error("Source location is required.");
+  }
+
   const normalizedLines = lines.map((line) => ({
     ...line,
     ownerId: line.ownerId ?? defaultOwnerId,
+    sourceLocationId: line.sourceLocationId ?? defaultSourceLocationId,
   }));
   const uniqueOwnerIds = [...new Set(normalizedLines.map((line) => line.ownerId))];
+  const uniqueSourceLocationIds = [...new Set(normalizedLines.map((line) => line.sourceLocationId))];
   const ownerRows = await tx
     .select({ id: owners.id })
     .from(owners)
     .where(and(inArray(owners.id, uniqueOwnerIds), eq(owners.companyId, companyId), isNull(owners.deletedAt)));
+  const locationRows = await tx
+    .select({ id: locations.id })
+    .from(locations)
+    .where(and(inArray(locations.id, uniqueSourceLocationIds), eq(locations.companyId, companyId), isNull(locations.deletedAt), eq(locations.isActive, true)));
 
   if (ownerRows.length !== uniqueOwnerIds.length) {
     throw new Error("One or more line owners are invalid or inactive.");
+  }
+
+  if (locationRows.length !== uniqueSourceLocationIds.length) {
+    throw new Error("One or more line source locations are invalid or inactive.");
+  }
+
+  const requestedQuantityByDomain = new Map<string, {
+    ownerId: string;
+    sourceLocationId: string;
+    productId: string;
+    quantity: number;
+  }>();
+
+  for (const line of normalizedLines) {
+    const key = `${line.sourceLocationId}:${line.ownerId}:${line.productId}`;
+    const current = requestedQuantityByDomain.get(key);
+
+    requestedQuantityByDomain.set(key, {
+      ownerId: line.ownerId,
+      sourceLocationId: line.sourceLocationId,
+      productId: line.productId,
+      quantity: (current?.quantity ?? 0) + line.quantity,
+    });
+  }
+
+  for (const requested of requestedQuantityByDomain.values()) {
+    const [stock] = await tx
+      .select({
+        quantityAvailable: sql<string>`coalesce(sum(${stockBalances.quantityAvailable}), 0)::text`,
+      })
+      .from(stockBalances)
+      .where(
+        and(
+          eq(stockBalances.companyId, companyId),
+          eq(stockBalances.ownerId, requested.ownerId),
+          eq(stockBalances.locationId, requested.sourceLocationId),
+          eq(stockBalances.productId, requested.productId),
+          isNull(stockBalances.deletedAt),
+        ),
+      );
+    const availableQuantity = Number(stock?.quantityAvailable ?? 0);
+
+    if (availableQuantity < requested.quantity) {
+      throw new Error(`Insufficient stock for one or more sales lines. Required ${requested.quantity}, available ${availableQuantity}.`);
+    }
   }
 
   return normalizedLines;
@@ -503,12 +594,12 @@ export async function createSalesOrder(formData: FormData) {
   const user = await requirePermission("sales:orders:create");
   const { header, lines } = parseSalesOrderForm(formData, "/admin/sales/new");
   const company = await getDefaultCompany();
-  const orderNo = documentNo("SO");
-  const reference = documentNo("REF");
   let createdOrderId: string | undefined;
+  let orderNo = "";
 
   try {
     await db.transaction(async (tx) => {
+      orderNo = await nextSalesOrderNo(tx, company.id);
       const [customer] = await tx
         .select({ id: partners.id })
         .from(partners)
@@ -531,7 +622,11 @@ export async function createSalesOrder(formData: FormData) {
         throw new Error("Owner is required.");
       }
 
-      const normalizedLines = await normalizeSalesLineOwners(tx, company.id, owner.id, lines);
+      if (!header.sourceLocationId) {
+        throw new Error("Source location is required.");
+      }
+
+      const normalizedLines = await normalizeSalesLineScope(tx, company.id, owner.id, header.sourceLocationId, lines);
       const prepared = await prepareSalesLines(tx, company.id, normalizedLines);
       const [order] = await tx
         .insert(salesOrders)
@@ -541,7 +636,7 @@ export async function createSalesOrder(formData: FormData) {
           ownerId: owner.id,
           sourceLocationId: header.sourceLocationId,
           orderNo,
-          customerReference: header.customerReference || reference,
+          customerReference: orderNo,
           fsNumber: header.fsNumber || null,
           paymentTerm: header.paymentTerm,
           status: "quotation",
@@ -565,6 +660,7 @@ export async function createSalesOrder(formData: FormData) {
           prepared.preparedLines.map((line) => ({
             salesOrderId: order.id,
             ownerId: line.ownerId,
+            sourceLocationId: line.sourceLocationId,
             lineNo: line.lineNo,
             productId: line.product.id,
             unitId: line.product.unitId,
@@ -667,7 +763,11 @@ export async function updateSalesOrder(formData: FormData) {
         throw new Error("Owner is required.");
       }
 
-      const normalizedLines = await normalizeSalesLineOwners(tx, company.id, owner.id, lines);
+      if (!header.sourceLocationId) {
+        throw new Error("Source location is required.");
+      }
+
+      const normalizedLines = await normalizeSalesLineScope(tx, company.id, owner.id, header.sourceLocationId, lines);
       const prepared = await prepareSalesLines(tx, company.id, normalizedLines);
       const existingLines = await tx
         .select({ id: salesOrderLines.id })
@@ -707,6 +807,7 @@ export async function updateSalesOrder(formData: FormData) {
           prepared.preparedLines.map((line) => ({
             salesOrderId: existingOrder.id,
             ownerId: line.ownerId,
+            sourceLocationId: line.sourceLocationId,
             lineNo: line.lineNo,
             productId: line.product.id,
             unitId: line.product.unitId,
@@ -798,6 +899,7 @@ export async function confirmSalesOrder(formData: FormData) {
           id: salesOrderLines.id,
           lineNo: salesOrderLines.lineNo,
           ownerId: salesOrderLines.ownerId,
+          sourceLocationId: salesOrderLines.sourceLocationId,
           productId: salesOrderLines.productId,
           productName: products.name,
           sku: products.sku,
@@ -890,24 +992,29 @@ export async function confirmSalesOrder(formData: FormData) {
           throw new Error("A source location is required to reserve stock.");
         }
 
-        const [sourceLocation] = await tx
-          .select({
-            code: locations.code,
-            name: locations.name,
-          })
-          .from(locations)
-          .where(eq(locations.id, order.sourceLocationId))
-          .limit(1);
-        const sourceLocationName = sourceLocation
-          ? `${sourceLocation.code} / ${sourceLocation.name}`
-          : "the selected source location";
-
         for (const line of lines) {
           const lineOwnerId = line.ownerId ?? order.ownerId;
+          const lineSourceLocationId = line.sourceLocationId ?? order.sourceLocationId;
 
           if (!lineOwnerId) {
             throw new Error(`Owner is required on sales order line ${line.lineNo}.`);
           }
+
+          if (!lineSourceLocationId) {
+            throw new Error(`Source location is required on sales order line ${line.lineNo}.`);
+          }
+
+          const [sourceLocation] = await tx
+            .select({
+              code: locations.code,
+              name: locations.name,
+            })
+            .from(locations)
+            .where(eq(locations.id, lineSourceLocationId))
+            .limit(1);
+          const sourceLocationName = sourceLocation
+            ? `${sourceLocation.code} / ${sourceLocation.name}`
+            : "the selected source location";
 
           const balances = await tx
             .select({
@@ -921,7 +1028,7 @@ export async function confirmSalesOrder(formData: FormData) {
               and(
                 eq(stockBalances.companyId, company.id),
                 eq(stockBalances.ownerId, lineOwnerId),
-                eq(stockBalances.locationId, order.sourceLocationId),
+                eq(stockBalances.locationId, lineSourceLocationId),
                 eq(stockBalances.productId, line.productId),
                 sql`cast(${stockBalances.quantityAvailable} as numeric) > 0`,
                 isNull(stockBalances.deletedAt),
@@ -954,7 +1061,7 @@ export async function confirmSalesOrder(formData: FormData) {
             await tx.insert(stockReservations).values({
               companyId: company.id,
               reservationNo,
-              locationId: order.sourceLocationId,
+              locationId: lineSourceLocationId,
               productId: line.productId,
               productSerialId: balance.productSerialId,
               productLotId: balance.productLotId,

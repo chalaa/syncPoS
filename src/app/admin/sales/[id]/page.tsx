@@ -191,6 +191,7 @@ export default async function SalesOrderDetailPage({ params, searchParams }: Sal
           productUnits={options.productUnits}
           locations={options.locations}
           taxes={options.taxes}
+          availableStock={options.availableStock}
           error={query.error}
           order={order}
           submitLabel="Save Quotation"

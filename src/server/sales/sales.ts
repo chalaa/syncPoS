@@ -46,7 +46,7 @@ export function displaySalesMoney(value: number, currencyCode: string) {
 
 export async function getSalesFormOptions(): Promise<SalesFormOptions> {
   const company = await getDefaultCompany();
-  const [customerRows, ownerRows, productRows, categoryRows, brandRows, unitRows, locationRows, taxRows] = await Promise.all([
+  const [customerRows, ownerRows, productRows, categoryRows, brandRows, unitRows, locationRows, taxRows, availableStockRows] = await Promise.all([
     db
       .select({
         id: partners.id,
@@ -137,6 +137,28 @@ export async function getSalesFormOptions(): Promise<SalesFormOptions> {
         ),
       )
       .orderBy(asc(taxes.name)),
+    db
+      .select({
+        locationId: stockBalances.locationId,
+        ownerId: sql<string>`${stockBalances.ownerId}`,
+        productId: stockBalances.productId,
+        quantityAvailable: sql<string>`sum(${stockBalances.quantityAvailable})::text`,
+      })
+      .from(stockBalances)
+      .innerJoin(products, eq(stockBalances.productId, products.id))
+      .where(
+        and(
+          eq(stockBalances.companyId, company.id),
+          eq(products.companyId, company.id),
+          eq(products.isActive, true),
+          isNull(products.deletedAt),
+          isNull(stockBalances.deletedAt),
+          sql`${stockBalances.ownerId} is not null`,
+          sql`cast(${stockBalances.quantityAvailable} as numeric) > 0`,
+        ),
+      )
+      .groupBy(stockBalances.locationId, stockBalances.ownerId, stockBalances.productId)
+      .orderBy(stockBalances.locationId, stockBalances.ownerId, stockBalances.productId),
   ]);
 
   return {
@@ -149,6 +171,7 @@ export async function getSalesFormOptions(): Promise<SalesFormOptions> {
     productUnits: unitRows,
     locations: locationRows,
     taxes: taxRows satisfies SalesTaxOption[],
+    availableStock: availableStockRows,
   };
 }
 
@@ -599,6 +622,9 @@ export async function getSalesOrderDetail(id: string): Promise<SalesOrderDetail 
         sol.line_no as "lineNo",
         sol.owner_id as "ownerId",
         own.name as "ownerName",
+        sol.source_location_id as "sourceLocationId",
+        line_loc.code as "sourceLocationCode",
+        line_loc.name as "sourceLocationName",
         sol.product_id as "productId",
         product.name as "productName",
         product.sku as "sku",
@@ -617,11 +643,12 @@ export async function getSalesOrderDetail(id: string): Promise<SalesOrderDetail 
       from sales_order_lines sol
       inner join products product on product.id = sol.product_id
       left join owners own on own.id = sol.owner_id
+      left join locations line_loc on line_loc.id = sol.source_location_id
       left join sales_order_line_taxes solt on solt.sales_order_line_id = sol.id
       left join taxes t on t.id = solt.tax_id
       where sol.sales_order_id = ${id}
         and sol.deleted_at is null
-      group by sol.id, product.id, own.id
+      group by sol.id, product.id, own.id, line_loc.id
       order by sol.line_no
     `),
     db.select({ count: sql<number>`count(*)::int` }).from(deliveries).where(and(eq(deliveries.salesOrderId, id), isNull(deliveries.deletedAt))),
