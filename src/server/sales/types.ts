@@ -1,3 +1,4 @@
+import type { CategorySelectOption, SelectOption } from "@/server/catalog/types";
 import type { PurchaseFormOption, PurchaseTaxOption } from "@/server/purchasing/types";
 
 export type SalesFormOption = PurchaseFormOption;
@@ -89,6 +90,9 @@ export type SalesFormOptions = {
   customers: SalesFormOption[];
   owners: SalesFormOption[];
   products: SalesFormOption[];
+  productCategories: CategorySelectOption[];
+  productBrands: SelectOption[];
+  productUnits: SelectOption[];
   locations: SalesFormOption[];
   taxes: SalesTaxOption[];
 };

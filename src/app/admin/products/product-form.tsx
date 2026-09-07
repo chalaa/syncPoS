@@ -16,6 +16,7 @@ import { useMemo, useState } from "react";
 type ProductFormProps = {
   mode: "create" | "edit";
   product?: ProductFormRecord;
+  initialProductName?: string;
   categories: CategorySelectOption[];
   brands: SelectOption[];
   units: SelectOption[];
@@ -164,6 +165,7 @@ function extractSpecificationValue(key: string, productName: string) {
 export function ProductForm({
   mode,
   product,
+  initialProductName,
   categories,
   brands,
   units,
@@ -176,7 +178,7 @@ export function ProductForm({
   const submitLabel = mode === "create" ? "Create product" : "Save changes";
   const [saleTaxIds, setSaleTaxIds] = useState(product?.saleTaxIds ?? []);
   const [purchaseTaxIds, setPurchaseTaxIds] = useState(product?.purchaseTaxIds ?? []);
-  const [productName, setProductName] = useState(product?.name ?? "");
+  const [productName, setProductName] = useState(product?.name ?? initialProductName ?? "");
   const [brandId, setBrandId] = useState(product?.brandId ?? "");
   const [country, setCountry] = useState(product?.country ?? "");
   const [model, setModel] = useState(product?.model ?? "");

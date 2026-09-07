@@ -33,6 +33,9 @@ export default async function NewPurchaseOrderPage({ searchParams }: NewPurchase
         suppliers={options.suppliers}
         owners={options.owners}
         products={options.products}
+        productCategories={options.productCategories}
+        productBrands={options.productBrands}
+        productUnits={options.productUnits}
         locations={options.locations}
         taxes={options.taxes}
         error={params.error}

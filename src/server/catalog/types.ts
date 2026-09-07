@@ -138,6 +138,9 @@ export type ProductPriceListItemRow = {
 
 export type PriceListFormOptions = {
   products: SelectOption[];
+  productCategories: CategorySelectOption[];
+  productBrands: SelectOption[];
+  productUnits: SelectOption[];
   owners: Omit<SelectOption, "code">[];
 };
 

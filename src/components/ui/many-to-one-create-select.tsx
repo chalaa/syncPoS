@@ -1,7 +1,8 @@
 "use client";
 
 import { PlusIcon, SearchIcon } from "lucide-react";
-import { useMemo, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition, type CSSProperties } from "react";
+import { createPortal } from "react-dom";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -57,10 +58,12 @@ export function ManyToOneCreateSelect({
   const [selectedId, setSelectedId] = useState(defaultValue ?? "");
   const [query, setQuery] = useState("");
   const [isOpen, setIsOpen] = useState(false);
+  const [dropdownStyle, setDropdownStyle] = useState<CSSProperties | undefined>();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const inputRef = useRef<HTMLInputElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   const selected = items.find((item) => item.id === selectedId);
   const selectedLabel = selected ? `${selected.code} / ${selected.name}` : "";
@@ -76,18 +79,66 @@ export function ManyToOneCreateSelect({
       `${item.code} ${item.name}`.toLowerCase().includes(normalized),
     );
   }, [items, trimmedQuery]);
-  const visibleItems = filteredItems.slice(0, 5);
+  const visibleItems = filteredItems.slice(0, 50);
+
+  function floatingDropdownStyle() {
+    const inputRect = inputRef.current?.getBoundingClientRect();
+
+    if (!inputRect) {
+      return undefined;
+    }
+
+    const viewportPadding = 8;
+    const maxWidth = Math.max(window.innerWidth - viewportPadding * 2, inputRect.width);
+    const width = Math.min(Math.max(inputRect.width, 240), 512, maxWidth);
+    const left = Math.min(
+      Math.max(inputRect.left, viewportPadding),
+      Math.max(window.innerWidth - width - viewportPadding, viewportPadding),
+    );
+
+    return {
+      left,
+      top: inputRect.bottom + 4,
+      width,
+    };
+  }
+
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    function closeFloatingList(event: Event) {
+      if (dropdownRef.current?.contains(event.target as Node)) {
+        return;
+      }
+
+      setIsOpen(false);
+      setQuery("");
+      setDropdownStyle(undefined);
+    }
+
+    window.addEventListener("resize", closeFloatingList);
+    window.addEventListener("scroll", closeFloatingList, true);
+
+    return () => {
+      window.removeEventListener("resize", closeFloatingList);
+      window.removeEventListener("scroll", closeFloatingList, true);
+    };
+  }, [isOpen]);
 
   function selectItem(option: ManyToOneOption) {
     setSelectedId(option.id);
     onValueChange?.(option.id);
     setQuery("");
     setIsOpen(false);
+    setDropdownStyle(undefined);
     setError(null);
   }
 
   function openSelectionList() {
     setQuery("");
+    setDropdownStyle(floatingDropdownStyle());
     setIsOpen(true);
     requestAnimationFrame(() => inputRef.current?.focus());
   }
@@ -109,6 +160,7 @@ export function ManyToOneCreateSelect({
         onValueChange?.(created.id);
         setQuery("");
         setIsOpen(false);
+        setDropdownStyle(undefined);
         setIsDialogOpen(false);
       } catch (caught) {
         setError(caught instanceof Error ? caught.message : `Could not create ${entityLabel.toLowerCase()}.`);
@@ -116,29 +168,14 @@ export function ManyToOneCreateSelect({
     });
   }
 
-  return (
-    <div className="relative flex flex-col gap-1 text-sm font-medium">
-      <span>{label}</span>
-      <input type="hidden" name={name} value={selectedId} />
-      <div className="relative">
-        <SearchIcon className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-        <input
-          ref={inputRef}
-          value={isOpen ? query : selectedLabel}
-          onChange={(event) => {
-            setQuery(event.target.value);
-            setIsOpen(true);
-          }}
-          onFocus={openSelectionList}
-          placeholder={selectedLabel || placeholder}
-          className={cn(inputClass, "w-full pl-9", fieldError ? "border-destructive focus-visible:border-destructive" : "")}
-        />
-      </div>
-
-      {fieldError ? <p className="text-sm font-normal text-destructive">{fieldError}</p> : null}
-
-      {isOpen ? (
-        <div className="absolute left-0 right-0 top-full z-50 mt-1 max-h-72 overflow-y-auto rounded-md border border-border bg-popover p-1 shadow-lg">
+  const dropdown = isOpen && dropdownStyle
+    ? createPortal(
+        <div
+          ref={dropdownRef}
+          onMouseDown={(event) => event.preventDefault()}
+          className="fixed z-[1000] max-h-72 overflow-y-auto rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-lg"
+          style={dropdownStyle}
+        >
           {!trimmedQuery && filteredItems.length > 0 ? (
             <div className="px-3 py-2 text-xs font-normal text-muted-foreground">
               Select {entityLabel.toLowerCase()}
@@ -169,7 +206,11 @@ export function ManyToOneCreateSelect({
               </button>
               <button
                 type="button"
-                onClick={() => setIsDialogOpen(true)}
+                onClick={() => {
+                  setIsOpen(false);
+                  setDropdownStyle(undefined);
+                  setIsDialogOpen(true);
+                }}
                 className="flex w-full items-center gap-2 rounded px-3 py-2 text-left text-sm hover:bg-accent"
               >
                 <PlusIcon className="size-4" />
@@ -181,8 +222,34 @@ export function ManyToOneCreateSelect({
           {filteredItems.length === 0 && !trimmedQuery ? (
             <p className="px-3 py-4 text-sm text-muted-foreground">No {entityLabel.toLowerCase()}s found.</p>
           ) : null}
-        </div>
-      ) : null}
+        </div>,
+        document.body,
+      )
+    : null;
+
+  return (
+    <div className="relative flex flex-col gap-1 text-sm font-medium">
+      <span>{label}</span>
+      <input type="hidden" name={name} value={selectedId} />
+      <div className="relative">
+        <SearchIcon className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+        <input
+          ref={inputRef}
+          value={isOpen ? query : selectedLabel}
+          onChange={(event) => {
+            setQuery(event.target.value);
+            setDropdownStyle(floatingDropdownStyle());
+            setIsOpen(true);
+          }}
+          onFocus={openSelectionList}
+          placeholder={selectedLabel || placeholder}
+          className={cn(inputClass, "w-full pl-9", fieldError ? "border-destructive focus-visible:border-destructive" : "")}
+        />
+      </div>
+
+      {fieldError ? <p className="text-sm font-normal text-destructive">{fieldError}</p> : null}
+
+      {dropdown}
 
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
 

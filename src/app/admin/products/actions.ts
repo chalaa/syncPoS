@@ -56,6 +56,20 @@ const productFormSchema = z.object({
   isActive: z.enum(["on"]).optional(),
 });
 
+const productSelectorSchema = z.object({
+  name: z.string().trim().min(1, "Product name is required").max(200),
+  standardName: z.string().trim().max(260).optional(),
+  categoryId: optionalUuid,
+  brandId: optionalUuid,
+  model: z.string().trim().max(100).optional(),
+  country: z.string().trim().max(80).optional(),
+  unitId: z.string().uuid("Unit is required"),
+  trackingMode: z.enum(trackingModeOptions),
+  standardCost: z.string().trim().default("0"),
+  listPrice: z.string().trim().default("0"),
+  specifications: z.record(z.string(), z.string().nullable()).default({}),
+});
+
 const priceListItemSchema = z.object({
   productId: z.string().uuid(),
   minimumQuantity: z.string().trim().default("1"),
@@ -355,6 +369,79 @@ export async function createProduct(formData: FormData) {
     redirect(`/admin/products/new?error=${encodeURIComponent("Product could not be created.")}`);
   }
   redirect(`/admin/products/${productId}/edit?notice=${encodeURIComponent("Product created")}`);
+}
+
+export async function createProductFromSelector(input: z.input<typeof productSelectorSchema>) {
+  await requirePermission("product.manage");
+
+  const parsed = productSelectorSchema.safeParse(input);
+
+  if (!parsed.success) {
+    throw new Error(parsed.error.issues[0]?.message ?? "Invalid product data.");
+  }
+
+  const company = await getDefaultCompany();
+
+  try {
+    const [product] = await db.transaction(async (tx) => {
+      const sku = await generateProductSku(tx, company.id);
+      const standardNameParts: string[] = [];
+
+      if (parsed.data.brandId) {
+        const [brand] = await tx.select({ name: brands.name }).from(brands).where(eq(brands.id, parsed.data.brandId)).limit(1);
+        if (brand?.name) {
+          standardNameParts.push(brand.name);
+        }
+      }
+
+      if (parsed.data.model) {
+        standardNameParts.push(parsed.data.model);
+      }
+
+      if (parsed.data.categoryId) {
+        const [category] = await tx.select({ name: productCategories.name }).from(productCategories).where(eq(productCategories.id, parsed.data.categoryId)).limit(1);
+        if (category?.name) {
+          standardNameParts.push(category.name);
+        }
+      }
+
+      return tx.insert(products).values({
+        companyId: company.id,
+        sku,
+        name: parsed.data.name,
+        standardName: parsed.data.standardName || standardNameParts.join(" ") || null,
+        categoryId: parsed.data.categoryId,
+        brandId: parsed.data.brandId,
+        model: parsed.data.model || null,
+        country: parsed.data.country || null,
+        specifications: parsed.data.specifications,
+        unitId: parsed.data.unitId,
+        trackingMode: parsed.data.trackingMode,
+        standardCostMinor: majorToMinor(parsed.data.standardCost),
+        listPriceMinor: majorToMinor(parsed.data.listPrice),
+        currencyCode: company.baseCurrencyCode,
+        isActive: true,
+      }).returning({
+        id: products.id,
+        code: products.sku,
+        name: products.name,
+        listPriceMinor: products.listPriceMinor,
+        standardCostMinor: products.standardCostMinor,
+      });
+    });
+
+    revalidatePath("/admin/products");
+    revalidatePath("/admin/sales");
+    revalidatePath("/admin/purchasing");
+
+    return {
+      ...product,
+      saleTaxIds: [],
+      purchaseTaxIds: [],
+    };
+  } catch (error) {
+    throw new Error(uniqueViolationMessage(error, "Could not create product."));
+  }
 }
 
 export async function updateProduct(formData: FormData) {

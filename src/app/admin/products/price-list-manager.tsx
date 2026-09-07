@@ -17,6 +17,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
+import { ProductSelect, type ProductSelectOption } from "@/app/admin/products/product-select";
 import { RelatedModelSelect } from "@/components/ui/related-model-select";
 import { minorToDisplay } from "@/lib/catalog-utils";
 import { cn } from "@/lib/utils";
@@ -72,6 +73,7 @@ function PriceListForm({
   returnPath: string;
 }) {
   const [lines, setLines] = useState<PriceListLineDraft[]>(() => record?.items.length ? record.items.map(lineFromItem) : [newLine()]);
+  const [productOptions, setProductOptions] = useState<ProductSelectOption[]>(options.products);
 
   function updateLine(key: string, patch: Partial<PriceListLineDraft>) {
     setLines((current) => current.map((line) => (line.key === key ? { ...line, ...patch } : line)));
@@ -136,11 +138,15 @@ function PriceListForm({
               {lines.map((line) => (
                 <tr key={line.key} className="border-b border-border/70">
                   <td className="px-2 py-2">
-                    <RelatedModelSelect
+                    <ProductSelect
                       name="itemProductId"
                       value={line.productId}
-                      options={options.products}
+                      options={productOptions}
+                      categories={options.productCategories}
+                      brands={options.productBrands}
+                      units={options.productUnits}
                       onValueChange={(productId) => updateLine(line.key, { productId })}
+                      onOptionsChange={setProductOptions}
                       placeholder="Select product"
                       emptyLabel="No products found."
                       inputClassName={tableInputClass}

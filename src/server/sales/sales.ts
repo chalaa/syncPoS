@@ -11,7 +11,9 @@ import {
   locations,
   owners,
   partners,
+  brands,
   productLots,
+  productCategories,
   products,
   productSerials,
   productSaleTaxes,
@@ -20,6 +22,7 @@ import {
   stockBalances,
   stockMovements,
   taxes,
+  unitsOfMeasure,
 } from "@/server/db/schema";
 import type {
   SalesFormOptions,
@@ -43,7 +46,7 @@ export function displaySalesMoney(value: number, currencyCode: string) {
 
 export async function getSalesFormOptions(): Promise<SalesFormOptions> {
   const company = await getDefaultCompany();
-  const [customerRows, ownerRows, productRows, locationRows, taxRows] = await Promise.all([
+  const [customerRows, ownerRows, productRows, categoryRows, brandRows, unitRows, locationRows, taxRows] = await Promise.all([
     db
       .select({
         id: partners.id,
@@ -76,6 +79,35 @@ export async function getSalesFormOptions(): Promise<SalesFormOptions> {
       .where(and(eq(products.companyId, company.id), isNull(products.deletedAt), eq(products.isActive, true)))
       .groupBy(products.id)
       .orderBy(asc(products.name)),
+    db
+      .select({
+        id: productCategories.id,
+        code: productCategories.code,
+        name: productCategories.name,
+        specificationSchema: productCategories.specificationSchema,
+      })
+      .from(productCategories)
+      .where(and(eq(productCategories.companyId, company.id), isNull(productCategories.deletedAt), eq(productCategories.isActive, true)))
+      .orderBy(asc(productCategories.name)),
+    db
+      .select({
+        id: brands.id,
+        code: brands.code,
+        name: brands.name,
+        country: brands.country,
+      })
+      .from(brands)
+      .where(and(eq(brands.companyId, company.id), isNull(brands.deletedAt), eq(brands.isActive, true)))
+      .orderBy(asc(brands.name)),
+    db
+      .select({
+        id: unitsOfMeasure.id,
+        code: unitsOfMeasure.code,
+        name: unitsOfMeasure.name,
+      })
+      .from(unitsOfMeasure)
+      .where(and(eq(unitsOfMeasure.companyId, company.id), isNull(unitsOfMeasure.deletedAt), eq(unitsOfMeasure.isActive, true)))
+      .orderBy(asc(unitsOfMeasure.code)),
     db
       .select({
         id: locations.id,
@@ -112,6 +144,9 @@ export async function getSalesFormOptions(): Promise<SalesFormOptions> {
     customers: customerRows,
     owners: ownerRows,
     products: productRows,
+    productCategories: categoryRows,
+    productBrands: brandRows,
+    productUnits: unitRows,
     locations: locationRows,
     taxes: taxRows satisfies SalesTaxOption[],
   };

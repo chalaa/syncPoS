@@ -617,7 +617,7 @@ export async function getProductPriceListRows(): Promise<ProductPriceListRow[]> 
 
 export async function getPriceListFormOptions(): Promise<PriceListFormOptions> {
   const company = await getDefaultCompany();
-  const [productRows, ownerRows] = await Promise.all([
+  const [productRows, categoryRows, brandRows, unitRows, ownerRows] = await Promise.all([
     db
       .select({
         id: products.id,
@@ -627,6 +627,35 @@ export async function getPriceListFormOptions(): Promise<PriceListFormOptions> {
       .from(products)
       .where(and(eq(products.companyId, company.id), isNull(products.deletedAt), eq(products.isActive, true)))
       .orderBy(asc(products.name)),
+    db
+      .select({
+        id: productCategories.id,
+        code: productCategories.code,
+        name: productCategories.name,
+        specificationSchema: productCategories.specificationSchema,
+      })
+      .from(productCategories)
+      .where(and(eq(productCategories.companyId, company.id), isNull(productCategories.deletedAt), eq(productCategories.isActive, true)))
+      .orderBy(asc(productCategories.name)),
+    db
+      .select({
+        id: brands.id,
+        code: brands.code,
+        name: brands.name,
+        country: brands.country,
+      })
+      .from(brands)
+      .where(and(eq(brands.companyId, company.id), isNull(brands.deletedAt), eq(brands.isActive, true)))
+      .orderBy(asc(brands.name)),
+    db
+      .select({
+        id: unitsOfMeasure.id,
+        code: unitsOfMeasure.code,
+        name: unitsOfMeasure.name,
+      })
+      .from(unitsOfMeasure)
+      .where(and(eq(unitsOfMeasure.companyId, company.id), isNull(unitsOfMeasure.deletedAt), eq(unitsOfMeasure.isActive, true)))
+      .orderBy(asc(unitsOfMeasure.code)),
     db
       .select({
         id: owners.id,
@@ -639,6 +668,9 @@ export async function getPriceListFormOptions(): Promise<PriceListFormOptions> {
 
   return {
     products: productRows,
+    productCategories: categoryRows,
+    productBrands: brandRows,
+    productUnits: unitRows,
     owners: ownerRows,
   };
 }

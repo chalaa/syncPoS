@@ -186,6 +186,9 @@ export default async function SalesOrderDetailPage({ params, searchParams }: Sal
           customers={options.customers}
           owners={options.owners}
           products={options.products}
+          productCategories={options.productCategories}
+          productBrands={options.productBrands}
+          productUnits={options.productUnits}
           locations={options.locations}
           taxes={options.taxes}
           error={query.error}

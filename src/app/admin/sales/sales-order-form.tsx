@@ -15,6 +15,7 @@ import {
 import { ManyToManyTags } from "@/components/ui/many-to-many-tags";
 import { ManyToOneCreateSelect } from "@/components/ui/many-to-one-create-select";
 import { Notebook } from "@/components/ui/notebook";
+import { ProductSelect, type ProductSelectOption } from "@/app/admin/products/product-select";
 import { RelatedModelSelect } from "@/components/ui/related-model-select";
 import { cn } from "@/lib/utils";
 import { createCustomerFromSales } from "@/app/admin/sales/actions";
@@ -105,6 +106,9 @@ export function SalesOrderForm({
   customers,
   owners,
   products,
+  productCategories,
+  productBrands,
+  productUnits,
   locations,
   taxes,
   error,
@@ -116,6 +120,9 @@ export function SalesOrderForm({
   customers: SalesFormOption[];
   owners: SalesFormOption[];
   products: SalesFormOption[];
+  productCategories: Parameters<typeof ProductSelect>[0]["categories"];
+  productBrands: Parameters<typeof ProductSelect>[0]["brands"];
+  productUnits: Parameters<typeof ProductSelect>[0]["units"];
   locations: SalesFormOption[];
   taxes: SalesTaxOption[];
   error?: string;
@@ -130,6 +137,7 @@ export function SalesOrderForm({
   const selectedLocationId = useAppStore((state) => state.selectedLocationId);
   const setSelectedLocationId = useAppStore((state) => state.setSelectedLocationId);
   const [sourceLocationId, setSourceLocationId] = useState(order?.sourceLocationId ?? "");
+  const [productOptions, setProductOptions] = useState<ProductSelectOption[]>(products);
   const [lines, setLines] = useState<SalesLineDraft[]>(() =>
     order?.lines.length
       ? order.lines.map((line) => ({
@@ -144,7 +152,7 @@ export function SalesOrderForm({
       : [newLine(defaultOwnerId)],
   );
   const taxById = useMemo(() => new Map(taxes.map((tax) => [tax.id, tax])), [taxes]);
-  const productById = useMemo(() => new Map(products.map((product) => [product.id, product])), [products]);
+  const productById = useMemo(() => new Map(productOptions.map((product) => [product.id, product])), [productOptions]);
   const taxTagOptions = useMemo(
     () => taxes.map((tax) => ({ id: tax.id, label: taxLabel(tax) })),
     [taxes],
@@ -336,10 +344,14 @@ export function SalesOrderForm({
                       {lines.map((line, index) => (
                         <tr key={line.key} className="border-b border-border/70">
                           <td className="w-80 px-2 py-3">
-                            <RelatedModelSelect
+                            <ProductSelect
                               value={line.productId}
-                              options={products}
+                              options={productOptions}
+                              categories={productCategories}
+                              brands={productBrands}
+                              units={productUnits}
                               onValueChange={(productId) => updateLineProduct(line.key, productId)}
+                              onOptionsChange={setProductOptions}
                               placeholder="Select product"
                               emptyLabel="No products found."
                               inputClassName={tableInputClass}
@@ -480,10 +492,14 @@ export function SalesOrderForm({
                       <div className="grid gap-4">
                         <label className="flex flex-col gap-1 text-sm font-medium">
                           Product
-                          <RelatedModelSelect
+                          <ProductSelect
                             value={editingLine.productId}
-                            options={products}
+                            options={productOptions}
+                            categories={productCategories}
+                            brands={productBrands}
+                            units={productUnits}
                             onValueChange={(productId) => updateLineProduct(editingLine.key, productId)}
+                            onOptionsChange={setProductOptions}
                             placeholder="Select product"
                             emptyLabel="No products found."
                           />

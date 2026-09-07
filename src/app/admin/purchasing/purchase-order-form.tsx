@@ -15,6 +15,7 @@ import {
 import { ManyToManyTags } from "@/components/ui/many-to-many-tags";
 import { ManyToOneCreateSelect } from "@/components/ui/many-to-one-create-select";
 import { Notebook } from "@/components/ui/notebook";
+import { ProductSelect, type ProductSelectOption } from "@/app/admin/products/product-select";
 import { RelatedModelSelect } from "@/components/ui/related-model-select";
 import { useFormValidation, type FormValidationResult } from "@/hooks/use-form-validation";
 import { cn } from "@/lib/utils";
@@ -171,6 +172,9 @@ export function PurchaseOrderForm({
   suppliers,
   owners,
   products,
+  productCategories,
+  productBrands,
+  productUnits,
   locations,
   taxes,
   error,
@@ -182,6 +186,9 @@ export function PurchaseOrderForm({
   suppliers: PurchaseFormOption[];
   owners: OwnerOption[];
   products: PurchaseFormOption[];
+  productCategories: Parameters<typeof ProductSelect>[0]["categories"];
+  productBrands: Parameters<typeof ProductSelect>[0]["brands"];
+  productUnits: Parameters<typeof ProductSelect>[0]["units"];
   locations: PurchaseFormOption[];
   taxes: PurchaseTaxOption[];
   error?: string;
@@ -201,6 +208,7 @@ export function PurchaseOrderForm({
   const [deliverToLocationId, setDeliverToLocationId] = useState(defaultDeliverToLocationId);
   const [orderDate, setOrderDate] = useState(order?.orderDate ?? defaultDate);
   const [paymentDueDate, setPaymentDueDate] = useState(order?.paymentDueDate ?? defaultDate);
+  const [productOptions, setProductOptions] = useState<ProductSelectOption[]>(products);
   const [lines, setLines] = useState<PurchaseLineDraft[]>(() =>
     order?.lines.length
       ? order.lines.map((line) => ({
@@ -227,7 +235,7 @@ export function PurchaseOrderForm({
   );
   const { formErrors, fieldErrors, isValid } = useFormValidation(validationValues, validatePurchaseOrderForm);
   const taxById = useMemo(() => new Map(taxes.map((tax) => [tax.id, tax])), [taxes]);
-  const productById = useMemo(() => new Map(products.map((product) => [product.id, product])), [products]);
+  const productById = useMemo(() => new Map(productOptions.map((product) => [product.id, product])), [productOptions]);
   const taxTagOptions = useMemo(
     () => taxes.map((tax) => ({ id: tax.id, label: taxLabel(tax) })),
     [taxes],
@@ -448,10 +456,14 @@ export function PurchaseOrderForm({
                       {lines.map((line, index) => (
                         <tr key={line.key} className="border-b border-border/70">
                           <td className="px-2 py-3">
-                            <RelatedModelSelect
+                            <ProductSelect
                               value={line.productId}
-                              options={products}
+                              options={productOptions}
+                              categories={productCategories}
+                              brands={productBrands}
+                              units={productUnits}
                               onValueChange={(productId) => updateLineProduct(line.key, productId)}
+                              onOptionsChange={setProductOptions}
                               placeholder="Select product"
                               emptyLabel="No products found."
                               inputClassName={tableInputClass}
@@ -606,10 +618,14 @@ export function PurchaseOrderForm({
                       <div className="grid gap-4">
                         <label className="flex flex-col gap-1 text-sm font-medium">
                           Product
-                          <RelatedModelSelect
+                          <ProductSelect
                             value={editingLine.productId}
-                            options={products}
+                            options={productOptions}
+                            categories={productCategories}
+                            brands={productBrands}
+                            units={productUnits}
                             onValueChange={(productId) => updateLineProduct(editingLine.key, productId)}
+                            onOptionsChange={setProductOptions}
                             placeholder="Select product"
                             emptyLabel="No products found."
                             error={showFieldError(fieldKey("productId", editingLine.key))}

@@ -1,6 +1,7 @@
 "use client";
 
-import { SearchIcon } from "lucide-react";
+import { ExternalLinkIcon, PencilIcon, PlusIcon, SearchIcon } from "lucide-react";
+import Link from "next/link";
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type FocusEvent } from "react";
 import { createPortal } from "react-dom";
 
@@ -27,6 +28,11 @@ type RelatedModelSelectProps = {
   error?: string;
   maxVisible?: number;
   clearLabel?: string;
+  createHref?: string | ((query: string) => string);
+  editHrefFor?: (id: string) => string;
+  createLabel?: string;
+  editLabel?: string;
+  onCreateAndEdit?: (query: string) => void;
   onValueChange?: (value: string) => void;
 };
 
@@ -49,8 +55,13 @@ export function RelatedModelSelect({
   className,
   inputClassName,
   error,
-  maxVisible = 5,
+  maxVisible = 50,
   clearLabel = "None",
+  createHref,
+  editHrefFor,
+  createLabel = "Create and Edit...",
+  editLabel = "Edit selected",
+  onCreateAndEdit,
   onValueChange,
 }: RelatedModelSelectProps) {
   const [internalValue, setInternalValue] = useState(defaultValue ?? "");
@@ -58,6 +69,7 @@ export function RelatedModelSelect({
   const [isOpen, setIsOpen] = useState(false);
   const [dropdownStyle, setDropdownStyle] = useState<CSSProperties | undefined>();
   const inputRef = useRef<HTMLInputElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
   const selectedId = value ?? internalValue;
   const selected = options.find((option) => option.id === selectedId);
   const selectedLabel = selected ? optionText(selected) : "";
@@ -72,6 +84,8 @@ export function RelatedModelSelect({
     return options.filter((option) => optionText(option).toLowerCase().includes(normalized));
   }, [options, trimmedQuery]);
   const visibleOptions = filteredOptions.slice(0, maxVisible);
+  const newRecordHref = typeof createHref === "function" ? createHref(trimmedQuery) : createHref;
+  const editRecordHref = selectedId && editHrefFor ? editHrefFor(selectedId) : "";
 
   function floatingDropdownStyle() {
     const inputRect = inputRef.current?.getBoundingClientRect();
@@ -100,7 +114,11 @@ export function RelatedModelSelect({
       return;
     }
 
-    function closeFloatingList() {
+    function closeFloatingList(event: Event) {
+      if (dropdownRef.current?.contains(event.target as Node)) {
+        return;
+      }
+
       setIsOpen(false);
       setQuery("");
       setDropdownStyle(undefined);
@@ -147,6 +165,8 @@ export function RelatedModelSelect({
   const dropdown = isOpen && dropdownStyle
     ? createPortal(
         <div
+          ref={dropdownRef}
+          onMouseDown={(event) => event.preventDefault()}
           className="fixed z-[1000] max-h-72 overflow-y-auto rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-lg"
           style={dropdownStyle}
         >
@@ -177,6 +197,44 @@ export function RelatedModelSelect({
           ))}
           {filteredOptions.length === 0 ? (
             <p className="px-3 py-4 text-sm font-normal text-muted-foreground">{emptyLabel}</p>
+          ) : null}
+          {createHref || onCreateAndEdit || editRecordHref ? (
+            <div className="border-t border-border pt-1">
+              {onCreateAndEdit ? (
+                <button
+                  type="button"
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={() => {
+                    setIsOpen(false);
+                    setDropdownStyle(undefined);
+                    onCreateAndEdit(trimmedQuery);
+                  }}
+                  className="flex w-full items-center gap-2 rounded px-3 py-2 text-left text-sm hover:bg-accent"
+                >
+                  <PlusIcon className="size-4" />
+                  {trimmedQuery ? `${createLabel.replace(/\.\.\.$/, "")} "${trimmedQuery}"` : createLabel}
+                </button>
+              ) : null}
+              {newRecordHref ? (
+                <Link
+                  href={newRecordHref}
+                  className="flex w-full items-center gap-2 rounded px-3 py-2 text-left text-sm hover:bg-accent"
+                >
+                  <PlusIcon className="size-4" />
+                  {trimmedQuery ? `${createLabel.replace(/\.\.\.$/, "")} "${trimmedQuery}"` : createLabel}
+                </Link>
+              ) : null}
+              {editRecordHref ? (
+                <Link
+                  href={editRecordHref}
+                  className="flex w-full items-center gap-2 rounded px-3 py-2 text-left text-sm hover:bg-accent"
+                >
+                  <PencilIcon className="size-4" />
+                  {editLabel}
+                  <ExternalLinkIcon className="ml-auto size-3 text-muted-foreground" />
+                </Link>
+              ) : null}
+            </div>
           ) : null}
         </div>,
         document.body,

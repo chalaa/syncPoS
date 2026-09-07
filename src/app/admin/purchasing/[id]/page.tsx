@@ -177,6 +177,9 @@ export default async function PurchaseOrderDetailPage({ params, searchParams }: 
           suppliers={options.suppliers}
           owners={options.owners}
           products={options.products}
+          productCategories={options.productCategories}
+          productBrands={options.productBrands}
+          productUnits={options.productUnits}
           locations={options.locations}
           taxes={options.taxes}
           error={query.error}

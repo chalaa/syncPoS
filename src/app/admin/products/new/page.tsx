@@ -8,6 +8,7 @@ type NewProductPageProps = {
   searchParams: Promise<{
     notice?: string;
     error?: string;
+    name?: string;
   }>;
 };
 
@@ -23,6 +24,7 @@ export default async function NewProductPage({ searchParams }: NewProductPagePro
       brands={options.brands}
       units={options.units}
       taxes={options.taxes}
+      initialProductName={params.name}
       notice={params.notice}
       error={params.error}
     />
