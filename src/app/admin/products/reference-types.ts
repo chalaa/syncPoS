@@ -12,6 +12,7 @@ export type ReferenceManagerConfig = {
   createLabel: string;
   showPrecision: boolean;
   showSpecifications?: boolean;
+  showCountry?: boolean;
   basePath: string;
   createAction: ReferenceMutation;
   updateAction: ReferenceMutation;

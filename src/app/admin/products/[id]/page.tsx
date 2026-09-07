@@ -113,8 +113,11 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
             content: (
               <div className="grid gap-5 md:grid-cols-2">
                 <section className="grid gap-3 text-sm">
+                  <InfoRow label="Product Name" value={product.name} />
+                  <InfoRow label="Standard Name" value={product.standardName ?? "-"} />
                   <InfoRow label="Category" value={product.categoryName ?? "-"} />
                   <InfoRow label="Brand" value={product.brandName ?? "-"} />
+                  <InfoRow label="Country" value={product.country ?? "-"} />
                   <InfoRow label="Unit" value={`${product.unitCode} / ${product.unitName}`} />
                   <InfoRow label="Status" value={product.isActive ? "Active" : "Inactive"} />
                 </section>

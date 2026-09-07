@@ -40,6 +40,7 @@ export default async function BrandsPage({ searchParams }: BrandsPageProps) {
       description="Maintain equipment and spare-part brands used in the product catalog."
       createLabel="New brand"
       showPrecision={false}
+      showCountry
       basePath="/admin/products/brands"
       createAction={createBrand}
       updateAction={updateBrand}

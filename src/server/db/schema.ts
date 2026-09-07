@@ -658,6 +658,7 @@ export const brands = pgTable(
       .references(() => companies.id, { onDelete: "restrict", onUpdate: "cascade" }),
     code: varchar("code", { length: 40 }).notNull(),
     name: varchar("name", { length: 120 }).notNull(),
+    country: varchar("country", { length: 80 }),
     description: text("description"),
     isActive: boolean("is_active").notNull().default(true),
     ...softDelete,
@@ -704,6 +705,7 @@ export const products = pgTable(
       .references(() => companies.id, { onDelete: "restrict", onUpdate: "cascade" }),
     sku: varchar("sku", { length: 60 }).notNull(),
     name: varchar("name", { length: 200 }).notNull(),
+    standardName: varchar("standard_name", { length: 260 }),
     categoryId: uuid("category_id").references(() => productCategories.id, {
       onDelete: "restrict",
       onUpdate: "cascade",
@@ -713,6 +715,7 @@ export const products = pgTable(
       onUpdate: "cascade",
     }),
     model: varchar("model", { length: 100 }),
+    country: varchar("country", { length: 80 }),
     description: text("description"),
     specifications: jsonb("specifications")
       .$type<Record<string, string | null>>()

@@ -295,6 +295,20 @@
       "when": 1788771700000,
       "tag": "0041_sleepy_revanche",
       "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1788771800000,
+      "tag": "0042_nappy_beast",
+      "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "7",
+      "when": 1788771900000,
+      "tag": "0043_famous_mariko_yashida",
+      "breakpoints": true
     }
   ]
 }

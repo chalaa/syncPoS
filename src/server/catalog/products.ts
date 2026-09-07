@@ -87,6 +87,7 @@ export async function getCatalogFormOptions() {
         id: brands.id,
         code: brands.code,
         name: brands.name,
+        country: brands.country,
       })
       .from(brands)
       .where(and(eq(brands.companyId, company.id), isNull(brands.deletedAt)))
@@ -136,7 +137,9 @@ export async function getProductList(params: { query?: string; showDeleted?: boo
     ? or(
         ilike(products.sku, `%${query}%`),
         ilike(products.name, `%${query}%`),
+        ilike(products.standardName, `%${query}%`),
         ilike(products.model, `%${query}%`),
+        ilike(products.country, `%${query}%`),
       )
     : undefined;
 
@@ -147,7 +150,9 @@ export async function getProductList(params: { query?: string; showDeleted?: boo
       id: products.id,
       sku: products.sku,
       name: products.name,
+      standardName: products.standardName,
       model: products.model,
+      country: products.country,
       specifications: products.specifications,
       trackingMode: products.trackingMode,
       standardCostMinor: products.standardCostMinor,
@@ -211,6 +216,7 @@ export async function getCatalogReferenceList(params: {
         ? or(
             ilike(brands.code, `%${query}%`),
             ilike(brands.name, `%${query}%`),
+            ilike(brands.country, `%${query}%`),
             ilike(brands.description, `%${query}%`),
           )
         : undefined,
@@ -221,6 +227,7 @@ export async function getCatalogReferenceList(params: {
         id: brands.id,
         code: brands.code,
         name: brands.name,
+        country: brands.country,
         description: brands.description,
         isActive: brands.isActive,
         deletedAt: brands.deletedAt,
@@ -296,9 +303,11 @@ export async function getProductById(id: string) {
       id: products.id,
       sku: products.sku,
       name: products.name,
+      standardName: products.standardName,
       categoryId: products.categoryId,
       brandId: products.brandId,
       model: products.model,
+      country: products.country,
       description: products.description,
       specifications: products.specifications,
       unitId: products.unitId,
@@ -351,11 +360,13 @@ export async function getProductDetail(id: string): Promise<ProductDetail | null
       id: products.id,
       sku: products.sku,
       name: products.name,
+      standardName: products.standardName,
       categoryId: products.categoryId,
       categoryName: productCategories.name,
       brandId: products.brandId,
       brandName: brands.name,
       model: products.model,
+      country: products.country,
       description: products.description,
       specifications: products.specifications,
       unitId: products.unitId,

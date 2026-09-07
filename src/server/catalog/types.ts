@@ -9,6 +9,7 @@ export type SelectOption = {
   id: string;
   code: string;
   name: string;
+  country?: string | null;
 };
 
 export type ProductSpecificationField = {
@@ -29,6 +30,7 @@ export type CatalogReferenceRecord = {
   code: string;
   name: string;
   description?: string | null;
+  country?: string | null;
   precision?: string;
   specificationSchema?: ProductSpecificationField[];
   isActive: boolean;
@@ -39,9 +41,11 @@ export type ProductFormRecord = {
   id: string;
   sku: string;
   name: string;
+  standardName: string | null;
   categoryId: string | null;
   brandId: string | null;
   model: string | null;
+  country: string | null;
   description: string | null;
   specifications: ProductSpecifications;
   unitId: string;
@@ -154,11 +158,13 @@ export type ProductImportRow = {
   rowNumber: number;
   sku: string;
   productName: string;
+  standardName: string;
   category: string;
   categoryName: string;
   brand: string;
   brandName: string;
   model: string;
+  country: string;
   unit: string;
   unitName: string;
   trackingMode: TrackingModeOption | "";

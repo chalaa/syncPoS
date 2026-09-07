@@ -7,6 +7,7 @@ import type { ReactNode } from "react";
 import type { ReferenceManagerProps, ReferenceMutation } from "@/app/admin/products/reference-types";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { CountrySelectField } from "@/components/ui/country-select-field";
 import {
   Dialog,
   DialogClose,
@@ -111,6 +112,7 @@ function ReferenceForm({
   returnPath,
   showPrecision,
   showSpecifications,
+  showCountry,
 }: {
   title: string;
   description: string;
@@ -119,6 +121,7 @@ function ReferenceForm({
   returnPath: string;
   showPrecision: boolean;
   showSpecifications?: boolean;
+  showCountry?: boolean;
 }) {
   return (
     <form action={action} className="flex flex-col gap-4">
@@ -151,6 +154,9 @@ function ReferenceForm({
             className={inputClass}
           />
         </label>
+        {showCountry ? (
+          <CountrySelectField name="country" label="Country" defaultValue={record?.country ?? ""} />
+        ) : null}
       </div>
 
       {showPrecision ? (
@@ -217,6 +223,7 @@ function ReferenceDialog({
   returnPath,
   showPrecision,
   showSpecifications,
+  showCountry,
   children,
 }: {
   label: string;
@@ -225,6 +232,7 @@ function ReferenceDialog({
   returnPath: string;
   showPrecision: boolean;
   showSpecifications?: boolean;
+  showCountry?: boolean;
   children: ReactNode;
 }) {
   return (
@@ -239,6 +247,7 @@ function ReferenceDialog({
           returnPath={returnPath}
           showPrecision={showPrecision}
           showSpecifications={showSpecifications}
+          showCountry={showCountry}
         />
       </DialogContent>
     </Dialog>
@@ -259,6 +268,7 @@ export function CatalogReferenceManager({
   createLabel,
   showPrecision,
   showSpecifications,
+  showCountry,
   basePath,
   createAction,
   updateAction,
@@ -277,6 +287,7 @@ export function CatalogReferenceManager({
             returnPath={returnPath}
             showPrecision={showPrecision}
             showSpecifications={showSpecifications}
+            showCountry={showCountry}
           >
             <Button>
               <PlusIcon data-icon="inline-start" />
@@ -325,6 +336,7 @@ export function CatalogReferenceManager({
                 <th className="px-4 py-3">Code</th>
                 <th className="px-4 py-3">Name</th>
                 {showPrecision ? <th className="px-4 py-3">Precision</th> : null}
+                {showCountry ? <th className="px-4 py-3">Country</th> : null}
                 <th className="px-4 py-3">Status</th>
                 <th className="px-4 py-3 text-right">Actions</th>
               </tr>
@@ -342,6 +354,7 @@ export function CatalogReferenceManager({
                     ) : null}
                   </td>
                   {showPrecision ? <td className="px-4 py-3">{record.precision ?? 0}</td> : null}
+                  {showCountry ? <td className="px-4 py-3">{record.country || "-"}</td> : null}
                   <td className="px-4 py-3">{record.isActive ? "Active" : "Inactive"}</td>
                   <td className="px-4 py-3">
                     <div className="flex justify-end gap-2">
@@ -354,6 +367,7 @@ export function CatalogReferenceManager({
                             returnPath={returnPath}
                             showPrecision={showPrecision}
                             showSpecifications={showSpecifications}
+                            showCountry={showCountry}
                           >
                             <Button variant="outline" size="sm">
                               <EditIcon data-icon="inline-start" />
@@ -386,7 +400,7 @@ export function CatalogReferenceManager({
               {records.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={showPrecision ? 5 : 4}
+                    colSpan={4 + (showPrecision ? 1 : 0) + (showCountry ? 1 : 0)}
                     className="px-4 py-10 text-center text-muted-foreground"
                   >
                     No records found.

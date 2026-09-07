@@ -33,6 +33,7 @@ const productTemplateHeaders = [
   "category",
   "brand",
   "model",
+  "country",
   "unit",
   "tracking_mode",
   "sales_unit_price",
@@ -44,9 +45,9 @@ const productTemplateHeaders = [
 ];
 
 export const productImportTemplateCsv = `${productTemplateHeaders.join(",")}
-,Hydraulic Filter,Parts,Perkins,HF-204,Each,none,1950,1200,VAT15,VAT15,Standard replacement filter,"{""Type"":""Filter""}"
-,Engine Oil 20W-50,Consumables,,20W-50,Liter,lot,650,450,VAT15,VAT15,Lot tracked engine oil,"{""Type"":""Engine Oil"",""Viscosity"":""20W-50""}"
-,Mini Excavator 320,Machinery,Caterpillar,320,Each,serial,4200000,3500000,VAT15,VAT15,Serial tracked machine,"{""Power"":""52 kW"",""Voltage"":""220V""}"
+,Hydraulic Filter,Parts,Perkins,HF-204,United Kingdom,Each,none,1950,1200,VAT15,VAT15,Standard replacement filter,"{""Type"":""Filter""}"
+,Engine Oil 20W-50,Consumables,,20W-50,,Liter,lot,650,450,VAT15,VAT15,Lot tracked engine oil,"{""Type"":""Engine Oil"",""Viscosity"":""20W-50""}"
+,Mini Excavator 320,Machinery,Caterpillar,320,USA,Each,serial,4200000,3500000,VAT15,VAT15,Serial tracked machine,"{""Power"":""52 kW"",""Voltage"":""220V""}"
 `;
 
 type ParsedProductCsvRow = {
@@ -56,6 +57,7 @@ type ParsedProductCsvRow = {
   category: string;
   brand: string;
   model: string;
+  country: string;
   unit: string;
   trackingMode: string;
   salesUnitPrice: string;
@@ -127,6 +129,7 @@ function parseCsv(text: string): ParsedProductCsvRow[] {
         category: values[headerIndex.category] ?? "",
         brand: values[headerIndex.brand] ?? "",
         model: values[headerIndex.model] ?? "",
+        country: values[headerIndex.country] ?? "",
         unit: values[headerIndex.unit] ?? "",
         trackingMode: values[headerIndex.tracking_mode] ?? "",
         salesUnitPrice: values[headerIndex.sales_unit_price] ?? "",
@@ -212,6 +215,22 @@ function splitRefs(value: string) {
     .split(",")
     .map((part) => part.trim())
     .filter(Boolean);
+}
+
+function generatedStandardName(params: {
+  brandName?: string;
+  model?: string;
+  categoryName?: string;
+  specifications: ProductSpecifications;
+}) {
+  return [
+    params.brandName,
+    params.model?.trim(),
+    params.categoryName,
+    ...Object.values(params.specifications).map((value) => value?.trim()).filter(Boolean),
+  ]
+    .filter(Boolean)
+    .join(" ");
 }
 
 function mapReference<T extends { code: string; name: string }>(rows: T[]) {
@@ -348,7 +367,7 @@ export async function previewProductImportCsv(text: string) {
     })
       .from(productCategories)
       .where(and(eq(productCategories.companyId, company.id), isNull(productCategories.deletedAt))),
-    db.select({ id: brands.id, code: brands.code, name: brands.name })
+    db.select({ id: brands.id, code: brands.code, name: brands.name, country: brands.country })
       .from(brands)
       .where(and(eq(brands.companyId, company.id), isNull(brands.deletedAt))),
     db.select({ id: unitsOfMeasure.id, code: unitsOfMeasure.code, name: unitsOfMeasure.name })
@@ -454,11 +473,18 @@ export async function previewProductImportCsv(text: string) {
       rowNumber: row.rowNumber,
       sku,
       productName,
+      standardName: generatedStandardName({
+        brandName: brand?.name,
+        model: row.model,
+        categoryName: category?.name,
+        specifications,
+      }),
       category: categoryRef,
       categoryName: category?.name ?? "",
       brand: brandRef,
       brandName: brand?.name ?? "",
       model: row.model.trim(),
+      country: row.country.trim() || brand?.country || "",
       unit: unitRef,
       unitName: unit?.name ?? "",
       trackingMode: trackingMode as TrackingModeOption | "",
@@ -501,7 +527,7 @@ export async function commitProductImport(payload: ProductImportCommitPayload) {
       tx.select({ id: productCategories.id, code: productCategories.code, name: productCategories.name })
         .from(productCategories)
         .where(and(eq(productCategories.companyId, company.id), isNull(productCategories.deletedAt))),
-      tx.select({ id: brands.id, code: brands.code, name: brands.name })
+      tx.select({ id: brands.id, code: brands.code, name: brands.name, country: brands.country })
         .from(brands)
         .where(and(eq(brands.companyId, company.id), isNull(brands.deletedAt))),
       tx.select({ id: unitsOfMeasure.id, code: unitsOfMeasure.code, name: unitsOfMeasure.name })
@@ -528,9 +554,11 @@ export async function commitProductImport(payload: ProductImportCommitPayload) {
       const values = {
         sku,
         name: row.productName,
+        standardName: row.standardName || null,
         categoryId: category?.id ?? null,
         brandId: brand?.id ?? null,
         model: row.model || null,
+        country: row.country || brand?.country || null,
         description: row.description || null,
         specifications: row.specifications,
         unitId: unit.id,
