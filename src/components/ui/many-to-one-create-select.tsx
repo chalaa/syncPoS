@@ -62,11 +62,12 @@ export function ManyToOneCreateSelect({
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const rootRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   const selected = items.find((item) => item.id === selectedId);
-  const selectedLabel = selected ? `${selected.code} / ${selected.name}` : "";
+  const selectedLabel = selected ? selected.name : "";
   const trimmedQuery = query.trim();
   const filteredItems = useMemo(() => {
     const normalized = trimmedQuery.toLowerCase();
@@ -108,20 +109,38 @@ export function ManyToOneCreateSelect({
       return;
     }
 
-    function closeFloatingList(event: Event) {
-      if (dropdownRef.current?.contains(event.target as Node)) {
-        return;
-      }
-
+    function closeList() {
       setIsOpen(false);
       setQuery("");
       setDropdownStyle(undefined);
     }
 
+    function closeFloatingList(event: Event) {
+      const target = event.target as Node;
+
+      if (dropdownRef.current?.contains(target)) {
+        return;
+      }
+
+      closeList();
+    }
+
+    function closeWhenClickOutside(event: PointerEvent) {
+      const target = event.target as Node;
+
+      if (rootRef.current?.contains(target) || dropdownRef.current?.contains(target)) {
+        return;
+      }
+
+      closeList();
+    }
+
+    document.addEventListener("pointerdown", closeWhenClickOutside);
     window.addEventListener("resize", closeFloatingList);
     window.addEventListener("scroll", closeFloatingList, true);
 
     return () => {
+      document.removeEventListener("pointerdown", closeWhenClickOutside);
       window.removeEventListener("resize", closeFloatingList);
       window.removeEventListener("scroll", closeFloatingList, true);
     };
@@ -228,7 +247,7 @@ export function ManyToOneCreateSelect({
     : null;
 
   return (
-    <div className="relative flex flex-col gap-1 text-sm font-medium">
+    <div ref={rootRef} className="relative flex flex-col gap-1 text-sm font-medium">
       <span>{label}</span>
       <input type="hidden" name={name} value={selectedId} />
       <div className="relative">

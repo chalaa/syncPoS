@@ -1,7 +1,7 @@
 "use client";
 
 import { PlusIcon, Trash2Icon } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useMemo, useState, type FormEvent } from "react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -19,7 +19,7 @@ import { ProductSelect, type ProductSelectOption } from "@/app/admin/products/pr
 import { RelatedModelSelect } from "@/components/ui/related-model-select";
 import { cn } from "@/lib/utils";
 import { createCustomerFromSales } from "@/app/admin/sales/actions";
-import type { SalesFormOption, SalesOrderDetail, SalesTaxOption } from "@/server/sales/types";
+import type { SalesAvailableStockOption, SalesFormOption, SalesOrderDetail, SalesTaxOption } from "@/server/sales/types";
 import { useAppStore } from "@/stores/app-store";
 
 const inputClass = "h-10 rounded-md border border-input bg-background px-3 text-sm";
@@ -28,6 +28,7 @@ const tableInputClass = "h-9 w-full rounded-md border border-input bg-background
 type SalesLineDraft = {
   key: string;
   ownerId: string;
+  sourceLocationId: string;
   productId: string;
   quantity: string;
   unitPrice: string;
@@ -35,10 +36,13 @@ type SalesLineDraft = {
   taxIds: string[];
 };
 
-function newLine(ownerId = ""): SalesLineDraft {
+type SalesLineErrors = Partial<Record<"sourceLocationId" | "ownerId" | "productId" | "quantity", string>>;
+
+function newLine(ownerId = "", sourceLocationId = ""): SalesLineDraft {
   return {
     key: crypto.randomUUID(),
     ownerId,
+    sourceLocationId,
     productId: "",
     quantity: "1",
     unitPrice: "0",
@@ -111,6 +115,7 @@ export function SalesOrderForm({
   productUnits,
   locations,
   taxes,
+  availableStock,
   error,
   order,
   submitLabel = "Create Quotation",
@@ -125,6 +130,7 @@ export function SalesOrderForm({
   productUnits: Parameters<typeof ProductSelect>[0]["units"];
   locations: SalesFormOption[];
   taxes: SalesTaxOption[];
+  availableStock: SalesAvailableStockOption[];
   error?: string;
   order?: SalesOrderDetail;
   submitLabel?: string;
@@ -136,20 +142,26 @@ export function SalesOrderForm({
   const [headerOwnerId, setHeaderOwnerId] = useState(defaultOwnerId);
   const selectedLocationId = useAppStore((state) => state.selectedLocationId);
   const setSelectedLocationId = useAppStore((state) => state.setSelectedLocationId);
-  const [sourceLocationId, setSourceLocationId] = useState(order?.sourceLocationId ?? "");
+  const selectedShopId = !order && selectedLocationId && locations.some((location) => location.id === selectedLocationId)
+    ? selectedLocationId
+    : "";
+  const initialSourceLocationId = order?.sourceLocationId ?? selectedShopId;
+  const [sourceLocationId, setSourceLocationId] = useState(initialSourceLocationId);
+  const [showValidation, setShowValidation] = useState(false);
   const [productOptions, setProductOptions] = useState<ProductSelectOption[]>(products);
   const [lines, setLines] = useState<SalesLineDraft[]>(() =>
     order?.lines.length
       ? order.lines.map((line) => ({
           key: line.id,
           ownerId: line.ownerId ?? defaultOwnerId,
+          sourceLocationId: line.sourceLocationId ?? initialSourceLocationId,
           productId: line.productId,
           quantity: line.quantityOrdered,
           unitPrice: String(line.unitPriceMinor / 100),
           discount: String(line.discountMinor / 100),
           taxIds: line.taxIds,
         }))
-      : [newLine(defaultOwnerId)],
+      : [newLine(defaultOwnerId, initialSourceLocationId)],
   );
   const taxById = useMemo(() => new Map(taxes.map((tax) => [tax.id, tax])), [taxes]);
   const productById = useMemo(() => new Map(productOptions.map((product) => [product.id, product])), [productOptions]);
@@ -183,8 +195,105 @@ export function SalesOrderForm({
     }),
     { subtotal: 0, taxAmount: 0, total: 0 },
   );
+  const effectiveSourceLocationId = sourceLocationId || selectedShopId;
+  const availableQuantityByDomain = useMemo(() => {
+    const map = new Map<string, number>();
+
+    for (const stock of availableStock) {
+      map.set(
+        `${stock.locationId}:${stock.ownerId}:${stock.productId}`,
+        (map.get(`${stock.locationId}:${stock.ownerId}:${stock.productId}`) ?? 0) + Number(stock.quantityAvailable),
+      );
+    }
+
+    return map;
+  }, [availableStock]);
+
+  function availableQuantityFor(line: SalesLineDraft) {
+    const ownerId = line.ownerId || headerOwnerId;
+    const locationId = line.sourceLocationId || effectiveSourceLocationId;
+
+    if (!ownerId || !locationId || !line.productId) {
+      return 0;
+    }
+
+    return availableQuantityByDomain.get(`${locationId}:${ownerId}:${line.productId}`) ?? 0;
+  }
+
+  const lineErrors = useMemo(() => {
+    const nextErrors: Record<string, SalesLineErrors> = {};
+
+    for (const line of lines) {
+      const errors: SalesLineErrors = {};
+      const ownerId = line.ownerId || headerOwnerId;
+      const locationId = line.sourceLocationId || effectiveSourceLocationId;
+      const quantity = Number(line.quantity);
+      const availableQuantity = line.productId && ownerId && locationId
+        ? (availableQuantityByDomain.get(`${locationId}:${ownerId}:${line.productId}`) ?? 0)
+        : 0;
+
+      if (!locationId) {
+        errors.sourceLocationId = "Select a source location.";
+      }
+
+      if (!ownerId) {
+        errors.ownerId = "Select an owner with stock in this location.";
+      }
+
+      if (!line.productId) {
+        errors.productId = "Select a product with available stock.";
+      }
+
+      if (!Number.isFinite(quantity) || quantity <= 0) {
+        errors.quantity = "Quantity must be greater than zero.";
+      } else if (line.productId && quantity > availableQuantity) {
+        errors.quantity = `Only ${availableQuantity.toFixed(6)} available for this owner and location.`;
+      }
+
+      if (Object.keys(errors).length > 0) {
+        nextErrors[line.key] = errors;
+      }
+    }
+
+    return nextErrors;
+  }, [availableQuantityByDomain, effectiveSourceLocationId, headerOwnerId, lines]);
+  const displayedLineErrors = showValidation ? lineErrors : {};
+
+  function ownerOptionsForLine(line: SalesLineDraft) {
+    const locationId = line.sourceLocationId || effectiveSourceLocationId;
+
+    if (!locationId) {
+      return [];
+    }
+
+    const ownerIds = new Set(
+      availableStock
+        .filter((stock) => stock.locationId === locationId && Number(stock.quantityAvailable) > 0)
+        .map((stock) => stock.ownerId),
+    );
+
+    return owners.filter((owner) => ownerIds.has(owner.id));
+  }
+
+  function productOptionsForLine(line: SalesLineDraft) {
+    const ownerId = line.ownerId || headerOwnerId;
+    const locationId = line.sourceLocationId || effectiveSourceLocationId;
+
+    if (!ownerId || !locationId) {
+      return [];
+    }
+
+    const productIds = new Set(
+      availableStock
+        .filter((stock) => stock.locationId === locationId && stock.ownerId === ownerId && Number(stock.quantityAvailable) > 0)
+        .map((stock) => stock.productId),
+    );
+
+    return productOptions.filter((product) => productIds.has(product.id));
+  }
 
   function updateLine(key: string, patch: Partial<SalesLineDraft>) {
+    setShowValidation(true);
     setLines((current) => current.map((line) => (line.key === key ? { ...line, ...patch } : line)));
   }
 
@@ -203,27 +312,67 @@ export function SalesOrderForm({
   }
 
   function addLine() {
-    const line = newLine(headerOwnerId);
+    const line = newLine(headerOwnerId, effectiveSourceLocationId);
 
     setLines((current) => [...current, line]);
   }
 
   const editingLine = lines.find((line) => line.key === editingLineKey);
-  const selectedShopId = !order && selectedLocationId && locations.some((location) => location.id === selectedLocationId)
-    ? selectedLocationId
-    : "";
-  const effectiveSourceLocationId = sourceLocationId || selectedShopId;
+
+  function changeHeaderOwner(ownerId: string) {
+    const previousOwnerId = headerOwnerId;
+
+    setShowValidation(true);
+    setHeaderOwnerId(ownerId);
+    setLines((current) =>
+      current.map((line) => {
+        if (line.ownerId && line.ownerId !== previousOwnerId) {
+          return line;
+        }
+
+        return { ...line, ownerId, productId: "" };
+      }),
+    );
+  }
 
   function changeSourceLocation(locationId: string) {
+    const previousSourceLocationId = effectiveSourceLocationId;
+
+    setShowValidation(true);
     setSourceLocationId(locationId);
 
     if (!order) {
       setSelectedLocationId(locationId || null);
     }
+
+    setLines((current) =>
+      current.map((line) => {
+        if (line.sourceLocationId && line.sourceLocationId !== previousSourceLocationId) {
+          return line;
+        }
+
+        return { ...line, sourceLocationId: locationId, ownerId: headerOwnerId, productId: "" };
+      }),
+    );
+  }
+
+  function changeLineSourceLocation(line: SalesLineDraft, locationId: string) {
+    updateLine(line.key, { sourceLocationId: locationId, ownerId: headerOwnerId, productId: "" });
+  }
+
+  function changeLineOwner(line: SalesLineDraft, ownerId: string) {
+    updateLine(line.key, { ownerId, productId: "" });
+  }
+
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    if (Object.keys(lineErrors).length > 0) {
+      setShowValidation(true);
+      event.preventDefault();
+    }
   }
 
   return (
-    <form action={action} className="grid gap-5 rounded-lg border border-border bg-card p-5">
+    <form action={action} onSubmit={handleSubmit} className="grid gap-5 rounded-lg border border-border bg-card p-5">
       {order ? <input type="hidden" name="salesOrderId" value={order.id} /> : null}
       {error ? <p className="rounded-md border border-destructive/30 p-3 text-sm text-destructive">{error}</p> : null}
 
@@ -238,12 +387,13 @@ export function SalesOrderForm({
         />
         <label className="flex flex-col gap-1 text-sm font-medium">
           Reference
+          <input type="hidden" name="customerReference" value={order?.customerReference ?? ""} />
           <input
-            name="customerReference"
             defaultValue={order?.customerReference ?? ""}
             placeholder="Auto"
-            readOnly
-            className={cn(inputClass, "bg-muted text-muted-foreground")}
+            disabled
+            aria-readonly="true"
+            className={cn(inputClass, "cursor-not-allowed bg-muted text-muted-foreground")}
           />
         </label>
         <label className="flex flex-col gap-1 text-sm font-medium">
@@ -258,7 +408,7 @@ export function SalesOrderForm({
           label="Owner"
           options={owners}
           value={headerOwnerId}
-          onValueChange={setHeaderOwnerId}
+          onValueChange={changeHeaderOwner}
           required={owners.length > 0}
           placeholder="Select owner"
           emptyLabel="No owners found."
@@ -318,6 +468,7 @@ export function SalesOrderForm({
                   <div key={`${line.key}-fields`} className="hidden">
                     <input type="hidden" name="productId" value={line.productId} />
                     <input type="hidden" name="lineOwnerId" value={line.ownerId || headerOwnerId} />
+                    <input type="hidden" name="lineSourceLocationId" value={line.sourceLocationId || effectiveSourceLocationId} />
                     <input type="hidden" name="quantity" value={line.quantity} />
                     <input type="hidden" name="unitPrice" value={line.unitPrice} />
                     <input type="hidden" name="discount" value={line.discount} />
@@ -326,11 +477,13 @@ export function SalesOrderForm({
                 ))}
 
                 <div className="hidden overflow-x-auto lg:block">
-                  <table className="w-full min-w-[1380px] border-collapse text-sm">
+                  <table className="w-full min-w-[1560px] border-collapse text-sm">
                     <thead>
                       <tr className="border-b border-border text-left text-xs font-semibold uppercase text-muted-foreground">
                         <th className="w-80 px-2 py-2">Product</th>
+                        <th className="w-64 px-2 py-2">Source Location</th>
                         <th className="w-56 px-2 py-2">Owner</th>
+                        <th className="w-32 px-2 py-2 text-right">Available</th>
                         <th className="w-28 px-2 py-2 text-right">Quantity</th>
                         <th className="w-32 px-2 py-2 text-right">Unit Price</th>
                         <th className="w-32 px-2 py-2 text-right">Discount</th>
@@ -346,26 +499,42 @@ export function SalesOrderForm({
                           <td className="w-80 px-2 py-3">
                             <ProductSelect
                               value={line.productId}
-                              options={productOptions}
+                              options={productOptionsForLine(line)}
                               categories={productCategories}
                               brands={productBrands}
                               units={productUnits}
                               onValueChange={(productId) => updateLineProduct(line.key, productId)}
                               onOptionsChange={setProductOptions}
                               placeholder="Select product"
-                              emptyLabel="No products found."
-                              inputClassName={tableInputClass}
+                              emptyLabel={(line.ownerId || headerOwnerId) && (line.sourceLocationId || effectiveSourceLocationId) ? "No products with available stock." : "Select owner and source location first."}
+                              inputClassName={cn(tableInputClass, displayedLineErrors[line.key]?.productId ? "border-destructive focus-visible:border-destructive" : "")}
                             />
+                            {displayedLineErrors[line.key]?.productId ? <p className="mt-1 text-xs text-destructive">{displayedLineErrors[line.key]?.productId}</p> : null}
+                          </td>
+                          <td className="w-64 px-2 py-3">
+                            <RelatedModelSelect
+                              value={line.sourceLocationId || effectiveSourceLocationId}
+                              options={locations}
+                              onValueChange={(locationId) => changeLineSourceLocation(line, locationId)}
+                              placeholder="Select source"
+                              emptyLabel="No locations found."
+                              inputClassName={cn(tableInputClass, displayedLineErrors[line.key]?.sourceLocationId ? "border-destructive focus-visible:border-destructive" : "")}
+                            />
+                            {displayedLineErrors[line.key]?.sourceLocationId ? <p className="mt-1 text-xs text-destructive">{displayedLineErrors[line.key]?.sourceLocationId}</p> : null}
                           </td>
                           <td className="w-56 px-2 py-3">
                             <RelatedModelSelect
                               value={line.ownerId || headerOwnerId}
-                              options={owners}
-                              onValueChange={(ownerId) => updateLine(line.key, { ownerId })}
+                              options={ownerOptionsForLine(line)}
+                              onValueChange={(ownerId) => changeLineOwner(line, ownerId)}
                               placeholder="Select owner"
-                              emptyLabel="No owners found."
-                              inputClassName={tableInputClass}
+                              emptyLabel={(line.sourceLocationId || effectiveSourceLocationId) ? "No owners with stock in this location." : "Select source location first."}
+                              inputClassName={cn(tableInputClass, displayedLineErrors[line.key]?.ownerId ? "border-destructive focus-visible:border-destructive" : "")}
                             />
+                            {displayedLineErrors[line.key]?.ownerId ? <p className="mt-1 text-xs text-destructive">{displayedLineErrors[line.key]?.ownerId}</p> : null}
+                          </td>
+                          <td className="px-2 py-3 text-right font-medium">
+                            {line.productId ? availableQuantityFor(line).toFixed(6) : "-"}
                           </td>
                           <td className="px-2 py-3">
                             <input
@@ -373,9 +542,10 @@ export function SalesOrderForm({
                               min="0.000001"
                               step="0.000001"
                               value={line.quantity}
-                              className={cn(tableInputClass, "text-right")}
+                              className={cn(tableInputClass, "text-right", displayedLineErrors[line.key]?.quantity ? "border-destructive focus-visible:border-destructive" : "")}
                               onChange={(event) => updateLine(line.key, { quantity: event.target.value })}
                             />
+                            {displayedLineErrors[line.key]?.quantity ? <p className="mt-1 text-xs text-destructive">{displayedLineErrors[line.key]?.quantity}</p> : null}
                           </td>
                           <td className="px-2 py-3">
                             <input
@@ -428,6 +598,7 @@ export function SalesOrderForm({
                   {lines.map((line, index) => {
                     const product = productById.get(line.productId);
                     const owner = owners.find((item) => item.id === (line.ownerId || headerOwnerId));
+                    const sourceLocation = locations.find((item) => item.id === (line.sourceLocationId || effectiveSourceLocationId));
                     const selectedTaxCount = line.taxIds.length;
 
                     return (
@@ -436,8 +607,13 @@ export function SalesOrderForm({
                           <div className="min-w-0">
                             <p className="truncate font-semibold">{product ? `${product.code} / ${product.name}` : "No product selected"}</p>
                             <p className="text-xs text-muted-foreground">
-                              {owner?.name ?? "No owner"} / Qty {line.quantity || "0"} / Unit price {line.unitPrice || "0"} / Taxes {selectedTaxCount}
+                              {owner?.name ?? "No owner"} / {sourceLocation?.code ?? "No source"} / Available {line.productId ? availableQuantityFor(line).toFixed(6) : "-"} / Qty {line.quantity || "0"} / Unit price {line.unitPrice || "0"} / Taxes {selectedTaxCount}
                             </p>
+                            {displayedLineErrors[line.key] ? (
+                              <p className="mt-1 text-xs text-destructive">
+                                {Object.values(displayedLineErrors[line.key]).filter(Boolean)[0]}
+                              </p>
+                            ) : null}
                           </div>
                           <div className="shrink-0 text-right font-semibold">{money(lineTotals[index]?.total ?? 0)}</div>
                         </div>
@@ -494,26 +670,42 @@ export function SalesOrderForm({
                           Product
                           <ProductSelect
                             value={editingLine.productId}
-                            options={productOptions}
+                            options={productOptionsForLine(editingLine)}
                             categories={productCategories}
                             brands={productBrands}
                             units={productUnits}
                             onValueChange={(productId) => updateLineProduct(editingLine.key, productId)}
                             onOptionsChange={setProductOptions}
                             placeholder="Select product"
-                            emptyLabel="No products found."
+                            emptyLabel={(editingLine.ownerId || headerOwnerId) && (editingLine.sourceLocationId || effectiveSourceLocationId) ? "No products with available stock." : "Select owner and source location first."}
                           />
+                          {displayedLineErrors[editingLine.key]?.productId ? <p className="text-xs text-destructive">{displayedLineErrors[editingLine.key]?.productId}</p> : null}
+                        </label>
+                        <label className="flex flex-col gap-1 text-sm font-medium">
+                          Source Location
+                          <RelatedModelSelect
+                            value={editingLine.sourceLocationId || effectiveSourceLocationId}
+                            options={locations}
+                            onValueChange={(locationId) => changeLineSourceLocation(editingLine, locationId)}
+                            placeholder="Select source"
+                            emptyLabel="No locations found."
+                          />
+                          {displayedLineErrors[editingLine.key]?.sourceLocationId ? <p className="text-xs text-destructive">{displayedLineErrors[editingLine.key]?.sourceLocationId}</p> : null}
                         </label>
                         <label className="flex flex-col gap-1 text-sm font-medium">
                           Owner
                           <RelatedModelSelect
                             value={editingLine.ownerId || headerOwnerId}
-                            options={owners}
-                            onValueChange={(ownerId) => updateLine(editingLine.key, { ownerId })}
+                            options={ownerOptionsForLine(editingLine)}
+                            onValueChange={(ownerId) => changeLineOwner(editingLine, ownerId)}
                             placeholder="Select owner"
-                            emptyLabel="No owners found."
+                            emptyLabel={(editingLine.sourceLocationId || effectiveSourceLocationId) ? "No owners with stock in this location." : "Select source location first."}
                           />
+                          {displayedLineErrors[editingLine.key]?.ownerId ? <p className="text-xs text-destructive">{displayedLineErrors[editingLine.key]?.ownerId}</p> : null}
                         </label>
+                        <p className="text-sm text-muted-foreground">
+                          Available: <span className="font-medium text-foreground">{editingLine.productId ? availableQuantityFor(editingLine).toFixed(6) : "-"}</span>
+                        </p>
                         <div className="grid gap-4 sm:grid-cols-3">
                           <label className="flex flex-col gap-1 text-sm font-medium">
                             Quantity
@@ -522,9 +714,10 @@ export function SalesOrderForm({
                               min="0.000001"
                               step="0.000001"
                               value={editingLine.quantity}
-                              className={cn(inputClass, "text-right")}
+                              className={cn(inputClass, "text-right", displayedLineErrors[editingLine.key]?.quantity ? "border-destructive focus-visible:border-destructive" : "")}
                               onChange={(event) => updateLine(editingLine.key, { quantity: event.target.value })}
                             />
+                            {displayedLineErrors[editingLine.key]?.quantity ? <p className="text-xs text-destructive">{displayedLineErrors[editingLine.key]?.quantity}</p> : null}
                           </label>
                           <label className="flex flex-col gap-1 text-sm font-medium">
                             Unit price

@@ -2101,6 +2101,10 @@ export const salesOrderLines = pgTable(
       onDelete: "restrict",
       onUpdate: "cascade",
     }),
+    sourceLocationId: uuid("source_location_id").references(() => locations.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
     lineNo: smallint("line_no").notNull(),
     productId: uuid("product_id")
       .notNull()
@@ -2138,6 +2142,7 @@ export const salesOrderLines = pgTable(
       .on(table.salesOrderId, table.lineNo)
       .where(sql`${table.deletedAt} is null`),
     index("sales_order_lines_owner_idx").on(table.ownerId),
+    index("sales_order_lines_source_location_idx").on(table.sourceLocationId),
     index("sales_order_lines_product_idx").on(table.productId),
   ],
 );

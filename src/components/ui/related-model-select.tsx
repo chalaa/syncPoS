@@ -42,6 +42,10 @@ function optionText(option: RelatedModelOption) {
   return option.code ? `${option.code} / ${option.name}` : option.name;
 }
 
+function selectedOptionText(option: RelatedModelOption) {
+  return option.name;
+}
+
 export function RelatedModelSelect({
   name,
   label,
@@ -68,11 +72,12 @@ export function RelatedModelSelect({
   const [query, setQuery] = useState("");
   const [isOpen, setIsOpen] = useState(false);
   const [dropdownStyle, setDropdownStyle] = useState<CSSProperties | undefined>();
+  const rootRef = useRef<HTMLElement | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const selectedId = value ?? internalValue;
   const selected = options.find((option) => option.id === selectedId);
-  const selectedLabel = selected ? optionText(selected) : "";
+  const selectedLabel = selected ? selectedOptionText(selected) : "";
   const trimmedQuery = query.trim();
   const filteredOptions = useMemo(() => {
     const normalized = trimmedQuery.toLowerCase();
@@ -114,20 +119,38 @@ export function RelatedModelSelect({
       return;
     }
 
-    function closeFloatingList(event: Event) {
-      if (dropdownRef.current?.contains(event.target as Node)) {
-        return;
-      }
-
+    function closeList() {
       setIsOpen(false);
       setQuery("");
       setDropdownStyle(undefined);
     }
 
+    function closeFloatingList(event: Event) {
+      const target = event.target as Node;
+
+      if (dropdownRef.current?.contains(target)) {
+        return;
+      }
+
+      closeList();
+    }
+
+    function closeWhenClickOutside(event: PointerEvent) {
+      const target = event.target as Node;
+
+      if (rootRef.current?.contains(target) || dropdownRef.current?.contains(target)) {
+        return;
+      }
+
+      closeList();
+    }
+
+    document.addEventListener("pointerdown", closeWhenClickOutside);
     window.addEventListener("resize", closeFloatingList);
     window.addEventListener("scroll", closeFloatingList, true);
 
     return () => {
+      document.removeEventListener("pointerdown", closeWhenClickOutside);
       window.removeEventListener("resize", closeFloatingList);
       window.removeEventListener("scroll", closeFloatingList, true);
     };
@@ -273,7 +296,7 @@ export function RelatedModelSelect({
 
   if (!label) {
     return (
-      <div className={cn("relative", className)} onBlur={closeWhenFocusLeaves}>
+      <div ref={(node) => { rootRef.current = node; }} className={cn("relative", className)} onBlur={closeWhenFocusLeaves}>
         {control}
       </div>
     );
@@ -281,6 +304,7 @@ export function RelatedModelSelect({
 
   return (
     <label
+      ref={(node) => { rootRef.current = node; }}
       className={cn("relative flex flex-col gap-1 text-sm font-medium", className)}
       onBlur={closeWhenFocusLeaves}
     >

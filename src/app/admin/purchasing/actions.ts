@@ -229,6 +229,33 @@ function movementNo(prefix: string) {
   return `${prefix}-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${randomUUID().slice(0, 8).toUpperCase()}`;
 }
 
+function currentYear() {
+  return new Intl.DateTimeFormat("en", {
+    timeZone: "Africa/Addis_Ababa",
+    year: "numeric",
+  }).format(new Date());
+}
+
+async function nextPurchaseOrderNo(tx: Parameters<Parameters<typeof db.transaction>[0]>[0], companyId: string) {
+  const year = currentYear();
+  const pattern = `^PO/([0-9]{5})/${year}$`;
+  const filterPattern = `^PO/[0-9]{5}/${year}$`;
+  const [row] = await tx.execute<{ orderNo: string }>(sql`
+    select (
+      'PO/'
+      || lpad((coalesce(max((substring(order_no from ${pattern}))::int), 0) + 1)::text, 5, '0')
+      || '/'
+      || ${year}
+    ) as "orderNo"
+    from purchase_orders
+    where company_id = ${companyId}
+      and deleted_at is null
+      and order_no ~ ${filterPattern}
+  `);
+
+  return row?.orderNo ?? `PO/00001/${year}`;
+}
+
 function dateOnly(date: Date) {
   return date.toISOString().slice(0, 10);
 }
@@ -375,12 +402,12 @@ export async function createPurchaseOrder(formData: FormData) {
   const user = await requirePermission("inventory.receive");
   const { header, lines } = parsePurchaseOrderForm(formData, "/admin/purchasing/new");
   const company = await getDefaultCompany();
-  const orderNo = movementNo("PO");
-  const reference = movementNo("REF");
   let createdOrderId: string | undefined;
+  let orderNo = "";
 
   try {
     await db.transaction(async (tx) => {
+      orderNo = await nextPurchaseOrderNo(tx, company.id);
       const uniqueProductIds = [...new Set(lines.map((line) => line.productId))];
       const uniqueTaxIds = [...new Set(lines.flatMap((line) => line.taxIds))];
       const productRows = await tx
@@ -505,7 +532,7 @@ export async function createPurchaseOrder(formData: FormData) {
           ownerId: owner.id,
           orderNo,
           deliverToLocationId: header.deliverToLocationId,
-          vendorReference: header.vendorReference || reference,
+          vendorReference: orderNo,
           paymentTerm: header.paymentTerm,
           status: "draft",
           orderDate: header.orderDate || dateOnly(new Date()),

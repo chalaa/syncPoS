@@ -350,12 +350,13 @@ export function PurchaseOrderForm({
         />
         <label className="flex flex-col gap-1 text-sm font-medium">
           Reference
+          <input type="hidden" name="vendorReference" value={order?.vendorReference ?? ""} />
           <input
-            name="vendorReference"
             defaultValue={order?.vendorReference ?? ""}
             placeholder="Auto"
-            readOnly
-            className={cn(inputClass, "bg-muted text-muted-foreground")}
+            disabled
+            aria-readonly="true"
+            className={cn(inputClass, "cursor-not-allowed bg-muted text-muted-foreground")}
           />
         </label>
       </div>

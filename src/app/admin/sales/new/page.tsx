@@ -43,6 +43,7 @@ export default async function NewSalesOrderPage({ searchParams }: NewSalesOrderP
         productUnits={options.productUnits}
         locations={options.locations}
         taxes={options.taxes}
+        availableStock={options.availableStock}
         error={query.error}
         defaultDate={todayDate()}
       />

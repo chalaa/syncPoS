@@ -33,6 +33,9 @@ export type SalesOrderDetailLine = {
   lineNo: number;
   ownerId: string | null;
   ownerName: string | null;
+  sourceLocationId: string | null;
+  sourceLocationCode: string | null;
+  sourceLocationName: string | null;
   productId: string;
   productName: string;
   sku: string;
@@ -95,6 +98,14 @@ export type SalesFormOptions = {
   productUnits: SelectOption[];
   locations: SalesFormOption[];
   taxes: SalesTaxOption[];
+  availableStock: SalesAvailableStockOption[];
+};
+
+export type SalesAvailableStockOption = {
+  locationId: string;
+  ownerId: string;
+  productId: string;
+  quantityAvailable: string;
 };
 
 export type DeliveryListRow = {
