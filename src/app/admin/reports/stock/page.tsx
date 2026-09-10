@@ -1,6 +1,7 @@
 import Link from "next/link";
 
-import { EmptyRows, ReportFilters, SummaryCard } from "@/app/admin/reports/report-ui";
+import { EmptyRows, ReportFilters, ReportNavTabs, SummaryCard } from "@/app/admin/reports/report-ui";
+import { Badge } from "@/components/ui/badge";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
 import { requirePermission } from "@/server/auth/session";
 import { displayQuantity } from "@/server/inventory/stock";
@@ -23,21 +24,36 @@ export default async function StockReportPage({ searchParams }: StockReportPageP
 
   return (
     <PageShell>
-      <PageHeader eyebrow="Reports" title="Stock Report" />
+      <PageHeader
+        eyebrow="Inventory Intelligence"
+        title="Stock Valuation Report"
+        description="Real-time stock on hand, inventory reservations, serialized tracking, and asset valuations."
+      />
+      <ReportNavTabs current="stock" />
       <ReportFilters query={filters.query} />
-      <div className="mb-5 grid gap-3 md:grid-cols-3">
-        <SummaryCard label="Rows" value={String(rows.length)} />
-        <SummaryCard label="Stock Value" value={displayReportMoney(stockValueMinor, currencyCode)} />
-        <SummaryCard label="Tracked Rows" value={String(rows.filter((row) => row.serialNo || row.lotNo).length)} />
+      <div className="mb-6 grid gap-3.5 sm:grid-cols-3">
+        <SummaryCard label="SKU / Batch Records" value={String(rows.length)} border="border-l-slate-400" />
+        <SummaryCard
+          label="Total Inventory Valuation"
+          value={displayReportMoney(stockValueMinor, currencyCode)}
+          border="border-l-primary"
+          highlight="text-primary font-bold"
+        />
+        <SummaryCard
+          label="Tracked Units (Serial / Lot)"
+          value={String(rows.filter((row) => row.serialNo || row.lotNo).length)}
+          border="border-l-accent"
+          highlight="text-amber-700 dark:text-amber-400 font-bold"
+        />
       </div>
-      <section className="overflow-x-auto rounded-lg border border-border bg-card">
+      <section className="overflow-x-auto rounded-xl border border-border bg-card shadow-xs">
         <table className="w-full min-w-[1120px] text-left text-sm">
-          <thead className="text-xs uppercase text-muted-foreground">
+          <thead className="bg-secondary/40 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
             <tr className="border-b border-border">
               <th className="px-4 py-3">Product</th>
               <th className="px-4 py-3">Location</th>
               <th className="px-4 py-3">Tracking</th>
-              <th className="px-4 py-3">Serial/Lot</th>
+              <th className="px-4 py-3">Serial / Lot</th>
               <th className="px-4 py-3 text-right">On Hand</th>
               <th className="px-4 py-3 text-right">Reserved</th>
               <th className="px-4 py-3 text-right">Available</th>
@@ -47,24 +63,28 @@ export default async function StockReportPage({ searchParams }: StockReportPageP
           </thead>
           <tbody>
             {rows.map((row) => (
-              <tr key={`${row.locationId}-${row.productId}-${row.productSerialId ?? row.productLotId ?? "bulk"}`} className="border-t border-border">
+              <tr key={`${row.locationId}-${row.productId}-${row.productSerialId ?? row.productLotId ?? "bulk"}`} className="border-t border-border transition-colors hover:bg-secondary/30">
                 <td className="px-4 py-3">
-                  <Link href={`/admin/products/${row.productId}`} className="font-medium text-primary underline-offset-4 hover:underline">
+                  <Link href={`/admin/products/${row.productId}`} className="font-semibold text-primary underline-offset-4 hover:underline">
                     {row.productName}
                   </Link>
                   <div className="text-xs text-muted-foreground">{row.sku}</div>
                 </td>
                 <td className="px-4 py-3">
-                  <div>{row.locationCode}</div>
+                  <div className="font-medium text-foreground">{row.locationCode}</div>
                   <div className="text-xs text-muted-foreground">{row.locationName}</div>
                 </td>
-                <td className="px-4 py-3 capitalize">{row.trackingMode}</td>
-                <td className="px-4 py-3">{row.serialNo ?? row.lotNo ?? "Bulk"}</td>
-                <td className="px-4 py-3 text-right">{displayQuantity(row.quantityOnHand)}</td>
-                <td className="px-4 py-3 text-right">{displayQuantity(row.quantityReserved)}</td>
-                <td className="px-4 py-3 text-right">{displayQuantity(row.quantityAvailable)}</td>
-                <td className="px-4 py-3 text-right">{displayReportMoney(row.averageCostMinor, row.currencyCode)}</td>
-                <td className="px-4 py-3 text-right">{displayReportMoney(row.stockValueMinor, row.currencyCode)}</td>
+                <td className="px-4 py-3">
+                  <Badge variant={row.trackingMode === "serial" ? "primary" : row.trackingMode === "lot" ? "accent" : "outline"} className="capitalize">
+                    {row.trackingMode}
+                  </Badge>
+                </td>
+                <td className="px-4 py-3 font-mono text-xs">{row.serialNo ?? row.lotNo ?? <span className="text-muted-foreground">Bulk</span>}</td>
+                <td className="px-4 py-3 text-right font-medium">{displayQuantity(row.quantityOnHand)}</td>
+                <td className="px-4 py-3 text-right text-muted-foreground">{displayQuantity(row.quantityReserved)}</td>
+                <td className="px-4 py-3 text-right font-semibold text-primary">{displayQuantity(row.quantityAvailable)}</td>
+                <td className="px-4 py-3 text-right text-muted-foreground">{displayReportMoney(row.averageCostMinor, row.currencyCode)}</td>
+                <td className="px-4 py-3 text-right font-semibold text-foreground">{displayReportMoney(row.stockValueMinor, row.currencyCode)}</td>
               </tr>
             ))}
             {rows.length === 0 ? <EmptyRows colSpan={9} /> : null}

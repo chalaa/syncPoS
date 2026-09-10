@@ -5,6 +5,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 
 import { Alert } from "@/components/ui/alert";
+import { StatusBadge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -322,13 +323,13 @@ export function PaymentConfigManager({
       {notice ? <Alert kind="success">{notice}</Alert> : null}
       {error ? <Alert kind="error">{error}</Alert> : null}
 
-      <section className="rounded-lg border border-border bg-card">
+      <section className="rounded-xl border border-border bg-card shadow-xs">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border p-4">
-          <div className="flex rounded-md border border-border bg-muted p-1 text-sm">
-            <Button asChild variant={methodTab ? "secondary" : "ghost"} size="sm">
+          <div className="flex rounded-lg border border-border bg-muted/60 p-1 text-sm">
+            <Button asChild variant={methodTab ? "secondary" : "ghost"} size="sm" className="h-7 text-xs">
               <Link href="/admin/settings/payments">Methods</Link>
             </Button>
-            <Button asChild variant={!methodTab ? "secondary" : "ghost"} size="sm">
+            <Button asChild variant={!methodTab ? "secondary" : "ghost"} size="sm" className="h-7 text-xs">
               <Link href="/admin/settings/payments?tab=accounts">Accounts</Link>
             </Button>
           </div>
@@ -338,19 +339,19 @@ export function PaymentConfigManager({
             <input
               name="q"
               defaultValue={query}
-              placeholder={methodTab ? "Search method code, name, or notes" : "Search account code, name, institution, or number"}
-              className="h-10 min-w-0 flex-1 rounded-md border border-input bg-background px-3 text-sm"
+              placeholder={methodTab ? "Search method code, name, or notes..." : "Search account code, name, institution, or number..."}
+              className="h-9 min-w-0 flex-1 rounded-md border border-input bg-background px-3 text-sm focus-visible:ring-1 focus-visible:ring-ring"
             />
-            <Button variant="outline">
-              <SearchIcon data-icon="inline-start" />
+            <Button variant="outline" size="sm">
+              <SearchIcon className="size-3.5" data-icon="inline-start" />
               Search
             </Button>
           </form>
-          <div className="flex rounded-md border border-border bg-muted p-1 text-sm">
-            <Button asChild variant={!showDeleted ? "secondary" : "ghost"} size="sm">
+          <div className="flex rounded-lg border border-border bg-muted/60 p-1 text-sm">
+            <Button asChild variant={!showDeleted ? "secondary" : "ghost"} size="sm" className="h-7 text-xs">
               <Link href={methodTab ? "/admin/settings/payments" : "/admin/settings/payments?tab=accounts"}>Active</Link>
             </Button>
-            <Button asChild variant={showDeleted ? "secondary" : "ghost"} size="sm">
+            <Button asChild variant={showDeleted ? "secondary" : "ghost"} size="sm" className="h-7 text-xs">
               <Link href={methodTab ? "/admin/settings/payments?show=deleted" : "/admin/settings/payments?tab=accounts&show=deleted"}>Deleted</Link>
             </Button>
           </div>
@@ -399,7 +400,7 @@ function MethodTable({
   return (
     <div className="overflow-x-auto">
       <table className="w-full min-w-[980px] text-left text-sm">
-        <thead className="bg-muted text-xs uppercase tracking-wide text-muted-foreground">
+        <thead className="border-b border-border bg-muted/50 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
           <tr>
             <th className="px-4 py-3">Method</th>
             <th className="px-4 py-3">Type</th>
@@ -409,32 +410,37 @@ function MethodTable({
             <th className="px-4 py-3 text-right">Actions</th>
           </tr>
         </thead>
-        <tbody>
+        <tbody className="divide-y divide-border">
           {records.map((record) => (
-            <tr key={record.id} className="border-t border-border">
+            <tr
+              key={record.id}
+              className="transition-colors hover:bg-[rgba(235,239,234,0.45)] dark:hover:bg-muted/30"
+            >
               <td className="px-4 py-3">
-                <div className="font-medium">{record.code} / {record.name}</div>
+                <div className="font-medium text-foreground">{record.code} / {record.name}</div>
                 <div className="text-xs text-muted-foreground">{record.notes || "No notes"}</div>
               </td>
-              <td className="px-4 py-3 capitalize">{methodTypeLabel(record.methodType)}</td>
-              <td className="px-4 py-3">{directions(record)}</td>
-              <td className="px-4 py-3">{record.requiresReference ? "Required" : "Optional"}</td>
-              <td className="px-4 py-3">{record.isActive ? "Active" : "Inactive"}</td>
+              <td className="px-4 py-3 capitalize text-foreground">{methodTypeLabel(record.methodType)}</td>
+              <td className="px-4 py-3 text-foreground">{directions(record)}</td>
+              <td className="px-4 py-3 text-foreground">{record.requiresReference ? "Required" : "Optional"}</td>
               <td className="px-4 py-3">
+                <StatusBadge status={record.isActive ? "active" : "inactive"} />
+              </td>
+              <td className="px-4 py-3 text-right">
                 <div className="flex justify-end gap-2">
                   {!showDeleted ? (
                     <>
                       <MethodDialog label={`Edit ${record.name}`} action={updateAction} record={record} returnPath={returnPath}>
-                        <Button variant="outline" size="sm">
-                          <EditIcon data-icon="inline-start" />
+                        <Button variant="outline" size="sm" className="h-7 text-xs">
+                          <EditIcon className="size-3.5" data-icon="inline-start" />
                           Edit
                         </Button>
                       </MethodDialog>
                       <form action={deleteAction}>
                         <input type="hidden" name="id" value={record.id} />
                         <input type="hidden" name="returnPath" value={returnPath} />
-                        <Button variant="destructive" size="sm">
-                          <Trash2Icon data-icon="inline-start" />
+                        <Button variant="destructive" size="sm" className="h-7 text-xs">
+                          <Trash2Icon className="size-3.5" data-icon="inline-start" />
                           Delete
                         </Button>
                       </form>
@@ -443,8 +449,8 @@ function MethodTable({
                     <form action={restoreAction}>
                       <input type="hidden" name="id" value={record.id} />
                       <input type="hidden" name="returnPath" value={returnPath} />
-                      <Button variant="outline" size="sm">
-                        <RotateCcwIcon data-icon="inline-start" />
+                      <Button variant="outline" size="sm" className="h-7 text-xs">
+                        <RotateCcwIcon className="size-3.5" data-icon="inline-start" />
                         Restore
                       </Button>
                     </form>
@@ -455,7 +461,7 @@ function MethodTable({
           ))}
           {records.length === 0 ? (
             <tr>
-              <td colSpan={6} className="px-4 py-10 text-center text-muted-foreground">No payment methods found.</td>
+              <td colSpan={6} className="px-4 py-12 text-center text-muted-foreground">No payment methods found.</td>
             </tr>
           ) : null}
         </tbody>
@@ -484,7 +490,7 @@ function AccountTable({
   return (
     <div className="overflow-x-auto">
       <table className="w-full min-w-[1040px] text-left text-sm">
-        <thead className="bg-muted text-xs uppercase tracking-wide text-muted-foreground">
+        <thead className="border-b border-border bg-muted/50 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
           <tr>
             <th className="px-4 py-3">Account</th>
             <th className="px-4 py-3">Method</th>
@@ -494,38 +500,43 @@ function AccountTable({
             <th className="px-4 py-3 text-right">Actions</th>
           </tr>
         </thead>
-        <tbody>
+        <tbody className="divide-y divide-border">
           {records.map((record) => (
-            <tr key={record.id} className="border-t border-border">
+            <tr
+              key={record.id}
+              className="transition-colors hover:bg-[rgba(235,239,234,0.45)] dark:hover:bg-muted/30"
+            >
               <td className="px-4 py-3">
-                <div className="font-medium">{record.code} / {record.name}</div>
+                <div className="font-medium text-foreground">{record.code} / {record.name}</div>
                 <div className="text-xs text-muted-foreground">{record.notes || "No notes"}</div>
               </td>
               <td className="px-4 py-3">
-                <div>{record.paymentMethodName}</div>
+                <div className="font-medium text-foreground">{record.paymentMethodName}</div>
                 <div className="text-xs capitalize text-muted-foreground">{methodTypeLabel(record.paymentMethodType)}</div>
               </td>
-              <td className="px-4 py-3">
+              <td className="px-4 py-3 text-foreground">
                 <div>{record.institutionName ?? "-"}</div>
-                <div className="text-xs text-muted-foreground">{record.accountNumber ?? "-"}</div>
+                <div className="text-xs text-muted-foreground font-mono">{record.accountNumber ?? "-"}</div>
               </td>
-              <td className="px-4 py-3 text-right">{displayPaymentMoney(record.openingBalanceMinor, record.currencyCode)}</td>
-              <td className="px-4 py-3">{record.isActive ? "Active" : "Inactive"}</td>
+              <td className="px-4 py-3 text-right font-semibold text-foreground">{displayPaymentMoney(record.openingBalanceMinor, record.currencyCode)}</td>
               <td className="px-4 py-3">
+                <StatusBadge status={record.isActive ? "active" : "inactive"} />
+              </td>
+              <td className="px-4 py-3 text-right">
                 <div className="flex justify-end gap-2">
                   {!showDeleted ? (
                     <>
                       <AccountDialog label={`Edit ${record.name}`} action={updateAction} record={record} methods={methods} returnPath={returnPath}>
-                        <Button variant="outline" size="sm">
-                          <EditIcon data-icon="inline-start" />
+                        <Button variant="outline" size="sm" className="h-7 text-xs">
+                          <EditIcon className="size-3.5" data-icon="inline-start" />
                           Edit
                         </Button>
                       </AccountDialog>
                       <form action={deleteAction}>
                         <input type="hidden" name="id" value={record.id} />
                         <input type="hidden" name="returnPath" value={returnPath} />
-                        <Button variant="destructive" size="sm">
-                          <Trash2Icon data-icon="inline-start" />
+                        <Button variant="destructive" size="sm" className="h-7 text-xs">
+                          <Trash2Icon className="size-3.5" data-icon="inline-start" />
                           Delete
                         </Button>
                       </form>
@@ -534,8 +545,8 @@ function AccountTable({
                     <form action={restoreAction}>
                       <input type="hidden" name="id" value={record.id} />
                       <input type="hidden" name="returnPath" value={returnPath} />
-                      <Button variant="outline" size="sm">
-                        <RotateCcwIcon data-icon="inline-start" />
+                      <Button variant="outline" size="sm" className="h-7 text-xs">
+                        <RotateCcwIcon className="size-3.5" data-icon="inline-start" />
                         Restore
                       </Button>
                     </form>
@@ -546,7 +557,7 @@ function AccountTable({
           ))}
           {records.length === 0 ? (
             <tr>
-              <td colSpan={6} className="px-4 py-10 text-center text-muted-foreground">No payment accounts found.</td>
+              <td colSpan={6} className="px-4 py-12 text-center text-muted-foreground">No payment accounts found.</td>
             </tr>
           ) : null}
         </tbody>

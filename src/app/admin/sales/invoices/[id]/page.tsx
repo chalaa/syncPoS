@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { postCustomerInvoice, registerCustomerPayment } from "@/app/admin/sales/actions";
 import { PaymentFormDialog } from "@/components/app/payment-form-dialog";
 import { Alert } from "@/components/ui/alert";
+import { StatusBadge } from "@/components/ui/badge";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { Notebook } from "@/components/ui/notebook";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
@@ -73,37 +74,73 @@ export default async function CustomerInvoicePage({ params, searchParams }: Cust
       {query.notice ? <Alert kind="success">{query.notice}</Alert> : null}
       {query.error ? <Alert kind="error">{query.error}</Alert> : null}
 
-      <div className="mb-5 flex flex-wrap gap-2">
+      <div className="mb-6 flex flex-wrap gap-2.5">
         {invoice.salesOrderId ? (
-          <Link href={`/admin/sales/${invoice.salesOrderId}`} className="rounded-md border border-border bg-card px-4 py-3 text-sm hover:bg-accent">
-            <span className="block text-lg font-semibold">{invoice.orderNo}</span>
-            <span className="text-muted-foreground">Sales Order</span>
+          <Link
+            href={`/admin/sales/${invoice.salesOrderId}`}
+            className="group flex flex-col rounded-lg border border-border bg-card px-4 py-2 text-sm shadow-xs transition-all hover:border-primary/50 hover:bg-secondary/40"
+          >
+            <span className="text-lg font-bold tracking-tight text-foreground transition-colors group-hover:text-primary">
+              {invoice.orderNo}
+            </span>
+            <span className="text-xs font-medium text-muted-foreground">Sales Order</span>
           </Link>
         ) : null}
         {invoice.deliveryId ? (
-          <Link href={`/admin/sales/deliveries/${invoice.deliveryId}`} className="rounded-md border border-border bg-card px-4 py-3 text-sm hover:bg-accent">
-            <span className="block text-lg font-semibold">{invoice.deliveryNo}</span>
-            <span className="text-muted-foreground">Delivery</span>
+          <Link
+            href={`/admin/sales/deliveries/${invoice.deliveryId}`}
+            className="group flex flex-col rounded-lg border border-border bg-card px-4 py-2 text-sm shadow-xs transition-all hover:border-primary/50 hover:bg-secondary/40"
+          >
+            <span className="text-lg font-bold tracking-tight text-foreground transition-colors group-hover:text-primary">
+              {invoice.deliveryNo}
+            </span>
+            <span className="text-xs font-medium text-muted-foreground">Delivery</span>
           </Link>
         ) : null}
-        <Link href={`/admin/sales?view=payments&customerInvoiceId=${invoice.id}`} className="rounded-md border border-border bg-card px-4 py-3 text-sm hover:bg-accent">
-          <span className="block text-lg font-semibold">{invoice.paymentCount}</span>
-          <span className="text-muted-foreground">Payments</span>
+        <Link
+          href={`/admin/sales?view=payments&customerInvoiceId=${invoice.id}`}
+          className="group flex flex-col rounded-lg border border-border bg-card px-4 py-2 text-sm shadow-xs transition-all hover:border-primary/50 hover:bg-secondary/40"
+        >
+          <span className="text-lg font-bold tracking-tight text-foreground transition-colors group-hover:text-primary">
+            {invoice.paymentCount}
+          </span>
+          <span className="text-xs font-medium text-muted-foreground">Payments</span>
         </Link>
       </div>
 
-      <section className="rounded-lg border border-border bg-card p-5">
-        <div className="mb-5 grid gap-4 md:grid-cols-4">
+      <section className="overflow-hidden rounded-lg border border-border bg-card p-6 shadow-xs">
+        <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <Info label="Customer" value={invoice.customerName} />
-          <Info label="Status" value={statusLabel(invoice.status)} />
-          <Info label="Payment" value={statusLabel(invoice.paymentStatus)} />
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Status</p>
+            <div className="mt-1">
+              <StatusBadge status={invoice.status} />
+            </div>
+          </div>
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Payment Status</p>
+            <div className="mt-1">
+              <StatusBadge status={invoice.paymentStatus} />
+            </div>
+          </div>
           <Info label="Invoice Date" value={invoice.invoiceDate} />
-          <Info label="Due Date" value={invoice.dueDate ?? "-"} />
+          <Info label="Due Date" value={invoice.dueDate ?? "—"} />
           <Info label="Untaxed" value={displaySalesMoney(invoice.untaxedAmountMinor, invoice.currencyCode)} />
           <Info label="Tax" value={displaySalesMoney(invoice.taxAmountMinor, invoice.currencyCode)} />
-          <Info label="Total" value={displaySalesMoney(invoice.totalMinor, invoice.currencyCode)} />
-          <Info label="Residual" value={displaySalesMoney(invoice.residualAmountMinor, invoice.currencyCode)} />
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Total Amount</p>
+            <p className="mt-1 font-mono text-base font-bold text-foreground">
+              {displaySalesMoney(invoice.totalMinor, invoice.currencyCode)}
+            </p>
+          </div>
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Residual Due</p>
+            <p className={`mt-1 font-mono text-base font-bold ${invoice.residualAmountMinor > 0 ? "text-destructive" : "text-primary"}`}>
+              {displaySalesMoney(invoice.residualAmountMinor, invoice.currencyCode)}
+            </p>
+          </div>
         </div>
+
 
         <Notebook
           defaultValue="invoice-lines"

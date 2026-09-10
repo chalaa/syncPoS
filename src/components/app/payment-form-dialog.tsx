@@ -297,12 +297,19 @@ export function PaymentFormDialog({
               <PlusIcon className="size-4" />
               Add line
             </Button>
-            <div className="rounded-md border border-border bg-muted/30 px-3 py-2 text-sm">
-              <span className="text-muted-foreground">Entered </span>
-              <span className="font-semibold">{currencyCode} {minorToInputValue(enteredAmountMinor)}</span>
-              <span className="mx-2 text-muted-foreground">/</span>
-              <span className="text-muted-foreground">Remaining </span>
-              <span className="font-semibold">{currencyCode} {minorToInputValue(remainingAmountMinor)}</span>
+            <div
+              className={cn(
+                "rounded-lg border px-3.5 py-2 text-sm shadow-2xs transition-colors",
+                remainingAmountMinor === 0
+                  ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-800 dark:text-emerald-300"
+                  : "border-accent/40 bg-accent/10 text-dark dark:text-amber-300"
+              )}
+            >
+              <span className="opacity-80">Entered: </span>
+              <span className="font-bold">{currencyCode} {minorToInputValue(enteredAmountMinor)}</span>
+              <span className="mx-2 opacity-50">•</span>
+              <span className="opacity-80">Remaining: </span>
+              <span className="font-bold">{currencyCode} {minorToInputValue(remainingAmountMinor)}</span>
             </div>
           </div>
 

@@ -5,6 +5,7 @@ import { cancelDelivery, postDelivery, updateDeliverySourceLocation } from "@/ap
 import { DeliverySourceLocationAutosave } from "@/app/admin/sales/deliveries/[id]/delivery-source-location-autosave";
 import { DeliveryOperationsForm } from "@/app/admin/sales/deliveries/[id]/delivery-operations-form";
 import { Alert } from "@/components/ui/alert";
+import { StatusBadge } from "@/components/ui/badge";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { Notebook } from "@/components/ui/notebook";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
@@ -49,22 +50,30 @@ export default async function DeliveryDetailPage({ params, searchParams }: Deliv
       {query.error ? <Alert kind="error">{query.error}</Alert> : null}
 
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap gap-2">
-          <Link href={`/admin/sales/${delivery.salesOrderId}`} className="rounded-md border border-border bg-card px-4 py-3 text-sm hover:bg-accent">
-            <span className="block text-lg font-semibold">{delivery.orderNo}</span>
-            <span className="text-muted-foreground">Sales Order</span>
+        <div className="flex flex-wrap gap-2.5">
+          <Link
+            href={`/admin/sales/${delivery.salesOrderId}`}
+            className="group flex flex-col rounded-lg border border-border bg-card px-4 py-2 text-sm shadow-xs transition-all hover:border-primary/50 hover:bg-secondary/40"
+          >
+            <span className="text-lg font-bold tracking-tight text-foreground transition-colors group-hover:text-primary">
+              {delivery.orderNo}
+            </span>
+            <span className="text-xs font-medium text-muted-foreground">Sales Order</span>
           </Link>
           {delivery.stockMovementId ? (
-            <Link href={`/admin/inventory/operations/${delivery.stockMovementId}`} className="rounded-md border border-border bg-card px-4 py-3 text-sm hover:bg-accent">
-              <span className="block text-lg font-semibold">1</span>
-              <span className="text-muted-foreground">Inventory Move</span>
+            <Link
+              href={`/admin/inventory/operations/${delivery.stockMovementId}`}
+              className="group flex flex-col rounded-lg border border-border bg-card px-4 py-2 text-sm shadow-xs transition-all hover:border-primary/50 hover:bg-secondary/40"
+            >
+              <span className="text-lg font-bold tracking-tight text-foreground transition-colors group-hover:text-primary">
+                1
+              </span>
+              <span className="text-xs font-medium text-muted-foreground">Inventory Move</span>
             </Link>
           ) : null}
         </div>
         <div className="flex items-center gap-3">
-          <span className="rounded-md border border-border bg-muted px-3 py-2 text-sm capitalize">
-            {statusLabel(delivery.status)}
-          </span>
+          <StatusBadge status={delivery.status} size="lg" />
           {isDraft ? (
             <form action={cancelDelivery}>
               <input type="hidden" name="deliveryId" value={delivery.id} />

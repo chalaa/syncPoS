@@ -1,6 +1,6 @@
 "use client";
 
-import { EditIcon, KeyRoundIcon, PlusIcon, ShieldIcon, Trash2Icon, UserPlusIcon } from "lucide-react";
+import { EditIcon, KeyRoundIcon, PlusIcon, ShieldIcon, Trash2Icon, UserPlusIcon, UsersIcon } from "lucide-react";
 import Link from "next/link";
 import { useState, type ReactNode } from "react";
 
@@ -14,6 +14,7 @@ import {
   updateUser,
 } from "@/app/admin/settings/actions";
 import { Alert } from "@/components/ui/alert";
+import { Badge, StatusBadge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -44,9 +45,9 @@ type IamManagerProps = IamManagementData & {
 };
 
 const inputClass =
-  "h-10 rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring";
+  "h-10 rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-primary/20 focus:border-primary";
 const textareaClass =
-  "min-h-24 rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring";
+  "min-h-24 rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-primary/20 focus:border-primary";
 
 function SettingsViewNav({
   view,
@@ -58,19 +59,28 @@ function SettingsViewNav({
   canViewRoles: boolean;
 }) {
   return (
-    <div className="flex rounded-md border border-border bg-muted p-1 text-sm">
+    <div className="flex rounded-lg border border-border bg-card p-1 text-sm shadow-2xs">
       {canViewUsers ? (
-        <Button asChild variant={view === "users" ? "secondary" : "ghost"} size="sm">
-          <Link href="/admin/settings">Users</Link>
+        <Button asChild variant={view === "users" ? "default" : "ghost"} size="sm" className="gap-1.5 font-medium">
+          <Link href="/admin/settings">
+            <UsersIcon className="size-3.5" />
+            Users
+          </Link>
         </Button>
       ) : null}
       {canViewRoles ? (
         <>
-          <Button asChild variant={view === "roles" ? "secondary" : "ghost"} size="sm">
-            <Link href="/admin/settings?view=roles">Roles</Link>
+          <Button asChild variant={view === "roles" ? "default" : "ghost"} size="sm" className="gap-1.5 font-medium">
+            <Link href="/admin/settings?view=roles">
+              <ShieldIcon className="size-3.5" />
+              Roles
+            </Link>
           </Button>
-          <Button asChild variant={view === "permissions" ? "secondary" : "ghost"} size="sm">
-            <Link href="/admin/settings?view=permissions">Permissions</Link>
+          <Button asChild variant={view === "permissions" ? "default" : "ghost"} size="sm" className="gap-1.5 font-medium">
+            <Link href="/admin/settings?view=permissions">
+              <KeyRoundIcon className="size-3.5" />
+              Permissions
+            </Link>
           </Button>
         </>
       ) : null}
@@ -377,9 +387,9 @@ export function IamManager({
         {notice ? <Alert kind="success">{notice}</Alert> : null}
         {error ? <Alert kind="error">{error}</Alert> : null}
 
-        <section className="overflow-x-auto rounded-lg border border-border bg-card">
+        <section className="overflow-x-auto rounded-xl border border-border bg-card shadow-xs">
           <table className="w-full min-w-[980px] text-left text-sm">
-            <thead className="text-xs uppercase text-muted-foreground">
+            <thead className="bg-secondary/40 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               <tr className="border-b border-border">
                 <th className="px-4 py-3">Role</th>
                 <th className="px-4 py-3">Flags</th>
@@ -391,17 +401,31 @@ export function IamManager({
             </thead>
             <tbody>
               {roles.map((role) => (
-                <tr key={role.id} className="border-t border-border">
+                <tr key={role.id} className="border-t border-border transition-colors hover:bg-secondary/30">
                   <td className="px-4 py-3">
-                    <div className="font-medium">{role.name}</div>
+                    <div className="font-semibold text-foreground">{role.name}</div>
                     <div className="text-xs text-muted-foreground">{role.code} / {role.description ?? "-"}</div>
                   </td>
                   <td className="px-4 py-3">
-                    {role.isSystem ? "System" : "Custom"} / {role.isEditable ? "Editable" : "Locked"} / {role.isDeletable ? "Deletable" : "Protected"}
+                    <div className="flex flex-wrap gap-1">
+                      <Badge variant={role.isSystem ? "dark" : "outline"} className="text-[10px]">
+                        {role.isSystem ? "System" : "Custom"}
+                      </Badge>
+                      <Badge variant={role.isEditable ? "secondary" : "muted"} className="text-[10px]">
+                        {role.isEditable ? "Editable" : "Locked"}
+                      </Badge>
+                      {role.isDeletable ? null : (
+                        <Badge variant="destructive" className="text-[10px]">
+                          Protected
+                        </Badge>
+                      )}
+                    </div>
                   </td>
-                  <td className="px-4 py-3 text-right">{role.userCount}</td>
-                  <td className="px-4 py-3 text-right">{role.permissionCount}</td>
-                  <td className="px-4 py-3">{role.isActive ? "Active" : "Inactive"}</td>
+                  <td className="px-4 py-3 text-right font-medium">{role.userCount}</td>
+                  <td className="px-4 py-3 text-right font-medium">{role.permissionCount}</td>
+                  <td className="px-4 py-3">
+                    <StatusBadge status={role.isActive ? "active" : "inactive"} size="sm" />
+                  </td>
                   <td className="px-4 py-3">
                     <div className="flex justify-end gap-2">
                       {canManageRoles ? (
@@ -453,9 +477,9 @@ export function IamManager({
         {notice ? <Alert kind="success">{notice}</Alert> : null}
         {error ? <Alert kind="error">{error}</Alert> : null}
 
-        <section className="overflow-x-auto rounded-lg border border-border bg-card">
+        <section className="overflow-x-auto rounded-xl border border-border bg-card shadow-xs">
           <table className="w-full min-w-[900px] text-left text-sm">
-            <thead className="text-xs uppercase text-muted-foreground">
+            <thead className="bg-secondary/40 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               <tr className="border-b border-border">
                 <th className="px-4 py-3">Permission</th>
                 <th className="px-4 py-3">Application</th>
@@ -466,15 +490,21 @@ export function IamManager({
             </thead>
             <tbody>
               {permissions.map((permission) => (
-                <tr key={permission.id} className="border-t border-border">
+                <tr key={permission.id} className="border-t border-border transition-colors hover:bg-secondary/30">
                   <td className="px-4 py-3">
-                    <div className="font-medium">{permission.code}</div>
+                    <div className="font-semibold text-foreground">{permission.code}</div>
                     <div className="text-xs text-muted-foreground">{permission.description ?? "-"}</div>
                   </td>
-                  <td className="px-4 py-3">{permission.application ?? "-"}</td>
-                  <td className="px-4 py-3">{permission.feature ?? "-"}</td>
-                  <td className="px-4 py-3">{permission.action ?? "-"}</td>
-                  <td className="px-4 py-3">{permission.isActive ? "Active" : "Inactive"}</td>
+                  <td className="px-4 py-3">
+                    <Badge variant="outline" className="capitalize text-[11px]">
+                      {permission.application ?? "-"}
+                    </Badge>
+                  </td>
+                  <td className="px-4 py-3 text-muted-foreground">{permission.feature ?? "-"}</td>
+                  <td className="px-4 py-3 font-mono text-xs text-primary">{permission.action ?? "-"}</td>
+                  <td className="px-4 py-3">
+                    <StatusBadge status={permission.isActive ? "active" : "inactive"} size="sm" />
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -513,9 +543,9 @@ export function IamManager({
       {notice ? <Alert kind="success">{notice}</Alert> : null}
       {error ? <Alert kind="error">{error}</Alert> : null}
 
-      <section className="overflow-x-auto rounded-lg border border-border bg-card">
+      <section className="overflow-x-auto rounded-xl border border-border bg-card shadow-xs">
         <table className="w-full min-w-[1120px] text-left text-sm">
-          <thead className="text-xs uppercase text-muted-foreground">
+          <thead className="bg-secondary/40 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
             <tr className="border-b border-border">
               <th className="px-4 py-3">User</th>
               <th className="px-4 py-3">Employee</th>
@@ -530,18 +560,34 @@ export function IamManager({
           </thead>
           <tbody>
             {users.map((user) => (
-              <tr key={user.id} className="border-t border-border">
+              <tr key={user.id} className="border-t border-border transition-colors hover:bg-secondary/30">
                 <td className="px-4 py-3">
-                  <div className="font-medium">{user.username}</div>
+                  <div className="font-semibold text-foreground">{user.username}</div>
                   <div className="text-xs text-muted-foreground">{user.email ?? "-"}</div>
                 </td>
-                <td className="px-4 py-3">{user.employeeName ?? "-"}</td>
-                <td className="px-4 py-3">{user.roleNames}</td>
-                <td className="px-4 py-3">{user.emailVerified ? "Yes" : "No"}</td>
-                <td className="px-4 py-3">{user.failedLoginAttempts}</td>
-                <td className="px-4 py-3">{user.lockedUntil?.toLocaleString() ?? "-"}</td>
-                <td className="px-4 py-3">{user.lastLoginAt?.toLocaleString() ?? "-"}</td>
-                <td className="px-4 py-3 capitalize">{user.status}</td>
+                <td className="px-4 py-3 font-medium text-foreground">{user.employeeName ?? "-"}</td>
+                <td className="px-4 py-3">
+                  <div className="flex flex-wrap gap-1">
+                    {user.roleNames
+                      ? user.roleNames.split(", ").map((role) => (
+                          <Badge key={role} variant="secondary" className="text-[11px]">
+                            {role}
+                          </Badge>
+                        ))
+                      : "-"}
+                  </div>
+                </td>
+                <td className="px-4 py-3">
+                  <Badge variant={user.emailVerified ? "success" : "muted"} className="text-[11px]">
+                    {user.emailVerified ? "Verified" : "Unverified"}
+                  </Badge>
+                </td>
+                <td className="px-4 py-3 text-muted-foreground">{user.failedLoginAttempts}</td>
+                <td className="px-4 py-3 text-xs text-muted-foreground">{user.lockedUntil?.toLocaleString() ?? "-"}</td>
+                <td className="px-4 py-3 text-xs text-muted-foreground">{user.lastLoginAt?.toLocaleString() ?? "-"}</td>
+                <td className="px-4 py-3">
+                  <StatusBadge status={user.status} size="sm" />
+                </td>
                 <td className="px-4 py-3">
                   <div className="flex justify-end gap-2">
                     {canManageUsers ? (

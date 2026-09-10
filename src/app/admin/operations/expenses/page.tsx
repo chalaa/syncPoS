@@ -3,6 +3,7 @@ import Link from "next/link";
 
 import { cancelExpense } from "@/app/admin/operations/expenses/actions";
 import { Alert } from "@/components/ui/alert";
+import { StatusBadge } from "@/components/ui/badge";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
 import { requirePermission } from "@/server/auth/session";
@@ -32,6 +33,7 @@ export default async function ExpensesPage({ searchParams }: ExpensesPageProps) 
       <PageHeader
         eyebrow="Operations"
         title="Expenses"
+        description="Record and track miscellaneous operating expenses, supplier payments, and team reimbursements."
         actions={
           <div className="flex flex-wrap gap-2">
             <ButtonLink href="/admin/operations/expenses/categories" variant="outline">
@@ -49,22 +51,22 @@ export default async function ExpensesPage({ searchParams }: ExpensesPageProps) 
       {params.notice ? <Alert kind="success">{params.notice}</Alert> : null}
       {params.error ? <Alert kind="error">{params.error}</Alert> : null}
 
-      <section className="rounded-lg border border-border bg-card">
+      <section className="rounded-xl border border-border bg-card shadow-xs">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border p-4">
           <form className="flex min-w-0 flex-1 gap-2">
             <input
               name="q"
               defaultValue={query}
               placeholder="Search expense, category, or description"
-              className="h-10 min-w-0 flex-1 rounded-md border border-input bg-background px-3 text-sm"
+              className="h-9 min-w-0 flex-1 rounded-md border border-input bg-background px-3 text-sm outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/15"
             />
             {showCancelled ? <input type="hidden" name="show" value="cancelled" /> : null}
-            <Button variant="outline">
+            <Button variant="outline" className="h-9">
               <SearchIcon data-icon="inline-start" />
               Search
             </Button>
           </form>
-          <div className="flex rounded-md border border-border bg-muted p-1 text-sm">
+          <div className="flex rounded-lg border border-border bg-muted/40 p-1 text-sm">
             <Button asChild variant={!showCancelled ? "secondary" : "ghost"} size="sm">
               <Link href="/admin/operations/expenses">Normal</Link>
             </Button>
@@ -84,7 +86,7 @@ function ExpenseTable({ rows, showCancelled }: { rows: ExpenseListRow[]; showCan
   return (
     <div className="overflow-x-auto">
       <table className="w-full min-w-[1040px] text-left text-sm">
-        <thead className="text-xs uppercase text-muted-foreground">
+        <thead className="bg-secondary/40 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
           <tr className="border-b border-border">
             <th className="px-4 py-3">Expense</th>
             <th className="px-4 py-3">Date</th>
@@ -99,29 +101,33 @@ function ExpenseTable({ rows, showCancelled }: { rows: ExpenseListRow[]; showCan
         </thead>
         <tbody>
           {rows.map((expense) => (
-            <tr key={expense.id} className="border-b border-border/70">
+            <tr key={expense.id} className="border-t border-border transition-colors hover:bg-secondary/30">
               <td className="px-4 py-3">
-                <Link href={`/admin/operations/expenses/${expense.id}`} className="font-medium text-primary underline-offset-4 hover:underline">
+                <Link href={`/admin/operations/expenses/${expense.id}`} className="font-semibold text-primary underline-offset-4 hover:underline">
                   {expense.expenseNo}
                 </Link>
-                <div className="text-xs text-muted-foreground">{expense.description ?? "-"}</div>
+                {expense.description ? <div className="text-xs text-muted-foreground">{expense.description}</div> : null}
               </td>
-              <td className="px-4 py-3">{expense.expenseDate}</td>
-              <td className="px-4 py-3">{expense.categoryName}</td>
+              <td className="px-4 py-3 text-muted-foreground">{expense.expenseDate}</td>
+              <td className="px-4 py-3 font-medium text-foreground">{expense.categoryName}</td>
               <td className="px-4 py-3">
-                <div>{expense.employeeName ?? "-"}</div>
-                <div className="text-xs text-muted-foreground">{expense.vendorName ?? "-"}</div>
+                <div className="font-medium text-foreground">{expense.employeeName ?? "-"}</div>
+                {expense.vendorName ? <div className="text-xs text-muted-foreground">{expense.vendorName}</div> : null}
               </td>
-              <td className="px-4 py-3">{expense.locationName ?? "-"}</td>
-              <td className="px-4 py-3 capitalize">
-                <div>{statusLabel(expense.paymentStatus)}</div>
-                {expense.status === "cancelled" ? <div className="text-xs text-muted-foreground">Cancelled</div> : null}
+              <td className="px-4 py-3 text-muted-foreground">{expense.locationName ?? "-"}</td>
+              <td className="px-4 py-3">
+                <div className="flex flex-col gap-1 items-start">
+                  <StatusBadge status={expense.paymentStatus} size="sm" />
+                  {expense.status === "cancelled" ? (
+                    <StatusBadge status="cancelled" size="sm" />
+                  ) : null}
+                </div>
               </td>
-              <td className="px-4 py-3 text-right">{displayExpenseMoney(expense.amountMinor, expense.currencyCode)}</td>
-              <td className="px-4 py-3 text-right">{displayExpenseMoney(expense.residualAmountMinor, expense.currencyCode)}</td>
+              <td className="px-4 py-3 text-right font-semibold text-foreground">{displayExpenseMoney(expense.amountMinor, expense.currencyCode)}</td>
+              <td className="px-4 py-3 text-right font-medium text-amber-600 dark:text-amber-400">{displayExpenseMoney(expense.residualAmountMinor, expense.currencyCode)}</td>
               <td className="px-4 py-3">
                 <div className="flex justify-end gap-2">
-                  <ButtonLink href={`/admin/operations/expenses/${expense.id}`} size="sm">
+                  <ButtonLink href={`/admin/operations/expenses/${expense.id}`} size="sm" variant="outline">
                     <BanknoteIcon data-icon="inline-start" />
                     Details
                   </ButtonLink>
@@ -138,8 +144,9 @@ function ExpenseTable({ rows, showCancelled }: { rows: ExpenseListRow[]; showCan
           ))}
           {rows.length === 0 ? (
             <tr>
-              <td colSpan={9} className="px-4 py-8 text-center text-muted-foreground">
-                No expenses found.
+              <td colSpan={9} className="px-4 py-12 text-center text-muted-foreground">
+                <p className="font-medium text-foreground">No expenses found</p>
+                <p className="mt-1 text-xs text-muted-foreground">Try adjusting your search keywords.</p>
               </td>
             </tr>
           ) : null}

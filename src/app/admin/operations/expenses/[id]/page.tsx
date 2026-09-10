@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { cancelExpense, registerExpensePayment } from "@/app/admin/operations/expenses/actions";
 import { PaymentFormDialog } from "@/components/app/payment-form-dialog";
 import { Alert } from "@/components/ui/alert";
+import { StatusBadge } from "@/components/ui/badge";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
 import { requirePermission } from "@/server/auth/session";
@@ -49,10 +50,19 @@ export default async function ExpenseDetailPage({ params, searchParams }: Expens
         actions={
           <div className="flex flex-wrap gap-2">
             <ButtonLink href="/admin/operations/expenses" variant="outline">Back to expenses</ButtonLink>
-            {payments.length > 0 ? (
-              <ButtonLink href={`/admin/operations/expenses/${expense.id}#payments`} variant="outline">
-                Payments {payments.length}
-              </ButtonLink>
+            {canPay ? (
+              <PaymentFormDialog
+                title="Register Expense Payment"
+                description={`Create a draft outbound payment for ${expense.expenseNo}.`}
+                triggerLabel="Register Payment"
+                submitLabel="Register Draft Payment"
+                action={registerExpensePayment}
+                hiddenFieldName="expenseId"
+                hiddenFieldValue={expense.id}
+                paymentAccounts={outboundAccounts}
+                currencyCode={expense.currencyCode}
+                amountMinor={expense.residualAmountMinor}
+              />
             ) : null}
             {canCancel ? (
               <form action={cancelExpense}>
@@ -68,10 +78,40 @@ export default async function ExpenseDetailPage({ params, searchParams }: Expens
       {query.notice ? <Alert kind="success">{query.notice}</Alert> : null}
       {query.error ? <Alert kind="error">{query.error}</Alert> : null}
 
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap gap-2.5">
+          {payments.length > 0 ? (
+            <Link
+              href={`/admin/operations/expenses/${expense.id}#payments`}
+              className="group flex flex-col rounded-lg border border-border bg-card px-4 py-2 text-sm shadow-xs transition-all hover:border-primary/50 hover:bg-secondary/40"
+            >
+              <span className="text-lg font-bold tracking-tight text-foreground transition-colors group-hover:text-primary">
+                {payments.length}
+              </span>
+              <span className="text-xs font-medium text-muted-foreground">Payments</span>
+            </Link>
+          ) : null}
+        </div>
+        <div className="flex flex-wrap items-center gap-2.5">
+          <StatusBadge status={expense.status} size="lg" />
+          <StatusBadge status={expense.paymentStatus} size="lg" />
+        </div>
+      </div>
+
       <section className="rounded-lg border border-border bg-card p-5">
         <div className="mb-5 grid gap-4 md:grid-cols-4">
-          <Info label="Status" value={statusLabel(expense.status)} />
-          <Info label="Payment Status" value={statusLabel(expense.paymentStatus)} />
+          <div>
+            <p className="text-xs font-medium uppercase text-muted-foreground">Status</p>
+            <div className="mt-1">
+              <StatusBadge status={expense.status} size="sm" />
+            </div>
+          </div>
+          <div>
+            <p className="text-xs font-medium uppercase text-muted-foreground">Payment Status</p>
+            <div className="mt-1">
+              <StatusBadge status={expense.paymentStatus} size="sm" />
+            </div>
+          </div>
           <Info label="Expense Date" value={expense.expenseDate} />
           <Info label="Category" value={expense.categoryName} />
           <Info label="Employee" value={expense.employeeName ?? "-"} />

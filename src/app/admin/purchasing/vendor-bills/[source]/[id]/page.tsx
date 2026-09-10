@@ -5,6 +5,7 @@ import { cancelVendorBill, postVendorBill } from "@/app/admin/purchasing/actions
 import { registerSupplierPayment } from "@/app/admin/purchasing/payments/actions";
 import { PaymentFormDialog } from "@/components/app/payment-form-dialog";
 import { Alert } from "@/components/ui/alert";
+import { StatusBadge } from "@/components/ui/badge";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
 import { requirePermission } from "@/server/auth/session";
@@ -55,11 +56,6 @@ export default async function VendorBillDetailPage({ params, searchParams }: Ven
         actions={
           <div className="flex flex-wrap gap-2">
             <ButtonLink href="/admin/purchasing?view=supplier-bills" variant="outline">Back to vendor bills</ButtonLink>
-            {bill.source === "vendor_bill" ? (
-              <ButtonLink href={`/admin/purchasing?view=payments&vendorBillId=${bill.id}`} variant="outline">
-                Payments {bill.paymentCount}
-              </ButtonLink>
-            ) : null}
             {bill.source === "vendor_bill" && bill.status === "posted" && bill.residualAmountMinor > 0 ? (
               <PaymentFormDialog
                 title="Register Supplier Payment"
@@ -93,6 +89,48 @@ export default async function VendorBillDetailPage({ params, searchParams }: Ven
       {query.notice ? <Alert kind="success">{query.notice}</Alert> : null}
       {query.error ? <Alert kind="error">{query.error}</Alert> : null}
 
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap gap-2.5">
+          {bill.purchaseOrderId ? (
+            <Link
+              href={`/admin/purchasing/${bill.purchaseOrderId}`}
+              className="group flex flex-col rounded-lg border border-border bg-card px-4 py-2 text-sm shadow-xs transition-all hover:border-primary/50 hover:bg-secondary/40"
+            >
+              <span className="text-lg font-bold tracking-tight text-foreground transition-colors group-hover:text-primary">
+                {bill.orderNo}
+              </span>
+              <span className="text-xs font-medium text-muted-foreground">Purchase Order</span>
+            </Link>
+          ) : null}
+          {bill.goodsReceiptId ? (
+            <Link
+              href={`/admin/purchasing/receipts/${bill.goodsReceiptId}`}
+              className="group flex flex-col rounded-lg border border-border bg-card px-4 py-2 text-sm shadow-xs transition-all hover:border-primary/50 hover:bg-secondary/40"
+            >
+              <span className="text-lg font-bold tracking-tight text-foreground transition-colors group-hover:text-primary">
+                {bill.receiptNo}
+              </span>
+              <span className="text-xs font-medium text-muted-foreground">Receipt</span>
+            </Link>
+          ) : null}
+          {bill.source === "vendor_bill" ? (
+            <Link
+              href={`/admin/purchasing?view=payments&vendorBillId=${bill.id}`}
+              className="group flex flex-col rounded-lg border border-border bg-card px-4 py-2 text-sm shadow-xs transition-all hover:border-primary/50 hover:bg-secondary/40"
+            >
+              <span className="text-lg font-bold tracking-tight text-foreground transition-colors group-hover:text-primary">
+                {bill.paymentCount}
+              </span>
+              <span className="text-xs font-medium text-muted-foreground">Payments</span>
+            </Link>
+          ) : null}
+        </div>
+        <div className="flex flex-wrap items-center gap-2.5">
+          <StatusBadge status={bill.status} size="lg" />
+          <StatusBadge status={bill.paymentStatus} size="lg" />
+        </div>
+      </div>
+
       <section className="rounded-lg border border-border bg-card p-5">
         <div className="mb-5 grid gap-4 md:grid-cols-4">
           <div>
@@ -111,7 +149,9 @@ export default async function VendorBillDetailPage({ params, searchParams }: Ven
           </div>
           <div>
             <p className="text-xs font-medium uppercase text-muted-foreground">Status</p>
-            <p className="mt-1 text-sm font-medium capitalize">{statusLabel(bill.status)}</p>
+            <div className="mt-1">
+              <StatusBadge status={bill.status} size="sm" />
+            </div>
           </div>
           <div>
             <p className="text-xs font-medium uppercase text-muted-foreground">Total</p>
@@ -123,7 +163,9 @@ export default async function VendorBillDetailPage({ params, searchParams }: Ven
           </div>
           <div>
             <p className="text-xs font-medium uppercase text-muted-foreground">Payment Status</p>
-            <p className="mt-1 text-sm font-medium capitalize">{statusLabel(bill.paymentStatus)}</p>
+            <div className="mt-1">
+              <StatusBadge status={bill.paymentStatus} size="sm" />
+            </div>
           </div>
           <div>
             <p className="text-xs font-medium uppercase text-muted-foreground">Bill Date</p>

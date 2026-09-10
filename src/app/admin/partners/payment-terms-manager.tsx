@@ -9,6 +9,7 @@ import type {
   PaymentTermsManagerProps,
 } from "@/app/admin/partners/payment-term-types";
 import { Alert } from "@/components/ui/alert";
+import { StatusBadge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -89,7 +90,7 @@ function PaymentTermForm({
           type="checkbox"
           name="isActive"
           defaultChecked={record?.isActive ?? true}
-          className="size-4 rounded border-input"
+          className="size-4 rounded border-input text-primary focus:ring-primary"
         />
         Active
       </label>
@@ -149,16 +150,17 @@ export function PaymentTermsManager({
   return (
     <PageShell>
       <PageHeader
-        eyebrow="Partners"
+        eyebrow="Commercial Partners"
         title="Payment Terms"
+        description="Standard credit intervals and settlement timelines applied to commercial invoices."
         actions={
           <PaymentTermDialog
             label="New payment term"
             action={createAction}
             returnPath={returnPath}
           >
-            <Button>
-              <PlusIcon data-icon="inline-start" />
+            <Button size="sm">
+              <PlusIcon className="size-4" data-icon="inline-start" />
               New payment term
             </Button>
           </PaymentTermDialog>
@@ -168,26 +170,26 @@ export function PaymentTermsManager({
       {notice ? <Alert kind="success">{notice}</Alert> : null}
       {error ? <Alert kind="error">{error}</Alert> : null}
 
-      <section className="rounded-lg border border-border bg-card">
+      <section className="rounded-xl border border-border bg-card shadow-xs">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border p-4">
           <form className="flex min-w-0 flex-1 gap-2">
             <input
               name="q"
               defaultValue={query}
-              placeholder="Search code, name, or description"
-              className="h-10 min-w-0 flex-1 rounded-md border border-input bg-background px-3 text-sm"
+              placeholder="Search code, name, or description..."
+              className="h-9 min-w-0 flex-1 rounded-md border border-input bg-background px-3 text-sm focus-visible:ring-1 focus-visible:ring-ring"
             />
             {showDeleted ? <input type="hidden" name="show" value="deleted" /> : null}
-            <Button variant="outline">
-              <SearchIcon data-icon="inline-start" />
+            <Button variant="outline" size="sm">
+              <SearchIcon className="size-3.5" data-icon="inline-start" />
               Search
             </Button>
           </form>
-          <div className="flex rounded-md border border-border bg-muted p-1 text-sm">
-            <Button asChild variant={!showDeleted ? "secondary" : "ghost"} size="sm">
+          <div className="flex rounded-lg border border-border bg-muted/60 p-1 text-sm">
+            <Button asChild variant={!showDeleted ? "secondary" : "ghost"} size="sm" className="h-7 text-xs">
               <Link href="/admin/partners/payment-terms">Active</Link>
             </Button>
-            <Button asChild variant={showDeleted ? "secondary" : "ghost"} size="sm">
+            <Button asChild variant={showDeleted ? "secondary" : "ghost"} size="sm" className="h-7 text-xs">
               <Link href="/admin/partners/payment-terms?show=deleted">Deleted</Link>
             </Button>
           </div>
@@ -195,28 +197,39 @@ export function PaymentTermsManager({
 
         <div className="overflow-x-auto">
           <table className="w-full min-w-[820px] text-left text-sm">
-            <thead className="bg-muted text-xs uppercase tracking-wide text-muted-foreground">
+            <thead className="border-b border-border bg-muted/50 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               <tr>
                 <th className="px-4 py-3">Code</th>
-                <th className="px-4 py-3">Term</th>
-                <th className="px-4 py-3">Due days</th>
+                <th className="px-4 py-3">Term Name</th>
+                <th className="px-4 py-3">Due Window</th>
                 <th className="px-4 py-3">Status</th>
                 <th className="px-4 py-3 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y divide-border">
               {records.map((record) => (
-                <tr key={record.id} className="border-t border-border">
-                  <td className="px-4 py-3 font-medium">{record.code}</td>
-                  <td className="px-4 py-3">
-                    <div className="font-medium">{record.name}</div>
-                    <div className="text-xs text-muted-foreground">
-                      {record.description || "No description"}
-                    </div>
+                <tr
+                  key={record.id}
+                  className="transition-colors hover:bg-[rgba(235,239,234,0.45)] dark:hover:bg-muted/30"
+                >
+                  <td className="px-4 py-3 font-mono text-xs font-semibold text-foreground">
+                    {record.code}
                   </td>
-                  <td className="px-4 py-3">{record.dueDays}</td>
-                  <td className="px-4 py-3">{record.isActive ? "Active" : "Inactive"}</td>
                   <td className="px-4 py-3">
+                    <div className="font-medium text-foreground">{record.name}</div>
+                    {record.description ? (
+                      <div className="text-xs text-muted-foreground">
+                        {record.description}
+                      </div>
+                    ) : null}
+                  </td>
+                  <td className="px-4 py-3 text-foreground">
+                    <span className="font-semibold">{record.dueDays}</span> days
+                  </td>
+                  <td className="px-4 py-3">
+                    <StatusBadge status={record.isActive ? "active" : "inactive"} />
+                  </td>
+                  <td className="px-4 py-3 text-right">
                     <div className="flex justify-end gap-2">
                       {!showDeleted ? (
                         <>
@@ -226,16 +239,16 @@ export function PaymentTermsManager({
                             record={record}
                             returnPath={returnPath}
                           >
-                            <Button variant="outline" size="sm">
-                              <EditIcon data-icon="inline-start" />
+                            <Button variant="outline" size="sm" className="h-7 text-xs">
+                              <EditIcon className="size-3.5" data-icon="inline-start" />
                               Edit
                             </Button>
                           </PaymentTermDialog>
                           <form action={softDeleteAction}>
                             <input type="hidden" name="id" value={record.id} />
                             <input type="hidden" name="returnPath" value={returnPath} />
-                            <Button variant="destructive" size="sm">
-                              <Trash2Icon data-icon="inline-start" />
+                            <Button variant="destructive" size="sm" className="h-7 text-xs">
+                              <Trash2Icon className="size-3.5" data-icon="inline-start" />
                               Delete
                             </Button>
                           </form>
@@ -244,8 +257,8 @@ export function PaymentTermsManager({
                         <form action={restoreAction}>
                           <input type="hidden" name="id" value={record.id} />
                           <input type="hidden" name="returnPath" value={returnPath} />
-                          <Button variant="outline" size="sm">
-                            <RotateCcwIcon data-icon="inline-start" />
+                          <Button variant="outline" size="sm" className="h-7 text-xs">
+                            <RotateCcwIcon className="size-3.5" data-icon="inline-start" />
                             Restore
                           </Button>
                         </form>
@@ -256,7 +269,7 @@ export function PaymentTermsManager({
               ))}
               {records.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-4 py-10 text-center text-muted-foreground">
+                  <td colSpan={5} className="px-4 py-12 text-center text-muted-foreground">
                     No payment terms found.
                   </td>
                 </tr>

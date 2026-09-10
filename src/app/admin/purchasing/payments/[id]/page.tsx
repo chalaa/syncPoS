@@ -8,6 +8,7 @@ import {
 } from "@/app/admin/purchasing/payments/actions";
 import { PaymentFormDialog } from "@/components/app/payment-form-dialog";
 import { Alert } from "@/components/ui/alert";
+import { StatusBadge } from "@/components/ui/badge";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
 import { requirePermission } from "@/server/auth/session";
@@ -89,25 +90,30 @@ export default async function PaymentDetailPage({ params, searchParams }: Paymen
       {query.notice ? <Alert kind="success">{query.notice}</Alert> : null}
       {query.error ? <Alert kind="error">{query.error}</Alert> : null}
 
-      {purchaseOrderId ? (
-        <div className="mb-4 flex flex-wrap gap-2">
-          <Link
-            href={`/admin/purchasing/${purchaseOrderId}`}
-            className="rounded-md border border-border bg-card px-4 py-3 text-sm hover:bg-accent"
-          >
-            <span className="block text-base font-semibold">
-              {payment.allocations.find((allocation) => allocation.purchaseOrderId === purchaseOrderId)?.purchaseOrderNo ?? "Purchase Order"}
-            </span>
-            <span className="text-muted-foreground">Purchase Order</span>
-          </Link>
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap gap-2.5">
+          {purchaseOrderId ? (
+            <Link
+              href={`/admin/purchasing/${purchaseOrderId}`}
+              className="group flex flex-col rounded-lg border border-border bg-card px-4 py-2 text-sm shadow-xs transition-all hover:border-primary/50 hover:bg-secondary/40"
+            >
+              <span className="text-lg font-bold tracking-tight text-foreground transition-colors group-hover:text-primary">
+                {payment.allocations.find((allocation) => allocation.purchaseOrderId === purchaseOrderId)?.purchaseOrderNo ?? "Purchase Order"}
+              </span>
+              <span className="text-xs font-medium text-muted-foreground">Purchase Order</span>
+            </Link>
+          ) : null}
         </div>
-      ) : null}
+        <StatusBadge status={payment.status} size="lg" />
+      </div>
 
       <section className="rounded-lg border border-border bg-card p-5">
         <div className="mb-5 grid gap-4 md:grid-cols-4">
           <div>
             <p className="text-xs font-medium uppercase text-muted-foreground">Status</p>
-            <p className="mt-1 text-sm font-medium capitalize">{statusLabel(payment.status)}</p>
+            <div className="mt-1">
+              <StatusBadge status={payment.status} size="sm" />
+            </div>
           </div>
           <div>
             <p className="text-xs font-medium uppercase text-muted-foreground">Type</p>

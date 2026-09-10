@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import {
@@ -10,6 +11,7 @@ import { CreateDeliveryLinesEditor } from "@/app/admin/sales/[id]/create-deliver
 import { SalesOrderForm } from "@/app/admin/sales/sales-order-form";
 import { PaymentFormDialog } from "@/components/app/payment-form-dialog";
 import { Alert } from "@/components/ui/alert";
+import { StatusBadge } from "@/components/ui/badge";
 import { Button, ButtonLink } from "@/components/ui/button";
 import {
   Dialog,
@@ -126,28 +128,44 @@ export default async function SalesOrderDetailPage({ params, searchParams }: Sal
       {query.notice ? <Alert kind="success">{query.notice}</Alert> : null}
       {query.error ? <Alert kind="error">{query.error}</Alert> : null}
 
-      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap gap-2">
-          <a href={`/admin/sales?view=deliveries&salesOrderId=${order.id}`} className="rounded-md border border-border bg-card px-4 py-3 text-sm hover:bg-accent">
-            <span className="block text-lg font-semibold">{order.deliveryCount}</span>
-            <span className="text-muted-foreground">Deliveries</span>
-          </a>
-          <a href={`/admin/sales?view=payments&salesOrderId=${order.id}`} className="rounded-md border border-border bg-card px-4 py-3 text-sm hover:bg-accent">
-            <span className="block text-lg font-semibold">{order.paymentCount}</span>
-            <span className="text-muted-foreground">Payments</span>
-          </a>
-          <a href={`/admin/sales?view=returns&salesOrderId=${order.id}`} className="rounded-md border border-border bg-card px-4 py-3 text-sm hover:bg-accent">
-            <span className="block text-lg font-semibold">{order.returnCount}</span>
-            <span className="text-muted-foreground">Returns</span>
-          </a>
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
+        <div className="flex flex-wrap gap-2.5">
+          <Link
+            href={`/admin/sales?view=deliveries&salesOrderId=${order.id}`}
+            className="group flex flex-col rounded-lg border border-border bg-card px-4 py-2 text-sm shadow-xs transition-all hover:border-primary/50 hover:bg-secondary/40"
+          >
+            <span className="text-lg font-bold tracking-tight text-foreground transition-colors group-hover:text-primary">
+              {order.deliveryCount}
+            </span>
+            <span className="text-xs font-medium text-muted-foreground">Deliveries</span>
+          </Link>
+          <Link
+            href={`/admin/sales?view=payments&salesOrderId=${order.id}`}
+            className="group flex flex-col rounded-lg border border-border bg-card px-4 py-2 text-sm shadow-xs transition-all hover:border-primary/50 hover:bg-secondary/40"
+          >
+            <span className="text-lg font-bold tracking-tight text-foreground transition-colors group-hover:text-primary">
+              {order.paymentCount}
+            </span>
+            <span className="text-xs font-medium text-muted-foreground">Payments</span>
+          </Link>
+          <Link
+            href={`/admin/sales?view=returns&salesOrderId=${order.id}`}
+            className="group flex flex-col rounded-lg border border-border bg-card px-4 py-2 text-sm shadow-xs transition-all hover:border-primary/50 hover:bg-secondary/40"
+          >
+            <span className="text-lg font-bold tracking-tight text-foreground transition-colors group-hover:text-primary">
+              {order.returnCount}
+            </span>
+            <span className="text-xs font-medium text-muted-foreground">Returns</span>
+          </Link>
         </div>
-        <div className="flex items-center gap-3">
-          <span className="rounded-md border border-border bg-muted px-3 py-2 text-sm capitalize">
-            {statusLabel(order.status)}
-          </span>
-          <span className="rounded-md border border-border bg-muted px-3 py-2 text-sm">
-            {paymentStatusLabel(order)}
-          </span>
+        <div className="flex flex-wrap items-center gap-2.5">
+          <StatusBadge status={order.status} size="lg" />
+          <StatusBadge
+            status={order.residualAmountMinor === 0 ? "paid" : order.residualAmountMinor < order.totalMinor ? "partially_paid" : "unpaid"}
+            label={paymentStatusLabel(order)}
+            size="lg"
+          />
+
           {isQuotation ? (
             <form action={confirmSalesOrder}>
               <input type="hidden" name="salesOrderId" value={order.id} />

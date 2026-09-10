@@ -5,7 +5,9 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 
 import type { ReferenceManagerProps, ReferenceMutation } from "@/app/admin/products/reference-types";
+import { ProductNavTabs } from "@/app/admin/products/product-nav-tabs";
 import { Alert } from "@/components/ui/alert";
+import { StatusBadge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { CountrySelectField } from "@/components/ui/country-select-field";
 import {
@@ -297,41 +299,43 @@ export function CatalogReferenceManager({
         }
       />
 
+      <ProductNavTabs currentHref={basePath} />
+
       {notice ? <Alert kind="success">{notice}</Alert> : null}
       {error ? <Alert kind="error">{error}</Alert> : null}
 
-      <section className="rounded-lg border border-border bg-card">
+      <section className="rounded-xl border border-border bg-card shadow-xs">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border p-4">
-          <form className="flex min-w-0 flex-1 gap-2">
+          <form className="flex min-w-0 flex-1 gap-2 sm:max-w-md">
             <input
               name="q"
               defaultValue={query}
-              placeholder="Search code or name"
-              className="h-10 min-w-0 flex-1 rounded-md border border-input bg-background px-3 text-sm"
+              placeholder="Search code or name..."
+              className="h-9 min-w-0 flex-1 rounded-md border border-input bg-background px-3 text-sm focus-visible:ring-1 focus-visible:ring-ring"
             />
             {showDeleted ? <input type="hidden" name="show" value="deleted" /> : null}
-            <Button variant="outline">
-              <SearchIcon data-icon="inline-start" />
+            <Button variant="outline" size="sm">
+              <SearchIcon className="size-3.5" data-icon="inline-start" />
               Search
             </Button>
           </form>
-          <div className="flex rounded-md border border-border bg-muted p-1 text-sm">
-            <Button asChild variant={!showDeleted ? "secondary" : "ghost"} size="sm">
+          <div className="flex rounded-lg border border-border bg-muted/60 p-1 text-sm">
+            <Button asChild variant={!showDeleted ? "secondary" : "ghost"} size="sm" className="h-7 text-xs">
               <Link href={basePath}>Active</Link>
             </Button>
-            <Button asChild variant={showDeleted ? "secondary" : "ghost"} size="sm">
+            <Button asChild variant={showDeleted ? "secondary" : "ghost"} size="sm" className="h-7 text-xs">
               <Link href={`${basePath}?show=deleted`}>Deleted</Link>
             </Button>
           </div>
         </div>
 
-        <div className="border-b border-border px-4 py-3">
-          <p className="text-sm text-muted-foreground">{description}</p>
+        <div className="border-b border-border bg-muted/20 px-4 py-2.5">
+          <p className="text-xs text-muted-foreground">{description}</p>
         </div>
 
         <div className="overflow-x-auto">
           <table className="w-full min-w-[760px] text-left text-sm">
-            <thead className="bg-muted text-xs uppercase tracking-wide text-muted-foreground">
+            <thead className="border-b border-border bg-muted/50 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               <tr>
                 <th className="px-4 py-3">Code</th>
                 <th className="px-4 py-3">Name</th>
@@ -341,22 +345,35 @@ export function CatalogReferenceManager({
                 <th className="px-4 py-3 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y divide-border">
               {records.map((record) => (
-                <tr key={record.id} className="border-t border-border">
-                  <td className="px-4 py-3 font-medium">{record.code}</td>
+                <tr
+                  key={record.id}
+                  className="transition-colors hover:bg-[rgba(235,239,234,0.45)] dark:hover:bg-muted/30"
+                >
+                  <td className="px-4 py-3 font-mono text-xs font-semibold text-foreground">
+                    {record.code}
+                  </td>
                   <td className="px-4 py-3">
-                    <div className="font-medium">{record.name}</div>
+                    <div className="font-medium text-foreground">{record.name}</div>
                     {!showPrecision ? (
                       <div className="text-xs text-muted-foreground">
                         {record.description || "No description"}
                       </div>
                     ) : null}
                   </td>
-                  {showPrecision ? <td className="px-4 py-3">{record.precision ?? 0}</td> : null}
-                  {showCountry ? <td className="px-4 py-3">{record.country || "-"}</td> : null}
-                  <td className="px-4 py-3">{record.isActive ? "Active" : "Inactive"}</td>
+                  {showPrecision ? (
+                    <td className="px-4 py-3 font-mono text-xs text-foreground">
+                      {record.precision ?? 0}
+                    </td>
+                  ) : null}
+                  {showCountry ? (
+                    <td className="px-4 py-3 text-foreground">{record.country || "—"}</td>
+                  ) : null}
                   <td className="px-4 py-3">
+                    <StatusBadge status={record.isActive ? "active" : "inactive"} />
+                  </td>
+                  <td className="px-4 py-3 text-right">
                     <div className="flex justify-end gap-2">
                       {!showDeleted ? (
                         <>
@@ -369,16 +386,16 @@ export function CatalogReferenceManager({
                             showSpecifications={showSpecifications}
                             showCountry={showCountry}
                           >
-                            <Button variant="outline" size="sm">
-                              <EditIcon data-icon="inline-start" />
+                            <Button variant="outline" size="sm" className="h-7 text-xs">
+                              <EditIcon className="size-3.5" data-icon="inline-start" />
                               Edit
                             </Button>
                           </ReferenceDialog>
                           <form action={softDeleteAction}>
                             <input type="hidden" name="id" value={record.id} />
                             <input type="hidden" name="returnPath" value={returnPath} />
-                            <Button variant="destructive" size="sm">
-                              <Trash2Icon data-icon="inline-start" />
+                            <Button variant="destructive" size="sm" className="h-7 text-xs">
+                              <Trash2Icon className="size-3.5" data-icon="inline-start" />
                               Delete
                             </Button>
                           </form>
@@ -387,8 +404,8 @@ export function CatalogReferenceManager({
                         <form action={restoreAction}>
                           <input type="hidden" name="id" value={record.id} />
                           <input type="hidden" name="returnPath" value={returnPath} />
-                          <Button variant="outline" size="sm">
-                            <RotateCcwIcon data-icon="inline-start" />
+                          <Button variant="outline" size="sm" className="h-7 text-xs">
+                            <RotateCcwIcon className="size-3.5" data-icon="inline-start" />
                             Restore
                           </Button>
                         </form>
@@ -401,7 +418,7 @@ export function CatalogReferenceManager({
                 <tr>
                   <td
                     colSpan={4 + (showPrecision ? 1 : 0) + (showCountry ? 1 : 0)}
-                    className="px-4 py-10 text-center text-muted-foreground"
+                    className="px-4 py-12 text-center text-muted-foreground"
                   >
                     No records found.
                   </td>

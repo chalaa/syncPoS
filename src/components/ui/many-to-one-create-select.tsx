@@ -186,7 +186,7 @@ export function ManyToOneCreateSelect({
               key={item.id}
               type="button"
               onClick={() => selectItem(item)}
-              className="flex w-full flex-col rounded px-3 py-2 text-left text-sm hover:bg-accent"
+              className="flex w-full flex-col rounded px-3 py-2 text-left text-sm text-foreground transition-colors hover:bg-secondary/80"
             >
               <span className="font-medium">{item.name}</span>
               <span className="text-xs text-muted-foreground">{item.code}</span>
@@ -199,7 +199,7 @@ export function ManyToOneCreateSelect({
                 type="button"
                 onClick={() => createCustomer({ displayName: trimmedQuery })}
                 disabled={isPending}
-                className="flex w-full items-center gap-2 rounded px-3 py-2 text-left text-sm hover:bg-accent disabled:opacity-60"
+                className="flex w-full items-center gap-2 rounded px-3 py-2 text-left text-sm text-foreground transition-colors hover:bg-secondary/80 disabled:opacity-60"
               >
                 <PlusIcon className="size-4" />
                 {isPending ? "Creating..." : `Create "${trimmedQuery}"`}
@@ -211,7 +211,7 @@ export function ManyToOneCreateSelect({
                   setDropdownStyle(undefined);
                   setIsDialogOpen(true);
                 }}
-                className="flex w-full items-center gap-2 rounded px-3 py-2 text-left text-sm hover:bg-accent"
+                className="flex w-full items-center gap-2 rounded px-3 py-2 text-left text-sm text-foreground transition-colors hover:bg-secondary/80"
               >
                 <PlusIcon className="size-4" />
                 Create and Edit...

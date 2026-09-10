@@ -1,5 +1,9 @@
 import Link from "next/link";
+import { ArrowUpRight, FileText, Receipt, ArrowLeft } from "lucide-react";
 
+import { Alert } from "@/components/ui/alert";
+import { Button, ButtonLink } from "@/components/ui/button";
+import { PageHeader, PageShell } from "@/components/ui/page-shell";
 import {
   addressTypeOptions,
   minorToDisplay,
@@ -25,50 +29,94 @@ function money(value: number, currencyCode: string) {
 
 function PartnerSmartSummary({ partner }: { partner: PartnerDetailRecord }) {
   return (
-    <section className="mb-5 grid gap-3 md:grid-cols-[auto_auto_1fr]">
-      <div className="flex flex-wrap gap-2 md:col-span-3">
+    <section className="mb-6 space-y-4">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {partner.isCustomer ? (
           <Link
             href={`/admin/sales?view=invoices&partnerId=${partner.id}`}
-            className="rounded-md border border-[#c9d1d4] bg-white px-4 py-3 text-sm font-semibold text-[#2f4a49]"
+            className="group flex items-center justify-between rounded-xl border border-border bg-card p-4 transition-all hover:border-primary/50 hover:bg-secondary/40 hover:shadow-xs"
           >
-            <span className="block text-lg leading-none">{partner.financial.invoiceCount}</span>
-            <span className="mt-1 block text-xs font-medium text-[#58706f]">Customer Invoices</span>
+            <div className="flex items-center gap-3">
+              <div className="flex size-10 items-center justify-center rounded-lg bg-primary/10 text-primary transition-colors group-hover:bg-primary group-hover:text-primary-foreground">
+                <FileText className="size-5" />
+              </div>
+              <div>
+                <div className="text-xl font-bold tracking-tight text-foreground">
+                  {partner.financial.invoiceCount}
+                </div>
+                <div className="text-xs font-medium text-muted-foreground">
+                  Customer Invoices
+                </div>
+              </div>
+            </div>
+            <ArrowUpRight className="size-4 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:text-primary" />
           </Link>
         ) : null}
         {partner.isSupplier ? (
           <Link
             href={`/admin/purchasing?view=supplier-bills&partnerId=${partner.id}`}
-            className="rounded-md border border-[#c9d1d4] bg-white px-4 py-3 text-sm font-semibold text-[#2f4a49]"
+            className="group flex items-center justify-between rounded-xl border border-border bg-card p-4 transition-all hover:border-primary/50 hover:bg-secondary/40 hover:shadow-xs"
           >
-            <span className="block text-lg leading-none">{partner.financial.billCount}</span>
-            <span className="mt-1 block text-xs font-medium text-[#58706f]">Vendor Bills</span>
+            <div className="flex items-center gap-3">
+              <div className="flex size-10 items-center justify-center rounded-lg bg-primary/10 text-primary transition-colors group-hover:bg-primary group-hover:text-primary-foreground">
+                <Receipt className="size-5" />
+              </div>
+              <div>
+                <div className="text-xl font-bold tracking-tight text-foreground">
+                  {partner.financial.billCount}
+                </div>
+                <div className="text-xs font-medium text-muted-foreground">
+                  Vendor Bills
+                </div>
+              </div>
+            </div>
+            <ArrowUpRight className="size-4 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:text-primary" />
           </Link>
         ) : null}
       </div>
 
-      <div className="rounded-md border border-[#d7dcdf] bg-white p-4">
-        <div className="text-xs font-medium uppercase tracking-wide text-[#58706f]">Customer unpaid</div>
-        <div className="mt-1 text-lg font-semibold">
-          {money(partner.financial.receivableResidualMinor, partner.currencyCode)}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="rounded-xl border border-border border-l-4 border-l-amber-500 bg-card p-4 shadow-xs">
+          <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            Customer unpaid
+          </div>
+          <div className="mt-1 text-xl font-bold tracking-tight text-foreground">
+            {money(partner.financial.receivableResidualMinor, partner.currencyCode)}
+          </div>
         </div>
-      </div>
-      <div className="rounded-md border border-[#d7dcdf] bg-white p-4">
-        <div className="text-xs font-medium uppercase tracking-wide text-[#58706f]">Available customer credit</div>
-        <div className="mt-1 text-lg font-semibold">
-          {money(partner.financial.remainingCreditMinor, partner.currencyCode)}
+        <div className="rounded-xl border border-border border-l-4 border-l-emerald-600 bg-card p-4 shadow-xs">
+          <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            Available credit
+          </div>
+          <div className="mt-1 text-xl font-bold tracking-tight text-foreground">
+            {money(partner.financial.remainingCreditMinor, partner.currencyCode)}
+          </div>
         </div>
-      </div>
-      <div className="grid gap-3 sm:grid-cols-2">
-        <div className="rounded-md border border-[#d7dcdf] bg-white p-4">
-          <div className="text-xs font-medium uppercase tracking-wide text-[#58706f]">Supplier unpaid</div>
-          <div className="mt-1 text-lg font-semibold">
+        <div className="rounded-xl border border-border border-l-4 border-l-rose-500 bg-card p-4 shadow-xs">
+          <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            Supplier unpaid
+          </div>
+          <div className="mt-1 text-xl font-bold tracking-tight text-foreground">
             {money(partner.financial.payableResidualMinor, partner.currencyCode)}
           </div>
         </div>
-        <div className="rounded-md border border-[#d7dcdf] bg-white p-4">
-          <div className="text-xs font-medium uppercase tracking-wide text-[#58706f]">Net balance receivable-payable</div>
-          <div className="mt-1 text-lg font-semibold">
+        <div
+          className={`rounded-xl border border-border border-l-4 bg-card p-4 shadow-xs ${
+            partner.financial.netBalanceMinor >= 0
+              ? "border-l-emerald-600"
+              : "border-l-rose-500"
+          }`}
+        >
+          <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            Net balance
+          </div>
+          <div
+            className={`mt-1 text-xl font-bold tracking-tight ${
+              partner.financial.netBalanceMinor >= 0
+                ? "text-emerald-700 dark:text-emerald-400"
+                : "text-rose-600 dark:text-rose-400"
+            }`}
+          >
             {money(partner.financial.netBalanceMinor, partner.currencyCode)}
           </div>
         </div>
@@ -83,32 +131,22 @@ export function PartnerForm({ mode, partner, paymentTerms, error }: PartnerFormP
   const submitLabel = mode === "create" ? "Create partner" : "Save changes";
 
   return (
-    <main className="min-h-screen bg-[#f5f7f8] text-[#172026]">
-      <section className="mx-auto w-full max-w-5xl px-6 py-8">
-        <header className="mb-6 flex flex-wrap items-center justify-between gap-4 border-b border-[#d7dcdf] pb-5">
-          <div>
-            <p className="text-sm font-medium uppercase tracking-wide text-[#58706f]">
-              Partners
-            </p>
-            <h1 className="mt-1 text-2xl font-semibold">{title}</h1>
-          </div>
-          <Link
-            href="/admin/partners"
-            className="rounded-md border border-[#c9d1d4] bg-white px-3 py-2 text-sm font-medium text-[#2f4a49]"
-          >
+    <PageShell maxWidth="max-w-5xl">
+      <PageHeader
+        eyebrow="Partners"
+        title={title}
+        actions={
+          <ButtonLink href="/admin/partners" variant="outline">
             Back to partners
-          </Link>
-        </header>
+          </ButtonLink>
+        }
+      />
 
-        {error ? (
-          <div className="mb-5 rounded-md border border-[#e0a6a6] bg-[#fff7f7] px-4 py-3 text-sm text-[#8a2626]">
-            {error}
-          </div>
-        ) : null}
+      {error ? <Alert kind="error">{error}</Alert> : null}
 
-        {hasFinancialSummary(partner) ? <PartnerSmartSummary partner={partner} /> : null}
+      {hasFinancialSummary(partner) ? <PartnerSmartSummary partner={partner} /> : null}
 
-        <form action={action} className="grid gap-5 rounded-lg border border-[#d7dcdf] bg-white p-5">
+      <form action={action} className="grid gap-5 rounded-xl border border-border bg-card p-6 shadow-xs">
           {partner ? <input type="hidden" name="id" value={partner.id} /> : null}
 
           <div className="grid gap-4 md:grid-cols-2">
@@ -119,7 +157,7 @@ export function PartnerForm({ mode, partner, paymentTerms, error }: PartnerFormP
                 defaultValue={partner?.code}
                 placeholder={partner ? undefined : "Auto"}
                 maxLength={40}
-                className="h-10 rounded-md border border-[#c9d1d4] px-3 font-normal"
+                className="h-10 rounded-md border border-input bg-background px-3 font-normal text-foreground"
               />
             </label>
             <label className="grid gap-1 text-sm font-medium">
@@ -128,7 +166,7 @@ export function PartnerForm({ mode, partner, paymentTerms, error }: PartnerFormP
                 name="tin"
                 defaultValue={partner?.tin ?? ""}
                 maxLength={30}
-                className="h-10 rounded-md border border-[#c9d1d4] px-3 font-normal"
+                className="h-10 rounded-md border border-input bg-background px-3 font-normal text-foreground"
               />
             </label>
           </div>
@@ -141,7 +179,7 @@ export function PartnerForm({ mode, partner, paymentTerms, error }: PartnerFormP
                 defaultValue={partner?.displayName}
                 required
                 maxLength={200}
-                className="h-10 rounded-md border border-[#c9d1d4] px-3 font-normal"
+                className="h-10 rounded-md border border-input bg-background px-3 font-normal text-foreground"
               />
             </label>
             <label className="grid gap-1 text-sm font-medium">
@@ -150,13 +188,13 @@ export function PartnerForm({ mode, partner, paymentTerms, error }: PartnerFormP
                 name="legalName"
                 defaultValue={partner?.legalName ?? ""}
                 maxLength={200}
-                className="h-10 rounded-md border border-[#c9d1d4] px-3 font-normal"
+                className="h-10 rounded-md border border-input bg-background px-3 font-normal text-foreground"
               />
             </label>
           </div>
 
           <div className="grid gap-4 md:grid-cols-3">
-            <fieldset className="rounded-md border border-[#d7dcdf] px-3 py-2">
+            <fieldset className="rounded-md border border-border bg-background/40 px-3 py-2">
               <legend className="px-1 text-sm font-medium">Role</legend>
               <label className="mt-1 flex items-center gap-2 text-sm">
                 <input name="isCustomer" type="checkbox" defaultChecked={partner?.isCustomer ?? true} />
@@ -172,7 +210,7 @@ export function PartnerForm({ mode, partner, paymentTerms, error }: PartnerFormP
               <select
                 name="paymentTermId"
                 defaultValue={partner?.paymentTermId ?? ""}
-                className="h-10 rounded-md border border-[#c9d1d4] px-3 font-normal"
+                className="h-10 rounded-md border border-input bg-background px-3 font-normal text-foreground"
               >
                 <option value="">None</option>
                 {paymentTerms.map((term) => (
@@ -187,7 +225,7 @@ export function PartnerForm({ mode, partner, paymentTerms, error }: PartnerFormP
               <select
                 name="status"
                 defaultValue={partner?.status ?? "active"}
-                className="h-10 rounded-md border border-[#c9d1d4] px-3 font-normal"
+                className="h-10 rounded-md border border-input bg-background px-3 font-normal text-foreground"
               >
                 {partnerStatusOptions.map((status) => (
                   <option key={status} value={status}>
@@ -206,12 +244,12 @@ export function PartnerForm({ mode, partner, paymentTerms, error }: PartnerFormP
               min="0"
               step="0.01"
               defaultValue={partner ? minorToDisplay(partner.creditLimitMinor) : "0.00"}
-              className="h-10 rounded-md border border-[#c9d1d4] px-3 font-normal"
+              className="h-10 rounded-md border border-input bg-background px-3 font-normal text-foreground"
             />
           </label>
 
-          <section className="grid gap-4 rounded-md border border-[#e1e6e8] p-4">
-            <h2 className="text-base font-semibold">Primary Contact</h2>
+          <section className="grid gap-4 rounded-lg border border-border bg-muted/20 p-4">
+            <h2 className="text-base font-semibold text-foreground">Primary Contact</h2>
             <div className="grid gap-4 md:grid-cols-2">
               <label className="grid gap-1 text-sm font-medium">
                 Name
@@ -219,7 +257,7 @@ export function PartnerForm({ mode, partner, paymentTerms, error }: PartnerFormP
                   name="contactName"
                   defaultValue={partner?.primaryContact?.fullName ?? ""}
                   maxLength={160}
-                  className="h-10 rounded-md border border-[#c9d1d4] px-3 font-normal"
+                  className="h-10 rounded-md border border-input bg-background px-3 font-normal text-foreground"
                 />
               </label>
               <label className="grid gap-1 text-sm font-medium">
@@ -228,7 +266,7 @@ export function PartnerForm({ mode, partner, paymentTerms, error }: PartnerFormP
                   name="contactRole"
                   defaultValue={partner?.primaryContact?.roleTitle ?? ""}
                   maxLength={100}
-                  className="h-10 rounded-md border border-[#c9d1d4] px-3 font-normal"
+                  className="h-10 rounded-md border border-input bg-background px-3 font-normal text-foreground"
                 />
               </label>
               <label className="grid gap-1 text-sm font-medium">
@@ -237,7 +275,7 @@ export function PartnerForm({ mode, partner, paymentTerms, error }: PartnerFormP
                   name="contactPhone"
                   defaultValue={partner?.primaryContact?.phone ?? ""}
                   maxLength={40}
-                  className="h-10 rounded-md border border-[#c9d1d4] px-3 font-normal"
+                  className="h-10 rounded-md border border-input bg-background px-3 font-normal text-foreground"
                 />
               </label>
               <label className="grid gap-1 text-sm font-medium">
@@ -247,21 +285,21 @@ export function PartnerForm({ mode, partner, paymentTerms, error }: PartnerFormP
                   type="email"
                   defaultValue={partner?.primaryContact?.email ?? ""}
                   maxLength={160}
-                  className="h-10 rounded-md border border-[#c9d1d4] px-3 font-normal"
+                  className="h-10 rounded-md border border-input bg-background px-3 font-normal text-foreground"
                 />
               </label>
             </div>
           </section>
 
-          <section className="grid gap-4 rounded-md border border-[#e1e6e8] p-4">
-            <h2 className="text-base font-semibold">Primary Address</h2>
+          <section className="grid gap-4 rounded-lg border border-border bg-muted/20 p-4">
+            <h2 className="text-base font-semibold text-foreground">Primary Address</h2>
             <div className="grid gap-4 md:grid-cols-3">
               <label className="grid gap-1 text-sm font-medium">
                 Type
                 <select
                   name="addressType"
                   defaultValue={partner?.primaryAddress?.addressType ?? "office"}
-                  className="h-10 rounded-md border border-[#c9d1d4] px-3 font-normal"
+                  className="h-10 rounded-md border border-input bg-background px-3 font-normal text-foreground"
                 >
                   {addressTypeOptions.map((type) => (
                     <option key={type} value={type}>
@@ -276,7 +314,7 @@ export function PartnerForm({ mode, partner, paymentTerms, error }: PartnerFormP
                   name="addressLabel"
                   defaultValue={partner?.primaryAddress?.label ?? ""}
                   maxLength={100}
-                  className="h-10 rounded-md border border-[#c9d1d4] px-3 font-normal"
+                  className="h-10 rounded-md border border-input bg-background px-3 font-normal text-foreground"
                 />
               </label>
             </div>
@@ -286,7 +324,7 @@ export function PartnerForm({ mode, partner, paymentTerms, error }: PartnerFormP
                 name="addressLine1"
                 defaultValue={partner?.primaryAddress?.line1 ?? ""}
                 maxLength={200}
-                className="h-10 rounded-md border border-[#c9d1d4] px-3 font-normal"
+                className="h-10 rounded-md border border-input bg-background px-3 font-normal text-foreground"
               />
             </label>
             <label className="grid gap-1 text-sm font-medium">
@@ -295,7 +333,7 @@ export function PartnerForm({ mode, partner, paymentTerms, error }: PartnerFormP
                 name="addressLine2"
                 defaultValue={partner?.primaryAddress?.line2 ?? ""}
                 maxLength={200}
-                className="h-10 rounded-md border border-[#c9d1d4] px-3 font-normal"
+                className="h-10 rounded-md border border-input bg-background px-3 font-normal text-foreground"
               />
             </label>
             <div className="grid gap-4 md:grid-cols-3">
@@ -305,7 +343,7 @@ export function PartnerForm({ mode, partner, paymentTerms, error }: PartnerFormP
                   name="city"
                   defaultValue={partner?.primaryAddress?.city ?? ""}
                   maxLength={120}
-                  className="h-10 rounded-md border border-[#c9d1d4] px-3 font-normal"
+                  className="h-10 rounded-md border border-input bg-background px-3 font-normal text-foreground"
                 />
               </label>
               <label className="grid gap-1 text-sm font-medium">
@@ -314,7 +352,7 @@ export function PartnerForm({ mode, partner, paymentTerms, error }: PartnerFormP
                   name="region"
                   defaultValue={partner?.primaryAddress?.region ?? ""}
                   maxLength={120}
-                  className="h-10 rounded-md border border-[#c9d1d4] px-3 font-normal"
+                  className="h-10 rounded-md border border-input bg-background px-3 font-normal text-foreground"
                 />
               </label>
               <label className="grid gap-1 text-sm font-medium">
@@ -324,7 +362,7 @@ export function PartnerForm({ mode, partner, paymentTerms, error }: PartnerFormP
                   defaultValue={partner?.primaryAddress?.country ?? "Ethiopia"}
                   required
                   maxLength={120}
-                  className="h-10 rounded-md border border-[#c9d1d4] px-3 font-normal"
+                  className="h-10 rounded-md border border-input bg-background px-3 font-normal text-foreground"
                 />
               </label>
             </div>
@@ -336,26 +374,19 @@ export function PartnerForm({ mode, partner, paymentTerms, error }: PartnerFormP
               name="notes"
               defaultValue={partner?.notes ?? ""}
               rows={4}
-              className="rounded-md border border-[#c9d1d4] px-3 py-2 font-normal"
+              className="rounded-md border border-input bg-background px-3 py-2 font-normal text-foreground"
             />
           </label>
 
-          <div className="flex flex-wrap justify-end gap-3 border-t border-[#e1e6e8] pt-4">
-            <Link
-              href="/admin/partners"
-              className="rounded-md border border-[#c9d1d4] px-4 py-2 text-sm font-medium"
-            >
+          <div className="flex flex-wrap justify-end gap-3 border-t border-border pt-4">
+            <ButtonLink href="/admin/partners" variant="outline">
               Cancel
-            </Link>
-            <button
-              type="submit"
-              className="rounded-md bg-[#1f6b5c] px-4 py-2 text-sm font-semibold text-white"
-            >
+            </ButtonLink>
+            <Button type="submit">
               {submitLabel}
-            </button>
+            </Button>
           </div>
         </form>
-      </section>
-    </main>
+    </PageShell>
   );
 }

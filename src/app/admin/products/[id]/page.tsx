@@ -1,5 +1,7 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { StatusBadge } from "@/components/ui/badge";
 import { ButtonLink } from "@/components/ui/button";
 import { Notebook } from "@/components/ui/notebook";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
@@ -80,27 +82,27 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
           </div>
         </div>
 
-        <div className="flex flex-wrap gap-2">
-          <a href="#inventory" className="rounded-md border border-border bg-card px-4 py-3 text-sm hover:bg-accent">
-            <span className="block text-lg font-semibold">{displayQuantity(product.quantityOnHand)}</span>
-            <span className="text-muted-foreground">On Hand</span>
+        <div className="flex flex-wrap gap-2.5">
+          <a href="#inventory" className="group flex flex-col rounded-lg border border-border bg-card px-4 py-2 text-sm shadow-xs transition-all hover:border-primary/50 hover:bg-secondary/40">
+            <span className="text-lg font-bold tracking-tight text-foreground transition-colors group-hover:text-primary">{displayQuantity(product.quantityOnHand)}</span>
+            <span className="text-xs font-medium text-muted-foreground">On Hand</span>
           </a>
-          <a href="#inventory" className="rounded-md border border-border bg-card px-4 py-3 text-sm hover:bg-accent">
-            <span className="block text-lg font-semibold">{displayQuantity(product.incomingQuantity)}</span>
-            <span className="text-muted-foreground">Incoming</span>
+          <a href="#inventory" className="group flex flex-col rounded-lg border border-border bg-card px-4 py-2 text-sm shadow-xs transition-all hover:border-primary/50 hover:bg-secondary/40">
+            <span className="text-lg font-bold tracking-tight text-foreground transition-colors group-hover:text-primary">{displayQuantity(product.incomingQuantity)}</span>
+            <span className="text-xs font-medium text-muted-foreground">Incoming</span>
           </a>
-          <a href="#tracking" className="rounded-md border border-border bg-card px-4 py-3 text-sm hover:bg-accent">
-            <span className="block text-lg font-semibold">{product.trackingRows.length}</span>
-            <span className="text-muted-foreground">Lots / Serials</span>
+          <a href="#tracking" className="group flex flex-col rounded-lg border border-border bg-card px-4 py-2 text-sm shadow-xs transition-all hover:border-primary/50 hover:bg-secondary/40">
+            <span className="text-lg font-bold tracking-tight text-foreground transition-colors group-hover:text-primary">{product.trackingRows.length}</span>
+            <span className="text-xs font-medium text-muted-foreground">Lots / Serials</span>
           </a>
-          <a href="#moves" className="rounded-md border border-border bg-card px-4 py-3 text-sm hover:bg-accent">
-            <span className="block text-lg font-semibold">{product.movementCount}</span>
-            <span className="text-muted-foreground">Moves</span>
+          <a href="#moves" className="group flex flex-col rounded-lg border border-border bg-card px-4 py-2 text-sm shadow-xs transition-all hover:border-primary/50 hover:bg-secondary/40">
+            <span className="text-lg font-bold tracking-tight text-foreground transition-colors group-hover:text-primary">{product.movementCount}</span>
+            <span className="text-xs font-medium text-muted-foreground">Moves</span>
           </a>
-          <a href={`/admin/purchasing?view=receipts`} className="rounded-md border border-border bg-card px-4 py-3 text-sm hover:bg-accent">
-            <span className="block text-lg font-semibold">{product.receiptCount}</span>
-            <span className="text-muted-foreground">Receipts</span>
-          </a>
+          <Link href="/admin/purchasing?view=receipts" className="group flex flex-col rounded-lg border border-border bg-card px-4 py-2 text-sm shadow-xs transition-all hover:border-primary/50 hover:bg-secondary/40">
+            <span className="text-lg font-bold tracking-tight text-foreground transition-colors group-hover:text-primary">{product.receiptCount}</span>
+            <span className="text-xs font-medium text-muted-foreground">Receipts</span>
+          </Link>
         </div>
       </div>
 
@@ -233,7 +235,9 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
                       <tr key={`${row.kind}-${row.id}`} className="border-b border-border/70">
                         <td className="px-3 py-3 capitalize">{row.kind}</td>
                         <td className="px-3 py-3 font-medium">{row.referenceNo}</td>
-                        <td className="px-3 py-3 capitalize">{trackingLabel(row.status)}</td>
+                        <td className="px-3 py-3">
+                          <StatusBadge status={row.status} />
+                        </td>
                         <td className="px-3 py-3">{row.currentLocationCode ?? "-"}</td>
                         <td className="px-3 py-3 text-right">{displayQuantity(row.quantityOnHand)}</td>
                         <td className="px-3 py-3 text-right">

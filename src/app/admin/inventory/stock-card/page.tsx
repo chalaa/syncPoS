@@ -2,6 +2,7 @@ import {
   ProductStockCardFilters,
   ProductStockCardTable,
 } from "@/app/admin/inventory/movement-table";
+import { InventoryNavTabs } from "@/app/admin/inventory/inventory-nav-tabs";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
 import { requirePermission } from "@/server/auth/session";
 import {
@@ -38,8 +39,15 @@ export default async function StockCardPage({ searchParams }: StockCardPageProps
 
   return (
     <PageShell>
-      <PageHeader eyebrow="Inventory" title="Product Stock Card" />
-      <section className="rounded-lg border border-border bg-card">
+      <PageHeader
+        eyebrow="Inventory Workspace"
+        title="Product Stock Card"
+        description="Continuous running balance ledger tracking ins, outs, unit costs, and remaining quantities."
+      />
+
+      <InventoryNavTabs currentHref="/admin/inventory/stock-card" />
+
+      <section className="rounded-xl border border-border bg-card shadow-xs">
         <ProductStockCardFilters
           query={query}
           productId={productId}

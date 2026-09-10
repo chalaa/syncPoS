@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { Alert } from "@/components/ui/alert";
+import { StatusBadge } from "@/components/ui/badge";
 import { ButtonLink } from "@/components/ui/button";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
 import { requirePermission } from "@/server/auth/session";
@@ -39,9 +40,6 @@ export default async function ReceiptDetailPage({ params, searchParams }: Receip
         actions={
           <div className="flex flex-wrap gap-2">
             <ButtonLink href="/admin/purchasing?view=receipts" variant="outline">Back to receipts</ButtonLink>
-            <ButtonLink href={`/admin/purchasing?view=landed-costs&purchaseOrderId=${receipt.purchaseOrderId}`} variant="outline">
-              Landed Costs {receipt.landedCostCount}
-            </ButtonLink>
             <ButtonLink href={`/admin/purchasing/landed-costs/new?receiptId=${receipt.id}`} variant="outline">Add Landed Cost</ButtonLink>
           </div>
         }
@@ -49,14 +47,28 @@ export default async function ReceiptDetailPage({ params, searchParams }: Receip
 
       {query.notice ? <Alert kind="success">{query.notice}</Alert> : null}
 
-      <div className="mb-4 flex flex-wrap gap-2">
-        <Link
-          href={`/admin/purchasing/${receipt.purchaseOrderId}`}
-          className="rounded-md border border-border bg-card px-4 py-3 text-sm hover:bg-accent"
-        >
-          <span className="block text-base font-semibold">{receipt.orderNo}</span>
-          <span className="text-muted-foreground">Purchase Order</span>
-        </Link>
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap gap-2.5">
+          <Link
+            href={`/admin/purchasing/${receipt.purchaseOrderId}`}
+            className="group flex flex-col rounded-lg border border-border bg-card px-4 py-2 text-sm shadow-xs transition-all hover:border-primary/50 hover:bg-secondary/40"
+          >
+            <span className="text-lg font-bold tracking-tight text-foreground transition-colors group-hover:text-primary">
+              {receipt.orderNo}
+            </span>
+            <span className="text-xs font-medium text-muted-foreground">Purchase Order</span>
+          </Link>
+          <Link
+            href={`/admin/purchasing?view=landed-costs&purchaseOrderId=${receipt.purchaseOrderId}`}
+            className="group flex flex-col rounded-lg border border-border bg-card px-4 py-2 text-sm shadow-xs transition-all hover:border-primary/50 hover:bg-secondary/40"
+          >
+            <span className="text-lg font-bold tracking-tight text-foreground transition-colors group-hover:text-primary">
+              {receipt.landedCostCount}
+            </span>
+            <span className="text-xs font-medium text-muted-foreground">Landed Costs</span>
+          </Link>
+        </div>
+        <StatusBadge status={receipt.status} size="lg" />
       </div>
 
       <section className="rounded-lg border border-border bg-card p-5">
@@ -73,7 +85,9 @@ export default async function ReceiptDetailPage({ params, searchParams }: Receip
           </div>
           <div>
             <p className="text-xs font-medium uppercase text-muted-foreground">Status</p>
-            <p className="mt-1 text-sm font-medium capitalize">{statusLabel(receipt.status)}</p>
+            <div className="mt-1">
+              <StatusBadge status={receipt.status} size="sm" />
+            </div>
           </div>
           <div>
             <p className="text-xs font-medium uppercase text-muted-foreground">Total</p>

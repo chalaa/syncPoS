@@ -9,9 +9,9 @@ export function Alert({ kind, children }: { kind: AlertKind; children: ReactNode
     <div
       className={cn(
         "mb-5 rounded-md border px-4 py-3 text-sm",
-        kind === "success" && "border-input bg-secondary text-secondary-foreground",
-        kind === "error" && "border-destructive/30 bg-card text-destructive",
-        kind === "warning" && "border-input bg-muted text-foreground",
+        kind === "success" && "border-primary/25 bg-secondary text-primary font-medium",
+        kind === "error" && "border-destructive/30 bg-[#FDF5F5] text-destructive font-medium",
+        kind === "warning" && "border-gold/40 bg-gold-muted text-[#7E5700] font-medium",
       )}
     >
       {children}

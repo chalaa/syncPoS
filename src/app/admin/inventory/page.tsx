@@ -1,5 +1,8 @@
-import { PageHeader, PageShell } from "@/components/ui/page-shell";
+import Link from "next/link";
+
 import { ButtonLink } from "@/components/ui/button";
+import { PageHeader, PageShell } from "@/components/ui/page-shell";
+import { cn } from "@/lib/utils";
 import { requirePermission } from "@/server/auth/session";
 import { StockByLocationTable, StockFilters } from "@/app/admin/inventory/stock-table";
 import {
@@ -8,6 +11,8 @@ import {
   parseAsOfDate,
   parseStockStatus,
 } from "@/server/inventory/stock";
+
+import { InventoryNavTabs } from "@/app/admin/inventory/inventory-nav-tabs";
 
 export const dynamic = "force-dynamic";
 
@@ -41,24 +46,23 @@ export default async function InventoryPage({ searchParams }: InventoryPageProps
   return (
     <PageShell>
       <PageHeader
-        eyebrow="Inventory"
-        title="Stock Workspace"
+        eyebrow="Inventory Workspace"
+        title="Stock & Balance Management"
         actions={
           <div className="flex flex-wrap gap-2">
-            <ButtonLink href="/admin/inventory/stock-card">Stock card</ButtonLink>
-            <ButtonLink href="/admin/inventory/operations">Operations</ButtonLink>
-            <ButtonLink href="/admin/inventory/serial-history">Serial history</ButtonLink>
-            <ButtonLink href="/admin/inventory/locations">Locations</ButtonLink>
-            <ButtonLink href="/admin/inventory/opening-stock">Opening stock</ButtonLink>
+            <ButtonLink href="/admin/inventory/operations" variant="default">
+              New Transfer / Operation
+            </ButtonLink>
           </div>
         }
       />
-      <section className="rounded-lg border border-border bg-card">
+
+      <InventoryNavTabs currentHref="/admin/inventory" />
+
+      <section className="overflow-hidden rounded-lg border border-border bg-card shadow-xs">
         {asOfDate ? (
-          <div className="border-b border-border px-4 py-3 text-sm text-muted-foreground">
-            As-of report foundation: quantities are calculated from posted movement
-            lines up to the selected date. Reservations remain current-state only
-            until reservation history is implemented.
+          <div className="border-b border-border bg-gold/10 px-4 py-3 text-xs font-medium text-dark">
+            As-of report active: quantities calculated from posted movements up to {asOfDate}.
           </div>
         ) : null}
         <StockFilters
@@ -73,3 +77,4 @@ export default async function InventoryPage({ searchParams }: InventoryPageProps
     </PageShell>
   );
 }
+

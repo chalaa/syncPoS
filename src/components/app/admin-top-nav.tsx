@@ -154,11 +154,12 @@ export function AdminShell({
           <Link
             href="/"
             className={cn(
-              "truncate text-base font-semibold",
+              "flex items-center gap-2 truncate text-base font-bold tracking-tight text-foreground",
               !adminNavOpen && "sr-only",
             )}
           >
-            syncPoS
+            <span className="size-2.5 rounded-full bg-gold inline-block shrink-0 shadow-xs" />
+            <span>syncPoS</span>
           </Link>
         </div>
 
@@ -172,8 +173,9 @@ export function AdminShell({
                 asChild
                 variant={isActive ? "secondary" : "ghost"}
                 className={cn(
-                  "justify-start",
+                  "justify-start transition-all",
                   !adminNavOpen && "justify-center px-0",
+                  isActive && "bg-secondary text-secondary-foreground font-semibold border-l-3 border-primary shadow-xs",
                 )}
               >
                 <Link href={item.submenus[0]?.href ?? item.href} title={item.label}>
@@ -189,8 +191,11 @@ export function AdminShell({
 
         <form action={logout} className="border-t border-border p-3 md:hidden">
           <div className="mb-3 flex items-center justify-between gap-3 text-sm">
-            <span className="text-muted-foreground">{syncStatus}</span>
-            <span className="truncate text-muted-foreground">{username}</span>
+            <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+              <span className={cn("size-2 rounded-full", syncStatus === "online" ? "bg-primary" : "bg-gold animate-pulse")} />
+              <span className="capitalize">{syncStatus}</span>
+            </span>
+            <span className="truncate text-xs font-medium text-foreground">{username}</span>
           </div>
           <Button variant="outline" size="sm" className="w-full justify-center">
             <LogOutIcon data-icon="inline-start" />
@@ -232,8 +237,8 @@ export function AdminShell({
                         <button
                           type="button"
                           className={cn(
-                            "flex w-full items-center justify-between rounded-sm px-3 py-2 text-left text-sm hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground focus:outline-none",
-                            isActive && "bg-accent text-accent-foreground",
+                            "flex w-full items-center justify-between rounded-sm px-3 py-2 text-left text-sm transition-colors hover:bg-secondary/80 hover:text-foreground focus:bg-secondary/80 focus:outline-none",
+                            isActive && "bg-primary/10 font-semibold text-primary",
                           )}
                           onClick={() =>
                             setMobileOpenSubmenuHref((current) => (current === item.href ? null : item.href))
@@ -252,8 +257,8 @@ export function AdminShell({
                           href={item.href}
                           onClick={closeMobileSubmenu}
                           className={cn(
-                            "block rounded-sm px-3 py-2 text-sm hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground focus:outline-none",
-                            isActive && "bg-accent text-accent-foreground",
+                            "block rounded-sm px-3 py-2 text-sm transition-colors hover:bg-secondary/80 hover:text-foreground focus:bg-secondary/80 focus:outline-none",
+                            isActive && "bg-primary/10 font-semibold text-primary",
                           )}
                         >
                           {item.label}
@@ -278,8 +283,8 @@ export function AdminShell({
                                 href={child.href}
                                 onClick={closeMobileSubmenu}
                                 className={cn(
-                                  "block rounded-sm px-3 py-2 text-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground focus:outline-none",
-                                  isChildActive && "bg-accent text-accent-foreground",
+                                  "block rounded-sm px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-secondary/80 hover:text-foreground focus:bg-secondary/80 focus:outline-none",
+                                  isChildActive && "bg-primary/10 font-semibold text-primary",
                                 )}
                               >
                                 {child.label}
@@ -344,8 +349,8 @@ export function AdminShell({
                               href={child.href}
                               onClick={() => setOpenSubmenuHref(null)}
                               className={cn(
-                                "block rounded-sm px-3 py-2 text-sm hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground focus:outline-none",
-                                isChildActive && "bg-accent text-accent-foreground",
+                                "block rounded-sm px-3 py-2 text-sm transition-colors hover:bg-secondary/80 hover:text-foreground focus:bg-secondary/80 focus:outline-none",
+                                isChildActive && "bg-primary/10 font-semibold text-primary",
                               )}
                               role="menuitem"
                             >
@@ -381,10 +386,11 @@ export function AdminShell({
           </div>
 
           <form action={logout} className="hidden shrink-0 items-center gap-3 md:flex">
-            <span className="text-muted-foreground">
-              {syncStatus}
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-secondary/60 px-2.5 py-1 text-xs font-medium text-foreground">
+              <span className={cn("size-2 rounded-full", syncStatus === "online" ? "bg-primary" : "bg-gold animate-pulse")} />
+              <span className="capitalize">{syncStatus}</span>
             </span>
-            <span className="text-muted-foreground">{username}</span>
+            <span className="text-xs font-medium text-foreground">{username}</span>
             <Button variant="outline" size="sm" aria-label="Sign out">
               <LogOutIcon data-icon="inline-start" />
               Sign out

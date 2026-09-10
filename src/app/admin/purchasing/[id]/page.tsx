@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import {
@@ -10,6 +11,7 @@ import { PaymentFormDialog } from "@/components/app/payment-form-dialog";
 import { PurchaseOrderForm } from "@/app/admin/purchasing/purchase-order-form";
 import { ReceiptLinesEditor } from "@/app/admin/purchasing/receipt-lines-editor";
 import { Alert } from "@/components/ui/alert";
+import { StatusBadge } from "@/components/ui/badge";
 import { Button, ButtonLink } from "@/components/ui/button";
 import {
   Dialog,
@@ -111,29 +113,59 @@ export default async function PurchaseOrderDetailPage({ params, searchParams }: 
       {query.notice ? <Alert kind="success">{query.notice}</Alert> : null}
       {query.error ? <Alert kind="error">{query.error}</Alert> : null}
 
-      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap gap-2">
-          <a href={`/admin/purchasing?view=receipts&purchaseOrderId=${order.id}`} className="rounded-md border border-border bg-card px-4 py-3 text-sm hover:bg-accent">
-            <span className="block text-lg font-semibold">{order.receiptCount}</span>
-            <span className="text-muted-foreground">Receipts</span>
-          </a>
-          <a href={`/admin/purchasing?view=landed-costs&purchaseOrderId=${order.id}`} className="rounded-md border border-border bg-card px-4 py-3 text-sm hover:bg-accent">
-            <span className="block text-lg font-semibold">{order.landedCostCount}</span>
-            <span className="text-muted-foreground">Landed Costs</span>
-          </a>
-          <a href={`/admin/purchasing?view=payments&purchaseOrderId=${order.id}`} className="rounded-md border border-border bg-card px-4 py-3 text-sm hover:bg-accent">
-            <span className="block text-lg font-semibold">{order.paymentCount}</span>
-            <span className="text-muted-foreground">Payments</span>
-          </a>
-          <a href={`/admin/purchasing?view=returns&purchaseOrderId=${order.id}`} className="rounded-md border border-border bg-card px-4 py-3 text-sm hover:bg-accent">
-            <span className="block text-lg font-semibold">{order.returnCount}</span>
-            <span className="text-muted-foreground">Returns</span>
-          </a>
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
+        <div className="flex flex-wrap gap-2.5">
+          <Link
+            href={`/admin/purchasing?view=receipts&purchaseOrderId=${order.id}`}
+            className="group flex flex-col rounded-lg border border-border bg-card px-4 py-2 text-sm shadow-xs transition-all hover:border-primary/50 hover:bg-secondary/40"
+          >
+            <span className="text-lg font-bold tracking-tight text-foreground transition-colors group-hover:text-primary">
+              {order.receiptCount}
+            </span>
+            <span className="text-xs font-medium text-muted-foreground">Receipts</span>
+          </Link>
+          <Link
+            href={`/admin/purchasing?view=landed-costs&purchaseOrderId=${order.id}`}
+            className="group flex flex-col rounded-lg border border-border bg-card px-4 py-2 text-sm shadow-xs transition-all hover:border-primary/50 hover:bg-secondary/40"
+          >
+            <span className="text-lg font-bold tracking-tight text-foreground transition-colors group-hover:text-primary">
+              {order.landedCostCount}
+            </span>
+            <span className="text-xs font-medium text-muted-foreground">Landed Costs</span>
+          </Link>
+          <Link
+            href={`/admin/purchasing?view=payments&purchaseOrderId=${order.id}`}
+            className="group flex flex-col rounded-lg border border-border bg-card px-4 py-2 text-sm shadow-xs transition-all hover:border-primary/50 hover:bg-secondary/40"
+          >
+            <span className="text-lg font-bold tracking-tight text-foreground transition-colors group-hover:text-primary">
+              {order.paymentCount}
+            </span>
+            <span className="text-xs font-medium text-muted-foreground">Payments</span>
+          </Link>
+          <Link
+            href={`/admin/purchasing?view=returns&purchaseOrderId=${order.id}`}
+            className="group flex flex-col rounded-lg border border-border bg-card px-4 py-2 text-sm shadow-xs transition-all hover:border-primary/50 hover:bg-secondary/40"
+          >
+            <span className="text-lg font-bold tracking-tight text-foreground transition-colors group-hover:text-primary">
+              {order.returnCount}
+            </span>
+            <span className="text-xs font-medium text-muted-foreground">Returns</span>
+          </Link>
         </div>
-        <div className="flex items-center gap-3">
-          <span className="rounded-md border border-border bg-muted px-3 py-2 text-sm capitalize">
-            {statusLabel(order.status)}
-          </span>
+        <div className="flex flex-wrap items-center gap-2.5">
+          <StatusBadge status={order.status} size="lg" />
+          {!isDraft ? (
+            <StatusBadge
+              status={order.residualAmountMinor === 0 ? "paid" : order.residualAmountMinor < order.totalMinor ? "partially_paid" : "unpaid"}
+              label={
+                order.residualAmountMinor === 0
+                  ? "Fully Paid"
+                  : `Unpaid ${displayPurchaseMoney(order.residualAmountMinor, order.currencyCode)}`
+              }
+              size="lg"
+            />
+          ) : null}
+
           {isDraft ? (
             <form action={confirmPurchaseOrder}>
               <input type="hidden" name="purchaseOrderId" value={order.id} />

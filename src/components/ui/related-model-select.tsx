@@ -178,7 +178,7 @@ export function RelatedModelSelect({
               type="button"
               onMouseDown={(event) => event.preventDefault()}
               onClick={() => selectOption("")}
-              className="flex w-full rounded px-3 py-2 text-left text-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+              className="flex w-full rounded px-3 py-2 text-left text-sm text-muted-foreground transition-colors hover:bg-secondary/80 hover:text-foreground"
             >
               {clearLabel}
             </button>
@@ -189,7 +189,7 @@ export function RelatedModelSelect({
               type="button"
               onMouseDown={(event) => event.preventDefault()}
               onClick={() => selectOption(option.id)}
-              className="flex w-full min-w-0 flex-col rounded px-3 py-2 text-left text-sm hover:bg-accent"
+              className="flex w-full min-w-0 flex-col rounded px-3 py-2 text-left text-sm text-foreground transition-colors hover:bg-secondary/80"
             >
               <span className="max-w-full truncate font-medium">{option.name}</span>
               {option.code ? <span className="max-w-full truncate text-xs text-muted-foreground">{option.code}</span> : null}
@@ -209,7 +209,7 @@ export function RelatedModelSelect({
                     setDropdownStyle(undefined);
                     onCreateAndEdit(trimmedQuery);
                   }}
-                  className="flex w-full items-center gap-2 rounded px-3 py-2 text-left text-sm hover:bg-accent"
+                  className="flex w-full items-center gap-2 rounded px-3 py-2 text-left text-sm text-foreground transition-colors hover:bg-secondary/80"
                 >
                   <PlusIcon className="size-4" />
                   {trimmedQuery ? `${createLabel.replace(/\.\.\.$/, "")} "${trimmedQuery}"` : createLabel}
@@ -218,7 +218,7 @@ export function RelatedModelSelect({
               {newRecordHref ? (
                 <Link
                   href={newRecordHref}
-                  className="flex w-full items-center gap-2 rounded px-3 py-2 text-left text-sm hover:bg-accent"
+                  className="flex w-full items-center gap-2 rounded px-3 py-2 text-left text-sm text-foreground transition-colors hover:bg-secondary/80"
                 >
                   <PlusIcon className="size-4" />
                   {trimmedQuery ? `${createLabel.replace(/\.\.\.$/, "")} "${trimmedQuery}"` : createLabel}
@@ -227,7 +227,7 @@ export function RelatedModelSelect({
               {editRecordHref ? (
                 <Link
                   href={editRecordHref}
-                  className="flex w-full items-center gap-2 rounded px-3 py-2 text-left text-sm hover:bg-accent"
+                  className="flex w-full items-center gap-2 rounded px-3 py-2 text-left text-sm text-foreground transition-colors hover:bg-secondary/80"
                 >
                   <PencilIcon className="size-4" />
                   {editLabel}

@@ -4,7 +4,9 @@ import { EditIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import { useState, type ReactNode } from "react";
 
 import { createPriceList, softDeletePriceList, updatePriceList } from "@/app/admin/products/actions";
+import { ProductNavTabs } from "@/app/admin/products/product-nav-tabs";
 import { Alert } from "@/components/ui/alert";
+import { StatusBadge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -231,25 +233,27 @@ export function PriceListManager({
   return (
     <PageShell>
       <PageHeader
-        eyebrow="Catalog"
-        title="Price Lists"
+        eyebrow="Catalog Management"
+        title="Price Lists & Tiered Pricing"
         actions={
           <PriceListDialog label="New price list" action={createPriceList} options={options} returnPath={returnPath}>
-            <Button>
-              <PlusIcon data-icon="inline-start" />
+            <Button size="sm">
+              <PlusIcon className="size-4" data-icon="inline-start" />
               New price list
             </Button>
           </PriceListDialog>
         }
       />
 
+      <ProductNavTabs currentHref="/admin/products/price-lists" />
+
       {notice ? <Alert kind="success">{notice}</Alert> : null}
       {error ? <Alert kind="error">{error}</Alert> : null}
 
-      <section className="rounded-lg border border-border bg-card">
+      <section className="rounded-xl border border-border bg-card shadow-xs">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[980px] text-left text-sm">
-            <thead className="bg-muted text-xs uppercase tracking-wide text-muted-foreground">
+            <thead className="border-b border-border bg-muted/50 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               <tr>
                 <th className="px-4 py-3">Price List</th>
                 <th className="px-4 py-3">Owner</th>
@@ -259,32 +263,37 @@ export function PriceListManager({
                 <th className="px-4 py-3 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y divide-border">
               {rows.map((row) => (
-                <tr key={row.id} className="border-t border-border">
+                <tr
+                  key={row.id}
+                  className="transition-colors hover:bg-[rgba(235,239,234,0.45)] dark:hover:bg-muted/30"
+                >
                   <td className="px-4 py-3">
-                    <div>{row.name}</div>
+                    <div className="font-medium text-foreground">{row.name}</div>
                     <div className="text-xs text-muted-foreground">
-                      {row.items.slice(0, 2).map((item) => `${item.sku} ${minorToDisplay(item.unitPriceMinor)}`).join(", ") || "No items"}
+                      {row.items.slice(0, 2).map((item) => `${item.sku} ${minorToDisplay(item.unitPriceMinor)}`).join(", ") || "No items configured"}
                     </div>
                   </td>
-                  <td className="px-4 py-3">{row.ownerName ?? "-"}</td>
-                  <td className="px-4 py-3">{row.currencyCode}</td>
-                  <td className="px-4 py-3 text-right">{row.itemCount}</td>
-                  <td className="px-4 py-3">{row.isActive ? "Active" : "Inactive"}</td>
+                  <td className="px-4 py-3 text-foreground">{row.ownerName ?? "—"}</td>
+                  <td className="px-4 py-3 font-mono text-xs text-foreground">{row.currencyCode}</td>
+                  <td className="px-4 py-3 text-right font-mono text-xs font-semibold text-foreground">{row.itemCount}</td>
                   <td className="px-4 py-3">
+                    <StatusBadge status={row.isActive ? "active" : "inactive"} />
+                  </td>
+                  <td className="px-4 py-3 text-right">
                     <div className="flex justify-end gap-2">
                       <PriceListDialog label={`Edit ${row.name}`} action={updatePriceList} record={row} options={options} returnPath={returnPath}>
-                        <Button type="button" variant="outline" size="icon">
-                          <EditIcon />
-                          <span className="sr-only">Edit price list</span>
+                        <Button type="button" variant="outline" size="sm" className="h-7 text-xs">
+                          <EditIcon className="size-3.5" data-icon="inline-start" />
+                          Edit
                         </Button>
                       </PriceListDialog>
                       <form action={softDeletePriceList}>
                         <input type="hidden" name="id" value={row.id} />
-                        <Button variant="danger" size="icon">
-                          <Trash2Icon />
-                          <span className="sr-only">Delete price list</span>
+                        <Button variant="destructive" size="sm" className="h-7 text-xs">
+                          <Trash2Icon className="size-3.5" data-icon="inline-start" />
+                          Delete
                         </Button>
                       </form>
                     </div>
@@ -293,7 +302,7 @@ export function PriceListManager({
               ))}
               {rows.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-4 py-10 text-center text-muted-foreground">
+                  <td colSpan={6} className="px-4 py-12 text-center text-muted-foreground">
                     No price lists found.
                   </td>
                 </tr>

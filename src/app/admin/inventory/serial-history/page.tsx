@@ -2,6 +2,7 @@ import {
   SerialHistoryFilters,
   SerialHistoryTable,
 } from "@/app/admin/inventory/movement-table";
+import { InventoryNavTabs } from "@/app/admin/inventory/inventory-nav-tabs";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
 import { requirePermission } from "@/server/auth/session";
 import { getSerialHistory, parseAsOfDate } from "@/server/inventory/stock";
@@ -28,8 +29,15 @@ export default async function SerialHistoryPage({ searchParams }: SerialHistoryP
 
   return (
     <PageShell>
-      <PageHeader eyebrow="Inventory" title="Serial History" />
-      <section className="rounded-lg border border-border bg-card">
+      <PageHeader
+        eyebrow="Inventory Workspace"
+        title="Serial & Lot Movement History"
+        description="End-to-end provenance, receipts, transfers, deliveries, and returns for specific machine serial numbers."
+      />
+
+      <InventoryNavTabs currentHref="/admin/inventory/serial-history" />
+
+      <section className="rounded-xl border border-border bg-card shadow-xs">
         <SerialHistoryFilters serialQuery={serialQuery} asOfDate={asOfDate} />
         <SerialHistoryTable rows={rows} />
       </section>

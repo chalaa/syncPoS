@@ -1,28 +1,46 @@
 @import "tailwindcss";
 
 :root {
-  --background: #f5f7f8;
-  --foreground: #172026;
-  --card: #ffffff;
-  --card-foreground: #172026;
-  --popover: #ffffff;
-  --popover-foreground: #172026;
-  --primary: #1f6b5c;
-  --primary-foreground: #ffffff;
-  --secondary: #e7efec;
-  --secondary-foreground: #1f4f46;
-  --muted: #eef3f2;
-  --muted-foreground: #667579;
-  --accent: #e7efec;
-  --accent-foreground: #1f4f46;
-  --destructive: #8a3426;
-  --destructive-foreground: #ffffff;
-  --border: #d7dcdf;
-  --input: #c9d1d4;
-  --ring: #1f6b5c;
+  /* Core brand palette */
+  --primary: #0B5D4B;            /* Deep Forest Green */
+  --primary-foreground: #FFFFFF;
+  --dark: #073B35;               /* Midnight Green */
+  --dark-foreground: #F7F7F2;
+  --accent: #D9A441;             /* Ethiopian-inspired Gold */
+  --accent-foreground: #073B35;
+  --background: #F7F7F2;         /* Warm Off-White */
+  --foreground: #17201E;         /* Charcoal */
+
+  /* Surfaces & UI elements */
+  --card: #FFFFFF;
+  --card-foreground: #17201E;
+  --popover: #FFFFFF;
+  --popover-foreground: #17201E;
+  
+  --secondary: #EBEFEA;          /* Soft sage neutral */
+  --secondary-foreground: #073B35;
+  
+  --muted: #EEF3EE;
+  --muted-foreground: #5E6E69;   /* Accessible charcoal-sage */
+
+  --accent-light: #FBF4E6;       /* Soft champagne gold */
+  --accent-dark: #B88528;
+
+  --destructive: #A83226;
+  --destructive-foreground: #FFFFFF;
+
+  --border: #DFE5DF;             /* Balanced subtle divider */
+  --input: #CAD4CE;
+  --ring: #0B5D4B;
+  --ring-accent: #D9A441;
+
+  --gold: #D9A441;
+  --gold-foreground: #073B35;
+  --gold-muted: #FBF4E6;
+
   --radius: 0.5rem;
-  --font-system-sans: Arial, Helvetica, sans-serif;
-  --font-system-mono: "Liberation Mono", "Courier New", monospace;
+  --font-system-sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-system-mono: "Liberation Mono", "SFMono-Regular", Consolas, "Courier New", monospace;
 }
 
 @theme inline {
@@ -34,17 +52,25 @@
   --color-popover-foreground: var(--popover-foreground);
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
+  --color-dark: var(--dark);
+  --color-dark-foreground: var(--dark-foreground);
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
   --color-muted: var(--muted);
   --color-muted-foreground: var(--muted-foreground);
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
+  --color-accent-light: var(--accent-light);
+  --color-accent-dark: var(--accent-dark);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+  --color-ring-accent: var(--ring-accent);
+  --color-gold: var(--gold);
+  --color-gold-foreground: var(--gold-foreground);
+  --color-gold-muted: var(--gold-muted);
   --font-sans: var(--font-system-sans);
   --font-mono: var(--font-system-mono);
 }
@@ -52,7 +78,7 @@
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-system-sans);
 }
 
 * {
@@ -71,6 +97,26 @@ button {
   font: inherit;
 }
 
+input:not([type="checkbox"]):not([type="radio"]):not([type="button"]):not([type="submit"]),
+select,
+textarea {
+  outline: none;
+  transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+}
+
+input:not([type="checkbox"]):not([type="radio"]):not([type="button"]):not([type="submit"]):focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  border-color: var(--ring);
+  box-shadow: 0 0 0 3px rgba(11, 93, 75, 0.16);
+}
+
+input[type="checkbox"],
+input[type="radio"] {
+  accent-color: var(--primary);
+  cursor: pointer;
+}
+
 table {
   border-spacing: 0;
 }
@@ -80,6 +126,15 @@ td {
   vertical-align: top;
 }
 
+table tbody tr {
+  transition: background-color 0.12s ease;
+}
+
+table tbody tr:hover {
+  background-color: rgba(235, 239, 234, 0.45);
+}
+
 .overflow-x-auto {
   -webkit-overflow-scrolling: touch;
 }
+
