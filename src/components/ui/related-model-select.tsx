@@ -126,9 +126,9 @@ export function RelatedModelSelect({
     }
 
     function closeFloatingList(event: Event) {
-      const target = event.target as Node;
+      const target = event.target;
 
-      if (dropdownRef.current?.contains(target)) {
+      if (target instanceof Node && dropdownRef.current?.contains(target)) {
         return;
       }
 
@@ -136,9 +136,9 @@ export function RelatedModelSelect({
     }
 
     function closeWhenClickOutside(event: PointerEvent) {
-      const target = event.target as Node;
+      const target = event.target;
 
-      if (rootRef.current?.contains(target) || dropdownRef.current?.contains(target)) {
+      if (target instanceof Node && (rootRef.current?.contains(target) || dropdownRef.current?.contains(target))) {
         return;
       }
 
@@ -173,6 +173,7 @@ export function RelatedModelSelect({
     setQuery("");
     setIsOpen(false);
     setDropdownStyle(undefined);
+    inputRef.current?.blur();
   }
 
   function closeWhenFocusLeaves(event: FocusEvent<HTMLElement>) {
@@ -279,6 +280,21 @@ export function RelatedModelSelect({
             setIsOpen(true);
           }}
           onFocus={openList}
+          onPointerDown={() => {
+            if (!isOpen) {
+              openList();
+            }
+          }}
+          onMouseDown={() => {
+            if (!isOpen) {
+              openList();
+            }
+          }}
+          onClick={() => {
+            if (!isOpen) {
+              openList();
+            }
+          }}
           placeholder={selectedLabel || placeholder}
           className={cn(
             inputClass,

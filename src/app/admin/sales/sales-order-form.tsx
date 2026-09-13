@@ -289,7 +289,14 @@ export function SalesOrderForm({
         .map((stock) => stock.productId),
     );
 
-    return productOptions.filter((product) => productIds.has(product.id));
+    const filteredProducts = productOptions.filter((product) => productIds.has(product.id));
+    const selectedProduct = line.productId ? productById.get(line.productId) : undefined;
+
+    if (!selectedProduct || filteredProducts.some((product) => product.id === selectedProduct.id)) {
+      return filteredProducts;
+    }
+
+    return [selectedProduct, ...filteredProducts];
   }
 
   function updateLine(key: string, patch: Partial<SalesLineDraft>) {

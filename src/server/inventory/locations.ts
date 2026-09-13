@@ -4,9 +4,10 @@ import { and, asc, eq, ilike, inArray, isNotNull, isNull, or } from "drizzle-orm
 
 import { getDefaultCompany } from "@/server/catalog/products";
 import { db } from "@/server/db/client";
-import { locations } from "@/server/db/schema";
+import { locationApprovers, locations, users } from "@/server/db/schema";
 import {
   stockLocationTypeOptions,
+  type StockLocationUserOption,
   type StockLocationRecord,
 } from "@/server/inventory/location-types";
 
@@ -55,10 +56,54 @@ export async function getStockLocationList(params: {
       ),
     )
     .orderBy(asc(locations.locationType), asc(locations.name));
+  const approverRows = rows.length === 0
+    ? []
+    : await db
+        .select({
+          locationId: locationApprovers.locationId,
+          userId: users.id,
+          username: users.username,
+        })
+        .from(locationApprovers)
+        .innerJoin(users, eq(locationApprovers.userId, users.id))
+        .where(
+          and(
+            eq(locationApprovers.companyId, company.id),
+            inArray(locationApprovers.locationId, rows.map((row) => row.id)),
+            eq(locationApprovers.isActive, true),
+            isNull(locationApprovers.deletedAt),
+            isNull(users.deletedAt),
+          ),
+        )
+        .orderBy(asc(users.username));
+  const approversByLocation = new Map<string, { ids: string[]; names: string[] }>();
+
+  for (const approver of approverRows) {
+    const current = approversByLocation.get(approver.locationId) ?? { ids: [], names: [] };
+    current.ids.push(approver.userId);
+    current.names.push(approver.username);
+    approversByLocation.set(approver.locationId, current);
+  }
 
   return rows.map((row) => ({
     ...row,
     locationType: row.locationType as StockLocationRecord["locationType"],
     addressText: addressText(row.addressJson),
+    approverIds: approversByLocation.get(row.id)?.ids ?? [],
+    approverNames: approversByLocation.get(row.id)?.names ?? [],
   }));
+}
+
+export async function getStockLocationUserOptions(): Promise<StockLocationUserOption[]> {
+  const company = await getDefaultCompany();
+
+  return db
+    .select({
+      id: users.id,
+      username: users.username,
+      email: users.email,
+    })
+    .from(users)
+    .where(and(eq(users.companyId, company.id), eq(users.status, "active"), isNull(users.deletedAt)))
+    .orderBy(asc(users.username));
 }

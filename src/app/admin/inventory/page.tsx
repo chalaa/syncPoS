@@ -47,6 +47,7 @@ export default async function InventoryPage({ searchParams }: InventoryPageProps
           <div className="flex flex-wrap gap-2">
             <ButtonLink href="/admin/inventory/stock-card">Stock card</ButtonLink>
             <ButtonLink href="/admin/inventory/operations">Operations</ButtonLink>
+            <ButtonLink href="/admin/inventory/approvals">Approvals</ButtonLink>
             <ButtonLink href="/admin/inventory/serial-history">Serial history</ButtonLink>
             <ButtonLink href="/admin/inventory/locations">Locations</ButtonLink>
             <ButtonLink href="/admin/inventory/opening-stock">Opening stock</ButtonLink>

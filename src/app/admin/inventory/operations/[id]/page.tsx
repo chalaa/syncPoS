@@ -1,12 +1,19 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { cancelInventoryOperation, postInventoryOperation } from "@/app/admin/inventory/operations/actions";
+import {
+  approveAndPostInventoryOperation,
+  cancelInventoryOperation,
+  postInventoryOperation,
+  requestInventoryOperationApproval,
+} from "@/app/admin/inventory/operations/actions";
 import { Alert } from "@/components/ui/alert";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { Notebook } from "@/components/ui/notebook";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
 import { requirePermission } from "@/server/auth/session";
+import { getDefaultCompany } from "@/server/catalog/products";
+import { getStockOutApprovalState } from "@/server/inventory/stock-approvals";
 import {
   displayMoneyMinor,
   displayQuantity,
@@ -56,15 +63,83 @@ function sourceHref(operation: {
   return null;
 }
 
+function sourceTypeForOperation(movementType: string) {
+  const sources: Record<string, string> = {
+    transfer: "internal_transfer",
+    adjustment: "inventory_adjustment",
+    scrap: "scrap",
+    customer_return: "customer_return",
+    supplier_return: "supplier_return",
+  };
+
+  return sources[movementType] ?? movementType;
+}
+
+function outgoingSourceLocationIds(operation: NonNullable<Awaited<ReturnType<typeof getInventoryOperationDetail>>>) {
+  const sourceIds = new Set<string>();
+
+  for (const line of operation.lines) {
+    if (line.fromLocationId) {
+      sourceIds.add(line.fromLocationId);
+    }
+  }
+
+  if (
+    sourceIds.size === 0 &&
+    ["transfer", "scrap", "supplier_return"].includes(operation.movementType) &&
+    operation.fromLocationId
+  ) {
+    sourceIds.add(operation.fromLocationId);
+  }
+
+  return [...sourceIds];
+}
+
 export default async function InventoryOperationDetailPage({ params, searchParams }: InventoryOperationDetailPageProps) {
-  await requirePermission("inventory.view");
+  const user = await requirePermission("inventory.view");
 
   const [{ id }, query] = await Promise.all([params, searchParams]);
-  const operation = await getInventoryOperationDetail(id);
+  const [operation, company] = await Promise.all([getInventoryOperationDetail(id), getDefaultCompany()]);
 
   if (!operation) {
     notFound();
   }
+
+  const sourceLocationIds = outgoingSourceLocationIds(operation);
+  const approvalState = operation.status === "draft" && sourceLocationIds.length > 0
+    ? await getStockOutApprovalState({
+        companyId: company.id,
+        userId: user.id,
+        sourceType: operation.sourceType ?? sourceTypeForOperation(operation.movementType),
+        stockMovementId: operation.id,
+        sourceNo: operation.sourceNo,
+        sourceLocationIds,
+      })
+    : null;
+  const postAction =
+    approvalState?.isProtected && approvalState.approvedApprovalIds.length < approvalState.locationNames.length
+      ? approvalState.pendingApprovalIds.length > 0 && approvalState.canApprove
+        ? {
+            action: approveAndPostInventoryOperation,
+            label: "Approve & Post",
+            disabled: false,
+          }
+        : approvalState.pendingApprovalIds.length > 0
+          ? {
+              action: requestInventoryOperationApproval,
+              label: "Approval Pending",
+              disabled: true,
+            }
+          : {
+              action: requestInventoryOperationApproval,
+              label: "Request Approval",
+              disabled: false,
+            }
+      : {
+          action: postInventoryOperation,
+          label: "Post",
+          disabled: false,
+        };
 
   return (
     <PageShell>
@@ -76,9 +151,12 @@ export default async function InventoryOperationDetailPage({ params, searchParam
             <ButtonLink href="/admin/inventory/operations" variant="outline">Back to operations</ButtonLink>
             {operation.status === "draft" ? (
               <>
-                <form action={postInventoryOperation}>
+                <form action={postAction.action}>
                   <input type="hidden" name="movementId" value={operation.id} />
-                  <Button type="submit">Post</Button>
+                  {approvalState?.pendingApprovalIds.map((approvalId) => (
+                    <input key={approvalId} type="hidden" name="approvalIds" value={approvalId} />
+                  ))}
+                  <Button type="submit" disabled={postAction.disabled}>{postAction.label}</Button>
                 </form>
                 <form action={cancelInventoryOperation}>
                   <input type="hidden" name="movementId" value={operation.id} />

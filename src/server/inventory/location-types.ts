@@ -24,6 +24,14 @@ export type StockLocationRecord = {
   allowNegativeStock: boolean;
   isActive: boolean;
   deletedAt: Date | null;
+  approverIds: string[];
+  approverNames: string[];
+};
+
+export type StockLocationUserOption = {
+  id: string;
+  username: string;
+  email: string | null;
 };
 
 export function formatStockLocationType(value: string) {

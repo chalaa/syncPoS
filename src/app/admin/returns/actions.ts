@@ -10,6 +10,7 @@ import { z } from "zod";
 import { requirePermission } from "@/server/auth/session";
 import { getDefaultCompany } from "@/server/catalog/products";
 import { db } from "@/server/db/client";
+import { generateCompanyDocumentNo } from "@/server/db/code-generator";
 import {
   auditLogs,
   customerRefundPlaceholders,
@@ -206,11 +207,16 @@ export async function createCustomerReturn(formData: FormData) {
   }
 
   const company = await getDefaultCompany();
-  const returnNo = documentNo("CR");
+  let returnNo = "";
   let returnId: string | undefined;
 
   try {
     await db.transaction(async (tx) => {
+      returnNo = await generateCompanyDocumentNo(tx, {
+        companyId: company.id,
+        table: "customer_returns",
+        prefix: "CR",
+      });
       const [order] = await tx
         .select({
           id: salesOrders.id,
@@ -447,7 +453,11 @@ export async function postCustomerReturn(formData: FormData) {
         .insert(stockMovements)
         .values({
           companyId: company.id,
-          movementNo: documentNo("CR-MOVE"),
+          movementNo: await generateCompanyDocumentNo(tx, {
+            companyId: company.id,
+            table: "stock_movements",
+            prefix: "CR-MOVE",
+          }),
           movementType: "customer_return",
           status: "posted",
           toLocationId: record.destinationLocationId,
@@ -614,11 +624,16 @@ export async function createSupplierReturn(formData: FormData) {
   }
 
   const company = await getDefaultCompany();
-  const returnNo = documentNo("SR");
+  let returnNo = "";
   let returnId: string | undefined;
 
   try {
     await db.transaction(async (tx) => {
+      returnNo = await generateCompanyDocumentNo(tx, {
+        companyId: company.id,
+        table: "supplier_returns",
+        prefix: "SR",
+      });
       const [receipt] = await tx
         .select({
           id: goodsReceipts.id,
@@ -849,7 +864,11 @@ export async function postSupplierReturn(formData: FormData) {
         .insert(stockMovements)
         .values({
           companyId: company.id,
-          movementNo: documentNo("SR-MOVE"),
+          movementNo: await generateCompanyDocumentNo(tx, {
+            companyId: company.id,
+            table: "stock_movements",
+            prefix: "SR-MOVE",
+          }),
           movementType: "supplier_return",
           status: "posted",
           fromLocationId: record.sourceLocationId,

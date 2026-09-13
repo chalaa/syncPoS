@@ -76,6 +76,8 @@ export async function resolvePaymentLines(
       currencyCode: paymentAccounts.currencyCode,
       methodId: paymentMethods.id,
       requiresReference: paymentMethods.requiresReference,
+      verifyEtEnabled: paymentAccounts.verifyEtEnabled,
+      verifyEtBank: paymentAccounts.verifyEtBank,
       allowInbound: paymentMethods.allowInbound,
       allowOutbound: paymentMethods.allowOutbound,
     })
@@ -121,8 +123,12 @@ export async function resolvePaymentLines(
       throw new Error(`Amount on payment line ${index + 1} must be greater than zero.`);
     }
 
-    if (account.requiresReference && !line.reference) {
+    if ((account.requiresReference || account.verifyEtEnabled) && !line.reference) {
       throw new Error(`Reference is required on payment line ${index + 1}.`);
+    }
+
+    if (account.verifyEtEnabled && !account.verifyEtBank) {
+      throw new Error(`Payment account on line ${index + 1} needs a Verify.ET bank configuration.`);
     }
 
     return {

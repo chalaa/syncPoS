@@ -77,6 +77,7 @@ export type SalesOrderDetail = {
   reserveOnConfirm: boolean;
   notes: string | null;
   deliveryCount: number;
+  draftDeliveryCount: number;
   invoiceCount: number;
   paymentCount: number;
   returnCount: number;

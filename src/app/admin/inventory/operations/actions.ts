@@ -1,7 +1,5 @@
 "use server";
 
-import { randomUUID } from "node:crypto";
-
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { and, eq, isNull, sql } from "drizzle-orm";
@@ -10,6 +8,7 @@ import { z } from "zod";
 import { requirePermission } from "@/server/auth/session";
 import { getDefaultCompany } from "@/server/catalog/products";
 import { db } from "@/server/db/client";
+import { generateCompanyDocumentNo } from "@/server/db/code-generator";
 import {
   auditLogs,
   locations,
@@ -21,6 +20,7 @@ import {
   stockMovementLines,
   stockMovements,
 } from "@/server/db/schema";
+import { approveStockOutApprovals, requireStockOutApproval } from "@/server/inventory/stock-approvals";
 import { getOrCreateSystemStockLocation } from "@/server/inventory/system-locations";
 
 const operationTypes = ["transfer", "adjustment", "scrap", "customer_return", "supplier_return"] as const;
@@ -36,6 +36,11 @@ const createOperationSchema = z.object({
 
 const statusSchema = z.object({
   movementId: z.string().uuid(),
+});
+
+const approvePostSchema = z.object({
+  movementId: z.string().uuid(),
+  approvalIds: z.array(z.string().uuid()).default([]),
 });
 
 const adjustmentSchema = z.object({
@@ -68,10 +73,6 @@ function formValue(formData: FormData, key: string) {
 
 function formValues(formData: FormData, key: string) {
   return formData.getAll(key).map((value) => (typeof value === "string" ? value : ""));
-}
-
-function documentNo(prefix: string) {
-  return `${prefix}-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${randomUUID().slice(0, 8).toUpperCase()}`;
 }
 
 function redirectWithError(path: string, message: string): never {
@@ -494,11 +495,16 @@ export async function createInventoryAdjustment(formData: FormData) {
 
   const company = await getDefaultCompany();
   const adjustmentLocation = await getOrCreateSystemStockLocation(company.id, "adjustment");
-  const movementNo = documentNo("ADJ");
+  let movementNo = "";
   let movementId: string | undefined;
 
   try {
     await db.transaction(async (tx) => {
+      movementNo = await generateCompanyDocumentNo(tx, {
+        companyId: company.id,
+        table: "stock_movements",
+        prefix: "ADJ",
+      });
       const owner = await validateOwner(tx, company.id, parsed.data.ownerId);
       await validateSelectableLocation(tx, company.id, parsed.data.locationId);
 
@@ -575,6 +581,22 @@ export async function createInventoryAdjustment(formData: FormData) {
             currencyCode: product.currencyCode,
           });
         } else {
+          await requireStockOutApproval(tx, {
+            companyId: company.id,
+            requestedBy: user.id,
+            sourceType: "inventory_adjustment",
+            sourceNo: parsed.data.sourceNo || null,
+            sourceLocationIds: [parsed.data.locationId],
+            reason: "Inventory adjustment decreases stock from an approval-controlled location.",
+            metadata: {
+              productId: product.id,
+              sku: product.sku,
+              countedQuantity: line.countedQuantity,
+              previousQuantity,
+              difference,
+            },
+          });
+
           await removeFromBalance(tx, {
             companyId: company.id,
             ownerId: owner.id,
@@ -711,13 +733,30 @@ export async function createScrapOperation(formData: FormData) {
 
   const company = await getDefaultCompany();
   const scrapLocation = await getOrCreateSystemStockLocation(company.id, "scrap");
-  const movementNo = documentNo("SCR");
+  let movementNo = "";
   let movementId: string | undefined;
 
   try {
     await db.transaction(async (tx) => {
+      movementNo = await generateCompanyDocumentNo(tx, {
+        companyId: company.id,
+        table: "stock_movements",
+        prefix: "SCR",
+      });
       const owner = await validateOwner(tx, company.id, parsed.data.ownerId);
       await validateSelectableLocation(tx, company.id, parsed.data.locationId);
+
+      await requireStockOutApproval(tx, {
+        companyId: company.id,
+        requestedBy: user.id,
+        sourceType: "scrap",
+        sourceNo: parsed.data.sourceNo || null,
+        sourceLocationIds: [parsed.data.locationId],
+        reason: "Scrap operation removes stock from an approval-controlled location.",
+        metadata: {
+          lineCount: inputLines.length,
+        },
+      });
 
       const productById = await getOperationProductMap(tx, company.id);
       const preparedLines: PreparedStockOperationLine[] = [];
@@ -886,14 +925,32 @@ export async function createInternalTransferOperation(formData: FormData) {
   }
 
   const company = await getDefaultCompany();
-  const movementNo = documentNo("INT");
+  let movementNo = "";
   let movementId: string | undefined;
 
   try {
     await db.transaction(async (tx) => {
+      movementNo = await generateCompanyDocumentNo(tx, {
+        companyId: company.id,
+        table: "stock_movements",
+        prefix: "INT",
+      });
       const owner = await validateOwner(tx, company.id, parsed.data.ownerId);
       await validateSelectableLocation(tx, company.id, parsed.data.fromLocationId);
       await validateSelectableLocation(tx, company.id, parsed.data.toLocationId);
+
+      await requireStockOutApproval(tx, {
+        companyId: company.id,
+        requestedBy: user.id,
+        sourceType: "internal_transfer",
+        sourceNo: parsed.data.sourceNo || null,
+        sourceLocationIds: [parsed.data.fromLocationId],
+        reason: "Internal transfer removes stock from an approval-controlled location.",
+        metadata: {
+          toLocationId: parsed.data.toLocationId,
+          lineCount: inputLines.length,
+        },
+      });
 
       const productById = await getOperationProductMap(tx, company.id);
       const preparedLines: PreparedStockOperationLine[] = [];
@@ -1068,11 +1125,16 @@ export async function createInventoryOperation(formData: FormData) {
   }
 
   const company = await getDefaultCompany();
-  const movementNo = documentNo(movementPrefix(parsed.data.movementType));
+  let movementNo = "";
   let movementId: string | undefined;
 
   try {
     await db.transaction(async (tx) => {
+      movementNo = await generateCompanyDocumentNo(tx, {
+        companyId: company.id,
+        table: "stock_movements",
+        prefix: movementPrefix(parsed.data.movementType),
+      });
       const owner = await validateOwner(tx, company.id, parsed.data.ownerId);
       validateHeader(parsed.data.movementType, parsed.data.fromLocationId, parsed.data.toLocationId);
 
@@ -1204,6 +1266,8 @@ export async function postInventoryOperation(formData: FormData) {
           status: stockMovements.status,
           fromLocationId: stockMovements.fromLocationId,
           toLocationId: stockMovements.toLocationId,
+          sourceType: stockMovements.sourceType,
+          sourceNo: stockMovements.sourceNo,
         })
         .from(stockMovements)
         .where(and(eq(stockMovements.id, parsed.data.movementId), eq(stockMovements.companyId, company.id), isNull(stockMovements.deletedAt)))
@@ -1246,6 +1310,35 @@ export async function postInventoryOperation(formData: FormData) {
       if (lines.length === 0) {
         throw new Error("Operation has no lines.");
       }
+
+      const approvalLocationIds = new Set<string>();
+      for (const line of lines) {
+        const metadata = line.metadata as { adjustmentDirection?: string | null };
+        const outboundLocationId =
+          movementType === "transfer" || movementType === "scrap" || movementType === "supplier_return"
+            ? movement.fromLocationId
+            : movementType === "adjustment" && metadata.adjustmentDirection === "decrease"
+              ? movement.fromLocationId
+              : null;
+
+        if (outboundLocationId) {
+          approvalLocationIds.add(outboundLocationId);
+        }
+      }
+
+      await requireStockOutApproval(tx, {
+        companyId: company.id,
+        requestedBy: user.id,
+        sourceType: movement.sourceType ?? sourceType(movementType),
+        stockMovementId: movement.id,
+        sourceNo: movement.sourceNo,
+        sourceLocationIds: [...approvalLocationIds],
+        reason: "Inventory operation removes stock from an approval-controlled location.",
+        metadata: {
+          movementNo: movement.movementNo,
+          movementType,
+        },
+      });
 
       for (const line of lines) {
         const lineOwnerId = line.ownerId ?? movement.ownerId;
@@ -1442,6 +1535,122 @@ export async function postInventoryOperation(formData: FormData) {
   revalidatePath("/admin/inventory/operations");
   revalidatePath(`/admin/inventory/operations/${parsed.data.movementId}`);
   redirect(`/admin/inventory/operations/${parsed.data.movementId}?notice=${encodeURIComponent("Inventory operation posted")}`);
+}
+
+export async function requestInventoryOperationApproval(formData: FormData) {
+  const user = await requirePermission("inventory.receive");
+  const parsed = statusSchema.safeParse({
+    movementId: formValue(formData, "movementId"),
+  });
+
+  if (!parsed.success) {
+    redirectWithError("/admin/inventory/operations", "Operation ID is required.");
+  }
+
+  try {
+    const company = await getDefaultCompany();
+
+    await db.transaction(async (tx) => {
+      const [movement] = await tx
+        .select({
+          id: stockMovements.id,
+          movementNo: stockMovements.movementNo,
+          movementType: stockMovements.movementType,
+          status: stockMovements.status,
+          fromLocationId: stockMovements.fromLocationId,
+          sourceType: stockMovements.sourceType,
+          sourceNo: stockMovements.sourceNo,
+        })
+        .from(stockMovements)
+        .where(and(eq(stockMovements.id, parsed.data.movementId), eq(stockMovements.companyId, company.id), isNull(stockMovements.deletedAt)))
+        .limit(1);
+
+      if (!movement) {
+        throw new Error("Inventory operation does not exist.");
+      }
+
+      if (movement.status !== "draft") {
+        throw new Error("Only draft inventory operations can request approval.");
+      }
+
+      if (!operationTypes.includes(movement.movementType as (typeof operationTypes)[number])) {
+        throw new Error("This operation is controlled by its source document.");
+      }
+
+      const movementType = movement.movementType as (typeof operationTypes)[number];
+      const lines = await tx
+        .select({
+          metadata: stockMovementLines.metadata,
+        })
+        .from(stockMovementLines)
+        .where(and(eq(stockMovementLines.stockMovementId, movement.id), isNull(stockMovementLines.deletedAt)));
+      const approvalLocationIds = new Set<string>();
+
+      for (const line of lines) {
+        const metadata = line.metadata as { adjustmentDirection?: string | null };
+        const outboundLocationId =
+          movementType === "transfer" || movementType === "scrap" || movementType === "supplier_return"
+            ? movement.fromLocationId
+            : movementType === "adjustment" && metadata.adjustmentDirection === "decrease"
+              ? movement.fromLocationId
+              : null;
+
+        if (outboundLocationId) {
+          approvalLocationIds.add(outboundLocationId);
+        }
+      }
+
+      await requireStockOutApproval(tx, {
+        companyId: company.id,
+        requestedBy: user.id,
+        sourceType: movement.sourceType ?? sourceType(movementType),
+        stockMovementId: movement.id,
+        sourceNo: movement.sourceNo,
+        sourceLocationIds: [...approvalLocationIds],
+        reason: "Inventory operation removes stock from an approval-controlled location.",
+        metadata: {
+          movementNo: movement.movementNo,
+          movementType,
+        },
+      });
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Could not request approval.";
+
+    if (!message.startsWith("Stock-out approval is required")) {
+      redirectWithError(`/admin/inventory/operations/${parsed.data.movementId}`, message);
+    }
+  }
+
+  revalidatePath(`/admin/inventory/operations/${parsed.data.movementId}`);
+  redirect(`/admin/inventory/operations/${parsed.data.movementId}?notice=${encodeURIComponent("Operation approval requested")}`);
+}
+
+export async function approveAndPostInventoryOperation(formData: FormData) {
+  const user = await requirePermission("inventory.receive");
+  const parsed = approvePostSchema.safeParse({
+    movementId: formValue(formData, "movementId"),
+    approvalIds: formData.getAll("approvalIds").filter((value): value is string => typeof value === "string"),
+  });
+
+  if (!parsed.success || parsed.data.approvalIds.length === 0) {
+    redirectWithError("/admin/inventory/operations", "Pending approval is required.");
+  }
+
+  const company = await getDefaultCompany();
+
+  try {
+    await approveStockOutApprovals({
+      companyId: company.id,
+      userId: user.id,
+      approvalIds: parsed.data.approvalIds,
+      notes: "Approved from inventory operation page.",
+    });
+  } catch (error) {
+    redirectWithError(`/admin/inventory/operations/${parsed.data.movementId}`, error instanceof Error ? error.message : "Could not approve operation.");
+  }
+
+  return postInventoryOperation(formData);
 }
 
 export async function cancelInventoryOperation(formData: FormData) {

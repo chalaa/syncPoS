@@ -35,6 +35,8 @@ type PaymentFormDialogProps = {
   reference?: string | null;
   notes?: string | null;
   paymentLines?: PaymentLineRow[];
+  verifyAction?: PaymentFormAction;
+  returnPath?: string;
 };
 
 function minorToInputValue(value: number) {
@@ -76,6 +78,8 @@ export function PaymentFormDialog({
   reference,
   notes,
   paymentLines,
+  verifyAction,
+  returnPath,
 }: PaymentFormDialogProps) {
   const idPrefix = useId();
   const nextLineId = useRef(2);
@@ -128,7 +132,7 @@ export function PaymentFormDialog({
         fieldErrors[`lines.${index}.amount`] = `Enter an amount greater than zero on line ${lineNo}.`;
       }
 
-      if (account?.requiresReference && !line.reference.trim()) {
+      if ((account?.requiresReference || account?.verifyEtEnabled) && !line.reference.trim()) {
         fieldErrors[`lines.${index}.reference`] = `Reference is required on line ${lineNo}.`;
       }
     });
@@ -179,6 +183,11 @@ export function PaymentFormDialog({
   }
 
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    const submitter = event.nativeEvent instanceof SubmitEvent ? event.nativeEvent.submitter : null;
+    if (submitter instanceof HTMLElement && submitter.dataset.skipPaymentValidation === "true") {
+      return;
+    }
+
     if (!isValid) {
       event.preventDefault();
     }
@@ -197,20 +206,27 @@ export function PaymentFormDialog({
           </DialogHeader>
 
           <input type="hidden" name={hiddenFieldName} value={hiddenFieldValue} />
+          {returnPath ? <input type="hidden" name="returnPath" value={returnPath} /> : null}
 
           <div className="overflow-x-auto rounded-md border border-border">
-            <table className="w-full min-w-[860px] text-left text-sm">
+            <table className="w-full min-w-[1040px] text-left text-sm">
               <thead className="bg-muted/40 text-xs uppercase text-muted-foreground">
                 <tr>
                   <th className="px-3 py-2">Method / Account</th>
                   <th className="px-3 py-2">Amount</th>
                   <th className="px-3 py-2">Reference</th>
+                  <th className="px-3 py-2">Verification</th>
                   <th className="px-3 py-2">Note</th>
                   <th className="w-12 px-3 py-2" aria-label="Actions" />
                 </tr>
               </thead>
               <tbody>
-                {lines.map((line, index) => (
+                {lines.map((line, index) => {
+                  const savedLine = paymentLines?.find((paymentLine) => paymentLine.id === line.key);
+                  const selectedAccount = accountById.get(line.paymentAccountId);
+                  const needsVerification = Boolean(selectedAccount?.verifyEtEnabled);
+
+                  return (
                   <tr key={line.key} className="border-t border-border align-top">
                     <td className="px-3 py-3">
                       <select
@@ -267,6 +283,41 @@ export function PaymentFormDialog({
                       ) : null}
                     </td>
                     <td className="px-3 py-3">
+                      {needsVerification ? (
+                        <div className="grid gap-2">
+                          <VerificationStatus
+                            status={savedLine?.verificationStatus ?? "not_verified"}
+                            message={savedLine?.verificationMessage ?? null}
+                          />
+                          <div className="text-xs text-muted-foreground">
+                            Verified amount:{" "}
+                            <span className="font-medium text-foreground">
+                          {savedLine?.verifiedAmountMinor !== null && savedLine?.verifiedAmountMinor !== undefined
+                                ? `${savedLine.verifiedCurrencyCode ?? currencyCode} ${minorToInputValue(savedLine.verifiedAmountMinor)}`
+                                : "-"}
+                            </span>
+                          </div>
+                          {verifyAction && savedLine ? (
+                            <Button
+                              type="submit"
+                              size="sm"
+                              variant="outline"
+                              name="paymentLineId"
+                              value={savedLine.id}
+                              formAction={verifyAction}
+                              data-skip-payment-validation="true"
+                            >
+                              Verify
+                            </Button>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">Save draft before verifying</span>
+                          )}
+                        </div>
+                      ) : (
+                        <VerificationStatus status="not_required" message={null} />
+                      )}
+                    </td>
+                    <td className="px-3 py-3">
                       <input
                         name="lineNote"
                         value={line.note}
@@ -287,7 +338,8 @@ export function PaymentFormDialog({
                       </Button>
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -330,5 +382,26 @@ export function PaymentFormDialog({
         </form>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function VerificationStatus({
+  status,
+  message,
+}: {
+  status: string;
+  message: string | null;
+}) {
+  const label = status.replace(/_/g, " ");
+  const className = status === "verified"
+    ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+    : status === "failed"
+      ? "border-destructive/30 bg-destructive/5 text-destructive"
+      : "border-border bg-muted/40 text-muted-foreground";
+
+  return (
+    <span title={message ?? undefined} className={`w-fit rounded-md border px-2 py-1 text-xs font-medium capitalize ${className}`}>
+      {label}
+    </span>
   );
 }

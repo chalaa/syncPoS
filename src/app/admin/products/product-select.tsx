@@ -188,22 +188,16 @@ export function ProductSelect({
   onValueChange,
   onOptionsChange,
 }: ProductSelectProps) {
-  const [items, setItems] = useState(options);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [initialName, setInitialName] = useState("");
   const selectedProductId = value ?? "";
 
-  function updateItems(nextItems: ProductSelectOption[]) {
-    setItems(nextItems);
-    onOptionsChange?.(nextItems);
-  }
-
   function addCreatedProduct(product: ProductSelectOption) {
-    const nextItems = [...items.filter((item) => item.id !== product.id), product].sort((left, right) =>
+    const nextItems = [...options.filter((item) => item.id !== product.id), product].sort((left, right) =>
       left.name.localeCompare(right.name),
     );
 
-    updateItems(nextItems);
+    onOptionsChange?.(nextItems);
     onValueChange?.(product.id);
   }
 
@@ -212,7 +206,7 @@ export function ProductSelect({
       <RelatedModelSelect
         name={name}
         value={selectedProductId}
-        options={items}
+        options={options}
         onValueChange={onValueChange}
         placeholder={placeholder}
         emptyLabel={emptyLabel}
