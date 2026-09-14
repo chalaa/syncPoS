@@ -4,6 +4,7 @@ import {
   ClipboardListIcon,
   GaugeIcon,
   PackageCheckIcon,
+  ReceiptIcon,
   SettingsIcon,
   ShoppingBagIcon,
   ShoppingCartIcon,
@@ -72,13 +73,13 @@ export const adminMenuItems: AdminMenuItem[] = [
     label: "Purchasing",
     href: "/admin/purchasing",
     icon: ShoppingBagIcon,
-    permission: PERMISSIONS.INVENTORY.RECEIVE,
+    permission: PERMISSIONS.PURCHASING.ORDERS_VIEW,
     submenus: [
-      { label: "RFQs / Orders", href: "/admin/purchasing", permission: PERMISSIONS.INVENTORY.RECEIVE },
-      { label: "Receipts", href: "/admin/purchasing?view=receipts", permission: PERMISSIONS.INVENTORY.RECEIVE },
-      { label: "Landed Costs", href: "/admin/purchasing?view=landed-costs", permission: PERMISSIONS.INVENTORY.RECEIVE },
-      { label: "Payments", href: "/admin/purchasing?view=payments", permission: PERMISSIONS.INVENTORY.RECEIVE },
-      { label: "Returns", href: "/admin/purchasing?view=returns", permission: PERMISSIONS.INVENTORY.RECEIVE },
+      { label: "RFQs / Orders", href: "/admin/purchasing", permission: PERMISSIONS.PURCHASING.ORDERS_VIEW },
+      { label: "Receipts", href: "/admin/purchasing?view=receipts", permission: PERMISSIONS.PURCHASING.RECEIPTS_MANAGE },
+      { label: "Landed Costs", href: "/admin/purchasing?view=landed-costs", permission: PERMISSIONS.PURCHASING.LANDED_COSTS_MANAGE },
+      { label: "Payments", href: "/admin/purchasing?view=payments", permission: PERMISSIONS.PURCHASING.PAYMENTS_MANAGE },
+      { label: "Returns", href: "/admin/purchasing?view=returns", permission: PERMISSIONS.PURCHASING.ORDERS_VIEW },
     ],
   },
   {
@@ -92,6 +93,17 @@ export const adminMenuItems: AdminMenuItem[] = [
       { label: "Deliveries", href: "/admin/sales?view=deliveries", permission: PERMISSIONS.SALES.CREATE },
       { label: "Payments", href: "/admin/sales?view=payments", permission: PERMISSIONS.SALES.CREATE },
       { label: "Returns", href: "/admin/sales?view=returns", permission: PERMISSIONS.SALES.CREATE },
+    ],
+  },
+  {
+    key: "expenses",
+    label: "Expenses",
+    href: "/admin/operations/expenses",
+    icon: ReceiptIcon,
+    permission: PERMISSIONS.EXPENSES.VIEW,
+    submenus: [
+      { label: "All Expenses", href: "/admin/operations/expenses", permission: PERMISSIONS.EXPENSES.VIEW },
+      { label: "Categories", href: "/admin/operations/expenses/categories", permission: PERMISSIONS.EXPENSES.CATEGORIES_MANAGE },
     ],
   },
   {
@@ -154,8 +166,6 @@ export const adminMenuItems: AdminMenuItem[] = [
     submenus: [
       { label: "Tasks", href: "/admin/operations", permission: PERMISSIONS.COMPANY.MANAGE },
       { label: "Approvals", href: "/admin/operations?view=approvals", permission: PERMISSIONS.COMPANY.MANAGE },
-      { label: "Expenses", href: "/admin/operations/expenses", permission: PERMISSIONS.COMPANY.MANAGE },
-      { label: "Expense Categories", href: "/admin/operations/expenses/categories", permission: PERMISSIONS.COMPANY.MANAGE },
     ],
   },
 ];

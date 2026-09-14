@@ -13,11 +13,12 @@ import { Badge, StatusBadge } from "@/components/ui/badge";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
 import { requirePermission } from "@/server/auth/session";
 import { displayReportMoney, getDashboardReport } from "@/server/reports/reports";
+import { PERMISSIONS } from "@/server/iam/permissions";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminDashboardPage() {
-  const [user, report] = await Promise.all([requirePermission("reports:profit:view"), getDashboardReport()]);
+  const [user, report] = await Promise.all([requirePermission(PERMISSIONS.REPORTS.HUB_VIEW), getDashboardReport()]);
 
   return (
     <PageShell>

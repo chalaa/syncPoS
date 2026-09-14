@@ -3,7 +3,8 @@ import { ArrowLeftRight, Sliders, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
-import { requirePermission } from "@/server/auth/session";
+import { requirePermission, getUserPermissionCodes } from "@/server/auth/session";
+import { PERMISSIONS, userHasPermission } from "@/server/iam/permissions";
 import { StockByLocationTable, StockFilters } from "@/app/admin/inventory/stock-table";
 import {
   getInventoryAdjustmentFormOptions,
@@ -29,7 +30,11 @@ type InventoryPageProps = {
 };
 
 export default async function InventoryPage({ searchParams }: InventoryPageProps) {
-  await requirePermission("inventory.view");
+  const user = await requirePermission(PERMISSIONS.INVENTORY.VIEW);
+  const userPerms = await getUserPermissionCodes(user.id);
+  const canTransfer = userHasPermission(userPerms, PERMISSIONS.INVENTORY.TRANSFER_CREATE);
+  const canAdjust = userHasPermission(userPerms, PERMISSIONS.INVENTORY.ADJUSTMENTS_CREATE);
+  const canScrap = userHasPermission(userPerms, PERMISSIONS.INVENTORY.SCRAP_CREATE);
 
   const params = await searchParams;
   const query = params.q ?? "";
@@ -57,50 +62,56 @@ export default async function InventoryPage({ searchParams }: InventoryPageProps
         description="Unified warehouse stock command center, continuous valuation, and inventory control."
         actions={
           <div className="flex flex-wrap items-center gap-2">
-            <NewInventoryOperationModal
-              defaultType="transfer"
-              owners={formOptions.owners}
-              locations={formOptions.locations}
-              products={formOptions.products}
-              balances={formOptions.balances}
-              returnPath="/admin/inventory"
-              trigger={
-                <Button className="gap-1.5 bg-gradient-to-r from-[#0B5D4B] to-[#073B35] font-semibold text-white shadow-sm shadow-[#0B5D4B]/20 hover:brightness-110">
-                  <ArrowLeftRight className="size-3.5 text-emerald-200" />
-                  New Transfer
-                </Button>
-              }
-            />
+            {canTransfer ? (
+              <NewInventoryOperationModal
+                defaultType="transfer"
+                owners={formOptions.owners}
+                locations={formOptions.locations}
+                products={formOptions.products}
+                balances={formOptions.balances}
+                returnPath="/admin/inventory"
+                trigger={
+                  <Button className="gap-1.5 bg-gradient-to-r from-[#0B5D4B] to-[#073B35] font-semibold text-white shadow-sm shadow-[#0B5D4B]/20 hover:brightness-110">
+                    <ArrowLeftRight className="size-3.5 text-emerald-200" />
+                    New Transfer
+                  </Button>
+                }
+              />
+            ) : null}
 
-            <NewInventoryOperationModal
-              defaultType="adjustment"
-              owners={formOptions.owners}
-              locations={formOptions.locations}
-              products={formOptions.products}
-              balances={formOptions.balances}
-              returnPath="/admin/inventory"
-              trigger={
-                <Button variant="outline" className="gap-1.5 font-semibold text-foreground">
-                  <Sliders className="size-3.5 text-amber-600" />
-                  Stock Adjustment
-                </Button>
-              }
-            />
+            {canAdjust ? (
+              <NewInventoryOperationModal
+                defaultType="adjustment"
+                owners={formOptions.owners}
+                locations={formOptions.locations}
+                products={formOptions.products}
+                balances={formOptions.balances}
+                returnPath="/admin/inventory"
+                trigger={
+                  <Button variant="outline" className="gap-1.5 font-semibold text-foreground">
+                    <Sliders className="size-3.5 text-amber-600" />
+                    Stock Adjustment
+                  </Button>
+                }
+              />
+            ) : null}
 
-            <NewInventoryOperationModal
-              defaultType="scrap"
-              owners={formOptions.owners}
-              locations={formOptions.locations}
-              products={formOptions.products}
-              balances={formOptions.balances}
-              returnPath="/admin/inventory"
-              trigger={
-                <Button variant="outline" className="gap-1.5 font-semibold text-muted-foreground hover:text-destructive hover:bg-destructive/10">
-                  <Trash2 className="size-3.5 text-destructive" />
-                  Scrap
-                </Button>
-              }
-            />
+            {canScrap ? (
+              <NewInventoryOperationModal
+                defaultType="scrap"
+                owners={formOptions.owners}
+                locations={formOptions.locations}
+                products={formOptions.products}
+                balances={formOptions.balances}
+                returnPath="/admin/inventory"
+                trigger={
+                  <Button variant="outline" className="gap-1.5 font-semibold text-muted-foreground hover:text-destructive hover:bg-destructive/10">
+                    <Trash2 className="size-3.5 text-destructive" />
+                    Scrap
+                  </Button>
+                }
+              />
+            ) : null}
           </div>
         }
       />

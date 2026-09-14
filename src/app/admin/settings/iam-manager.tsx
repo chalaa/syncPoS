@@ -1,7 +1,6 @@
 "use client";
 
-import { EditIcon, KeyRoundIcon, PlusIcon, ShieldIcon, Trash2Icon, UserPlusIcon, UsersIcon } from "lucide-react";
-import Link from "next/link";
+import { EditIcon, KeyRoundIcon, PlusIcon, ShieldIcon, Trash2Icon, UserPlusIcon } from "lucide-react";
 import { useState, type ReactNode } from "react";
 
 import {
@@ -32,9 +31,10 @@ import type { IamManagementData, IamRoleRow, IamUserRow } from "@/server/iam/typ
 
 type UserMutation = (formData: FormData) => Promise<void>;
 type RoleMutation = (formData: FormData) => Promise<void>;
+type SettingsView = "users" | "roles" | "permissions";
 
 type IamManagerProps = IamManagementData & {
-  view: "users" | "roles" | "permissions";
+  view: SettingsView;
   canViewUsers: boolean;
   canManageUsers: boolean;
   canViewRoles: boolean;
@@ -48,45 +48,6 @@ const inputClass =
   "h-10 rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-primary/20 focus:border-primary";
 const textareaClass =
   "min-h-24 rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-primary/20 focus:border-primary";
-
-function SettingsViewNav({
-  view,
-  canViewUsers,
-  canViewRoles,
-}: {
-  view: IamManagerProps["view"];
-  canViewUsers: boolean;
-  canViewRoles: boolean;
-}) {
-  return (
-    <div className="flex rounded-lg border border-border bg-card p-1 text-sm shadow-2xs">
-      {canViewUsers ? (
-        <Button asChild variant={view === "users" ? "default" : "ghost"} size="sm" className="gap-1.5 font-medium">
-          <Link href="/admin/settings">
-            <UsersIcon className="size-3.5" />
-            Users
-          </Link>
-        </Button>
-      ) : null}
-      {canViewRoles ? (
-        <>
-          <Button asChild variant={view === "roles" ? "default" : "ghost"} size="sm" className="gap-1.5 font-medium">
-            <Link href="/admin/settings?view=roles">
-              <ShieldIcon className="size-3.5" />
-              Roles
-            </Link>
-          </Button>
-          <Button asChild variant={view === "permissions" ? "default" : "ghost"} size="sm" className="gap-1.5 font-medium">
-            <Link href="/admin/settings?view=permissions">
-              <KeyRoundIcon className="size-3.5" />
-              Permissions
-            </Link>
-          </Button>
-        </>
-      ) : null}
-    </div>
-  );
-}
 
 function UserForm({
   title,
@@ -333,9 +294,7 @@ export function IamManager({
   permissions,
   employeeOptions,
   view,
-  canViewUsers,
   canManageUsers,
-  canViewRoles,
   canManageRoles,
   notice,
   error,
@@ -360,22 +319,19 @@ export function IamManager({
           eyebrow="Settings"
           title="Roles"
           actions={
-            <div className="flex flex-wrap items-center gap-2">
-              <SettingsViewNav view={view} canViewUsers={canViewUsers} canViewRoles={canViewRoles} />
-              {canManageRoles ? (
-                <RoleDialog
-                  label="New role"
-                  action={createRole}
-                  permissions={activePermissions}
-                  returnPath={returnPath}
-                >
-                  <Button>
-                    <PlusIcon data-icon="inline-start" />
-                    New role
-                  </Button>
-                </RoleDialog>
-              ) : null}
-            </div>
+            canManageRoles ? (
+              <RoleDialog
+                label="New role"
+                action={createRole}
+                permissions={activePermissions}
+                returnPath={returnPath}
+              >
+                <Button>
+                  <PlusIcon data-icon="inline-start" />
+                  New role
+                </Button>
+              </RoleDialog>
+            ) : null
           }
         />
 
@@ -463,11 +419,7 @@ export function IamManager({
   if (view === "permissions") {
     return (
       <PageShell>
-        <PageHeader
-          eyebrow="Settings"
-          title="Permissions"
-          actions={<SettingsViewNav view={view} canViewUsers={canViewUsers} canViewRoles={canViewRoles} />}
-        />
+        <PageHeader eyebrow="Settings" title="Permissions" />
 
         {notice ? <Alert kind="success">{notice}</Alert> : null}
         {error ? <Alert kind="error">{error}</Alert> : null}
@@ -515,23 +467,20 @@ export function IamManager({
         eyebrow="Settings"
         title="Users"
         actions={
-          <div className="flex flex-wrap items-center gap-2">
-            <SettingsViewNav view={view} canViewUsers={canViewUsers} canViewRoles={canViewRoles} />
-            {canManageUsers ? (
-              <UserDialog
-                label="New user"
-                action={createUser}
-                roles={activeRoles}
-                employeeOptions={employeeOptions}
-                returnPath={returnPath}
-              >
-                <Button>
-                  <UserPlusIcon data-icon="inline-start" />
-                  New user
-                </Button>
-              </UserDialog>
-            ) : null}
-          </div>
+          canManageUsers ? (
+            <UserDialog
+              label="New user"
+              action={createUser}
+              roles={activeRoles}
+              employeeOptions={employeeOptions}
+              returnPath={returnPath}
+            >
+              <Button>
+                <UserPlusIcon data-icon="inline-start" />
+                New user
+              </Button>
+            </UserDialog>
+          ) : null
         }
       />
 

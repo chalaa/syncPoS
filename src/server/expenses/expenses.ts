@@ -54,6 +54,9 @@ export async function getExpenseCategoryList(params: {
 export async function getExpenseList(params: {
   query?: string;
   showCancelled?: boolean;
+  userId?: string;
+  employeeId?: string | null;
+  canSeeAll?: boolean;
 }): Promise<ExpenseListRow[]> {
   const company = await getDefaultCompany();
   const query = params.query?.trim();
@@ -61,6 +64,15 @@ export async function getExpenseList(params: {
   const searchFilter = query
     ? sql`(e.expense_no ilike ${`%${query}%`} or e.description ilike ${`%${query}%`} or ec.name ilike ${`%${query}%`})`
     : undefined;
+
+  let ownerFilter = sql``;
+  if (!params.canSeeAll && params.userId) {
+    if (params.employeeId) {
+      ownerFilter = sql`and (e.created_by = ${params.userId} or e.employee_id = ${params.employeeId})`;
+    } else {
+      ownerFilter = sql`and e.created_by = ${params.userId}`;
+    }
+  }
 
   return db.execute<ExpenseListRow>(sql`
     select
@@ -98,6 +110,7 @@ export async function getExpenseList(params: {
     left join payments p on p.id = pa.payment_id
     where e.company_id = ${company.id}
       and e.deleted_at is null
+      ${ownerFilter}
       ${statusFilter ? sql`and ${statusFilter}` : sql``}
       ${searchFilter ? sql`and ${searchFilter}` : sql``}
     group by e.id, ec.id, emp.id, vendor.id, loc.id
@@ -105,8 +118,20 @@ export async function getExpenseList(params: {
   `);
 }
 
-export async function getExpenseDetail(id: string): Promise<ExpenseDetail | null> {
+export async function getExpenseDetail(
+  id: string,
+  options?: { userId?: string; employeeId?: string | null; canSeeAll?: boolean }
+): Promise<ExpenseDetail | null> {
   const company = await getDefaultCompany();
+  let ownerFilter = sql``;
+  if (options && !options.canSeeAll && options.userId) {
+    if (options.employeeId) {
+      ownerFilter = sql`and (e.created_by = ${options.userId} or e.employee_id = ${options.employeeId})`;
+    } else {
+      ownerFilter = sql`and e.created_by = ${options.userId}`;
+    }
+  }
+
   const [expense] = await db.execute<Omit<ExpenseDetail, "attachments">>(sql`
     select
       e.id as "id",
@@ -152,6 +177,7 @@ export async function getExpenseDetail(id: string): Promise<ExpenseDetail | null
     where e.id = ${id}
       and e.company_id = ${company.id}
       and e.deleted_at is null
+      ${ownerFilter}
     group by e.id, ec.id, emp.id, vendor.id, loc.id
     limit 1
   `);

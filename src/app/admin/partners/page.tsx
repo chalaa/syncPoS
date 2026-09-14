@@ -10,7 +10,8 @@ import {
   getPartnerList,
   minorToDisplay,
 } from "@/server/partners/partners";
-import { requirePermission } from "@/server/auth/session";
+import { requirePermission, getUserPermissionCodes } from "@/server/auth/session";
+import { PERMISSIONS, userHasPermission } from "@/server/iam/permissions";
 import { restorePartner, softDeletePartner } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -27,7 +28,9 @@ type PartnersPageProps = {
 };
 
 export default async function PartnersPage({ searchParams }: PartnersPageProps) {
-  await requirePermission("partner.view");
+  const user = await requirePermission(PERMISSIONS.PARTNERS.VIEW);
+  const userPerms = await getUserPermissionCodes(user.id);
+  const canManage = userHasPermission(userPerms, PERMISSIONS.PARTNERS.MANAGE);
 
   const params = await searchParams;
 
@@ -47,9 +50,11 @@ export default async function PartnersPage({ searchParams }: PartnersPageProps) 
         title="Partners & Accounts"
         description="Manage customer profiles, supplier accounts, credit allowances, and primary contacts."
         actions={
-          <Button asChild>
-            <Link href="/admin/partners/new">New partner</Link>
-          </Button>
+          canManage ? (
+            <Button asChild>
+              <Link href="/admin/partners/new">New partner</Link>
+            </Button>
+          ) : undefined
         }
       />
 

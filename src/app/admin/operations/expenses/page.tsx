@@ -2,13 +2,15 @@ import { BanknoteIcon, FolderIcon, PlusIcon, SearchIcon } from "lucide-react";
 import Link from "next/link";
 
 import { cancelExpense } from "@/app/admin/operations/expenses/actions";
+import { NewExpenseModal } from "@/app/admin/operations/expenses/new-expense-modal";
 import { Alert } from "@/components/ui/alert";
 import { StatusBadge } from "@/components/ui/badge";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
-import { requirePermission } from "@/server/auth/session";
-import { displayExpenseMoney, getExpenseList } from "@/server/expenses/expenses";
+import { requirePermission, getUserPermissionCodes } from "@/server/auth/session";
+import { displayExpenseMoney, getExpenseFormOptions, getExpenseList } from "@/server/expenses/expenses";
 import type { ExpenseListRow } from "@/server/expenses/types";
+import { PERMISSIONS, userHasPermission } from "@/server/iam/permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -21,12 +23,26 @@ function statusLabel(value: string) {
 }
 
 export default async function ExpensesPage({ searchParams }: ExpensesPageProps) {
-  await requirePermission("company.manage");
+  const user = await requirePermission(PERMISSIONS.EXPENSES.VIEW);
+  const userPerms = await getUserPermissionCodes(user.id);
+  const canSeeAll = userHasPermission(userPerms, PERMISSIONS.OWNER.ALL);
+  const canCreateExpense = userHasPermission(userPerms, PERMISSIONS.EXPENSES.CREATE);
+  const canManageCategories = userHasPermission(userPerms, PERMISSIONS.EXPENSES.CATEGORIES_MANAGE);
 
   const params = await searchParams;
   const query = params.q?.trim() ?? "";
   const showCancelled = params.show === "cancelled";
-  const expenses = await getExpenseList({ query, showCancelled });
+
+  const [expenses, options] = await Promise.all([
+    getExpenseList({
+      query,
+      showCancelled,
+      userId: user.id,
+      employeeId: user.employeeId,
+      canSeeAll,
+    }),
+    getExpenseFormOptions(),
+  ]);
 
   return (
     <PageShell>
@@ -36,14 +52,13 @@ export default async function ExpensesPage({ searchParams }: ExpensesPageProps) 
         description="Record and track miscellaneous operating expenses, supplier payments, and team reimbursements."
         actions={
           <div className="flex flex-wrap gap-2">
-            <ButtonLink href="/admin/operations/expenses/categories" variant="outline">
-              <FolderIcon data-icon="inline-start" />
-              Categories
-            </ButtonLink>
-            <ButtonLink href="/admin/operations/expenses/new">
-              <PlusIcon data-icon="inline-start" />
-              New expense
-            </ButtonLink>
+            {canManageCategories ? (
+              <ButtonLink href="/admin/operations/expenses/categories" variant="outline">
+                <FolderIcon data-icon="inline-start" />
+                Categories
+              </ButtonLink>
+            ) : null}
+            {canCreateExpense ? <NewExpenseModal options={options} /> : null}
           </div>
         }
       />

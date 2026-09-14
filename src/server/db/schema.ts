@@ -2125,6 +2125,10 @@ export const expenses = pgTable(
       onDelete: "restrict",
       onUpdate: "cascade",
     }),
+    createdBy: uuid("created_by").references(() => users.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
     ...softDelete,
     ...timestamps,
   },

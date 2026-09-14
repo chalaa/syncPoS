@@ -1,5 +1,6 @@
 import { and, asc, desc, eq, ilike, isNotNull, isNull, or, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
+import { cache } from "react";
 
 import { db } from "@/server/db/client";
 import {
@@ -51,7 +52,7 @@ export {
   trackingModeOptions,
 } from "@/server/catalog/types";
 
-export async function getDefaultCompany() {
+export const getDefaultCompany = cache(async () => {
   const [company] = await db
     .select({
       id: companies.id,
@@ -67,7 +68,7 @@ export async function getDefaultCompany() {
   }
 
   return company;
-}
+});
 
 export async function getCatalogFormOptions() {
   const company = await getDefaultCompany();

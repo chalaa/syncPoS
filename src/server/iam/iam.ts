@@ -11,6 +11,7 @@ import {
   userRoles,
   employees,
 } from "@/server/db/schema";
+import { ensurePermissionsSeeded } from "@/server/iam/seeder";
 import type { IamManagementData, IamOption, IamPermissionRow, IamRoleRow, IamUserRow } from "@/server/iam/types";
 
 export async function getIamUserList(): Promise<IamUserRow[]> {
@@ -82,11 +83,19 @@ export async function getIamEmployeeOptions(): Promise<IamOption[]> {
 }
 
 export async function getIamManagementData(): Promise<IamManagementData> {
-  const [users, roles, permissions, employeeOptions] = await Promise.all([
+  // Seed is memoized per process and no-ops when catalog already matches DB.
+  const seedPromise = ensurePermissionsSeeded();
+
+  const dataPromise = Promise.all([
     getIamUserList(),
     getIamRoleList(),
     getIamPermissionList(),
     getIamEmployeeOptions(),
+  ]);
+
+  const [, [users, roles, permissions, employeeOptions]] = await Promise.all([
+    seedPromise,
+    dataPromise,
   ]);
 
   return { users, roles, permissions, employeeOptions };

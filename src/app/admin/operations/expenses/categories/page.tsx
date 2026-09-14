@@ -1,6 +1,7 @@
 import { ExpenseCategoryManager } from "@/app/admin/operations/expenses/expense-category-manager";
 import { requirePermission } from "@/server/auth/session";
 import { getExpenseCategoryList } from "@/server/expenses/expenses";
+import { PERMISSIONS } from "@/server/iam/permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -9,7 +10,7 @@ type ExpenseCategoriesPageProps = {
 };
 
 export default async function ExpenseCategoriesPage({ searchParams }: ExpenseCategoriesPageProps) {
-  await requirePermission("company.manage");
+  await requirePermission(PERMISSIONS.EXPENSES.CATEGORIES_MANAGE);
 
   const params = await searchParams;
   const query = params.q?.trim() ?? "";

@@ -600,6 +600,7 @@ export async function getInventorySummaryMetrics(): Promise<InventorySummaryMetr
     totalValuationMinor: string | number;
     currencyCode: string | null;
     totalSkusOnHand: number;
+    totalQuantityOnHand: string | number;
     lowStockCount: number;
     outOfStockCount: number;
     totalReservedQuantity: string | number;
@@ -621,7 +622,8 @@ export async function getInventorySummaryMetrics(): Promise<InventorySummaryMetr
       coalesce(sum(valuation_minor), 0)::bigint as "totalValuationMinor",
       coalesce(max(currency_code), 'ETB') as "currencyCode",
       count(*) filter (where on_hand > 0)::int as "totalSkusOnHand",
-      count(*) filter (where available > 0 and available <= 5)::int as "lowStockCount",
+      coalesce(sum(on_hand) filter (where on_hand > 0), 0)::numeric as "totalQuantityOnHand",
+      count(*) filter (where available > 0 and available <= 10)::int as "lowStockCount",
       count(*) filter (where on_hand <= 0)::int as "outOfStockCount",
       coalesce(sum(reserved), 0)::numeric as "totalReservedQuantity"
     from product_totals
@@ -631,6 +633,7 @@ export async function getInventorySummaryMetrics(): Promise<InventorySummaryMetr
     totalValuationMinor: Number(row?.totalValuationMinor ?? 0),
     currencyCode: row?.currencyCode || "ETB",
     totalSkusOnHand: Number(row?.totalSkusOnHand ?? 0),
+    totalQuantityOnHand: Number(row?.totalQuantityOnHand ?? 0),
     lowStockCount: Number(row?.lowStockCount ?? 0),
     outOfStockCount: Number(row?.outOfStockCount ?? 0),
     totalReservedQuantity: Number(row?.totalReservedQuantity ?? 0),

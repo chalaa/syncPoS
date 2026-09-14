@@ -47,63 +47,61 @@ export interface BadgeProps
   dot?: boolean;
 }
 
-export function Badge({
-  className,
-  variant,
-  size,
-  dot = false,
-  children,
-  ...props
-}: BadgeProps) {
-  const dotColorClass = React.useMemo(() => {
-    switch (variant) {
-      case "destructive":
-        return "bg-destructive";
-      case "warning":
-      case "accent":
-        return "bg-gold";
-      case "secondary":
-      case "muted":
-        return "bg-muted-foreground";
-      case "dark":
-        return "bg-gold";
-      case "success":
-      case "default":
-      default:
-        return "bg-primary";
-    }
-  }, [variant]);
+export const Badge = React.forwardRef<HTMLDivElement, BadgeProps>(
+  ({ className, variant, size, dot = false, children, ...props }, ref) => {
+    const dotColorClass = React.useMemo(() => {
+      switch (variant) {
+        case "destructive":
+          return "bg-destructive";
+        case "warning":
+        case "accent":
+          return "bg-gold";
+        case "secondary":
+        case "muted":
+          return "bg-muted-foreground";
+        case "dark":
+          return "bg-gold";
+        case "success":
+        case "default":
+        default:
+          return "bg-primary";
+      }
+    }, [variant]);
 
-  return (
-    <div className={cn(badgeVariants({ variant, size }), className)} {...props}>
-      {dot ? (
-        <span
-          className={cn("size-1.5 shrink-0 rounded-full", dotColorClass)}
-          aria-hidden="true"
-        />
-      ) : null}
-      {children}
-    </div>
-  );
-}
+    return (
+      <div ref={ref} className={cn(badgeVariants({ variant, size }), className)} {...props}>
+        {dot ? (
+          <span
+            className={cn("size-1.5 shrink-0 rounded-full", dotColorClass)}
+            aria-hidden="true"
+          />
+        ) : null}
+        {children}
+      </div>
+    );
+  }
+);
+Badge.displayName = "Badge";
 
 /**
  * Intelligent StatusBadge that automatically styles and labels
  * any document, payment, inventory, or workflow status.
  */
-export function StatusBadge({
-  status,
-  label,
-  size = "default",
-  className,
-}: {
-  status: string | null | undefined;
-  label?: string;
-  size?: "sm" | "default" | "lg";
-  className?: string;
-}) {
+export const StatusBadge = React.forwardRef<
+  HTMLDivElement,
+  {
+    status: string | null | undefined;
+    label?: string;
+    size?: "sm" | "default" | "lg";
+    className?: string;
+  } & React.HTMLAttributes<HTMLDivElement>
+>(({ status, label, size = "default", className, ...props }, ref) => {
   if (!status) {
-    return <span className="text-xs text-muted-foreground">-</span>;
+    return (
+      <span ref={ref as React.Ref<HTMLSpanElement>} className="text-xs text-muted-foreground" {...props}>
+        -
+      </span>
+    );
   }
 
   const normalized = status.toLowerCase().trim();
@@ -126,7 +124,7 @@ export function StatusBadge({
     ].includes(normalized)
   ) {
     return (
-      <Badge variant="success" dot size={size} className={className}>
+      <Badge ref={ref} variant="success" dot size={size} className={className} {...props}>
         {displayLabel}
       </Badge>
     );
@@ -151,7 +149,7 @@ export function StatusBadge({
     ].includes(normalized)
   ) {
     return (
-      <Badge variant="warning" dot size={size} className={className}>
+      <Badge ref={ref} variant="warning" dot size={size} className={className} {...props}>
         {displayLabel}
       </Badge>
     );
@@ -174,7 +172,7 @@ export function StatusBadge({
     ].includes(normalized)
   ) {
     return (
-      <Badge variant="destructive" dot size={size} className={className}>
+      <Badge ref={ref} variant="destructive" dot size={size} className={className} {...props}>
         {displayLabel}
       </Badge>
     );
@@ -182,8 +180,10 @@ export function StatusBadge({
 
   // Neutral / Secondary / Outbound / Closed
   return (
-    <Badge variant="secondary" size={size} className={className}>
+    <Badge ref={ref} variant="secondary" size={size} className={className} {...props}>
       {displayLabel}
     </Badge>
   );
-}
+});
+StatusBadge.displayName = "StatusBadge";
+

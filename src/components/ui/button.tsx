@@ -1,5 +1,6 @@
 "use client";
 
+import * as React from "react";
 import Link from "next/link";
 import { Slot } from "@radix-ui/react-slot";
 import { cva, type VariantProps } from "class-variance-authority";
@@ -97,45 +98,53 @@ type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> &
     pendingLabel?: ReactNode;
   };
 
-export function Button({
-  className,
-  variant,
-  size,
-  asChild = false,
-  children,
-  disabled,
-  type,
-  pendingLabel,
-  ...props
-}: ButtonProps) {
-  const { pending } = useFormStatus();
-  const isSubmitButton = !asChild && (type ?? "submit") === "submit";
-  const isPending = isSubmitButton && pending;
+export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
+  (
+    {
+      className,
+      variant,
+      size,
+      asChild = false,
+      children,
+      disabled,
+      type,
+      pendingLabel,
+      ...props
+    },
+    ref
+  ) => {
+    const { pending } = useFormStatus();
+    const isSubmitButton = !asChild && (type ?? "submit") === "submit";
+    const isPending = isSubmitButton && pending;
 
-  if (asChild) {
+    if (asChild) {
+      return (
+        <Slot
+          ref={ref}
+          className={cn(buttonVariants({ variant, size, className }))}
+          {...props}
+        >
+          {children}
+        </Slot>
+      );
+    }
+
     return (
-      <Slot
+      <button
+        ref={ref}
         className={cn(buttonVariants({ variant, size, className }))}
+        aria-busy={isPending || undefined}
+        disabled={disabled || isPending}
+        type={type}
         {...props}
       >
-        {children}
-      </Slot>
+        {isPending ? <LoaderCircleIcon className="animate-spin" aria-hidden="true" /> : null}
+        {isPending ? (pendingLabel ?? defaultPendingLabel(children)) : children}
+      </button>
     );
   }
-
-  return (
-    <button
-      className={cn(buttonVariants({ variant, size, className }))}
-      aria-busy={isPending || undefined}
-      disabled={disabled || isPending}
-      type={type}
-      {...props}
-    >
-      {isPending ? <LoaderCircleIcon className="animate-spin" aria-hidden="true" /> : null}
-      {isPending ? (pendingLabel ?? defaultPendingLabel(children)) : children}
-    </button>
-  );
-}
+);
+Button.displayName = "Button";
 
 export function ButtonLink({
   href,

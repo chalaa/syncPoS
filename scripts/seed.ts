@@ -4,7 +4,7 @@ import { createHash, scryptSync } from "node:crypto";
 
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
-import { sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 
 import {
   auditLogs,
@@ -48,13 +48,6 @@ const ids = {
   seedAudit: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
 };
 
-const roleIdsByCode = {
-  owner: ids.ownerRole,
-  admin: ids.adminRole,
-  salesperson: ids.salespersonRole,
-  inventory_manager: ids.inventoryManagerRole,
-};
-
 function hashPassword(password: string) {
   const salt = "syncpos-dev-seed";
   const hash = scryptSync(password, salt, 64).toString("hex");
@@ -84,12 +77,19 @@ const permissionRows = PERMISSION_CATALOG.flatMap((item) => [
   ...item,
 }));
 
-const rolePermissionCodes: Record<keyof typeof roleIdsByCode, readonly string[]> = {
-  owner: SYSTEM_ROLES.find((role) => role.code === "owner")?.permissionCodes ?? [],
-  admin: SYSTEM_ROLES.find((role) => role.code === "admin")?.permissionCodes ?? [],
-  salesperson: SYSTEM_ROLES.find((role) => role.code === "salesperson")?.permissionCodes ?? [],
-  inventory_manager: SYSTEM_ROLES.find((role) => role.code === "inventory_manager")?.permissionCodes ?? [],
+const roleIdsByCode: Record<string, string> = {
+  owner: ids.ownerRole,
+  admin: ids.adminRole,
+  salesperson: ids.salespersonRole,
+  inventory_manager: ids.inventoryManagerRole,
+  ...Object.fromEntries(
+    SYSTEM_ROLES.map((role) => [role.code, uuidFromSeed(`seed:role:${role.code}`)])
+  ),
 };
+
+const rolePermissionCodes: Record<string, readonly string[]> = Object.fromEntries(
+  SYSTEM_ROLES.map((role) => [role.code, role.permissionCodes])
+);
 
 async function main() {
   const client = postgres(databaseUrl, { max: 1 });
@@ -203,22 +203,57 @@ async function main() {
           },
         });
 
-      await tx
-        .insert(roles)
-        .values(
-          SYSTEM_ROLES.map((role) => ({
-            id: roleIdsByCode[role.code],
-            companyId: ids.company,
-            code: role.code,
-            name: role.name,
-            description: role.description,
-            isSystem: true,
-            isEditable: role.isEditable,
-            isDeletable: role.isDeletable,
-            isActive: true,
-          })),
-        )
-        .onConflictDoNothing();
+      // Fetch existing permissions from DB
+      const existingPermissions = await tx
+        .select({ id: permissions.id, code: permissions.code })
+        .from(permissions);
+      const permIdMap = new Map(existingPermissions.map((p) => [p.code, p.id]));
+
+      for (const perm of permissionRows) {
+        if (!permIdMap.has(perm.code)) {
+          const [inserted] = await tx
+            .insert(permissions)
+            .values({
+              id: perm.id,
+              code: perm.code,
+              description: perm.description,
+              application: perm.application,
+              feature: perm.feature,
+              action: perm.action,
+              isActive: true,
+            })
+            .returning({ id: permissions.id });
+          permIdMap.set(perm.code, inserted.id);
+        }
+      }
+
+      // Fetch existing roles from DB for company
+      const existingRoles = await tx
+        .select({ id: roles.id, code: roles.code })
+        .from(roles)
+        .where(eq(roles.companyId, ids.company));
+      const roleIdMap = new Map(existingRoles.map((r) => [r.code, r.id]));
+
+      for (const roleDef of SYSTEM_ROLES) {
+        if (!roleIdMap.has(roleDef.code)) {
+          const roleId = roleIdsByCode[roleDef.code] ?? uuidFromSeed(`seed:role:${roleDef.code}`);
+          const [inserted] = await tx
+            .insert(roles)
+            .values({
+              id: roleId,
+              companyId: ids.company,
+              code: roleDef.code,
+              name: roleDef.name,
+              description: roleDef.description,
+              isSystem: true,
+              isEditable: roleDef.isEditable,
+              isDeletable: roleDef.isDeletable,
+              isActive: true,
+            })
+            .returning({ id: roles.id });
+          roleIdMap.set(roleDef.code, inserted.id);
+        }
+      }
 
       await tx
         .insert(owners)
@@ -229,46 +264,35 @@ async function main() {
         })
         .onConflictDoNothing();
 
-      await tx
-        .insert(permissions)
-        .values(
-          permissionRows.map((permission) => ({
-            id: permission.id,
-            code: permission.code,
-            description: permission.description,
-            application: permission.application,
-            feature: permission.feature,
-            action: permission.action,
-            isActive: true,
-          })),
-        )
-        .onConflictDoNothing();
-
-      const permissionIdByCode = Object.fromEntries(
-        permissionRows.map((permission) => [permission.code, permission.id]),
-      );
+      const adminRoleId = roleIdMap.get("admin") ?? ids.adminRole;
 
       await tx
         .insert(userRoles)
         .values({
           userId: ids.adminUser,
-          roleId: ids.adminRole,
+          roleId: adminRoleId,
           assignedBy: ids.adminUser,
         })
         .onConflictDoNothing();
 
-      await tx
-        .insert(rolePermissions)
-        .values(
-          Object.entries(rolePermissionCodes).flatMap(([roleCode, codes]) =>
-            codes.map((code) => ({
-              roleId: roleIdsByCode[roleCode as keyof typeof roleIdsByCode],
-              permissionId: permissionIdByCode[code],
+      for (const [roleCode, codes] of Object.entries(rolePermissionCodes)) {
+        const rId = roleIdMap.get(roleCode);
+        if (!rId) continue;
+
+        for (const code of codes) {
+          const pId = permIdMap.get(code);
+          if (!pId) continue;
+
+          await tx
+            .insert(rolePermissions)
+            .values({
+              roleId: rId,
+              permissionId: pId,
               grantedBy: ids.adminUser,
-            })),
-          ),
-        )
-        .onConflictDoNothing();
+            })
+            .onConflictDoNothing();
+        }
+      }
 
       await tx
         .insert(locations)

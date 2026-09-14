@@ -7,9 +7,10 @@ import { Alert } from "@/components/ui/alert";
 import { StatusBadge } from "@/components/ui/badge";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
-import { requirePermission } from "@/server/auth/session";
+import { requirePermission, getUserPermissionCodes } from "@/server/auth/session";
 import { displayExpenseMoney, getExpenseDetail } from "@/server/expenses/expenses";
 import { getActivePaymentAccounts, getPaymentList } from "@/server/payments/payments";
+import { PERMISSIONS, userHasPermission } from "@/server/iam/permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -23,7 +24,9 @@ function statusLabel(value: string) {
 }
 
 export default async function ExpenseDetailPage({ params, searchParams }: ExpenseDetailPageProps) {
-  await requirePermission("company.manage");
+  const user = await requirePermission(PERMISSIONS.EXPENSES.VIEW);
+  const userPerms = await getUserPermissionCodes(user.id);
+  const canSeeAll = userHasPermission(userPerms, PERMISSIONS.OWNER.ALL);
 
   const [{ id }, query, outboundAccounts] = await Promise.all([
     params,
@@ -31,7 +34,7 @@ export default async function ExpenseDetailPage({ params, searchParams }: Expens
     getActivePaymentAccounts("outbound"),
   ]);
   const [expense, payments] = await Promise.all([
-    getExpenseDetail(id),
+    getExpenseDetail(id, { userId: user.id, employeeId: user.employeeId, canSeeAll }),
     getPaymentList({ expenseId: id }),
   ]);
 

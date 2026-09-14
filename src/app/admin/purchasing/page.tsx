@@ -3,10 +3,11 @@ import type { ReactNode } from "react";
 
 import { Alert } from "@/components/ui/alert";
 import { Badge, StatusBadge } from "@/components/ui/badge";
-import { ButtonLink } from "@/components/ui/button";
+import { Button, ButtonLink } from "@/components/ui/button";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
 import { cn } from "@/lib/utils";
-import { requirePermission } from "@/server/auth/session";
+import { requirePermission, getUserPermissionCodes } from "@/server/auth/session";
+import { PERMISSIONS, userHasPermission } from "@/server/iam/permissions";
 import {
   displayPurchaseMoney,
   getPurchaseFormOptions,
@@ -15,6 +16,7 @@ import {
   getPurchaseReceiptList,
 } from "@/server/purchasing/purchasing";
 import { NewPurchaseOrderModal } from "./new-purchase-order-modal";
+import { PurchasingKpiCards } from "./purchasing-kpi-cards";
 import {
   displayPaymentMoney,
   getPaymentList,
@@ -52,16 +54,20 @@ function todayDate() {
 }
 
 export default async function PurchasingPage({ searchParams }: PurchasingPageProps) {
-  await requirePermission("inventory.receive");
+  const user = await requirePermission(PERMISSIONS.PURCHASING.ORDERS_VIEW);
+  const userPerms = await getUserPermissionCodes(user.id);
+  const canCreateOrders = userHasPermission(userPerms, PERMISSIONS.PURCHASING.ORDERS_CREATE);
 
   const params = await searchParams;
   const view = params.view ?? "orders";
+
+  const allOrders = await getPurchaseOrderList();
 
   if (view === "receipts") {
     const receipts = await getPurchaseReceiptList(params.purchaseOrderId);
 
     return (
-      <PurchasingLayout currentView={view} title="Receipts" notice={params.notice} error={params.error}>
+      <PurchasingLayout currentView={view} title="Receipts" orders={allOrders} notice={params.notice} error={params.error}>
         <ReceiptList receipts={receipts} />
       </PurchasingLayout>
     );
@@ -74,6 +80,7 @@ export default async function PurchasingPage({ searchParams }: PurchasingPagePro
       <PurchasingLayout
         currentView={view}
         title="Landed Costs"
+        orders={allOrders}
         notice={params.notice}
         error={params.error}
         actions={<ButtonLink href="/admin/purchasing/landed-costs/new">New Landed Cost</ButtonLink>}
@@ -91,7 +98,7 @@ export default async function PurchasingPage({ searchParams }: PurchasingPagePro
     });
 
     return (
-      <PurchasingLayout currentView={view} title="Supplier Payments" notice={params.notice} error={params.error}>
+      <PurchasingLayout currentView={view} title="Supplier Payments" orders={allOrders} notice={params.notice} error={params.error}>
         <PaymentList payments={payments} />
       </PurchasingLayout>
     );
@@ -104,42 +111,43 @@ export default async function PurchasingPage({ searchParams }: PurchasingPagePro
       <PurchasingLayout
         currentView={view}
         title="Supplier Returns"
+        orders={allOrders}
         notice={params.notice}
         error={params.error}
-        actions={<ButtonLink href="/admin/purchasing/returns/new">New Supplier Return</ButtonLink>}
+        actions={canCreateOrders ? <ButtonLink href="/admin/purchasing/returns/new">New Supplier Return</ButtonLink> : null}
       >
         <SupplierReturnList returns={returns} />
       </PurchasingLayout>
     );
   }
 
-  const [orders, formOptions] = await Promise.all([
-    getPurchaseOrderList(),
-    getPurchaseFormOptions(),
-  ]);
+  const formOptions = await getPurchaseFormOptions();
 
   return (
     <PurchasingLayout
       currentView={view}
       title="Purchase Orders"
+      orders={allOrders}
       notice={params.notice}
       error={params.error}
       actions={
-        <NewPurchaseOrderModal
-          suppliers={formOptions.suppliers}
-          owners={formOptions.owners}
-          products={formOptions.products}
-          productCategories={formOptions.productCategories}
-          productBrands={formOptions.productBrands}
-          productUnits={formOptions.productUnits}
-          locations={formOptions.locations}
-          taxes={formOptions.taxes}
-          initialOpen={params.new === "1" || params.new === "true"}
-          defaultDate={todayDate()}
-        />
+        canCreateOrders ? (
+          <NewPurchaseOrderModal
+            suppliers={formOptions.suppliers}
+            owners={formOptions.owners}
+            products={formOptions.products}
+            productCategories={formOptions.productCategories}
+            productBrands={formOptions.productBrands}
+            productUnits={formOptions.productUnits}
+            locations={formOptions.locations}
+            taxes={formOptions.taxes}
+            initialOpen={params.new === "1" || params.new === "true"}
+            defaultDate={todayDate()}
+          />
+        ) : null
       }
     >
-      <PurchaseOrderList orders={orders} />
+      <PurchaseOrderList orders={allOrders} />
     </PurchasingLayout>
   );
 }
@@ -155,6 +163,7 @@ const purchasingTabs = [
 function PurchasingLayout({
   title,
   currentView = "orders",
+  orders,
   notice,
   error,
   actions,
@@ -162,6 +171,7 @@ function PurchasingLayout({
 }: {
   title: string;
   currentView?: string;
+  orders: PurchaseOrderListRow[];
   notice?: string;
   error?: string;
   actions?: ReactNode;
@@ -169,29 +179,14 @@ function PurchasingLayout({
 }) {
   return (
     <PageShell>
-      <PageHeader eyebrow="Purchasing Workspace" title={title} actions={actions} />
+      <PageHeader
+        eyebrow="Purchasing Workspace"
+        title={title}
+        description="Unified vendor procurement, goods receipt tracking, landed costs, and bill settlements."
+        actions={actions}
+      />
 
-      {/* Sub-navigation tabs */}
-      <nav className="mb-6 flex items-center gap-1 overflow-x-auto border-b border-border pb-px">
-        {purchasingTabs.map((tab) => {
-          const isActive = currentView === tab.key;
-          return (
-            <Link
-              key={tab.key}
-              href={tab.href}
-              className={cn(
-                "inline-flex items-center gap-2 whitespace-nowrap border-b-2 px-3.5 py-2.5 text-sm font-medium transition-colors",
-                isActive
-                  ? "border-primary font-semibold text-primary"
-                  : "border-transparent text-muted-foreground hover:border-border hover:text-foreground",
-              )}
-            >
-              {isActive ? <span className="size-1.5 rounded-full bg-gold" /> : null}
-              {tab.label}
-            </Link>
-          );
-        })}
-      </nav>
+      <PurchasingKpiCards orders={orders} />
 
       {notice ? <Alert kind="success">{notice}</Alert> : null}
       {error ? <Alert kind="error">{error}</Alert> : null}
@@ -203,13 +198,13 @@ function PurchasingLayout({
 
 function SupplierReturnList({ returns }: { returns: SupplierReturnListRow[] }) {
   return (
-    <section className="overflow-hidden rounded-lg border border-border bg-card shadow-xs">
+    <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-xs">
       <div className="overflow-x-auto">
         <table className="w-full min-w-[900px] text-left text-sm">
           <thead>
             <tr className="border-b border-border bg-muted/40 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-              <th className="px-4 py-3">Return</th>
-              <th className="px-4 py-3">Receipt</th>
+              <th className="px-4 py-3">Return No</th>
+              <th className="px-4 py-3">Receipt Ref</th>
               <th className="px-4 py-3">Supplier</th>
               <th className="px-4 py-3">Status</th>
               <th className="px-4 py-3">Date</th>
@@ -220,24 +215,24 @@ function SupplierReturnList({ returns }: { returns: SupplierReturnListRow[] }) {
           </thead>
           <tbody className="divide-y divide-border/60">
             {returns.map((record) => (
-              <tr key={record.id} className="transition-colors hover:bg-secondary/40">
+              <tr key={record.id} className="group transition-colors hover:bg-muted/30">
                 <td className="px-4 py-3.5">
-                  <Link href={`/admin/purchasing/returns/${record.id}`} className="font-semibold text-primary underline-offset-4 hover:underline">
+                  <Link href={`/admin/purchasing/returns/${record.id}`} className="font-mono text-xs font-bold text-primary hover:underline">
                     {record.returnNo}
                   </Link>
                 </td>
-                <td className="px-4 py-3.5 text-muted-foreground">{record.receiptNo}</td>
+                <td className="px-4 py-3.5 text-xs font-mono text-muted-foreground">{record.receiptNo}</td>
                 <td className="px-4 py-3.5 font-medium text-foreground">{record.supplierName}</td>
                 <td className="px-4 py-3.5">
                   <StatusBadge status={record.status} />
                 </td>
                 <td className="px-4 py-3.5 text-xs text-muted-foreground">{record.returnDate}</td>
                 <td className="px-4 py-3.5 text-right font-mono text-xs">{record.lineCount}</td>
-                <td className="px-4 py-3.5 text-right font-mono text-xs font-semibold text-foreground">
+                <td className="px-4 py-3.5 text-right font-mono text-xs font-bold text-foreground">
                   {displayReturnMoney(record.refundAmountMinor, record.currencyCode)}
                 </td>
                 <td className="px-4 py-3.5 text-right">
-                  <ButtonLink href={`/admin/purchasing/returns/${record.id}`} size="sm" variant="outline">Details</ButtonLink>
+                  <ButtonLink href={`/admin/purchasing/returns/${record.id}`} size="sm" variant="outline" className="h-8 px-2.5 text-xs">Details</ButtonLink>
                 </td>
               </tr>
             ))}
@@ -257,13 +252,13 @@ function SupplierReturnList({ returns }: { returns: SupplierReturnListRow[] }) {
 
 function LandedCostList({ landedCosts }: { landedCosts: PurchaseLandedCostListRow[] }) {
   return (
-    <section className="overflow-hidden rounded-lg border border-border bg-card shadow-xs">
+    <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-xs">
       <div className="overflow-x-auto">
         <table className="w-full min-w-[1040px] text-left text-sm">
           <thead>
             <tr className="border-b border-border bg-muted/40 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-              <th className="px-4 py-3">Cost</th>
-              <th className="px-4 py-3">Type</th>
+              <th className="px-4 py-3">Cost No</th>
+              <th className="px-4 py-3">Cost Type</th>
               <th className="px-4 py-3">Status</th>
               <th className="px-4 py-3">Purchase Order</th>
               <th className="px-4 py-3">Receipt</th>
@@ -276,30 +271,30 @@ function LandedCostList({ landedCosts }: { landedCosts: PurchaseLandedCostListRo
           </thead>
           <tbody className="divide-y divide-border/60">
             {landedCosts.map((cost) => (
-              <tr key={cost.id} className="transition-colors hover:bg-secondary/40">
-                <td className="px-4 py-3.5 font-semibold text-foreground">{cost.costNo}</td>
+              <tr key={cost.id} className="group transition-colors hover:bg-muted/30">
+                <td className="px-4 py-3.5 font-mono text-xs font-bold text-foreground">{cost.costNo}</td>
                 <td className="px-4 py-3.5 text-xs font-medium uppercase tracking-wider text-muted-foreground">{cost.costType}</td>
                 <td className="px-4 py-3.5">
                   <StatusBadge status={cost.status} />
                 </td>
                 <td className="px-4 py-3.5">
                   {cost.purchaseOrderId ? (
-                    <Link href={`/admin/purchasing/${cost.purchaseOrderId}`} className="text-xs text-primary underline-offset-4 hover:underline">
+                    <Link href={`/admin/purchasing/${cost.purchaseOrderId}`} className="font-mono text-xs text-primary underline-offset-4 hover:underline">
                       {cost.orderNo}
                     </Link>
                   ) : (
                     "-"
                   )}
                 </td>
-                <td className="px-4 py-3.5 text-xs text-muted-foreground">{cost.receiptNo ?? "-"}</td>
+                <td className="px-4 py-3.5 text-xs font-mono text-muted-foreground">{cost.receiptNo ?? "-"}</td>
                 <td className="px-4 py-3.5 font-medium text-foreground">{cost.vendorName ?? "-"}</td>
                 <td className="px-4 py-3.5 text-xs text-muted-foreground capitalize">{cost.allocationMethod}</td>
                 <td className="px-4 py-3.5 text-right font-mono text-xs">{cost.allocationCount}</td>
-                <td className="px-4 py-3.5 text-right font-mono text-xs font-semibold text-foreground">
+                <td className="px-4 py-3.5 text-right font-mono text-xs font-bold text-foreground">
                   {displayPurchaseMoney(cost.amountMinor, cost.currencyCode)}
                 </td>
                 <td className="px-4 py-3.5 text-right">
-                  <ButtonLink href={`/admin/purchasing/landed-costs/${cost.id}`} size="sm" variant="outline">
+                  <ButtonLink href={`/admin/purchasing/landed-costs/${cost.id}`} size="sm" variant="outline" className="h-8 px-2.5 text-xs">
                     Details
                   </ButtonLink>
                 </td>
@@ -321,34 +316,36 @@ function LandedCostList({ landedCosts }: { landedCosts: PurchaseLandedCostListRo
 
 function PurchaseOrderList({ orders }: { orders: PurchaseOrderListRow[] }) {
   return (
-    <section className="overflow-hidden rounded-lg border border-border bg-card shadow-xs">
+    <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-xs">
       <div className="overflow-x-auto">
         <table className="w-full min-w-[1080px] text-left text-sm">
           <thead>
             <tr className="border-b border-border bg-muted/40 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-              <th className="px-4 py-3">Order</th>
+              <th className="px-4 py-3">Order No</th>
               <th className="px-4 py-3">Supplier</th>
-              <th className="px-4 py-3">Status</th>
-              <th className="px-4 py-3">Date</th>
-              <th className="px-4 py-3">Payment</th>
+              <th className="px-4 py-3">Order Status</th>
+              <th className="px-4 py-3">Order Date</th>
+              <th className="px-4 py-3">Payment Settlement</th>
               <th className="px-4 py-3">Deliver To</th>
-              <th className="px-4 py-3 text-right">Qty</th>
-              <th className="px-4 py-3 text-right">Received</th>
-              <th className="px-4 py-3 text-right">Total</th>
+              <th className="px-4 py-3 text-right">Ordered Qty</th>
+              <th className="px-4 py-3 text-right">Received Qty</th>
+              <th className="px-4 py-3 text-right">Grand Total</th>
               <th className="px-4 py-3 text-right">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border/60">
             {orders.map((order) => (
-              <tr key={order.id} className="transition-colors hover:bg-secondary/40">
+              <tr key={order.id} className="group transition-colors hover:bg-muted/30">
                 <td className="px-4 py-3.5">
-                  <Link href={`/admin/purchasing/${order.id}`} className="font-semibold text-primary underline-offset-4 hover:underline">
+                  <Link href={`/admin/purchasing/${order.id}`} className="inline-flex items-center gap-1.5 rounded-lg border border-primary/20 bg-primary/5 px-2.5 py-1 font-mono text-xs font-bold text-primary transition-all hover:bg-primary/10 hover:border-primary/40">
                     {order.orderNo}
                   </Link>
                 </td>
                 <td className="px-4 py-3.5">
-                  <div className="font-medium text-foreground">{order.supplierName}</div>
-                  <div className="text-xs text-muted-foreground">Ref {order.vendorReference ?? "-"}</div>
+                  <div className="font-semibold text-foreground group-hover:text-primary transition-colors">{order.supplierName}</div>
+                  {order.vendorReference ? (
+                    <div className="text-xs text-muted-foreground">Ref {order.vendorReference}</div>
+                  ) : null}
                 </td>
                 <td className="px-4 py-3.5">
                   <StatusBadge status={order.status} />
@@ -377,14 +374,14 @@ function PurchaseOrderList({ orders }: { orders: PurchaseOrderListRow[] }) {
                     )}
                   </div>
                 </td>
-                <td className="px-4 py-3.5 text-xs text-muted-foreground">{order.deliverToLocationCode ?? "-"}</td>
-                <td className="px-4 py-3.5 text-right font-mono text-xs">{order.quantityOrdered}</td>
-                <td className="px-4 py-3.5 text-right font-mono text-xs font-medium">{order.quantityReceived}</td>
-                <td className="px-4 py-3.5 text-right font-mono text-xs font-bold text-foreground">
+                <td className="px-4 py-3.5 text-xs font-medium text-muted-foreground">{order.deliverToLocationCode ?? "-"}</td>
+                <td className="px-4 py-3.5 text-right font-mono text-xs text-muted-foreground">{order.quantityOrdered}</td>
+                <td className="px-4 py-3.5 text-right font-mono text-xs font-semibold text-foreground">{order.quantityReceived}</td>
+                <td className="px-4 py-3.5 text-right font-mono text-xs font-extrabold text-foreground">
                   {displayPurchaseMoney(order.totalMinor, order.currencyCode)}
                 </td>
                 <td className="px-4 py-3.5 text-right">
-                  <ButtonLink href={`/admin/purchasing/${order.id}`} size="sm" variant="outline">
+                  <ButtonLink href={`/admin/purchasing/${order.id}`} size="sm" variant="outline" className="h-8 px-2.5 text-xs">
                     Open
                   </ButtonLink>
                 </td>
@@ -409,36 +406,36 @@ function PurchaseOrderList({ orders }: { orders: PurchaseOrderListRow[] }) {
 
 function ReceiptList({ receipts }: { receipts: PurchaseReceiptListRow[] }) {
   return (
-    <section className="overflow-hidden rounded-lg border border-border bg-card shadow-xs">
+    <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-xs">
       <div className="overflow-x-auto">
         <table className="w-full min-w-[980px] text-left text-sm">
           <thead>
             <tr className="border-b border-border bg-muted/40 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-              <th className="px-4 py-3">Receipt</th>
-              <th className="px-4 py-3">Purchase Order</th>
+              <th className="px-4 py-3">Receipt No</th>
+              <th className="px-4 py-3">PO Ref</th>
               <th className="px-4 py-3">Supplier</th>
               <th className="px-4 py-3">Status</th>
               <th className="px-4 py-3">Date</th>
-              <th className="px-4 py-3">Location</th>
+              <th className="px-4 py-3">Warehouse</th>
               <th className="px-4 py-3 text-right">Lines</th>
-              <th className="px-4 py-3 text-right">Qty</th>
-              <th className="px-4 py-3 text-right">Total</th>
+              <th className="px-4 py-3 text-right">Received Qty</th>
+              <th className="px-4 py-3 text-right">Total Value</th>
               <th className="px-4 py-3 text-right">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border/60">
             {receipts.map((receipt) => (
-              <tr key={receipt.id} className="transition-colors hover:bg-secondary/40">
+              <tr key={receipt.id} className="group transition-colors hover:bg-muted/30">
                 <td className="px-4 py-3.5">
-                  <Link href={`/admin/purchasing/receipts/${receipt.id}`} className="font-semibold text-primary underline-offset-4 hover:underline">
+                  <Link href={`/admin/purchasing/receipts/${receipt.id}`} className="font-mono text-xs font-bold text-primary hover:underline">
                     {receipt.receiptNo}
                   </Link>
                   {receipt.supplierInvoiceNo ? (
-                    <div className="text-xs text-muted-foreground">Invoice: {receipt.supplierInvoiceNo}</div>
+                    <div className="text-xs text-muted-foreground">Inv: {receipt.supplierInvoiceNo}</div>
                   ) : null}
                 </td>
                 <td className="px-4 py-3.5">
-                  <Link href={`/admin/purchasing/${receipt.purchaseOrderId}`} className="text-xs text-primary underline-offset-4 hover:underline">
+                  <Link href={`/admin/purchasing/${receipt.purchaseOrderId}`} className="font-mono text-xs text-muted-foreground hover:text-primary hover:underline">
                     {receipt.orderNo}
                   </Link>
                 </td>
@@ -447,14 +444,14 @@ function ReceiptList({ receipts }: { receipts: PurchaseReceiptListRow[] }) {
                   <StatusBadge status={receipt.status} />
                 </td>
                 <td className="px-4 py-3.5 text-xs text-muted-foreground">{receipt.receiptDate}</td>
-                <td className="px-4 py-3.5 text-xs text-muted-foreground">{receipt.locationCode ?? "-"}</td>
-                <td className="px-4 py-3.5 text-right font-mono text-xs">{receipt.lineCount}</td>
-                <td className="px-4 py-3.5 text-right font-mono text-xs font-medium">{receipt.quantityReceived}</td>
-                <td className="px-4 py-3.5 text-right font-mono text-xs font-semibold text-foreground">
+                <td className="px-4 py-3.5 text-xs font-medium text-muted-foreground">{receipt.locationCode ?? "-"}</td>
+                <td className="px-4 py-3.5 text-right font-mono text-xs text-muted-foreground">{receipt.lineCount}</td>
+                <td className="px-4 py-3.5 text-right font-mono text-xs font-semibold text-foreground">{receipt.quantityReceived}</td>
+                <td className="px-4 py-3.5 text-right font-mono text-xs font-bold text-foreground">
                   {displayPurchaseMoney(receipt.totalMinor, receipt.currencyCode)}
                 </td>
                 <td className="px-4 py-3.5 text-right">
-                  <ButtonLink href={`/admin/purchasing/receipts/${receipt.id}`} size="sm" variant="outline">
+                  <ButtonLink href={`/admin/purchasing/receipts/${receipt.id}`} size="sm" variant="outline" className="h-8 px-2.5 text-xs">
                     Details
                   </ButtonLink>
                 </td>
@@ -476,16 +473,16 @@ function ReceiptList({ receipts }: { receipts: PurchaseReceiptListRow[] }) {
 
 function PaymentList({ payments }: { payments: PaymentListRow[] }) {
   return (
-    <section className="overflow-hidden rounded-lg border border-border bg-card shadow-xs">
+    <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-xs">
       <div className="overflow-x-auto">
         <table className="w-full min-w-[1040px] text-left text-sm">
           <thead>
             <tr className="border-b border-border bg-muted/40 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-              <th className="px-4 py-3">Payment</th>
+              <th className="px-4 py-3">Payment No</th>
               <th className="px-4 py-3">Supplier</th>
               <th className="px-4 py-3">Status</th>
               <th className="px-4 py-3">Date</th>
-              <th className="px-4 py-3">Method</th>
+              <th className="px-4 py-3">Payment Method</th>
               <th className="px-4 py-3">Account</th>
               <th className="px-4 py-3">Reference</th>
               <th className="px-4 py-3 text-right">Amount</th>
@@ -495,9 +492,9 @@ function PaymentList({ payments }: { payments: PaymentListRow[] }) {
           </thead>
           <tbody className="divide-y divide-border/60">
             {payments.map((payment) => (
-              <tr key={payment.id} className="transition-colors hover:bg-secondary/40">
+              <tr key={payment.id} className="group transition-colors hover:bg-muted/30">
                 <td className="px-4 py-3.5">
-                  <Link href={`/admin/purchasing/payments/${payment.id}`} className="font-semibold text-primary underline-offset-4 hover:underline">
+                  <Link href={`/admin/purchasing/payments/${payment.id}`} className="font-mono text-xs font-bold text-primary hover:underline">
                     {payment.paymentNo}
                   </Link>
                 </td>
@@ -509,14 +506,14 @@ function PaymentList({ payments }: { payments: PaymentListRow[] }) {
                 <td className="px-4 py-3.5 text-xs font-medium text-foreground">{payment.paymentMethodName}</td>
                 <td className="px-4 py-3.5 text-xs text-muted-foreground">{payment.paymentAccountName}</td>
                 <td className="px-4 py-3.5 text-xs font-mono text-muted-foreground">{payment.reference ?? "-"}</td>
-                <td className="px-4 py-3.5 text-right font-mono text-xs font-semibold text-foreground">
+                <td className="px-4 py-3.5 text-right font-mono text-xs font-bold text-foreground">
                   {displayPaymentMoney(payment.amountMinor, payment.currencyCode)}
                 </td>
-                <td className="px-4 py-3.5 text-right font-mono text-xs text-primary font-medium">
+                <td className="px-4 py-3.5 text-right font-mono text-xs text-primary font-semibold">
                   {displayPaymentMoney(payment.allocatedAmountMinor, payment.currencyCode)}
                 </td>
                 <td className="px-4 py-3.5 text-right">
-                  <ButtonLink href={`/admin/purchasing/payments/${payment.id}`} size="sm" variant="outline">
+                  <ButtonLink href={`/admin/purchasing/payments/${payment.id}`} size="sm" variant="outline" className="h-8 px-2.5 text-xs">
                     Details
                   </ButtonLink>
                 </td>
@@ -535,4 +532,3 @@ function PaymentList({ payments }: { payments: PaymentListRow[] }) {
     </section>
   );
 }
-

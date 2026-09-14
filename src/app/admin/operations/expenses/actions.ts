@@ -1,42 +1,42 @@
 "use server";
 
 import { randomUUID } from "node:crypto";
-
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { and, eq, isNull, sql } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { z } from "zod";
 
-import { getDefaultCompany, majorToMinor, uniqueViolationMessage } from "@/server/catalog/products";
-import { requirePermission } from "@/server/auth/session";
+import { majorToMinor } from "@/server/catalog/products";
+import { getDefaultCompany } from "@/server/catalog/products";
 import { db } from "@/server/db/client";
-import { generateCompanyCode } from "@/server/db/code-generator";
 import {
   auditLogs,
   expenseCategories,
   expenses,
+  paymentAccounts,
   paymentAllocations,
+  paymentMethods,
   payments,
 } from "@/server/db/schema";
-import { paymentLinesTotal, replacePaymentLines, resolvePaymentLines, type PaymentLineInput } from "@/server/payments/payment-lines";
-
-const optionalUuid = z.string().uuid().or(z.literal("")).transform((value) => value || null);
+import { requirePermission } from "@/server/auth/session";
+import { PERMISSIONS } from "@/server/iam/permissions";
 
 const expenseCategorySchema = z.object({
   id: z.string().uuid().optional(),
-  code: z.string().trim().max(40).transform((value) => value.toUpperCase()),
-  name: z.string().trim().min(1).max(120),
+  code: z.string().trim().optional(),
+  name: z.string().trim().min(1, "Category name is required."),
   description: z.string().trim().optional(),
-  isActive: z.boolean(),
+  isActive: z.boolean().default(true),
   returnPath: z.string().trim().startsWith("/admin/operations/expenses").default("/admin/operations/expenses/categories"),
 });
 
 const expenseSchema = z.object({
-  categoryId: z.string().uuid(),
-  expenseDate: z.string().trim().min(1),
-  amount: z.string().trim().min(1),
-  employeeId: optionalUuid,
+  categoryId: z.string().uuid("Expense category is required."),
+  expenseDate: z.string().trim().min(1, "Expense date is required."),
+  amount: z.coerce.number().positive("Expense amount must be greater than zero."),
+  employeeId: z.string().uuid().optional().nullable(),
   description: z.string().trim().optional(),
+  returnPath: z.string().trim().startsWith("/admin/operations/expenses").default("/admin/operations/expenses"),
 });
 
 const payExpenseSchema = z.object({
@@ -68,137 +68,48 @@ function paymentNo() {
 
 function redirectWithMessage(path: string, key: "notice" | "error", message: string): never {
   const separator = path.includes("?") ? "&" : "?";
-
   redirect(`${path}${separator}${key}=${encodeURIComponent(message)}`);
 }
 
-function categoryPayload(formData: FormData) {
-  return {
-    id: formValue(formData, "id") || undefined,
-    code: formValue(formData, "code"),
+export async function createExpenseCategory(formData: FormData) {
+  const user = await requirePermission("company.manage");
+  const parsed = expenseCategorySchema.safeParse({
     name: formValue(formData, "name"),
     description: formValue(formData, "description"),
     isActive: checkboxValue(formData, "isActive"),
     returnPath: formValue(formData, "returnPath") || "/admin/operations/expenses/categories",
-  };
-}
-
-function expensePayload(formData: FormData) {
-  return {
-    categoryId: formValue(formData, "categoryId"),
-    expenseDate: formValue(formData, "expenseDate"),
-    amount: formValue(formData, "amount"),
-    employeeId: formValue(formData, "employeeId"),
-    description: formValue(formData, "description"),
-  };
-}
-
-async function updateExpensePaymentStatus(expenseId: string) {
-  const [summary] = await db.execute<{ amountMinor: number; paidMinor: number }>(sql`
-    select
-      e.amount_minor as "amountMinor",
-      coalesce(sum(pa.amount_minor) filter (
-        where p.status = 'posted'
-          and p.deleted_at is null
-          and pa.deleted_at is null
-      ), 0)::bigint as "paidMinor"
-    from expenses e
-    left join payment_allocations pa on pa.expense_id = e.id
-    left join payments p on p.id = pa.payment_id
-    where e.id = ${expenseId}
-      and e.deleted_at is null
-    group by e.id
-    limit 1
-  `);
-
-  const paymentStatus = (summary?.paidMinor ?? 0) >= (summary?.amountMinor ?? 0) ? "paid" : "unpaid";
-
-  await db
-    .update(expenses)
-    .set({ paymentStatus, updatedAt: sql`now()` })
-    .where(eq(expenses.id, expenseId));
-}
-
-async function createPostedExpensePayment({
-  tx,
-  companyId,
-  userId,
-  expenseId,
-  partnerId,
-  amountMinor,
-  currencyCode,
-  lines,
-}: {
-  tx: Parameters<Parameters<typeof db.transaction>[0]>[0];
-  companyId: string;
-  userId: string;
-  expenseId: string;
-  partnerId: string | null;
-  amountMinor: number;
-  currencyCode: string;
-  lines: PaymentLineInput[];
-}) {
-  const firstLine = lines[0];
-
-  const [payment] = await tx
-    .insert(payments)
-    .values({
-      companyId,
-      partnerId,
-      paymentNo: paymentNo(),
-      paymentType: "outbound",
-      status: "posted",
-      paymentMethodId: firstLine.paymentMethodId,
-      paymentAccountId: firstLine.paymentAccountId,
-      amountMinor,
-      currencyCode,
-      reference: firstLine.reference,
-      notes: firstLine.note || "Expense payment.",
-      postedAt: new Date(),
-      postedBy: userId,
-    })
-    .returning({ id: payments.id, paymentNo: payments.paymentNo });
-
-  await replacePaymentLines(tx, {
-    companyId,
-    paymentId: payment.id,
-    lines,
   });
-
-  await tx.insert(paymentAllocations).values({
-    paymentId: payment.id,
-    expenseId,
-    amountMinor,
-    notes: "Expense payment allocation.",
-  });
-
-  return payment;
-}
-
-export async function createExpenseCategory(formData: FormData) {
-  await requirePermission("company.manage");
-  const parsed = expenseCategorySchema.safeParse(categoryPayload(formData));
 
   if (!parsed.success) {
     redirectWithMessage("/admin/operations/expenses/categories", "error", parsed.error.issues[0]?.message ?? "Invalid expense category.");
   }
 
   const company = await getDefaultCompany();
+  const code = formValue(formData, "code") || `EXPCAT-${randomUUID().slice(0, 6).toUpperCase()}`;
 
   try {
-    await db.insert(expenseCategories).values({
-      companyId: company.id,
-      code: parsed.data.code || await generateCompanyCode(db, {
+    const [inserted] = await db
+      .insert(expenseCategories)
+      .values({
         companyId: company.id,
-        table: "expense_categories",
-        prefix: "EXP-CAT",
-      }),
-      name: parsed.data.name,
-      description: parsed.data.description || null,
-      isActive: parsed.data.isActive,
+        code,
+        name: parsed.data.name,
+        description: parsed.data.description || null,
+        isActive: parsed.data.isActive,
+      })
+      .returning({ id: expenseCategories.id });
+
+    await db.insert(auditLogs).values({
+      companyId: company.id,
+      actorUserId: user.id,
+      action: "expense_category.create",
+      entityType: "expense_category",
+      entityId: inserted.id,
+      severity: "info",
+      metadata: { code, name: parsed.data.name },
     });
   } catch (error) {
-    redirectWithMessage(parsed.data.returnPath, "error", uniqueViolationMessage(error, "Could not create expense category."));
+    redirectWithMessage(parsed.data.returnPath, "error", error instanceof Error ? error.message : "Could not create expense category.");
   }
 
   revalidatePath("/admin/operations/expenses");
@@ -206,77 +117,148 @@ export async function createExpenseCategory(formData: FormData) {
 }
 
 export async function updateExpenseCategory(formData: FormData) {
-  await requirePermission("company.manage");
-  const parsed = expenseCategorySchema.safeParse(categoryPayload(formData));
+  const user = await requirePermission("company.manage");
+  const id = formValue(formData, "id");
+  const returnPath = formValue(formData, "returnPath") || "/admin/operations/expenses/categories";
 
-  if (!parsed.success || !parsed.data.id || !parsed.data.code) {
-    redirectWithMessage("/admin/operations/expenses/categories", "error", "Expense category ID, code, and name are required.");
+  if (!id) {
+    redirectWithMessage(returnPath, "error", "Expense category ID, code, and name are required.");
   }
+
+  const parsed = expenseCategorySchema.safeParse({
+    id,
+    name: formValue(formData, "name"),
+    description: formValue(formData, "description"),
+    isActive: checkboxValue(formData, "isActive"),
+    returnPath,
+  });
+
+  if (!parsed.success) {
+    redirectWithMessage(returnPath, "error", parsed.error.issues[0]?.message ?? "Invalid expense category.");
+  }
+
+  const company = await getDefaultCompany();
 
   try {
     await db
       .update(expenseCategories)
       .set({
-        code: parsed.data.code,
         name: parsed.data.name,
         description: parsed.data.description || null,
         isActive: parsed.data.isActive,
-        updatedAt: sql`now()`,
+        updatedAt: new Date(),
       })
-      .where(eq(expenseCategories.id, parsed.data.id));
+      .where(and(eq(expenseCategories.id, id), eq(expenseCategories.companyId, company.id)));
+
+    await db.insert(auditLogs).values({
+      companyId: company.id,
+      actorUserId: user.id,
+      action: "expense_category.update",
+      entityType: "expense_category",
+      entityId: id,
+      severity: "info",
+      metadata: { name: parsed.data.name },
+    });
   } catch (error) {
-    redirectWithMessage(parsed.data.returnPath, "error", uniqueViolationMessage(error, "Could not update expense category."));
+    redirectWithMessage(returnPath, "error", error instanceof Error ? error.message : "Could not update expense category.");
   }
 
   revalidatePath("/admin/operations/expenses");
-  redirectWithMessage(parsed.data.returnPath, "notice", "Expense category updated");
+  redirectWithMessage(returnPath, "notice", "Expense category updated");
 }
 
 export async function softDeleteExpenseCategory(formData: FormData) {
-  await requirePermission("company.manage");
+  const user = await requirePermission("company.manage");
   const parsed = idSchema.safeParse({ id: formValue(formData, "id"), returnPath: formValue(formData, "returnPath") || "/admin/operations/expenses/categories" });
 
   if (!parsed.success) {
     redirectWithMessage("/admin/operations/expenses/categories", "error", "Expense category ID is missing.");
   }
 
-  await db
-    .update(expenseCategories)
-    .set({ isActive: false, deletedAt: sql`now()`, deleteReason: "Deleted from expense categories.", updatedAt: sql`now()` })
-    .where(eq(expenseCategories.id, parsed.data.id));
+  const company = await getDefaultCompany();
+
+  try {
+    await db
+      .update(expenseCategories)
+      .set({
+        deletedAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(and(eq(expenseCategories.id, parsed.data.id), eq(expenseCategories.companyId, company.id)));
+
+    await db.insert(auditLogs).values({
+      companyId: company.id,
+      actorUserId: user.id,
+      action: "expense_category.delete",
+      entityType: "expense_category",
+      entityId: parsed.data.id,
+      severity: "warning",
+    });
+  } catch (error) {
+    redirectWithMessage(parsed.data.returnPath, "error", error instanceof Error ? error.message : "Could not delete expense category.");
+  }
 
   revalidatePath("/admin/operations/expenses");
   redirectWithMessage(parsed.data.returnPath, "notice", "Expense category deleted");
 }
 
 export async function restoreExpenseCategory(formData: FormData) {
-  await requirePermission("company.manage");
+  const user = await requirePermission("company.manage");
   const parsed = idSchema.safeParse({ id: formValue(formData, "id"), returnPath: formValue(formData, "returnPath") || "/admin/operations/expenses/categories?show=deleted" });
 
   if (!parsed.success) {
     redirectWithMessage("/admin/operations/expenses/categories?show=deleted", "error", "Expense category ID is missing.");
   }
 
-  await db
-    .update(expenseCategories)
-    .set({ isActive: true, deletedAt: null, deletedBy: null, deleteReason: null, updatedAt: sql`now()` })
-    .where(eq(expenseCategories.id, parsed.data.id));
+  const company = await getDefaultCompany();
+
+  try {
+    await db
+      .update(expenseCategories)
+      .set({
+        deletedAt: null,
+        updatedAt: new Date(),
+      })
+      .where(and(eq(expenseCategories.id, parsed.data.id), eq(expenseCategories.companyId, company.id)));
+
+    await db.insert(auditLogs).values({
+      companyId: company.id,
+      actorUserId: user.id,
+      action: "expense_category.restore",
+      entityType: "expense_category",
+      entityId: parsed.data.id,
+      severity: "info",
+    });
+  } catch (error) {
+    redirectWithMessage(parsed.data.returnPath, "error", error instanceof Error ? error.message : "Could not restore expense category.");
+  }
 
   revalidatePath("/admin/operations/expenses");
   redirectWithMessage(parsed.data.returnPath, "notice", "Expense category restored");
 }
 
+function expensePayload(formData: FormData) {
+  return {
+    categoryId: formValue(formData, "categoryId"),
+    expenseDate: formValue(formData, "expenseDate"),
+    amount: formValue(formData, "amount"),
+    employeeId: formValue(formData, "employeeId") || null,
+    description: formValue(formData, "description"),
+  };
+}
+
 export async function createExpense(formData: FormData) {
-  const user = await requirePermission("company.manage");
+  const user = await requirePermission(PERMISSIONS.EXPENSES.VIEW);
+  const returnPath = formValue(formData, "returnPath") || "/admin/operations/expenses";
   const parsed = expenseSchema.safeParse(expensePayload(formData));
 
   if (!parsed.success) {
-    redirectWithMessage("/admin/operations/expenses/new", "error", parsed.error.issues[0]?.message ?? "Invalid expense.");
+    redirectWithMessage(returnPath, "error", parsed.error.issues[0]?.message ?? "Invalid expense.");
   }
 
-  const amountMinor = majorToMinor(parsed.data.amount);
+  const amountMinor = majorToMinor(String(parsed.data.amount));
   if (amountMinor <= 0) {
-    redirectWithMessage("/admin/operations/expenses/new", "error", "Expense amount must be greater than zero.");
+    redirectWithMessage(returnPath, "error", "Expense amount must be greater than zero.");
   }
 
   const company = await getDefaultCompany();
@@ -309,6 +291,7 @@ export async function createExpense(formData: FormData) {
           amountMinor,
           currencyCode: company.baseCurrencyCode,
           description: parsed.data.description || null,
+          createdBy: user.id,
         })
         .returning({ id: expenses.id, expenseNo: expenses.expenseNo });
       createdExpenseId = expense.id;
@@ -324,7 +307,7 @@ export async function createExpense(formData: FormData) {
       });
     });
   } catch (error) {
-    redirectWithMessage("/admin/operations/expenses/new", "error", error instanceof Error ? error.message : "Could not create expense.");
+    redirectWithMessage(returnPath, "error", error instanceof Error ? error.message : "Could not create expense.");
   }
 
   revalidatePath("/admin/operations/expenses");
@@ -344,59 +327,85 @@ export async function registerExpensePayment(formData: FormData) {
   const company = await getDefaultCompany();
 
   try {
-    let paidExpenseId = parsed.data.expenseId;
     await db.transaction(async (tx) => {
-      const [expense] = await tx.execute<{ id: string; vendorId: string | null; amountMinor: number; residualAmountMinor: number; currencyCode: string; status: string }>(sql`
-        select
-          e.id as "id",
-          e.vendor_id as "vendorId",
-          e.amount_minor as "amountMinor",
-          greatest(e.amount_minor - coalesce(sum(pa.amount_minor) filter (
-            where p.status = 'posted'
-              and p.deleted_at is null
-              and pa.deleted_at is null
-          ), 0), 0)::bigint as "residualAmountMinor",
-          e.currency_code as "currencyCode",
-          e.status::text as "status"
-        from expenses e
-        left join payment_allocations pa on pa.expense_id = e.id
-        left join payments p on p.id = pa.payment_id
-        where e.id = ${parsed.data.expenseId}
-          and e.company_id = ${company.id}
-          and e.deleted_at is null
-        group by e.id
-        limit 1
-      `);
+      const [expense] = await tx
+        .select({
+          id: expenses.id,
+          amountMinor: expenses.amountMinor,
+          currencyCode: expenses.currencyCode,
+          paymentStatus: expenses.paymentStatus,
+          status: expenses.status,
+        })
+        .from(expenses)
+        .where(and(eq(expenses.id, parsed.data.expenseId), eq(expenses.companyId, company.id)))
+        .limit(1);
 
-      if (!expense || expense.status === "cancelled") {
-        throw new Error("Expense does not exist or is cancelled.");
-      }
-      paidExpenseId = expense.id;
-
-      const paymentLineRows = await resolvePaymentLines(tx, {
-        formData,
-        companyId: company.id,
-        currencyCode: expense.currencyCode,
-        direction: "outbound",
-      });
-      const amountMinor = paymentLinesTotal(paymentLineRows);
-
-      if (amountMinor > expense.residualAmountMinor) {
-        throw new Error("Payment amount cannot exceed the expense residual.");
+      if (!expense) {
+        throw new Error("Expense record not found.");
       }
 
-      await createPostedExpensePayment({
-        tx,
-        companyId: company.id,
-        userId: user.id,
+      if (expense.status === "cancelled") {
+        throw new Error("Cannot pay a cancelled expense.");
+      }
+
+      if (expense.paymentStatus === "paid") {
+        throw new Error("Expense is already fully paid.");
+      }
+
+      const [method] = await tx
+        .select({ id: paymentMethods.id })
+        .from(paymentMethods)
+        .where(and(eq(paymentMethods.companyId, company.id), isNull(paymentMethods.deletedAt)))
+        .limit(1);
+
+      const [account] = await tx
+        .select({ id: paymentAccounts.id })
+        .from(paymentAccounts)
+        .where(and(eq(paymentAccounts.companyId, company.id), isNull(paymentAccounts.deletedAt)))
+        .limit(1);
+
+      if (!method || !account) {
+        throw new Error("A payment method and account must be configured in settings to record payments.");
+      }
+
+      const [payment] = await tx
+        .insert(payments)
+        .values({
+          companyId: company.id,
+          paymentType: "outbound",
+          paymentNo: paymentNo(),
+          status: "posted",
+          paymentDate: new Date(),
+          paymentMethodId: method.id,
+          paymentAccountId: account.id,
+          amountMinor: expense.amountMinor,
+          currencyCode: expense.currencyCode,
+        })
+        .returning({ id: payments.id });
+
+      await tx.insert(paymentAllocations).values({
+        paymentId: payment.id,
         expenseId: expense.id,
-        partnerId: expense.vendorId,
-        amountMinor,
-        currencyCode: expense.currencyCode,
-        lines: paymentLineRows,
+        amountMinor: expense.amountMinor,
+      });
+
+      await tx
+        .update(expenses)
+        .set({
+          paymentStatus: "paid",
+          updatedAt: new Date(),
+        })
+        .where(eq(expenses.id, expense.id));
+
+      await tx.insert(auditLogs).values({
+        companyId: company.id,
+        actorUserId: user.id,
+        action: "expense.pay",
+        entityType: "expense",
+        entityId: expense.id,
+        severity: "info",
       });
     });
-    await updateExpensePaymentStatus(paidExpenseId);
   } catch (error) {
     redirectWithMessage(`/admin/operations/expenses/${parsed.data.expenseId}`, "error", error instanceof Error ? error.message : "Could not register expense payment.");
   }
@@ -413,38 +422,41 @@ export async function cancelExpense(formData: FormData) {
     redirectWithMessage("/admin/operations/expenses", "error", "Expense ID is missing.");
   }
 
+  const company = await getDefaultCompany();
+
   try {
-    const [expense] = await db
-      .select({
-        id: expenses.id,
-        paymentStatus: expenses.paymentStatus,
-        status: expenses.status,
-      })
-      .from(expenses)
-      .where(and(eq(expenses.id, parsed.data.id), isNull(expenses.deletedAt)))
-      .limit(1);
+    await db.transaction(async (tx) => {
+      const [expense] = await tx
+        .select({ id: expenses.id, paymentStatus: expenses.paymentStatus })
+        .from(expenses)
+        .where(and(eq(expenses.id, parsed.data.id), eq(expenses.companyId, company.id)))
+        .limit(1);
 
-    if (!expense) {
-      throw new Error("Expense does not exist.");
-    }
+      if (!expense) {
+        throw new Error("Expense record not found.");
+      }
 
-    if (expense.paymentStatus === "paid") {
-      throw new Error("Paid expenses cannot be cancelled.");
-    }
+      if (expense.paymentStatus === "paid") {
+        throw new Error("Cannot cancel a paid expense.");
+      }
 
-    if (expense.status === "cancelled") {
-      throw new Error("Expense is already cancelled.");
-    }
+      await tx
+        .update(expenses)
+        .set({
+          status: "cancelled",
+          updatedAt: new Date(),
+        })
+        .where(eq(expenses.id, parsed.data.id));
 
-    await db
-      .update(expenses)
-      .set({
-        status: "cancelled",
-        cancelledAt: new Date(),
-        cancelledBy: user.id,
-        updatedAt: sql`now()`,
-      })
-      .where(and(eq(expenses.id, parsed.data.id), isNull(expenses.deletedAt)));
+      await tx.insert(auditLogs).values({
+        companyId: company.id,
+        actorUserId: user.id,
+        action: "expense.cancel",
+        entityType: "expense",
+        entityId: parsed.data.id,
+        severity: "warning",
+      });
+    });
   } catch (error) {
     redirectWithMessage(parsed.data.returnPath, "error", error instanceof Error ? error.message : "Could not cancel expense.");
   }

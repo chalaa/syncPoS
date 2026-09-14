@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { ExternalLink, Layers, Package, ShieldCheck, Tag, Trash2, RotateCcw } from "lucide-react";
+
 import { minorToDisplay } from "@/lib/catalog-utils";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { ProductDetailModal } from "./product-detail-modal";
@@ -93,81 +95,126 @@ export function ProductListTable({
           <thead>
             <tr className="border-b border-border bg-muted/40 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
               <th className="px-4 py-3">Item Code</th>
-              <th className="px-4 py-3">Product</th>
-              <th className="px-4 py-3">Standard Name</th>
+              <th className="px-4 py-3">Product Info</th>
+              <th className="px-4 py-3">Taxonomy</th>
               <th className="px-4 py-3">Tracking</th>
-              <th className="px-4 py-3">Unit</th>
-              <th className="px-4 py-3 text-right">Cost</th>
-              <th className="px-4 py-3 text-right">Price</th>
+              <th className="px-4 py-3">UoM</th>
+              <th className="px-4 py-3 text-right">Standard Cost</th>
+              <th className="px-4 py-3 text-right">List Price</th>
               <th className="px-4 py-3 text-right">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border/60">
             {products.map((product) => (
-              <tr key={product.id} className="transition-colors hover:bg-secondary/40">
-                <td className="px-4 py-3.5 font-semibold text-primary">
+              <tr key={product.id} className="group transition-colors hover:bg-muted/30">
+                <td className="px-4 py-3.5 align-middle">
                   <button
                     type="button"
                     onClick={() => handleOpen(product.id)}
-                    className="font-mono text-left underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring rounded"
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-primary/20 bg-primary/5 px-2.5 py-1 font-mono text-xs font-semibold text-primary transition-all hover:bg-primary/10 hover:border-primary/40 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                   >
                     {product.sku}
                   </button>
                 </td>
-                <td className="px-4 py-3.5">
-                  <div className="font-medium text-foreground">{product.name}</div>
-                  <div className="text-xs text-muted-foreground">
-                    {[product.brandName, product.categoryName, product.model]
-                      .filter(Boolean)
-                      .join(" · ") || "No category"}
+                <td className="px-4 py-3.5 align-middle">
+                  <div className="font-semibold text-foreground group-hover:text-primary transition-colors">
+                    {product.name}
                   </div>
+                  {product.standardName && product.standardName !== product.name ? (
+                    <div className="text-xs text-muted-foreground line-clamp-1">
+                      Alt: {product.standardName}
+                    </div>
+                  ) : null}
                   {product.country ? (
-                    <div className="text-xs text-muted-foreground">Country: {product.country}</div>
+                    <div className="text-[11px] text-muted-foreground">Origin: {product.country}</div>
                   ) : null}
                 </td>
-                <td className="px-4 py-3.5 text-xs text-muted-foreground">{product.standardName ?? "—"}</td>
-                <td className="px-4 py-3.5">
-                  <span className="inline-flex items-center rounded border border-border/80 bg-secondary px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wider text-secondary-foreground">
-                    {product.trackingMode}
+                <td className="px-4 py-3.5 align-middle">
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {product.categoryName ? (
+                      <span className="inline-flex items-center gap-1 rounded-md bg-secondary/80 px-2 py-0.5 text-[11px] font-medium text-secondary-foreground border border-border/50">
+                        <Layers className="size-3 text-muted-foreground" />
+                        {product.categoryName}
+                      </span>
+                    ) : null}
+                    {product.brandName ? (
+                      <span className="inline-flex items-center gap-1 rounded-md bg-blue-500/10 px-2 py-0.5 text-[11px] font-medium text-blue-700 dark:text-blue-300 border border-blue-500/20">
+                        <Tag className="size-3 text-blue-500" />
+                        {product.brandName}
+                      </span>
+                    ) : null}
+                    {!product.categoryName && !product.brandName ? (
+                      <span className="text-xs text-muted-foreground">Unassigned</span>
+                    ) : null}
+                  </div>
+                </td>
+                <td className="px-4 py-3.5 align-middle">
+                  {product.trackingMode === "serial" ? (
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-400 border border-emerald-500/20">
+                      <span className="size-1.5 rounded-full bg-emerald-500" />
+                      Serial
+                    </span>
+                  ) : product.trackingMode === "lot" ? (
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-500/10 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wider text-blue-700 dark:text-blue-400 border border-blue-500/20">
+                      <span className="size-1.5 rounded-full bg-blue-500" />
+                      Lot
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center rounded-full bg-muted px-2.5 py-0.5 text-[11px] font-medium text-muted-foreground border border-border/60">
+                      Standard
+                    </span>
+                  )}
+                </td>
+                <td className="px-4 py-3.5 align-middle">
+                  <span className="inline-flex items-center rounded bg-muted/60 px-2 py-0.5 text-xs font-medium text-foreground">
+                    {product.unitCode || "PCS"}
                   </span>
                 </td>
-                <td className="px-4 py-3.5 text-xs font-medium text-foreground">{product.unitCode}</td>
-                <td className="px-4 py-3.5 text-right font-mono text-xs text-muted-foreground">
+                <td className="px-4 py-3.5 align-middle text-right font-mono text-xs text-muted-foreground">
                   {product.currencyCode} {minorToDisplay(product.standardCostMinor)}
                 </td>
-                <td className="px-4 py-3.5 text-right font-mono text-xs font-bold text-foreground">
+                <td className="px-4 py-3.5 align-middle text-right font-mono text-xs font-bold text-foreground">
                   {product.currencyCode} {minorToDisplay(product.listPriceMinor)}
                 </td>
-                <td className="px-4 py-3.5">
-                  <div className="flex justify-end gap-2">
+                <td className="px-4 py-3.5 align-middle">
+                  <div className="flex items-center justify-end gap-1.5">
                     {!showDeleted ? (
                       <>
                         <Button
                           type="button"
-                          variant="outline"
+                          variant="ghost"
                           size="sm"
                           onClick={() => handleOpen(product.id)}
+                          className="h-8 gap-1 px-2 text-xs font-medium hover:bg-primary/10 hover:text-primary"
                         >
-                          Open
+                          <ExternalLink className="size-3.5" />
+                          View
                         </Button>
                         <ButtonLink
                           href={`/admin/products/${product.id}/edit`}
                           variant="outline"
                           size="sm"
+                          className="h-8 px-2.5 text-xs"
                         >
                           Edit
                         </ButtonLink>
                         <form action={softDeleteProduct}>
                           <input type="hidden" name="id" value={product.id} />
-                          <Button variant="destructive" size="sm">
-                            Delete
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 px-2 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                            title="Delete product"
+                          >
+                            <Trash2 className="size-3.5" />
                           </Button>
                         </form>
                       </>
                     ) : (
                       <form action={restoreProduct}>
                         <input type="hidden" name="id" value={product.id} />
-                        <Button variant="outline" size="sm">
+                        <Button variant="outline" size="sm" className="h-8 gap-1 px-2.5 text-xs">
+                          <RotateCcw className="size-3.5" />
                           Restore
                         </Button>
                       </form>
@@ -178,8 +225,16 @@ export function ProductListTable({
             ))}
             {products.length === 0 ? (
               <tr>
-                <td colSpan={8} className="px-4 py-12 text-center text-sm text-muted-foreground">
-                  No products found matching the criteria.
+                <td colSpan={8} className="px-4 py-16 text-center text-sm text-muted-foreground">
+                  <div className="mx-auto flex max-w-xs flex-col items-center justify-center text-center">
+                    <div className="flex size-12 items-center justify-center rounded-2xl bg-muted/60 text-muted-foreground ring-1 ring-border">
+                      <Package className="size-6" />
+                    </div>
+                    <p className="mt-3 font-semibold text-foreground">No Products Found</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      No product records match your current search query or filter options.
+                    </p>
+                  </div>
                 </td>
               </tr>
             ) : null}

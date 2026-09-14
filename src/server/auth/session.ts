@@ -5,6 +5,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { and, eq, gt, isNull, or, sql } from "drizzle-orm";
+import { cache } from "react";
 
 import { db } from "@/server/db/client";
 import {
@@ -84,7 +85,7 @@ export async function destroySession() {
   cookieStore.delete(sessionCookieName);
 }
 
-export async function getCurrentUser() {
+export const getCurrentUser = cache(async () => {
   const cookieStore = await cookies();
   const token = cookieStore.get(sessionCookieName)?.value;
 
@@ -96,6 +97,7 @@ export async function getCurrentUser() {
     .select({
       id: users.id,
       companyId: users.companyId,
+      employeeId: users.employeeId,
       username: users.username,
       email: users.email,
       status: users.status,
@@ -118,7 +120,7 @@ export async function getCurrentUser() {
     .limit(1);
 
   return sessionUser;
-}
+});
 
 export async function requireUser() {
   const user = await getCurrentUser();
@@ -130,7 +132,7 @@ export async function requireUser() {
   return user;
 }
 
-export async function getUserPermissionCodes(userId: string) {
+export const getUserPermissionCodes = cache(async (userId: string) => {
   const rows = await db
     .select({ code: permissions.code })
     .from(userRoles)
@@ -150,7 +152,7 @@ export async function getUserPermissionCodes(userId: string) {
     );
 
   return new Set(rows.flatMap((row) => canonicalPermissionCodesFor(row.code)));
-}
+});
 
 export async function requirePermission(permissionCode: string) {
   const user = await requireUser();

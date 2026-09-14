@@ -21,6 +21,7 @@ export type InventorySummaryMetrics = {
   totalValuationMinor: number;
   currencyCode: string;
   totalSkusOnHand: number;
+  totalQuantityOnHand: number;
   lowStockCount: number;
   outOfStockCount: number;
   totalReservedQuantity: number;

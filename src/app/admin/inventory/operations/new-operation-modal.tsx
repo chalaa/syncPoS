@@ -130,15 +130,17 @@ export function NewInventoryOperationModal({
   return (
     <Dialog open={open} onOpenChange={(val) => (val ? setOpen(true) : handleCloseRequest())}>
       {trigger ? (
-        <DialogTrigger asChild>{trigger}</DialogTrigger>
-      ) : (
+        <DialogTrigger asChild>
+          <span className="inline-flex">{trigger}</span>
+        </DialogTrigger>
+      ) : !isControlled ? (
         <DialogTrigger asChild>
           <Button className="gap-2 bg-gradient-to-r from-[#0B5D4B] to-[#073B35] font-semibold text-white shadow-md shadow-[#0B5D4B]/20 transition-all hover:brightness-110 active:scale-[0.99]">
             <Plus className="size-4 text-emerald-200" />
             New Operation
           </Button>
         </DialogTrigger>
-      )}
+      ) : null}
 
       <DialogContent
         className="fixed left-1/2 top-1/2 z-50 -translate-x-1/2 -translate-y-1/2 w-[calc(100%-1.5rem)] max-w-6xl sm:max-w-6xl max-h-[92vh] p-0 sm:p-0 gap-0 flex flex-col rounded-2xl border border-border/80 bg-card shadow-2xl overflow-hidden outline-none"

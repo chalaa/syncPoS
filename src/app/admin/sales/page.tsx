@@ -2,15 +2,17 @@ import Link from "next/link";
 
 import { Alert } from "@/components/ui/alert";
 import { Badge, StatusBadge } from "@/components/ui/badge";
-import { ButtonLink } from "@/components/ui/button";
+import { Button, ButtonLink } from "@/components/ui/button";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
 import { cn } from "@/lib/utils";
-import { requirePermission } from "@/server/auth/session";
+import { requirePermission, getUserPermissionCodes } from "@/server/auth/session";
+import { PERMISSIONS, userHasPermission } from "@/server/iam/permissions";
 import { getPaymentList } from "@/server/payments/payments";
 import type { PaymentListRow } from "@/server/payments/types";
 import { displayReturnMoney, getCustomerReturnList } from "@/server/returns/returns";
 import type { CustomerReturnListRow } from "@/server/returns/types";
 import { NewSalesOrderModal } from "@/app/admin/sales/new-sales-order-modal";
+import { SalesKpiCards } from "@/app/admin/sales/sales-kpi-cards";
 import { displaySalesMoney, getCustomerInvoiceList, getDeliveryList, getSalesFormOptions, getSalesOrderList } from "@/server/sales/sales";
 import type { CustomerInvoiceListRow, DeliveryListRow, SalesOrderListRow } from "@/server/sales/types";
 
@@ -38,16 +40,21 @@ function todayDate() {
 }
 
 export default async function SalesPage({ searchParams }: SalesPageProps) {
-  await requirePermission("sales:orders:create");
+  const user = await requirePermission(PERMISSIONS.SALES.ORDERS_VIEW);
+  const userPerms = await getUserPermissionCodes(user.id);
+  const canCreate = userHasPermission(userPerms, PERMISSIONS.SALES.CREATE);
+  const canManageReturns = userHasPermission(userPerms, PERMISSIONS.SALES.RETURNS_MANAGE);
 
   const params = await searchParams;
   const view = params.view ?? "orders";
+
+  const allOrders = await getSalesOrderList();
 
   if (view === "deliveries") {
     const deliveries = await getDeliveryList({ salesOrderId: params.salesOrderId });
 
     return (
-      <SalesLayout currentView={view} title="Deliveries" notice={params.notice} error={params.error}>
+      <SalesLayout currentView={view} title="Deliveries" orders={allOrders} notice={params.notice} error={params.error}>
         <DeliveryList deliveries={deliveries} />
       </SalesLayout>
     );
@@ -61,7 +68,7 @@ export default async function SalesPage({ searchParams }: SalesPageProps) {
     });
 
     return (
-      <SalesLayout currentView={view} title="Customer Invoices" notice={params.notice} error={params.error}>
+      <SalesLayout currentView={view} title="Customer Invoices" orders={allOrders} notice={params.notice} error={params.error}>
         <CustomerInvoiceList invoices={invoices} />
       </SalesLayout>
     );
@@ -75,7 +82,7 @@ export default async function SalesPage({ searchParams }: SalesPageProps) {
     });
 
     return (
-      <SalesLayout currentView={view} title="Customer Payments" notice={params.notice} error={params.error}>
+      <SalesLayout currentView={view} title="Customer Payments" orders={allOrders} notice={params.notice} error={params.error}>
         <CustomerPaymentList payments={payments} />
       </SalesLayout>
     );
@@ -88,43 +95,44 @@ export default async function SalesPage({ searchParams }: SalesPageProps) {
       <SalesLayout
         currentView={view}
         title="Returns"
+        orders={allOrders}
         notice={params.notice}
         error={params.error}
-        actions={<ButtonLink href="/admin/sales/returns/new">New Return</ButtonLink>}
+        actions={canManageReturns ? <ButtonLink href="/admin/sales/returns/new">New Return</ButtonLink> : undefined}
       >
         <CustomerReturnList returns={returns} />
       </SalesLayout>
     );
   }
 
-  const [orders, formOptions] = await Promise.all([
-    getSalesOrderList(),
-    getSalesFormOptions(),
-  ]);
+  const formOptions = await getSalesFormOptions();
 
   return (
     <SalesLayout
       currentView={view}
       title="Quotations / Orders"
+      orders={allOrders}
       notice={params.notice}
       error={params.error}
       actions={
-        <NewSalesOrderModal
-          customers={formOptions.customers}
-          owners={formOptions.owners}
-          products={formOptions.products}
-          productCategories={formOptions.productCategories}
-          productBrands={formOptions.productBrands}
-          productUnits={formOptions.productUnits}
-          locations={formOptions.locations}
-          taxes={formOptions.taxes}
-          availableStock={formOptions.availableStock}
-          initialOpen={params.new === "1" || params.new === "true"}
-          defaultDate={todayDate()}
-        />
+        canCreate ? (
+          <NewSalesOrderModal
+            customers={formOptions.customers}
+            owners={formOptions.owners}
+            products={formOptions.products}
+            productCategories={formOptions.productCategories}
+            productBrands={formOptions.productBrands}
+            productUnits={formOptions.productUnits}
+            locations={formOptions.locations}
+            taxes={formOptions.taxes}
+            availableStock={formOptions.availableStock}
+            initialOpen={params.new === "1" || params.new === "true"}
+            defaultDate={todayDate()}
+          />
+        ) : undefined
       }
     >
-      <SalesOrderList orders={orders} />
+      <SalesOrderList orders={allOrders} />
     </SalesLayout>
   );
 }
@@ -140,6 +148,7 @@ const salesTabs = [
 function SalesLayout({
   title,
   currentView = "orders",
+  orders,
   notice,
   error,
   actions,
@@ -147,6 +156,7 @@ function SalesLayout({
 }: {
   title: string;
   currentView?: string;
+  orders: SalesOrderListRow[];
   notice?: string;
   error?: string;
   actions?: React.ReactNode;
@@ -154,29 +164,14 @@ function SalesLayout({
 }) {
   return (
     <PageShell>
-      <PageHeader eyebrow="Sales Workspace" title={title} actions={actions} />
+      <PageHeader
+        eyebrow="Sales Workspace"
+        title={title}
+        description="Streamlined order management, customer invoicing, delivery fulfillment, and revenue tracking."
+        actions={actions}
+      />
 
-      {/* Sub-navigation tabs */}
-      <nav className="mb-6 flex items-center gap-1 overflow-x-auto border-b border-border pb-px">
-        {salesTabs.map((tab) => {
-          const isActive = currentView === tab.key;
-          return (
-            <Link
-              key={tab.key}
-              href={tab.href}
-              className={cn(
-                "inline-flex items-center gap-2 whitespace-nowrap border-b-2 px-3.5 py-2.5 text-sm font-medium transition-colors",
-                isActive
-                  ? "border-primary font-semibold text-primary"
-                  : "border-transparent text-muted-foreground hover:border-border hover:text-foreground",
-              )}
-            >
-              {isActive ? <span className="size-1.5 rounded-full bg-gold" /> : null}
-              {tab.label}
-            </Link>
-          );
-        })}
-      </nav>
+      <SalesKpiCards orders={orders} />
 
       {notice ? <Alert kind="success">{notice}</Alert> : null}
       {error ? <Alert kind="error">{error}</Alert> : null}
@@ -188,41 +183,41 @@ function SalesLayout({
 
 function CustomerReturnList({ returns }: { returns: CustomerReturnListRow[] }) {
   return (
-    <section className="overflow-hidden rounded-lg border border-border bg-card shadow-xs">
+    <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-xs">
       <div className="overflow-x-auto">
         <table className="w-full min-w-[900px] text-left text-sm">
           <thead>
             <tr className="border-b border-border bg-muted/40 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-              <th className="px-4 py-3">Return</th>
+              <th className="px-4 py-3">Return No</th>
               <th className="px-4 py-3">Sales Order</th>
               <th className="px-4 py-3">Customer</th>
               <th className="px-4 py-3">Status</th>
               <th className="px-4 py-3">Date</th>
               <th className="px-4 py-3 text-right">Lines</th>
-              <th className="px-4 py-3 text-right">Refund</th>
+              <th className="px-4 py-3 text-right">Refund Amount</th>
               <th className="px-4 py-3 text-right">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border/60">
             {returns.map((record) => (
-              <tr key={record.id} className="transition-colors hover:bg-secondary/40">
+              <tr key={record.id} className="group transition-colors hover:bg-muted/30">
                 <td className="px-4 py-3.5">
-                  <Link href={`/admin/sales/returns/${record.id}`} className="font-semibold text-primary underline-offset-4 hover:underline">
+                  <Link href={`/admin/sales/returns/${record.id}`} className="font-mono text-xs font-bold text-primary hover:underline">
                     {record.returnNo}
                   </Link>
                 </td>
-                <td className="px-4 py-3.5 text-muted-foreground">{record.orderNo}</td>
+                <td className="px-4 py-3.5 text-xs font-mono text-muted-foreground">{record.orderNo}</td>
                 <td className="px-4 py-3.5 font-medium text-foreground">{record.customerName}</td>
                 <td className="px-4 py-3.5">
                   <StatusBadge status={record.status} />
                 </td>
                 <td className="px-4 py-3.5 text-xs text-muted-foreground">{record.returnDate}</td>
                 <td className="px-4 py-3.5 text-right font-mono text-xs">{record.lineCount}</td>
-                <td className="px-4 py-3.5 text-right font-mono text-xs font-semibold text-foreground">
+                <td className="px-4 py-3.5 text-right font-mono text-xs font-bold text-foreground">
                   {displayReturnMoney(record.refundAmountMinor, record.currencyCode)}
                 </td>
                 <td className="px-4 py-3.5 text-right">
-                  <ButtonLink href={`/admin/sales/returns/${record.id}`} size="sm" variant="outline">Details</ButtonLink>
+                  <ButtonLink href={`/admin/sales/returns/${record.id}`} size="sm" variant="outline" className="h-8 px-2.5 text-xs">Details</ButtonLink>
                 </td>
               </tr>
             ))}
@@ -242,41 +237,43 @@ function CustomerReturnList({ returns }: { returns: CustomerReturnListRow[] }) {
 
 function CustomerInvoiceList({ invoices }: { invoices: CustomerInvoiceListRow[] }) {
   return (
-    <section className="overflow-hidden rounded-lg border border-border bg-card shadow-xs">
+    <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-xs">
       <div className="overflow-x-auto">
         <table className="w-full min-w-[1120px] text-left text-sm">
           <thead>
             <tr className="border-b border-border bg-muted/40 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-              <th className="px-4 py-3">Invoice</th>
+              <th className="px-4 py-3">Invoice No</th>
               <th className="px-4 py-3">Customer</th>
-              <th className="px-4 py-3">Source</th>
-              <th className="px-4 py-3">Status</th>
+              <th className="px-4 py-3">Source Ref</th>
+              <th className="px-4 py-3">Invoice Status</th>
               <th className="px-4 py-3">Payment</th>
               <th className="px-4 py-3">Invoice Date</th>
               <th className="px-4 py-3">Due Date</th>
               <th className="px-4 py-3">Products</th>
-              <th className="px-4 py-3 text-right">Total</th>
+              <th className="px-4 py-3 text-right">Grand Total</th>
               <th className="px-4 py-3 text-right">Residual</th>
               <th className="px-4 py-3 text-right">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border/60">
             {invoices.map((invoice) => (
-              <tr key={invoice.id} className="transition-colors hover:bg-secondary/40">
+              <tr key={invoice.id} className="group transition-colors hover:bg-muted/30">
                 <td className="px-4 py-3.5">
-                  <Link href={`/admin/sales/invoices/${invoice.id}`} className="font-semibold text-primary underline-offset-4 hover:underline">
+                  <Link href={`/admin/sales/invoices/${invoice.id}`} className="font-mono text-xs font-bold text-primary hover:underline">
                     {invoice.invoiceNo}
                   </Link>
-                  <div className="text-xs text-muted-foreground">{invoice.customerReference ?? "-"}</div>
+                  {invoice.customerReference ? (
+                    <div className="text-xs text-muted-foreground">Ref: {invoice.customerReference}</div>
+                  ) : null}
                 </td>
                 <td className="px-4 py-3.5 font-medium text-foreground">{invoice.customerName}</td>
                 <td className="px-4 py-3.5">
                   {invoice.orderNo ? (
-                    <Link href={`/admin/sales/${invoice.salesOrderId}`} className="text-xs text-primary underline-offset-4 hover:underline">
+                    <Link href={`/admin/sales/${invoice.salesOrderId}`} className="font-mono text-xs text-primary hover:underline">
                       {invoice.orderNo}
                     </Link>
                   ) : invoice.deliveryNo ? (
-                    <span className="text-xs text-muted-foreground">{invoice.deliveryNo}</span>
+                    <span className="font-mono text-xs text-muted-foreground">{invoice.deliveryNo}</span>
                   ) : (
                     "-"
                   )}
@@ -289,15 +286,15 @@ function CustomerInvoiceList({ invoices }: { invoices: CustomerInvoiceListRow[] 
                 </td>
                 <td className="px-4 py-3.5 text-xs text-muted-foreground">{invoice.invoiceDate}</td>
                 <td className="px-4 py-3.5 text-xs text-muted-foreground">{invoice.dueDate ?? "-"}</td>
-                <td className="px-4 py-3.5 text-xs text-muted-foreground">{invoice.productSummary ?? "-"}</td>
-                <td className="px-4 py-3.5 text-right font-mono text-xs font-semibold text-foreground">
+                <td className="px-4 py-3.5 text-xs text-muted-foreground max-w-[200px] truncate">{invoice.productSummary ?? "-"}</td>
+                <td className="px-4 py-3.5 text-right font-mono text-xs font-bold text-foreground">
                   {displaySalesMoney(invoice.totalMinor, invoice.currencyCode)}
                 </td>
-                <td className={`px-4 py-3.5 text-right font-mono text-xs font-semibold ${invoice.residualAmountMinor > 0 ? "text-destructive" : "text-primary"}`}>
+                <td className={`px-4 py-3.5 text-right font-mono text-xs font-bold ${invoice.residualAmountMinor > 0 ? "text-destructive" : "text-emerald-600 dark:text-emerald-400"}`}>
                   {displaySalesMoney(invoice.residualAmountMinor, invoice.currencyCode)}
                 </td>
                 <td className="px-4 py-3.5 text-right">
-                  <ButtonLink href={`/admin/sales/invoices/${invoice.id}`} size="sm" variant="outline">Details</ButtonLink>
+                  <ButtonLink href={`/admin/sales/invoices/${invoice.id}`} size="sm" variant="outline" className="h-8 px-2.5 text-xs">Details</ButtonLink>
                 </td>
               </tr>
             ))}
@@ -317,12 +314,12 @@ function CustomerInvoiceList({ invoices }: { invoices: CustomerInvoiceListRow[] 
 
 function CustomerPaymentList({ payments }: { payments: PaymentListRow[] }) {
   return (
-    <section className="overflow-hidden rounded-lg border border-border bg-card shadow-xs">
+    <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-xs">
       <div className="overflow-x-auto">
         <table className="w-full min-w-[960px] text-left text-sm">
           <thead>
             <tr className="border-b border-border bg-muted/40 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-              <th className="px-4 py-3">Payment</th>
+              <th className="px-4 py-3">Payment No</th>
               <th className="px-4 py-3">Customer</th>
               <th className="px-4 py-3">Status</th>
               <th className="px-4 py-3">Date</th>
@@ -336,9 +333,9 @@ function CustomerPaymentList({ payments }: { payments: PaymentListRow[] }) {
           </thead>
           <tbody className="divide-y divide-border/60">
             {payments.map((payment) => (
-              <tr key={payment.id} className="transition-colors hover:bg-secondary/40">
+              <tr key={payment.id} className="group transition-colors hover:bg-muted/30">
                 <td className="px-4 py-3.5">
-                  <Link href={`/admin/sales/payments/${payment.id}`} className="font-semibold text-primary underline-offset-4 hover:underline">
+                  <Link href={`/admin/sales/payments/${payment.id}`} className="font-mono text-xs font-bold text-primary hover:underline">
                     {payment.paymentNo}
                   </Link>
                 </td>
@@ -350,14 +347,14 @@ function CustomerPaymentList({ payments }: { payments: PaymentListRow[] }) {
                 <td className="px-4 py-3.5 text-xs font-medium text-foreground">{payment.paymentMethodName}</td>
                 <td className="px-4 py-3.5 text-xs text-muted-foreground">{payment.paymentAccountName}</td>
                 <td className="px-4 py-3.5 text-xs font-mono text-muted-foreground">{payment.reference ?? "-"}</td>
-                <td className="px-4 py-3.5 text-right font-mono text-xs font-semibold text-foreground">
+                <td className="px-4 py-3.5 text-right font-mono text-xs font-bold text-foreground">
                   {displaySalesMoney(payment.amountMinor, payment.currencyCode)}
                 </td>
-                <td className="px-4 py-3.5 text-right font-mono text-xs text-primary font-medium">
+                <td className="px-4 py-3.5 text-right font-mono text-xs text-primary font-semibold">
                   {displaySalesMoney(payment.allocatedAmountMinor, payment.currencyCode)}
                 </td>
                 <td className="px-4 py-3.5 text-right">
-                  <ButtonLink href={`/admin/sales/payments/${payment.id}`} size="sm" variant="outline">Details</ButtonLink>
+                  <ButtonLink href={`/admin/sales/payments/${payment.id}`} size="sm" variant="outline" className="h-8 px-2.5 text-xs">Details</ButtonLink>
                 </td>
               </tr>
             ))}
@@ -377,33 +374,33 @@ function CustomerPaymentList({ payments }: { payments: PaymentListRow[] }) {
 
 function DeliveryList({ deliveries }: { deliveries: DeliveryListRow[] }) {
   return (
-    <section className="overflow-hidden rounded-lg border border-border bg-card shadow-xs">
+    <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-xs">
       <div className="overflow-x-auto">
         <table className="w-full min-w-[960px] text-left text-sm">
           <thead>
             <tr className="border-b border-border bg-muted/40 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-              <th className="px-4 py-3">Delivery</th>
-              <th className="px-4 py-3">Sales Order</th>
+              <th className="px-4 py-3">Delivery No</th>
+              <th className="px-4 py-3">Order Ref</th>
               <th className="px-4 py-3">Customer</th>
               <th className="px-4 py-3">Status</th>
               <th className="px-4 py-3">Date</th>
-              <th className="px-4 py-3">Source</th>
+              <th className="px-4 py-3">Source Warehouse</th>
               <th className="px-4 py-3 text-right">Lines</th>
               <th className="px-4 py-3 text-right">Quantity</th>
-              <th className="px-4 py-3 text-right">Cost</th>
+              <th className="px-4 py-3 text-right">Total Cost</th>
               <th className="px-4 py-3 text-right">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border/60">
             {deliveries.map((delivery) => (
-              <tr key={delivery.id} className="transition-colors hover:bg-secondary/40">
+              <tr key={delivery.id} className="group transition-colors hover:bg-muted/30">
                 <td className="px-4 py-3.5">
-                  <Link href={`/admin/sales/deliveries/${delivery.id}`} className="font-semibold text-primary underline-offset-4 hover:underline">
+                  <Link href={`/admin/sales/deliveries/${delivery.id}`} className="font-mono text-xs font-bold text-primary hover:underline">
                     {delivery.deliveryNo}
                   </Link>
                 </td>
                 <td className="px-4 py-3.5">
-                  <Link href={`/admin/sales/${delivery.salesOrderId}`} className="text-xs text-primary underline-offset-4 hover:underline">
+                  <Link href={`/admin/sales/${delivery.salesOrderId}`} className="font-mono text-xs text-muted-foreground hover:text-primary hover:underline">
                     {delivery.orderNo}
                   </Link>
                 </td>
@@ -412,14 +409,14 @@ function DeliveryList({ deliveries }: { deliveries: DeliveryListRow[] }) {
                   <StatusBadge status={delivery.status} />
                 </td>
                 <td className="px-4 py-3.5 text-xs text-muted-foreground">{delivery.deliveryDate}</td>
-                <td className="px-4 py-3.5 text-xs text-muted-foreground">{delivery.sourceLocationCode}</td>
-                <td className="px-4 py-3.5 text-right font-mono text-xs">{delivery.lineCount}</td>
-                <td className="px-4 py-3.5 text-right font-mono text-xs font-medium">{delivery.quantityDelivered}</td>
-                <td className="px-4 py-3.5 text-right font-mono text-xs font-semibold text-foreground">
+                <td className="px-4 py-3.5 text-xs font-medium text-muted-foreground">{delivery.sourceLocationCode}</td>
+                <td className="px-4 py-3.5 text-right font-mono text-xs text-muted-foreground">{delivery.lineCount}</td>
+                <td className="px-4 py-3.5 text-right font-mono text-xs font-semibold text-foreground">{delivery.quantityDelivered}</td>
+                <td className="px-4 py-3.5 text-right font-mono text-xs font-bold text-foreground">
                   {displaySalesMoney(delivery.totalCostMinor, delivery.currencyCode)}
                 </td>
                 <td className="px-4 py-3.5 text-right">
-                  <ButtonLink href={`/admin/sales/deliveries/${delivery.id}`} size="sm" variant="outline">Details</ButtonLink>
+                  <ButtonLink href={`/admin/sales/deliveries/${delivery.id}`} size="sm" variant="outline" className="h-8 px-2.5 text-xs">Details</ButtonLink>
                 </td>
               </tr>
             ))}
@@ -439,35 +436,39 @@ function DeliveryList({ deliveries }: { deliveries: DeliveryListRow[] }) {
 
 function SalesOrderList({ orders }: { orders: SalesOrderListRow[] }) {
   return (
-    <section className="overflow-hidden rounded-lg border border-border bg-card shadow-xs">
+    <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-xs">
       <div className="overflow-x-auto">
         <table className="w-full min-w-[1080px] text-left text-sm">
           <thead>
             <tr className="border-b border-border bg-muted/40 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-              <th className="px-4 py-3">Order</th>
+              <th className="px-4 py-3">Order No</th>
               <th className="px-4 py-3">Customer</th>
-              <th className="px-4 py-3">Status</th>
+              <th className="px-4 py-3">Order Status</th>
               <th className="px-4 py-3">Order Date</th>
-              <th className="px-4 py-3">Payment</th>
-              <th className="px-4 py-3">Source</th>
+              <th className="px-4 py-3">Payment Settlement</th>
+              <th className="px-4 py-3">Source Warehouse</th>
               <th className="px-4 py-3 text-right">Lines</th>
               <th className="px-4 py-3 text-right">Ordered</th>
               <th className="px-4 py-3 text-right">Delivered</th>
-              <th className="px-4 py-3 text-right">Total</th>
+              <th className="px-4 py-3 text-right">Grand Total</th>
               <th className="px-4 py-3 text-right">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border/60">
             {orders.map((order) => (
-              <tr key={order.id} className="transition-colors hover:bg-secondary/40">
+              <tr key={order.id} className="group transition-colors hover:bg-muted/30">
                 <td className="px-4 py-3.5">
-                  <Link href={`/admin/sales/${order.id}`} className="font-semibold text-primary underline-offset-4 hover:underline">
+                  <Link href={`/admin/sales/${order.id}`} className="inline-flex items-center gap-1.5 rounded-lg border border-primary/20 bg-primary/5 px-2.5 py-1 font-mono text-xs font-bold text-primary transition-all hover:bg-primary/10 hover:border-primary/40">
                     {order.orderNo}
                   </Link>
-                  <div className="text-xs text-muted-foreground">{order.customerReference ?? "-"}</div>
-                  {order.fsNumber ? <div className="text-xs font-mono text-muted-foreground">FS {order.fsNumber}</div> : null}
+                  {order.customerReference ? (
+                    <div className="text-xs text-muted-foreground">Ref: {order.customerReference}</div>
+                  ) : null}
+                  {order.fsNumber ? <div className="text-[11px] font-mono text-muted-foreground">FS: {order.fsNumber}</div> : null}
                 </td>
-                <td className="px-4 py-3.5 font-medium text-foreground">{order.customerName}</td>
+                <td className="px-4 py-3.5">
+                  <div className="font-semibold text-foreground group-hover:text-primary transition-colors">{order.customerName}</div>
+                </td>
                 <td className="px-4 py-3.5">
                   <StatusBadge status={order.status} />
                 </td>
@@ -490,15 +491,15 @@ function SalesOrderList({ orders }: { orders: SalesOrderListRow[] }) {
                     )}
                   </div>
                 </td>
-                <td className="px-4 py-3.5 text-xs text-muted-foreground">{order.sourceLocationCode ?? "-"}</td>
-                <td className="px-4 py-3.5 text-right font-mono text-xs">{order.lineCount}</td>
-                <td className="px-4 py-3.5 text-right font-mono text-xs font-medium">{order.quantityOrdered}</td>
-                <td className="px-4 py-3.5 text-right font-mono text-xs font-medium">{order.quantityDelivered}</td>
-                <td className="px-4 py-3.5 text-right font-mono text-xs font-bold text-foreground">
+                <td className="px-4 py-3.5 text-xs font-medium text-muted-foreground">{order.sourceLocationCode ?? "-"}</td>
+                <td className="px-4 py-3.5 text-right font-mono text-xs text-muted-foreground">{order.lineCount}</td>
+                <td className="px-4 py-3.5 text-right font-mono text-xs font-semibold text-foreground">{order.quantityOrdered}</td>
+                <td className="px-4 py-3.5 text-right font-mono text-xs font-semibold text-foreground">{order.quantityDelivered}</td>
+                <td className="px-4 py-3.5 text-right font-mono text-xs font-extrabold text-foreground">
                   {displaySalesMoney(order.totalMinor, order.currencyCode)}
                 </td>
                 <td className="px-4 py-3.5 text-right">
-                  <ButtonLink href={`/admin/sales/${order.id}`} size="sm" variant="outline">Details</ButtonLink>
+                  <ButtonLink href={`/admin/sales/${order.id}`} size="sm" variant="outline" className="h-8 px-2.5 text-xs">Details</ButtonLink>
                 </td>
               </tr>
             ))}
@@ -515,4 +516,3 @@ function SalesOrderList({ orders }: { orders: SalesOrderListRow[] }) {
     </section>
   );
 }
-

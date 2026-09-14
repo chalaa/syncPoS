@@ -6,6 +6,7 @@ export type AdminMenuKey =
   | "partners"
   | "purchasing"
   | "sales"
+  | "expenses"
   | "inventory"
   | "reports"
   | "operations"
