@@ -50,9 +50,12 @@ export default async function InventoryPage({ searchParams }: InventoryPageProps
         title="Stock & Balance Management"
         actions={
           <div className="flex flex-wrap gap-2">
-            <ButtonLink href="/admin/inventory/operations" variant="default">
-              New Transfer / Operation
-            </ButtonLink>
+            <ButtonLink href="/admin/inventory/stock-card">Stock card</ButtonLink>
+            <ButtonLink href="/admin/inventory/operations">Operations</ButtonLink>
+            <ButtonLink href="/admin/inventory/approvals">Approvals</ButtonLink>
+            <ButtonLink href="/admin/inventory/serial-history">Serial history</ButtonLink>
+            <ButtonLink href="/admin/inventory/locations">Locations</ButtonLink>
+            <ButtonLink href="/admin/inventory/opening-stock">Opening stock</ButtonLink>
           </div>
         }
       />

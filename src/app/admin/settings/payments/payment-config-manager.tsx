@@ -207,6 +207,44 @@ function AccountForm({
         />
       </label>
 
+      <div className="grid gap-4 rounded-md border border-border bg-muted/20 p-3">
+        <label className="flex items-center gap-2 text-sm font-medium">
+          <input
+            type="checkbox"
+            name="verifyEtEnabled"
+            defaultChecked={record?.verifyEtEnabled ?? false}
+            className="size-4 rounded border-input"
+          />
+          Verify references with Verify.ET
+        </label>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <label className="flex flex-col gap-1 text-sm font-medium">
+            Verify.ET bank
+            <select name="verifyEtBank" defaultValue={record?.verifyEtBank ?? ""} className={inputClass}>
+              <option value="">No bank selected</option>
+              <option value="cbe">CBE</option>
+              <option value="boa">Bank of Abyssinia</option>
+              <option value="telebirr">Telebirr</option>
+              <option value="mpesa">M-Pesa</option>
+              <option value="cbebirr">CBE Birr</option>
+              <option value="dashen">Dashen</option>
+              <option value="awash">Awash</option>
+              <option value="siinqee">Siinqee</option>
+              <option value="kaafiebirr">Kaafi eBirr</option>
+            </select>
+          </label>
+          <label className="flex flex-col gap-1 text-sm font-medium">
+            Settlement account
+            <input
+              name="verifyEtSettlementAccount"
+              defaultValue={record?.verifyEtSettlementAccount ?? ""}
+              placeholder="Receiver account or wallet phone"
+              className={inputClass}
+            />
+          </label>
+        </div>
+      </div>
+
       <label className="flex items-center gap-2 text-sm font-medium">
         <input type="checkbox" name="isActive" defaultChecked={record?.isActive ?? true} className="size-4 rounded border-input" />
         Active
@@ -406,6 +444,7 @@ function MethodTable({
             <th className="px-4 py-3">Type</th>
             <th className="px-4 py-3">Direction</th>
             <th className="px-4 py-3">Reference</th>
+            <th className="px-4 py-3">Verification</th>
             <th className="px-4 py-3">Status</th>
             <th className="px-4 py-3 text-right">Actions</th>
           </tr>
@@ -518,7 +557,17 @@ function AccountTable({
                 <div>{record.institutionName ?? "-"}</div>
                 <div className="text-xs text-muted-foreground font-mono">{record.accountNumber ?? "-"}</div>
               </td>
-              <td className="px-4 py-3 text-right font-semibold text-foreground">{displayPaymentMoney(record.openingBalanceMinor, record.currencyCode)}</td>
+              <td className="px-4 py-3 text-right">{displayPaymentMoney(record.openingBalanceMinor, record.currencyCode)}</td>
+              <td className="px-4 py-3">
+                {record.verifyEtEnabled ? (
+                  <div>
+                    <div className="font-medium">Verify.ET</div>
+                    <div className="text-xs text-muted-foreground">{record.verifyEtBank ?? "No bank"} / {record.verifyEtSettlementAccount ?? "No settlement"}</div>
+                  </div>
+                ) : (
+                  <span className="text-muted-foreground">Not required</span>
+                )}
+              </td>
               <td className="px-4 py-3">
                 <StatusBadge status={record.isActive ? "active" : "inactive"} />
               </td>
@@ -557,7 +606,7 @@ function AccountTable({
           ))}
           {records.length === 0 ? (
             <tr>
-              <td colSpan={6} className="px-4 py-12 text-center text-muted-foreground">No payment accounts found.</td>
+              <td colSpan={7} className="px-4 py-10 text-center text-muted-foreground">No payment accounts found.</td>
             </tr>
           ) : null}
         </tbody>

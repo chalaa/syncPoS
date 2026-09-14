@@ -1,7 +1,5 @@
 "use server";
 
-import { randomUUID } from "node:crypto";
-
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { and, eq, isNull, sql } from "drizzle-orm";
@@ -10,6 +8,7 @@ import { z } from "zod";
 import { requirePermission } from "@/server/auth/session";
 import { getDefaultCompany } from "@/server/catalog/products";
 import { db } from "@/server/db/client";
+import { generateCompanyDocumentNo } from "@/server/db/code-generator";
 import {
   auditLogs,
   owners,
@@ -43,10 +42,6 @@ function formValue(formData: FormData, key: string) {
 
 function formValues(formData: FormData, key: string) {
   return formData.getAll(key).map((value) => (typeof value === "string" ? value : ""));
-}
-
-function documentNo(prefix: string) {
-  return `${prefix}-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${randomUUID().slice(0, 8).toUpperCase()}`;
 }
 
 function redirectWithError(path: string, message: string): never {
@@ -225,11 +220,16 @@ export async function createTransfer(formData: FormData) {
   }
 
   const company = await getDefaultCompany();
-  const transferNo = documentNo("TR");
+  let transferNo = "";
   let transferId: string | undefined;
 
   try {
     await db.transaction(async (tx) => {
+      transferNo = await generateCompanyDocumentNo(tx, {
+        companyId: company.id,
+        table: "transfers",
+        prefix: "TR",
+      });
       const [owner] = await tx
         .select({ id: owners.id })
         .from(owners)
@@ -407,7 +407,11 @@ export async function dispatchTransfer(formData: FormData) {
         .insert(stockMovements)
         .values({
           companyId: company.id,
-          movementNo: documentNo("TR-DIS"),
+          movementNo: await generateCompanyDocumentNo(tx, {
+            companyId: company.id,
+            table: "stock_movements",
+            prefix: "TR-DIS",
+          }),
           movementType: "transfer",
           status: "posted",
           fromLocationId: transfer.fromLocationId,
@@ -596,7 +600,11 @@ export async function receiveTransfer(formData: FormData) {
         .insert(stockMovements)
         .values({
           companyId: company.id,
-          movementNo: documentNo("TR-REC"),
+          movementNo: await generateCompanyDocumentNo(tx, {
+            companyId: company.id,
+            table: "stock_movements",
+            prefix: "TR-REC",
+          }),
           movementType: "transfer",
           status: "posted",
           fromLocationId: transfer.transitLocationId,

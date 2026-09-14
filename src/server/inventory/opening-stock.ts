@@ -1,11 +1,12 @@
 import "server-only";
 
-import { createHash, randomUUID } from "node:crypto";
+import { createHash } from "node:crypto";
 
 import { and, eq, isNull, sql } from "drizzle-orm";
 
 import { getDefaultCompany, majorToMinor } from "@/server/catalog/products";
 import { db } from "@/server/db/client";
+import { generateCompanyDocumentNo } from "@/server/db/code-generator";
 import {
   auditLogs,
   locations,
@@ -267,9 +268,12 @@ export async function commitOpeningStockImport(payload: OpeningStockCommitPayloa
     throw new Error("Only a valid preview can be imported.");
   }
 
-  const movementNo = `OS-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${randomUUID().slice(0, 8).toUpperCase()}`;
-
   return db.transaction(async (tx) => {
+    const movementNo = await generateCompanyDocumentNo(tx, {
+      companyId: company.id,
+      table: "stock_movements",
+      prefix: "OS",
+    });
     const [firstLocation] = await tx
       .select({ id: locations.id })
       .from(locations)

@@ -10,7 +10,7 @@ import { z } from "zod";
 import { getDefaultCompany, majorToMinor, uniqueViolationMessage } from "@/server/catalog/products";
 import { requirePermission } from "@/server/auth/session";
 import { db } from "@/server/db/client";
-import { generateCompanyCode } from "@/server/db/code-generator";
+import { generateCompanyCode, generateCompanyDocumentNo } from "@/server/db/code-generator";
 import {
   auditLogs,
   goodsReceiptLines,
@@ -950,7 +950,11 @@ export async function confirmPurchaseOrder(formData: FormData) {
         .limit(1);
 
       if (!existingReceipt && remainingLines.length > 0) {
-        const receiptNo = movementNo("GR");
+        const receiptNo = await generateCompanyDocumentNo(tx, {
+          companyId: company.id,
+          table: "goods_receipts",
+          prefix: "GR",
+        });
         const hasSerialLines = remainingLines.some((line) => line.trackingMode === "serial");
 
         if (hasSerialLines) {
@@ -983,7 +987,11 @@ export async function confirmPurchaseOrder(formData: FormData) {
           );
           notice = "Purchase order confirmed. Draft receipt created for serial assignment.";
         } else {
-          const stockMoveNo = movementNo("PR");
+          const stockMoveNo = await generateCompanyDocumentNo(tx, {
+            companyId: company.id,
+            table: "stock_movements",
+            prefix: "PR",
+          });
           const [movement] = await tx
             .insert(stockMovements)
             .values({
@@ -1198,12 +1206,22 @@ export async function postGoodsReceipt(formData: FormData) {
 
   const company = await getDefaultCompany();
   const supplierLocation = await getOrCreatePartnerStockLocation(company.id, "supplier");
-  let receiptNo = movementNo("GR");
-  const stockMoveNo = movementNo("PR");
+  let receiptNo = "";
+  let stockMoveNo = "";
   let postedReceiptId: string | undefined;
 
   try {
     await db.transaction(async (tx) => {
+      receiptNo = await generateCompanyDocumentNo(tx, {
+        companyId: company.id,
+        table: "goods_receipts",
+        prefix: "GR",
+      });
+      stockMoveNo = await generateCompanyDocumentNo(tx, {
+        companyId: company.id,
+        table: "stock_movements",
+        prefix: "PR",
+      });
       const [order] = await tx
         .select({
           id: purchaseOrders.id,

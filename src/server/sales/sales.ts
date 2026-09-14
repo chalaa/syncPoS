@@ -615,7 +615,7 @@ export async function getSalesOrderDetail(id: string): Promise<SalesOrderDetail 
     return null;
   }
 
-  const [lineRows, [deliveryCount], [invoiceCount], [paymentCount], [returnCount]] = await Promise.all([
+  const [lineRows, [deliveryCount], [draftDeliveryCount], [invoiceCount], [paymentCount], [returnCount]] = await Promise.all([
     db.execute<SalesOrderDetailLine>(sql`
       select
         sol.id as "id",
@@ -652,6 +652,7 @@ export async function getSalesOrderDetail(id: string): Promise<SalesOrderDetail 
       order by sol.line_no
     `),
     db.select({ count: sql<number>`count(*)::int` }).from(deliveries).where(and(eq(deliveries.salesOrderId, id), isNull(deliveries.deletedAt))),
+    db.select({ count: sql<number>`count(*)::int` }).from(deliveries).where(and(eq(deliveries.salesOrderId, id), eq(deliveries.status, "draft"), isNull(deliveries.deletedAt))),
     db.select({ count: sql<number>`count(*)::int` }).from(customerInvoices).where(and(eq(customerInvoices.salesOrderId, id), isNull(customerInvoices.deletedAt))),
     db.execute<{ count: number }>(sql`
       select count(distinct p.id)::int as "count"
@@ -715,6 +716,7 @@ export async function getSalesOrderDetail(id: string): Promise<SalesOrderDetail 
   return {
     ...order,
     deliveryCount: deliveryCount?.count ?? 0,
+    draftDeliveryCount: draftDeliveryCount?.count ?? 0,
     invoiceCount: invoiceCount?.count ?? 0,
     paymentCount: paymentCount?.count ?? 0,
     returnCount: returnCount?.count ?? 0,

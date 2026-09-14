@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { verifyPaymentLine } from "@/app/admin/payments/actions";
 import {
   cancelSupplierPayment,
   postSupplierPayment,
@@ -69,6 +70,8 @@ export default async function PaymentDetailPage({ params, searchParams }: Paymen
                 reference={payment.reference}
                 notes={payment.notes}
                 paymentLines={payment.lines}
+                verifyAction={verifyPaymentLine}
+                returnPath={`/admin/purchasing/payments/${payment.id}`}
               />
             ) : null}
             {isSupplierPayment && payment.status === "draft" ? (
@@ -144,6 +147,10 @@ export default async function PaymentDetailPage({ params, searchParams }: Paymen
             <p className="mt-1 text-sm font-medium">{payment.reference ?? "-"}</p>
           </div>
           <div>
+            <p className="text-xs font-medium uppercase text-muted-foreground">Verification Policy</p>
+            <p className="mt-1 text-sm font-medium">Advisory; unverified lines can still post</p>
+          </div>
+          <div>
             <p className="text-xs font-medium uppercase text-muted-foreground">Posted At</p>
             <p className="mt-1 text-sm font-medium">{payment.postedAt ?? "-"}</p>
           </div>
@@ -187,6 +194,8 @@ export default async function PaymentDetailPage({ params, searchParams }: Paymen
                 <th className="px-3 py-2">Account</th>
                 <th className="px-3 py-2">Reference</th>
                 <th className="px-3 py-2">Note</th>
+                <th className="px-3 py-2">Verification</th>
+                <th className="px-3 py-2 text-right">Verified Amount</th>
                 <th className="px-3 py-2 text-right">Amount</th>
               </tr>
             </thead>
@@ -197,6 +206,23 @@ export default async function PaymentDetailPage({ params, searchParams }: Paymen
                   <td className="px-3 py-3">{line.paymentAccountName}</td>
                   <td className="px-3 py-3">{line.reference ?? "-"}</td>
                   <td className="px-3 py-3">{line.note ?? "-"}</td>
+                  <td className="px-3 py-3">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <VerificationStatus status={line.verificationStatus} message={line.verificationMessage} />
+                      {payment.status === "draft" && line.verifyEtEnabled ? (
+                        <form action={verifyPaymentLine}>
+                          <input type="hidden" name="paymentLineId" value={line.id} />
+                          <input type="hidden" name="returnPath" value={`/admin/purchasing/payments/${payment.id}`} />
+                          <Button size="sm" variant="outline">Verify</Button>
+                        </form>
+                      ) : null}
+                    </div>
+                  </td>
+                  <td className="px-3 py-3 text-right">
+                    {line.verifiedAmountMinor !== null
+                      ? displayPaymentMoney(line.verifiedAmountMinor, line.verifiedCurrencyCode ?? line.currencyCode)
+                      : "-"}
+                  </td>
                   <td className="px-3 py-3 text-right">{displayPaymentMoney(line.amountMinor, line.currencyCode)}</td>
                 </tr>
               ))}
@@ -244,5 +270,26 @@ export default async function PaymentDetailPage({ params, searchParams }: Paymen
         </div>
       </section>
     </PageShell>
+  );
+}
+
+function VerificationStatus({
+  status,
+  message,
+}: {
+  status: string;
+  message: string | null;
+}) {
+  const label = status.replace(/_/g, " ");
+  const className = status === "verified"
+    ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+    : status === "failed"
+      ? "border-destructive/30 bg-destructive/5 text-destructive"
+      : "border-border bg-muted/40 text-muted-foreground";
+
+  return (
+    <span title={message ?? undefined} className={`rounded-md border px-2 py-1 text-xs font-medium capitalize ${className}`}>
+      {label}
+    </span>
   );
 }

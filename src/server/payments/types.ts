@@ -27,6 +27,9 @@ export type PaymentAccountRow = {
   accountNumber: string | null;
   openingBalanceMinor: number;
   currencyCode: string;
+  verifyEtEnabled: boolean;
+  verifyEtBank: string | null;
+  verifyEtSettlementAccount: string | null;
   isActive: boolean;
   notes: string | null;
   deletedAt: Date | null;
@@ -48,6 +51,9 @@ export type PaymentAccountOption = {
   paymentMethodName: string;
   requiresReference: boolean;
   currencyCode: string;
+  verifyEtEnabled: boolean;
+  verifyEtBank: string | null;
+  verifyEtSettlementAccount: string | null;
 };
 
 export type PaymentListRow = {
@@ -93,6 +99,12 @@ export type PaymentLineRow = {
   currencyCode: string;
   reference: string | null;
   note: string | null;
+  verifyEtEnabled: boolean;
+  verificationStatus: "not_required" | "pending" | "verified" | "failed" | "not_verified";
+  verificationMessage: string | null;
+  verifiedAmountMinor: number | null;
+  verifiedCurrencyCode: string | null;
+  verifiedAt: string | null;
 };
 
 export type PaymentDetail = PaymentListRow & {

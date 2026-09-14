@@ -29,12 +29,14 @@ import {
   formatStockLocationType,
   stockLocationTypeOptions,
   type StockLocationRecord,
+  type StockLocationUserOption,
 } from "@/server/inventory/location-types";
 
 type LocationMutation = (formData: FormData) => Promise<void>;
 
 type LocationManagerProps = {
   records: StockLocationRecord[];
+  users: StockLocationUserOption[];
   query: string;
   showDeleted: boolean;
   notice?: string;
@@ -51,13 +53,17 @@ function LocationForm({
   title,
   action,
   record,
+  users,
   returnPath,
 }: {
   title: string;
   action: LocationMutation;
   record?: StockLocationRecord;
+  users: StockLocationUserOption[];
   returnPath: string;
 }) {
+  const selectedApproverIds = new Set(record?.approverIds ?? []);
+
   return (
     <form action={action} className="flex flex-col gap-4">
       <DialogHeader>
@@ -70,16 +76,11 @@ function LocationForm({
       <input type="hidden" name="returnPath" value={returnPath} />
       {record ? <input type="hidden" name="id" value={record.id} /> : null}
 
-      <div className="grid gap-4 sm:grid-cols-[0.7fr_1fr]">
-        <label className="flex flex-col gap-1 text-sm font-medium">
-          Code
-          <input name="code" placeholder={record ? undefined : "Auto"} defaultValue={record?.code} className={inputClass} />
-        </label>
-        <label className="flex flex-col gap-1 text-sm font-medium">
-          Name
-          <input name="name" required defaultValue={record?.name} className={inputClass} />
-        </label>
-      </div>
+      <label className="flex flex-col gap-1 text-sm font-medium">
+        Name
+        <input name="name" required defaultValue={record?.name} className={inputClass} />
+      </label>
+      {record ? <input type="hidden" name="code" value={record.code} /> : null}
 
       <label className="flex flex-col gap-1 text-sm font-medium">
         Type
@@ -105,6 +106,33 @@ function LocationForm({
           className={textareaClass}
         />
       </label>
+
+      <div className="grid gap-2 text-sm font-medium">
+        Approvers
+        <div className="max-h-44 overflow-y-auto rounded-md border border-input bg-background p-2">
+          {users.length === 0 ? (
+            <p className="px-2 py-3 text-sm text-muted-foreground">No active users found.</p>
+          ) : (
+            <div className="grid gap-1">
+              {users.map((user) => (
+                <label key={user.id} className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm font-normal hover:bg-accent">
+                  <input
+                    type="checkbox"
+                    name="approverIds"
+                    value={user.id}
+                    defaultChecked={selectedApproverIds.has(user.id)}
+                    className="size-4 rounded border-input"
+                  />
+                  <span className="min-w-0">
+                    <span className="block truncate font-medium">{user.username}</span>
+                    {user.email ? <span className="block truncate text-xs text-muted-foreground">{user.email}</span> : null}
+                  </span>
+                </label>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
 
       <div className="grid gap-3 sm:grid-cols-3">
         <label className="flex items-center gap-2 text-sm font-medium">
@@ -152,12 +180,14 @@ function LocationDialog({
   label,
   action,
   record,
+  users,
   returnPath,
   children,
 }: {
   label: string;
   action: LocationMutation;
   record?: StockLocationRecord;
+  users: StockLocationUserOption[];
   returnPath: string;
   children: ReactNode;
 }) {
@@ -169,6 +199,7 @@ function LocationDialog({
           title={label}
           action={action}
           record={record}
+          users={users}
           returnPath={returnPath}
         />
       </DialogContent>
@@ -178,6 +209,7 @@ function LocationDialog({
 
 export function LocationManager({
   records,
+  users,
   query,
   showDeleted,
   notice,
@@ -193,6 +225,7 @@ export function LocationManager({
           <LocationDialog
             label="New location"
             action={createStockLocation}
+            users={users}
             returnPath={returnPath}
           >
             <Button size="sm">
@@ -238,10 +271,11 @@ export function LocationManager({
             <thead className="border-b border-border bg-muted/50 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               <tr>
                 <th className="px-4 py-3">Code</th>
-                <th className="px-4 py-3">Location Name</th>
-                <th className="px-4 py-3">Facility Type</th>
-                <th className="px-4 py-3">Offline Sales</th>
-                <th className="px-4 py-3">Negative Stock</th>
+                <th className="px-4 py-3">Location</th>
+                <th className="px-4 py-3">Type</th>
+                <th className="px-4 py-3">Offline</th>
+                <th className="px-4 py-3">Negative</th>
+                <th className="px-4 py-3">Approvers</th>
                 <th className="px-4 py-3">Status</th>
                 <th className="px-4 py-3 text-right">Actions</th>
               </tr>
@@ -264,8 +298,21 @@ export function LocationManager({
                   <td className="px-4 py-3 capitalize text-foreground">
                     {formatStockLocationType(record.locationType)}
                   </td>
-                  <td className="px-4 py-3 text-foreground">{record.offlineSalesEnabled ? "Yes" : "No"}</td>
-                  <td className="px-4 py-3 text-foreground">{record.allowNegativeStock ? "Yes" : "No"}</td>
+                  <td className="px-4 py-3">{record.offlineSalesEnabled ? "Yes" : "No"}</td>
+                  <td className="px-4 py-3">{record.allowNegativeStock ? "Yes" : "No"}</td>
+                  <td className="px-4 py-3">
+                    {record.approverNames.length > 0 ? (
+                      <div className="flex max-w-64 flex-wrap gap-1">
+                        {record.approverNames.map((name) => (
+                          <span key={name} className="rounded-md bg-muted px-2 py-1 text-xs font-medium">
+                            {name}
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <span className="text-muted-foreground">None</span>
+                    )}
+                  </td>
                   <td className="px-4 py-3">
                     <StatusBadge status={record.isActive ? "active" : "inactive"} />
                   </td>
@@ -277,6 +324,7 @@ export function LocationManager({
                             label={`Edit ${record.name}`}
                             action={updateStockLocation}
                             record={record}
+                            users={users}
                             returnPath={returnPath}
                           >
                             <Button variant="outline" size="sm" className="h-7 text-xs">
@@ -309,7 +357,7 @@ export function LocationManager({
               ))}
               {records.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-12 text-center text-muted-foreground">
+                  <td colSpan={8} className="px-4 py-10 text-center text-muted-foreground">
                     No locations found.
                   </td>
                 </tr>

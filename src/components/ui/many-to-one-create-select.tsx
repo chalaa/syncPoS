@@ -116,9 +116,9 @@ export function ManyToOneCreateSelect({
     }
 
     function closeFloatingList(event: Event) {
-      const target = event.target as Node;
+      const target = event.target;
 
-      if (dropdownRef.current?.contains(target)) {
+      if (target instanceof Node && dropdownRef.current?.contains(target)) {
         return;
       }
 
@@ -126,9 +126,9 @@ export function ManyToOneCreateSelect({
     }
 
     function closeWhenClickOutside(event: PointerEvent) {
-      const target = event.target as Node;
+      const target = event.target;
 
-      if (rootRef.current?.contains(target) || dropdownRef.current?.contains(target)) {
+      if (target instanceof Node && (rootRef.current?.contains(target) || dropdownRef.current?.contains(target))) {
         return;
       }
 
@@ -153,6 +153,7 @@ export function ManyToOneCreateSelect({
     setIsOpen(false);
     setDropdownStyle(undefined);
     setError(null);
+    inputRef.current?.blur();
   }
 
   function openSelectionList() {
@@ -181,6 +182,7 @@ export function ManyToOneCreateSelect({
         setIsOpen(false);
         setDropdownStyle(undefined);
         setIsDialogOpen(false);
+        inputRef.current?.blur();
       } catch (caught) {
         setError(caught instanceof Error ? caught.message : `Could not create ${entityLabel.toLowerCase()}.`);
       }
@@ -261,6 +263,21 @@ export function ManyToOneCreateSelect({
             setIsOpen(true);
           }}
           onFocus={openSelectionList}
+          onPointerDown={() => {
+            if (!isOpen) {
+              openSelectionList();
+            }
+          }}
+          onMouseDown={() => {
+            if (!isOpen) {
+              openSelectionList();
+            }
+          }}
+          onClick={() => {
+            if (!isOpen) {
+              openSelectionList();
+            }
+          }}
           placeholder={selectedLabel || placeholder}
           className={cn(inputClass, "w-full pl-9", fieldError ? "border-destructive focus-visible:border-destructive" : "")}
         />

@@ -98,6 +98,8 @@ export type InventoryOperationDetailLine = {
   trackingMode: string;
   serialNo: string | null;
   lotNo: string | null;
+  fromLocationId: string | null;
+  toLocationId: string | null;
   fromLocationCode: string | null;
   toLocationCode: string | null;
   quantity: string;
@@ -115,6 +117,8 @@ export type InventoryOperationDetail = {
   sourceType: string | null;
   sourceId: string | null;
   sourceNo: string | null;
+  fromLocationId: string | null;
+  toLocationId: string | null;
   fromLocationCode: string | null;
   toLocationCode: string | null;
   postedAt: Date | null;

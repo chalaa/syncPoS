@@ -11,7 +11,7 @@ import { minorToDisplay } from "@/lib/catalog-utils";
 import { requirePermission } from "@/server/auth/session";
 import { getDefaultCompany, majorToMinor, uniqueViolationMessage } from "@/server/catalog/products";
 import { db } from "@/server/db/client";
-import { generateCompanyCode } from "@/server/db/code-generator";
+import { generateCompanyCode, generateCompanyDocumentNo } from "@/server/db/code-generator";
 import {
   auditLogs,
   customerInvoiceLines,
@@ -19,6 +19,7 @@ import {
   customerInvoices,
   deliveries,
   deliveryLines,
+  locationApprovers,
   paymentAllocations,
   payments,
   owners,
@@ -40,8 +41,10 @@ import {
   warrantyRegistrations,
 } from "@/server/db/schema";
 import { getOrCreatePartnerStockLocation } from "@/server/inventory/partner-locations";
+import { approveStockOutApprovals, requireStockOutApproval } from "@/server/inventory/stock-approvals";
 import { paymentLinesTotal, replacePaymentLines, resolvePaymentLines } from "@/server/payments/payment-lines";
 import { getCustomerInvoicePaymentSummary, getSalesOrderPaymentSummary } from "@/server/payments/payments";
+import { getPaymentVerificationWarnings } from "@/server/payments/verify-et";
 
 const salesOrderHeaderSchema = z.object({
   salesOrderId: z.string().uuid().optional(),
@@ -86,6 +89,11 @@ const createDeliverySchema = z.object({
 
 const postDeliverySchema = z.object({
   deliveryId: z.string().uuid(),
+});
+
+const approvePostDeliverySchema = z.object({
+  deliveryId: z.string().uuid(),
+  approvalIds: z.array(z.string().uuid()).default([]),
 });
 
 const updateDeliverySourceLocationSchema = z.object({
@@ -182,6 +190,605 @@ function addYears(value: Date, years: number) {
 
 function formatMoneyForError(valueMinor: number, currencyCode: string) {
   return `${currencyCode} ${minorToDisplay(valueMinor)}`;
+}
+
+type DeliveryDraftGroupLine = {
+  id: string;
+  lineNo: number;
+  sourceLocationId: string | null;
+  productId: string;
+  unitId: string;
+  currencyCode: string;
+  selectedQuantity: number;
+  serialNo?: string | null;
+  lotNo?: string | null;
+};
+
+type DeliveryDraftOrder = {
+  id: string;
+  orderNo: string;
+  customerId: string;
+  sourceLocationId: string | null;
+};
+
+type SalesTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+async function deliveryApprovalGroupKey(
+  tx: SalesTransaction,
+  params: {
+    companyId: string;
+    userId: string;
+    sourceLocationId: string;
+  },
+) {
+  const approvers = await tx
+    .select({ userId: locationApprovers.userId })
+    .from(locationApprovers)
+    .where(
+      and(
+        eq(locationApprovers.companyId, params.companyId),
+        eq(locationApprovers.locationId, params.sourceLocationId),
+        eq(locationApprovers.canApproveOutgoing, true),
+        eq(locationApprovers.isActive, true),
+        isNull(locationApprovers.deletedAt),
+      ),
+    );
+
+  if (approvers.length === 0 || approvers.some((approver) => approver.userId === params.userId)) {
+    return "direct";
+  }
+
+  return `approval:${approvers.map((approver) => approver.userId).sort().join(",")}`;
+}
+
+async function postDraftDeliveryInsideTransaction(
+  tx: SalesTransaction,
+  params: {
+    companyId: string;
+    userId: string;
+    deliveryId: string;
+    customerLocationId: string;
+  },
+) {
+  const movementNo = await generateCompanyDocumentNo(tx, {
+    companyId: params.companyId,
+    table: "stock_movements",
+    prefix: "SD",
+  });
+  const [delivery] = await tx
+    .select({
+      id: deliveries.id,
+      deliveryNo: deliveries.deliveryNo,
+      status: deliveries.status,
+      salesOrderId: deliveries.salesOrderId,
+      customerId: deliveries.customerId,
+      ownerId: salesOrders.ownerId,
+      sourceLocationId: deliveries.sourceLocationId,
+    })
+    .from(deliveries)
+    .innerJoin(salesOrders, eq(deliveries.salesOrderId, salesOrders.id))
+    .where(and(eq(deliveries.id, params.deliveryId), eq(deliveries.companyId, params.companyId), isNull(deliveries.deletedAt)))
+    .limit(1);
+
+  if (!delivery) {
+    throw new Error("Delivery does not exist.");
+  }
+
+  if (delivery.status !== "draft") {
+    throw new Error("Only draft deliveries can be posted.");
+  }
+
+  const lines = await tx
+    .select({
+      id: deliveryLines.id,
+      lineNo: deliveryLines.lineNo,
+      salesOrderLineId: deliveryLines.salesOrderLineId,
+      ownerId: salesOrderLines.ownerId,
+      productId: deliveryLines.productId,
+      unitId: deliveryLines.unitId,
+      quantityDelivered: deliveryLines.quantityDelivered,
+      currencyCode: deliveryLines.currencyCode,
+      quantityOrdered: salesOrderLines.quantityOrdered,
+      salesQuantityDelivered: salesOrderLines.quantityDelivered,
+      salesQuantityReserved: salesOrderLines.quantityReserved,
+      trackingMode: products.trackingMode,
+      sku: products.sku,
+      serialNo: deliveryLines.serialNo,
+      lotNo: deliveryLines.lotNo,
+    })
+    .from(deliveryLines)
+    .innerJoin(products, eq(deliveryLines.productId, products.id))
+    .leftJoin(salesOrderLines, eq(deliveryLines.salesOrderLineId, salesOrderLines.id))
+    .where(and(eq(deliveryLines.deliveryId, delivery.id), isNull(deliveryLines.deletedAt)))
+    .orderBy(sql`${deliveryLines.lineNo} asc`);
+  const selectedLines = lines.filter((line) => Number(line.quantityDelivered) > 0);
+
+  if (selectedLines.length === 0) {
+    throw new Error("At least one delivery quantity is required.");
+  }
+
+  await requireStockOutApproval(tx, {
+    companyId: params.companyId,
+    requestedBy: params.userId,
+    sourceType: "sales_delivery",
+    sourceId: delivery.id,
+    sourceNo: delivery.deliveryNo,
+    sourceLocationIds: [delivery.sourceLocationId],
+    reason: "Sales delivery removes stock from an approval-controlled location.",
+    metadata: {
+      deliveryNo: delivery.deliveryNo,
+      salesOrderId: delivery.salesOrderId,
+      lineCount: selectedLines.length,
+    },
+  });
+
+  const [movement] = await tx
+    .insert(stockMovements)
+    .values({
+      companyId: params.companyId,
+      ownerId: delivery.ownerId,
+      movementNo,
+      movementType: "sale_delivery",
+      status: "posted",
+      fromLocationId: delivery.sourceLocationId,
+      toLocationId: params.customerLocationId,
+      sourceType: "delivery",
+      sourceId: delivery.id,
+      sourceNo: delivery.deliveryNo,
+      postedAt: new Date(),
+      postedBy: params.userId,
+      notes: `Sales delivery ${delivery.deliveryNo}`,
+    })
+    .returning({ id: stockMovements.id });
+
+  for (const line of selectedLines) {
+    const lineOwnerId = line.ownerId ?? delivery.ownerId;
+
+    if (!lineOwnerId) {
+      throw new Error(`Owner is required on delivery line ${line.lineNo}.`);
+    }
+
+    const deliverQuantity = Number(line.quantityDelivered);
+    const remaining = Number(line.quantityOrdered ?? 0) - Number(line.salesQuantityDelivered ?? 0);
+
+    if (deliverQuantity <= 0) {
+      continue;
+    }
+
+    if (deliverQuantity > remaining) {
+      throw new Error(`Delivery quantity for ${line.sku} is greater than the remaining sales order quantity.`);
+    }
+
+    if (line.trackingMode === "serial" && (!line.serialNo || deliverQuantity !== 1)) {
+      throw new Error(`Serialized product ${line.sku} requires quantity 1 and a serial number.`);
+    }
+
+    if (line.trackingMode === "lot" && !line.lotNo) {
+      throw new Error(`Lot tracked product ${line.sku} requires a lot number.`);
+    }
+
+    let productSerialId: string | null = null;
+    let productLotId: string | null = null;
+
+    if (line.trackingMode === "serial" && line.serialNo) {
+      const [serial] = await tx
+        .select({
+          id: productSerials.id,
+          status: productSerials.status,
+          currentLocationId: productSerials.currentLocationId,
+          landedUnitCostMinor: productSerials.landedUnitCostMinor,
+        })
+        .from(productSerials)
+        .where(and(eq(productSerials.productId, line.productId), eq(productSerials.serialNo, line.serialNo), isNull(productSerials.deletedAt)))
+        .limit(1);
+
+      if (!serial || serial.currentLocationId !== delivery.sourceLocationId || !["available", "reserved"].includes(serial.status)) {
+        throw new Error(`Serial ${line.serialNo} is not available in the delivery location.`);
+      }
+
+      const [postedSerialDelivery] = await tx.execute<{ id: string }>(sql`
+        select dl.id
+        from delivery_lines dl
+        inner join deliveries d on d.id = dl.delivery_id
+        where dl.product_serial_id = ${serial.id}
+          and dl.deleted_at is null
+          and d.deleted_at is null
+          and d.status = 'posted'
+        limit 1
+      `);
+
+      if (postedSerialDelivery) {
+        throw new Error(`Serial ${line.serialNo} has already been delivered.`);
+      }
+
+      productSerialId = serial.id;
+    }
+
+    if (line.trackingMode === "lot" && line.lotNo) {
+      const [lot] = await tx
+        .select({
+          id: productLots.id,
+          status: productLots.status,
+          currentLocationId: productLots.currentLocationId,
+          landedUnitCostMinor: productLots.landedUnitCostMinor,
+        })
+        .from(productLots)
+        .where(and(eq(productLots.productId, line.productId), eq(productLots.lotNo, line.lotNo), isNull(productLots.deletedAt)))
+        .limit(1);
+
+      if (!lot) {
+        throw new Error(`Lot ${line.lotNo} does not exist.`);
+      }
+
+      if (lot.currentLocationId !== delivery.sourceLocationId || !["available", "reserved"].includes(lot.status)) {
+        throw new Error(`Lot ${line.lotNo} is not available in the delivery location.`);
+      }
+
+      productLotId = lot.id;
+    }
+
+    const serialFilter = productSerialId
+      ? eq(stockBalances.productSerialId, productSerialId)
+      : isNull(stockBalances.productSerialId);
+    const lotFilter = productLotId
+      ? eq(stockBalances.productLotId, productLotId)
+      : isNull(stockBalances.productLotId);
+    const [balance] = await tx
+      .select({
+        id: stockBalances.id,
+        quantityOnHand: stockBalances.quantityOnHand,
+        quantityReserved: stockBalances.quantityReserved,
+        quantityAvailable: stockBalances.quantityAvailable,
+        averageCostMinor: stockBalances.averageCostMinor,
+      })
+      .from(stockBalances)
+      .where(
+        and(
+          eq(stockBalances.companyId, params.companyId),
+          eq(stockBalances.ownerId, lineOwnerId),
+          eq(stockBalances.locationId, delivery.sourceLocationId),
+          eq(stockBalances.productId, line.productId),
+          serialFilter,
+          lotFilter,
+          isNull(stockBalances.deletedAt),
+        ),
+      )
+      .limit(1);
+
+    if (!balance) {
+      throw new Error(`No stock balance exists for ${line.sku} in the delivery location.`);
+    }
+
+    const trackedBalanceSelected = Boolean(productSerialId || productLotId);
+    const reservedQuantity = Math.min(Number(line.salesQuantityReserved ?? 0), deliverQuantity);
+    const reservedFromSelectedBalance = Math.min(Number(balance.quantityReserved), reservedQuantity);
+    const reservedFromOrderBalance = trackedBalanceSelected ? reservedQuantity - reservedFromSelectedBalance : 0;
+    const availableForThisDelivery = Number(balance.quantityAvailable) + reservedFromSelectedBalance;
+
+    if (Number(balance.quantityOnHand) < deliverQuantity || availableForThisDelivery < deliverQuantity) {
+      throw new Error(`Insufficient stock available for ${line.sku}.`);
+    }
+
+    const nextOnHand = Number(balance.quantityOnHand) - deliverQuantity;
+    const nextReserved = Math.max(Number(balance.quantityReserved) - reservedFromSelectedBalance, 0);
+    const nextAvailable = nextOnHand - nextReserved;
+    const totalCostMinor = Math.round(deliverQuantity * balance.averageCostMinor);
+
+    if (nextOnHand < 0 || nextReserved < 0 || nextAvailable < 0) {
+      throw new Error(`Delivery would create negative stock for ${line.sku}.`);
+    }
+
+    await tx.insert(stockMovementLines).values({
+      stockMovementId: movement.id,
+      ownerId: lineOwnerId,
+      lineNo: line.lineNo,
+      productId: line.productId,
+      productSerialId,
+      productLotId,
+      fromLocationId: delivery.sourceLocationId,
+      toLocationId: params.customerLocationId,
+      unitId: line.unitId,
+      quantity: String(deliverQuantity),
+      totalCostMinor,
+      currencyCode: line.currencyCode,
+      notes: `Delivered on ${delivery.deliveryNo}`,
+    });
+
+    await tx
+      .update(stockBalances)
+      .set({
+        quantityOnHand: String(nextOnHand),
+        quantityReserved: String(nextReserved),
+        quantityAvailable: String(nextAvailable),
+        lastMovementAt: new Date(),
+        updatedAt: sql`now()`,
+      })
+      .where(eq(stockBalances.id, balance.id));
+
+    if (reservedFromOrderBalance > 0) {
+      const [reservationBalance] = await tx
+        .select({
+          id: stockBalances.id,
+          quantityOnHand: stockBalances.quantityOnHand,
+          quantityReserved: stockBalances.quantityReserved,
+        })
+        .from(stockBalances)
+        .where(
+          and(
+            eq(stockBalances.companyId, params.companyId),
+            eq(stockBalances.ownerId, lineOwnerId),
+            eq(stockBalances.locationId, delivery.sourceLocationId),
+            eq(stockBalances.productId, line.productId),
+            isNull(stockBalances.productSerialId),
+            isNull(stockBalances.productLotId),
+            isNull(stockBalances.deletedAt),
+          ),
+        )
+        .limit(1);
+
+      if (reservationBalance) {
+        const nextReservationBalanceReserved = Math.max(Number(reservationBalance.quantityReserved) - reservedFromOrderBalance, 0);
+        await tx
+          .update(stockBalances)
+          .set({
+            quantityReserved: String(nextReservationBalanceReserved),
+            quantityAvailable: String(Number(reservationBalance.quantityOnHand) - nextReservationBalanceReserved),
+            updatedAt: sql`now()`,
+          })
+          .where(eq(stockBalances.id, reservationBalance.id));
+      }
+    }
+
+    if (productSerialId) {
+      await tx
+        .update(productSerials)
+        .set({
+          status: "sold",
+          currentLocationId: null,
+          updatedAt: sql`now()`,
+        })
+        .where(eq(productSerials.id, productSerialId));
+
+      await tx.insert(serialOwnershipHistory).values({
+        companyId: params.companyId,
+        productSerialId,
+        partnerId: delivery.customerId,
+        ownershipType: "sale",
+        sourceType: "delivery",
+        sourceId: delivery.id,
+        sourceNo: delivery.deliveryNo,
+        notes: "Serial sold through delivery.",
+      });
+
+      const [existingWarranty] = await tx
+        .select({ id: warrantyRegistrations.id })
+        .from(warrantyRegistrations)
+        .where(and(eq(warrantyRegistrations.productSerialId, productSerialId), eq(warrantyRegistrations.status, "active"), isNull(warrantyRegistrations.deletedAt)))
+        .limit(1);
+
+      if (!existingWarranty) {
+        const startDate = new Date();
+        await tx.insert(warrantyRegistrations).values({
+          companyId: params.companyId,
+          productSerialId,
+          customerId: delivery.customerId,
+          salesOrderId: delivery.salesOrderId,
+          deliveryId: delivery.id,
+          warrantyNo: documentNo("WRT"),
+          status: "active",
+          startDate: dateOnly(startDate),
+          endDate: dateOnly(addYears(startDate, 1)),
+          notes: "Automatic warranty from serial sale.",
+        });
+
+        await tx.insert(serialOwnershipHistory).values({
+          companyId: params.companyId,
+          productSerialId,
+          partnerId: delivery.customerId,
+          ownershipType: "warranty_registration",
+          sourceType: "warranty_registration",
+          sourceId: delivery.id,
+          sourceNo: delivery.deliveryNo,
+          notes: "Warranty registered from delivery.",
+        });
+      }
+    }
+
+    const nextLineReserved = Math.max(Number(line.salesQuantityReserved ?? 0) - reservedQuantity, 0);
+    await tx
+      .update(deliveryLines)
+      .set({
+        productSerialId,
+        productLotId,
+        quantityDelivered: String(deliverQuantity),
+        unitCostMinor: balance.averageCostMinor,
+        totalCostMinor,
+        serialNo: line.serialNo ?? null,
+        lotNo: line.lotNo ?? null,
+        updatedAt: sql`now()`,
+      })
+      .where(eq(deliveryLines.id, line.id));
+
+    if (line.salesOrderLineId) {
+      await tx
+        .update(salesOrderLines)
+        .set({
+          quantityDelivered: sql`${salesOrderLines.quantityDelivered} + ${String(deliverQuantity)}`,
+          quantityReserved: String(nextLineReserved),
+          updatedAt: sql`now()`,
+        })
+        .where(eq(salesOrderLines.id, line.salesOrderLineId));
+
+      if (reservedQuantity > 0) {
+        const reservationUpdate =
+          nextLineReserved <= 0
+            ? {
+                status: "fulfilled" as const,
+                fulfilledAt: new Date(),
+                updatedAt: sql`now()`,
+              }
+            : {
+                quantity: String(nextLineReserved),
+                status: "active" as const,
+                fulfilledAt: null,
+                updatedAt: sql`now()`,
+              };
+
+        await tx
+          .update(stockReservations)
+          .set(reservationUpdate)
+          .where(
+            and(
+              eq(stockReservations.sourceType, "sales_order_line"),
+              eq(stockReservations.sourceId, line.salesOrderLineId),
+              eq(stockReservations.status, "active"),
+              isNull(stockReservations.deletedAt),
+            ),
+          );
+      }
+    }
+  }
+
+  const [remainingAfterDelivery] = await tx.execute<{ count: number }>(sql`
+    select count(*)::int as "count"
+    from sales_order_lines
+    where sales_order_id = ${delivery.salesOrderId}
+      and deleted_at is null
+      and quantity_delivered < quantity_ordered
+  `);
+
+  await tx
+    .update(deliveries)
+    .set({
+      status: "posted",
+      postedAt: new Date(),
+      postedBy: params.userId,
+      stockMovementId: movement.id,
+      updatedAt: sql`now()`,
+    })
+    .where(eq(deliveries.id, delivery.id));
+
+  await tx
+    .update(salesOrders)
+    .set({
+      status: remainingAfterDelivery?.count === 0 ? "delivered" : "partially_delivered",
+      updatedAt: sql`now()`,
+    })
+    .where(eq(salesOrders.id, delivery.salesOrderId));
+
+  await tx.insert(auditLogs).values({
+    companyId: params.companyId,
+    actorUserId: params.userId,
+    action: "delivery.post",
+    entityType: "delivery",
+    entityId: delivery.id,
+    severity: "info",
+    metadata: { deliveryNo: delivery.deliveryNo, movementNo },
+  });
+
+  return { salesOrderId: delivery.salesOrderId, movementNo };
+}
+
+async function createGroupedDraftDeliveries(
+  tx: SalesTransaction,
+  params: {
+    companyId: string;
+    userId: string;
+    order: DeliveryDraftOrder;
+    lines: DeliveryDraftGroupLine[];
+    notePrefix: string;
+    autoPostDirect?: boolean;
+    customerLocationId?: string;
+  },
+) {
+  const groups = new Map<string, { sourceLocationId: string; approvalKey: string; lines: DeliveryDraftGroupLine[] }>();
+
+  for (const line of params.lines.filter((item) => item.selectedQuantity > 0)) {
+    const sourceLocationId = line.sourceLocationId ?? params.order.sourceLocationId;
+
+    if (!sourceLocationId) {
+      throw new Error(`Source location is required on sales order line ${line.lineNo}.`);
+    }
+
+    const approvalKey = await deliveryApprovalGroupKey(tx, {
+      companyId: params.companyId,
+      userId: params.userId,
+      sourceLocationId,
+    });
+    const groupKey = `${sourceLocationId}:${approvalKey}`;
+    const group = groups.get(groupKey) ?? { sourceLocationId, approvalKey, lines: [] };
+
+    group.lines.push(line);
+    groups.set(groupKey, group);
+  }
+
+  const createdDeliveryIds: string[] = [];
+
+  for (const group of groups.values()) {
+    const deliveryNo = await generateCompanyDocumentNo(tx, {
+      companyId: params.companyId,
+      table: "deliveries",
+      prefix: "DO",
+    });
+    const [delivery] = await tx
+      .insert(deliveries)
+      .values({
+        companyId: params.companyId,
+        salesOrderId: params.order.id,
+        customerId: params.order.customerId,
+        sourceLocationId: group.sourceLocationId,
+        deliveryNo,
+        status: "draft",
+        notes: `${params.notePrefix} ${params.order.orderNo}.`,
+      })
+      .returning({ id: deliveries.id });
+
+    createdDeliveryIds.push(delivery.id);
+
+    await tx.insert(deliveryLines).values(
+      group.lines.map((line, index) => ({
+        deliveryId: delivery.id,
+        salesOrderLineId: line.id,
+        lineNo: index + 1,
+        productId: line.productId,
+        unitId: line.unitId,
+        quantityDelivered: String(line.selectedQuantity),
+        currencyCode: line.currencyCode,
+        serialNo: line.serialNo ?? null,
+        lotNo: line.lotNo ?? null,
+      })),
+    );
+
+    await tx.insert(auditLogs).values({
+      companyId: params.companyId,
+      actorUserId: params.userId,
+      action: "delivery.create",
+      entityType: "delivery",
+      entityId: delivery.id,
+      severity: "info",
+      metadata: {
+        deliveryNo,
+        orderNo: params.order.orderNo,
+        sourceLocationId: group.sourceLocationId,
+        lineCount: group.lines.length,
+      },
+    });
+
+    if (params.autoPostDirect && group.approvalKey === "direct") {
+      if (!params.customerLocationId) {
+        throw new Error("Customer stock location is required to auto-post delivery.");
+      }
+
+      await postDraftDeliveryInsideTransaction(tx, {
+        companyId: params.companyId,
+        userId: params.userId,
+        deliveryId: delivery.id,
+        customerLocationId: params.customerLocationId,
+      });
+    }
+  }
+
+  return createdDeliveryIds;
 }
 
 function redirectWithError(path: string, message: string): never {
@@ -868,6 +1475,7 @@ export async function confirmSalesOrder(formData: FormData) {
   }
 
   const company = await getDefaultCompany();
+  const customerLocation = await getOrCreatePartnerStockLocation(company.id, "customer");
 
   try {
     await db.transaction(async (tx) => {
@@ -1112,38 +1720,32 @@ export async function confirmSalesOrder(formData: FormData) {
         .limit(1);
 
       if (!existingDelivery) {
-        const deliveryNo = documentNo("DO");
-        const [delivery] = await tx
-          .insert(deliveries)
-          .values({
-            companyId: company.id,
-            salesOrderId: order.id,
-            customerId: order.customerId,
-            sourceLocationId: order.sourceLocationId,
-            deliveryNo,
-            status: "draft",
-            notes: `Draft delivery generated from ${order.orderNo}.`,
-          })
-          .returning({ id: deliveries.id });
-
-        const deliveryLineValues = lines
+        const deliveryLinesToCreate = lines
           .map((line) => {
             const quantityRemaining = Number(line.quantityOrdered) - Number(line.quantityDelivered);
 
             return {
-              deliveryId: delivery.id,
-              salesOrderLineId: line.id,
+              id: line.id,
               lineNo: line.lineNo,
+              sourceLocationId: line.sourceLocationId,
               productId: line.productId,
               unitId: line.unitId,
-              quantityDelivered: String(quantityRemaining),
+              selectedQuantity: quantityRemaining,
               currencyCode: line.currencyCode,
             };
           })
-          .filter((line) => Number(line.quantityDelivered) > 0);
+          .filter((line) => line.selectedQuantity > 0);
 
-        if (deliveryLineValues.length > 0) {
-          await tx.insert(deliveryLines).values(deliveryLineValues);
+        if (deliveryLinesToCreate.length > 0) {
+          await createGroupedDraftDeliveries(tx, {
+            companyId: company.id,
+            userId: user.id,
+            order,
+            lines: deliveryLinesToCreate,
+            notePrefix: "Draft delivery generated from",
+            autoPostDirect: true,
+            customerLocationId: customerLocation.id,
+          });
         }
       }
 
@@ -1177,7 +1779,7 @@ export async function createDeliveryFromSalesOrder(formData: FormData) {
   }
 
   const company = await getDefaultCompany();
-  const deliveryNo = documentNo("DO");
+  const customerLocation = await getOrCreatePartnerStockLocation(company.id, "customer");
   const inputLines = parseCreateDeliveryLines(formData);
   let createdDeliveryId: string | undefined;
 
@@ -1189,6 +1791,7 @@ export async function createDeliveryFromSalesOrder(formData: FormData) {
           orderNo: salesOrders.orderNo,
           status: salesOrders.status,
           customerId: salesOrders.customerId,
+          ownerId: salesOrders.ownerId,
           sourceLocationId: salesOrders.sourceLocationId,
           currencyCode: salesOrders.currencyCode,
         })
@@ -1213,6 +1816,7 @@ export async function createDeliveryFromSalesOrder(formData: FormData) {
           id: salesOrderLines.id,
           lineNo: salesOrderLines.lineNo,
           ownerId: salesOrderLines.ownerId,
+          sourceLocationId: salesOrderLines.sourceLocationId,
           productId: salesOrderLines.productId,
           unitId: salesOrderLines.unitId,
           quantityOrdered: salesOrderLines.quantityOrdered,
@@ -1259,43 +1863,16 @@ export async function createDeliveryFromSalesOrder(formData: FormData) {
         throw new Error("At least one delivery quantity is required.");
       }
 
-      const [delivery] = await tx
-        .insert(deliveries)
-        .values({
-          companyId: company.id,
-          salesOrderId: order.id,
-          customerId: order.customerId,
-          sourceLocationId: order.sourceLocationId,
-          deliveryNo,
-          status: "draft",
-          notes: `Delivery for ${order.orderNo}`,
-        })
-        .returning({ id: deliveries.id });
-      createdDeliveryId = delivery.id;
-
-      await tx.insert(deliveryLines).values(
-        selectedLines.map((line, index) => ({
-          deliveryId: delivery.id,
-          salesOrderLineId: line.id,
-          lineNo: index + 1,
-          productId: line.productId,
-          unitId: line.unitId,
-          quantityDelivered: String(line.selectedQuantity),
-          currencyCode: line.currencyCode,
-          serialNo: line.serialNo,
-          lotNo: line.lotNo,
-        })),
-      );
-
-      await tx.insert(auditLogs).values({
+      const createdDeliveryIds = await createGroupedDraftDeliveries(tx, {
         companyId: company.id,
-        actorUserId: user.id,
-        action: "delivery.create",
-        entityType: "delivery",
-        entityId: delivery.id,
-        severity: "info",
-        metadata: { deliveryNo, orderNo: order.orderNo },
+        userId: user.id,
+        order,
+        lines: selectedLines,
+        notePrefix: "Delivery for",
+        autoPostDirect: true,
+        customerLocationId: customerLocation.id,
       });
+      createdDeliveryId = createdDeliveryIds[0];
     });
   } catch (error) {
     redirectWithError(`/admin/sales/${parsed.data.salesOrderId}`, error instanceof Error ? error.message : "Could not create delivery.");
@@ -1323,11 +1900,16 @@ export async function postDelivery(formData: FormData) {
 
   const company = await getDefaultCompany();
   const customerLocation = await getOrCreatePartnerStockLocation(company.id, "customer");
-  const movementNo = documentNo("SD");
+  let movementNo = "";
   let salesOrderId: string | undefined;
 
   try {
     await db.transaction(async (tx) => {
+      movementNo = await generateCompanyDocumentNo(tx, {
+        companyId: company.id,
+        table: "stock_movements",
+        prefix: "SD",
+      });
       const [delivery] = await tx
         .select({
           id: deliveries.id,
@@ -1474,6 +2056,21 @@ export async function postDelivery(formData: FormData) {
       if (selectedLines.length === 0) {
         throw new Error("At least one delivery quantity is required.");
       }
+
+      await requireStockOutApproval(tx, {
+        companyId: company.id,
+        requestedBy: user.id,
+        sourceType: "sales_delivery",
+        sourceId: delivery.id,
+        sourceNo: delivery.deliveryNo,
+        sourceLocationIds: [delivery.sourceLocationId],
+        reason: "Sales delivery removes stock from an approval-controlled location.",
+        metadata: {
+          deliveryNo: delivery.deliveryNo,
+          salesOrderId: delivery.salesOrderId,
+          lineCount: selectedLines.length,
+        },
+      });
 
       const [movement] = await tx
         .insert(stockMovements)
@@ -1850,6 +2447,93 @@ export async function postDelivery(formData: FormData) {
   }
   revalidatePath(`/admin/sales/deliveries/${parsed.data.deliveryId}`);
   redirect(`/admin/sales/deliveries/${parsed.data.deliveryId}?notice=${encodeURIComponent("Delivery posted")}`);
+}
+
+export async function requestDeliveryApproval(formData: FormData) {
+  const user = await requirePermission("sales:orders:create");
+  const parsed = postDeliverySchema.safeParse({
+    deliveryId: formValue(formData, "deliveryId"),
+  });
+
+  if (!parsed.success) {
+    redirectWithError("/admin/sales?view=deliveries", "Delivery ID is required.");
+  }
+
+  const company = await getDefaultCompany();
+
+  try {
+    await db.transaction(async (tx) => {
+      const [delivery] = await tx
+        .select({
+          id: deliveries.id,
+          deliveryNo: deliveries.deliveryNo,
+          status: deliveries.status,
+          salesOrderId: deliveries.salesOrderId,
+          sourceLocationId: deliveries.sourceLocationId,
+        })
+        .from(deliveries)
+        .where(and(eq(deliveries.id, parsed.data.deliveryId), eq(deliveries.companyId, company.id), isNull(deliveries.deletedAt)))
+        .limit(1);
+
+      if (!delivery) {
+        throw new Error("Delivery does not exist.");
+      }
+
+      if (delivery.status !== "draft") {
+        throw new Error("Only draft deliveries can request approval.");
+      }
+
+      await requireStockOutApproval(tx, {
+        companyId: company.id,
+        requestedBy: user.id,
+        sourceType: "sales_delivery",
+        sourceId: delivery.id,
+        sourceNo: delivery.deliveryNo,
+        sourceLocationIds: [delivery.sourceLocationId],
+        reason: "Sales delivery removes stock from an approval-controlled location.",
+        metadata: {
+          deliveryNo: delivery.deliveryNo,
+          salesOrderId: delivery.salesOrderId,
+        },
+      });
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Could not request approval.";
+
+    if (!message.startsWith("Stock-out approval is required")) {
+      redirectWithError(`/admin/sales/deliveries/${parsed.data.deliveryId}`, message);
+    }
+  }
+
+  revalidatePath(`/admin/sales/deliveries/${parsed.data.deliveryId}`);
+  redirect(`/admin/sales/deliveries/${parsed.data.deliveryId}?notice=${encodeURIComponent("Delivery approval requested")}`);
+}
+
+export async function approveAndPostDelivery(formData: FormData) {
+  const user = await requirePermission("sales:orders:create");
+  const parsed = approvePostDeliverySchema.safeParse({
+    deliveryId: formValue(formData, "deliveryId"),
+    approvalIds: formData.getAll("approvalIds").filter((value): value is string => typeof value === "string"),
+  });
+
+  if (!parsed.success || parsed.data.approvalIds.length === 0) {
+    redirectWithError("/admin/sales?view=deliveries", "Pending approval is required.");
+  }
+
+  const company = await getDefaultCompany();
+
+  try {
+    await approveStockOutApprovals({
+      companyId: company.id,
+      userId: user.id,
+      approvalIds: parsed.data.approvalIds,
+      notes: "Approved from delivery page.",
+    });
+  } catch (error) {
+    redirectWithError(`/admin/sales/deliveries/${parsed.data.deliveryId}`, error instanceof Error ? error.message : "Could not approve delivery.");
+  }
+
+  return postDelivery(formData);
 }
 
 export async function updateDeliverySourceLocation(formData: FormData) {
@@ -2818,6 +3502,11 @@ export async function postCustomerPayment(formData: FormData) {
         }
       }
 
+      const verificationWarnings = await getPaymentVerificationWarnings(tx, {
+        companyId: company.id,
+        paymentId: payment.id,
+      });
+
       await tx
         .update(payments)
         .set({
@@ -2834,8 +3523,14 @@ export async function postCustomerPayment(formData: FormData) {
         action: "customer_payment.post",
         entityType: "payment",
         entityId: payment.id,
-        severity: "info",
-        metadata: { paymentNo: payment.paymentNo, customerInvoiceId, salesOrderId },
+        severity: verificationWarnings.length > 0 ? "warning" : "info",
+        metadata: {
+          paymentNo: payment.paymentNo,
+          customerInvoiceId,
+          salesOrderId,
+          verificationBypassed: verificationWarnings.length > 0,
+          verificationWarnings,
+        },
       });
     });
 

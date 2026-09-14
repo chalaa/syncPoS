@@ -1,7 +1,13 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { cancelDelivery, postDelivery, updateDeliverySourceLocation } from "@/app/admin/sales/actions";
+import {
+  approveAndPostDelivery,
+  cancelDelivery,
+  postDelivery,
+  requestDeliveryApproval,
+  updateDeliverySourceLocation,
+} from "@/app/admin/sales/actions";
 import { DeliverySourceLocationAutosave } from "@/app/admin/sales/deliveries/[id]/delivery-source-location-autosave";
 import { DeliveryOperationsForm } from "@/app/admin/sales/deliveries/[id]/delivery-operations-form";
 import { Alert } from "@/components/ui/alert";
@@ -10,6 +16,8 @@ import { Button, ButtonLink } from "@/components/ui/button";
 import { Notebook } from "@/components/ui/notebook";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
 import { requirePermission } from "@/server/auth/session";
+import { getDefaultCompany } from "@/server/catalog/products";
+import { getStockOutApprovalState } from "@/server/inventory/stock-approvals";
 import { displaySalesMoney, getDeliveryDetail, getSalesFormOptions } from "@/server/sales/sales";
 import type { SalesFormOption } from "@/server/sales/types";
 
@@ -25,16 +33,50 @@ function statusLabel(value: string) {
 }
 
 export default async function DeliveryDetailPage({ params, searchParams }: DeliveryDetailPageProps) {
-  await requirePermission("sales:orders:create");
+  const user = await requirePermission("sales:orders:create");
 
   const [{ id }, query] = await Promise.all([params, searchParams]);
-  const [delivery, options] = await Promise.all([getDeliveryDetail(id), getSalesFormOptions()]);
+  const [delivery, options, company] = await Promise.all([getDeliveryDetail(id), getSalesFormOptions(), getDefaultCompany()]);
 
   if (!delivery) {
     notFound();
   }
 
   const isDraft = delivery.status === "draft";
+  const approvalState = isDraft
+    ? await getStockOutApprovalState({
+        companyId: company.id,
+        userId: user.id,
+        sourceType: "sales_delivery",
+        sourceId: delivery.id,
+        sourceNo: delivery.deliveryNo,
+        sourceLocationIds: [delivery.sourceLocationId],
+      })
+    : null;
+  const deliverySubmit =
+    approvalState?.isProtected && approvalState.approvedApprovalIds.length < approvalState.locationNames.length
+      ? approvalState.pendingApprovalIds.length > 0 && approvalState.canApprove
+        ? {
+            action: approveAndPostDelivery,
+            label: "Approve & Post Delivery",
+            disabled: false,
+          }
+        : approvalState.pendingApprovalIds.length > 0
+          ? {
+              action: requestDeliveryApproval,
+              label: "Approval Pending",
+              disabled: true,
+            }
+          : {
+              action: requestDeliveryApproval,
+              label: "Request Approval",
+              disabled: false,
+            }
+      : {
+          action: postDelivery,
+          label: "Post Delivery",
+          disabled: false,
+        };
   const totalCostMinor = delivery.lines.reduce((sum, line) => sum + line.totalCostMinor, 0);
   const currencyCode = delivery.lines[0]?.currencyCode ?? "ETB";
 
@@ -99,7 +141,19 @@ export default async function DeliveryDetailPage({ params, searchParams }: Deliv
             {
               value: "operations",
               label: "Operations",
-              content: <DeliveryOperationsForm delivery={delivery} isDraft={isDraft} action={postDelivery} />,
+              content: (
+                <DeliveryOperationsForm
+                  delivery={delivery}
+                  isDraft={isDraft}
+                  action={deliverySubmit.action}
+                  submitLabel={deliverySubmit.label}
+                  submitDisabled={deliverySubmit.disabled}
+                >
+                  {approvalState?.pendingApprovalIds.map((approvalId) => (
+                    <input key={approvalId} type="hidden" name="approvalIds" value={approvalId} />
+                  ))}
+                </DeliveryOperationsForm>
+              ),
             },
             {
               value: "other-information",

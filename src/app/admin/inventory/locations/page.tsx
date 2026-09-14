@@ -1,6 +1,6 @@
 import { LocationManager } from "@/app/admin/inventory/locations/location-manager";
 import { requirePermission } from "@/server/auth/session";
-import { getStockLocationList } from "@/server/inventory/locations";
+import { getStockLocationList, getStockLocationUserOptions } from "@/server/inventory/locations";
 
 export const dynamic = "force-dynamic";
 
@@ -19,12 +19,16 @@ export default async function LocationsPage({ searchParams }: LocationsPageProps
   const params = await searchParams;
   const query = params.q ?? "";
   const showDeleted = params.show === "deleted";
-  const records = await getStockLocationList({ query, showDeleted });
+  const [records, users] = await Promise.all([
+    getStockLocationList({ query, showDeleted }),
+    getStockLocationUserOptions(),
+  ]);
   const returnPath = `/admin/inventory/locations${showDeleted ? "?show=deleted" : ""}`;
 
   return (
     <LocationManager
       records={records}
+      users={users}
       query={query}
       showDeleted={showDeleted}
       notice={params.notice}

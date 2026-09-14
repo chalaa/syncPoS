@@ -109,6 +109,7 @@ export const adminMenuItems: AdminMenuItem[] = [
       },
       { label: "Stock Card", href: "/admin/inventory/stock-card", permission: PERMISSIONS.INVENTORY.VIEW },
       { label: "Serial History", href: "/admin/inventory/serial-history", permission: PERMISSIONS.INVENTORY.VIEW },
+      { label: "Approvals", href: "/admin/inventory/approvals", permission: PERMISSIONS.INVENTORY.VIEW },
       { label: "Locations", href: "/admin/inventory/locations", permission: PERMISSIONS.LOCATIONS.MANAGE },
       { label: "Opening Stock", href: "/admin/inventory/opening-stock", permission: PERMISSIONS.INVENTORY.RECEIVE },
     ],
@@ -141,6 +142,7 @@ export const adminMenuItems: AdminMenuItem[] = [
       { label: "Permissions", href: "/admin/settings?view=permissions", permission: PERMISSIONS.ROLES.VIEW },
       { label: "Owners", href: "/admin/settings/owners", permission: PERMISSIONS.COMPANY.MANAGE },
       { label: "Payments", href: "/admin/settings/payments", permission: PERMISSIONS.COMPANY.MANAGE },
+      { label: "Audit Logs", href: "/admin/settings/audit-logs", permission: PERMISSIONS.COMPANY.MANAGE },
     ],
   },
   {

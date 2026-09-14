@@ -113,7 +113,8 @@ export default async function SalesOrderDetailPage({ params, searchParams }: Sal
   );
   const canCreateDelivery =
     ["confirmed", "partially_delivered", "delivered", "invoiced"].includes(order.status) &&
-    hasRemainingDeliveryQuantity;
+    hasRemainingDeliveryQuantity &&
+    order.draftDeliveryCount === 0;
   const canRegisterPayment = !isQuotation && order.status !== "cancelled" && order.residualAmountMinor > 0;
   const canCreateReturn = !isQuotation && order.status !== "cancelled" && order.deliveryCount > 0;
 
@@ -243,10 +244,12 @@ export default async function SalesOrderDetailPage({ params, searchParams }: Sal
                 label: "Order Lines",
                 content: (
                   <div className="overflow-x-auto">
-                    <table className="w-full min-w-[980px] text-left text-sm">
+                    <table className="w-full min-w-[1180px] text-left text-sm">
                       <thead className="text-xs uppercase text-muted-foreground">
                         <tr className="border-b border-border">
                           <th className="px-2 py-2">Product</th>
+                          <th className="px-2 py-2">Owner</th>
+                          <th className="px-2 py-2">Source Location</th>
                           <th className="px-2 py-2 text-right">Ordered</th>
                           <th className="px-2 py-2 text-right">Reserved</th>
                           <th className="px-2 py-2 text-right">Delivered</th>
@@ -264,6 +267,13 @@ export default async function SalesOrderDetailPage({ params, searchParams }: Sal
                               <div className="text-xs text-muted-foreground">
                                 {line.sku} / {line.trackingMode} / Taxes {line.taxNames ?? "-"}
                               </div>
+                            </td>
+                            <td className="px-2 py-3">
+                              <div className="font-medium">{line.ownerName ?? order.ownerName ?? "-"}</div>
+                            </td>
+                            <td className="px-2 py-3">
+                              <div className="font-medium">{line.sourceLocationCode ?? "-"}</div>
+                              <div className="text-xs text-muted-foreground">{line.sourceLocationName ?? "-"}</div>
                             </td>
                             <td className="px-2 py-3 text-right">{line.quantityOrdered}</td>
                             <td className="px-2 py-3 text-right">{line.quantityReserved}</td>

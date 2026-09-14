@@ -19,6 +19,7 @@ import {
 } from "@/server/db/schema";
 import { paymentLinesTotal, replacePaymentLines, resolvePaymentLines } from "@/server/payments/payment-lines";
 import { getPurchaseOrderPaymentSummary, getVendorBillPaymentSummary } from "@/server/payments/payments";
+import { getPaymentVerificationWarnings } from "@/server/payments/verify-et";
 
 const optionalUuid = z.string().uuid().or(z.literal("")).optional().transform((value) => value || undefined);
 
@@ -363,6 +364,11 @@ export async function postSupplierPayment(formData: FormData) {
         }
       }
 
+      const verificationWarnings = await getPaymentVerificationWarnings(tx, {
+        companyId: company.id,
+        paymentId: payment.id,
+      });
+
       await tx
         .update(payments)
         .set({
@@ -379,8 +385,14 @@ export async function postSupplierPayment(formData: FormData) {
         action: "supplier_payment.post",
         entityType: "payment",
         entityId: payment.id,
-        severity: "info",
-        metadata: { paymentNo: payment.paymentNo, vendorBillId, purchaseOrderId },
+        severity: verificationWarnings.length > 0 ? "warning" : "info",
+        metadata: {
+          paymentNo: payment.paymentNo,
+          vendorBillId,
+          purchaseOrderId,
+          verificationBypassed: verificationWarnings.length > 0,
+          verificationWarnings,
+        },
       });
     });
 

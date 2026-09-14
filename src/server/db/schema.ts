@@ -81,6 +81,12 @@ export const stockMovementStatus = pgEnum("stock_movement_status", [
   "posted",
   "void",
 ]);
+export const stockOutApprovalStatus = pgEnum("stock_out_approval_status", [
+  "pending",
+  "approved",
+  "rejected",
+  "cancelled",
+]);
 export const stockReservationStatus = pgEnum("stock_reservation_status", [
   "active",
   "fulfilled",
@@ -158,6 +164,11 @@ export const paymentMethodType = pgEnum("payment_method_type", [
 ]);
 export const paymentType = pgEnum("payment_type", ["inbound", "outbound"]);
 export const paymentStatus = pgEnum("payment_status", ["draft", "posted", "cancelled"]);
+export const paymentVerificationStatus = pgEnum("payment_verification_status", [
+  "pending",
+  "verified",
+  "failed",
+]);
 export const expenseStatus = pgEnum("expense_status", ["posted", "cancelled"]);
 export const expensePaymentStatus = pgEnum("expense_payment_status", ["unpaid", "paid"]);
 export const salesOrderStatus = pgEnum("sales_order_status", [
@@ -569,6 +580,33 @@ export const attachments = pgTable(
   (table) => [
     index("attachments_entity_idx").on(table.entityType, table.entityId),
     index("attachments_company_idx").on(table.companyId),
+  ],
+);
+
+export const locationApprovers = pgTable(
+  "location_approvers",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    companyId: uuid("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    locationId: uuid("location_id")
+      .notNull()
+      .references(() => locations.id, { onDelete: "cascade", onUpdate: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade", onUpdate: "cascade" }),
+    canApproveOutgoing: boolean("can_approve_outgoing").notNull().default(true),
+    isActive: boolean("is_active").notNull().default(true),
+    ...softDelete,
+    ...timestamps,
+  },
+  (table) => [
+    uniqueIndex("location_approvers_location_user_active_uidx")
+      .on(table.companyId, table.locationId, table.userId)
+      .where(sql`${table.deletedAt} is null`),
+    index("location_approvers_location_idx").on(table.companyId, table.locationId),
+    index("location_approvers_user_idx").on(table.companyId, table.userId),
   ],
 );
 
@@ -1073,6 +1111,50 @@ export const stockMovementLines = pgTable(
   ],
 );
 
+export const stockOutApprovals = pgTable(
+  "stock_out_approvals",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    companyId: uuid("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    sourceType: varchar("source_type", { length: 80 }).notNull(),
+    sourceId: uuid("source_id"),
+    stockMovementId: uuid("stock_movement_id").references(() => stockMovements.id, {
+      onDelete: "cascade",
+      onUpdate: "cascade",
+    }),
+    sourceNo: varchar("source_no", { length: 120 }),
+    sourceLocationId: uuid("source_location_id")
+      .notNull()
+      .references(() => locations.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    requestedBy: uuid("requested_by").references(() => users.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
+    approverUserId: uuid("approver_user_id").references(() => users.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
+    status: stockOutApprovalStatus("status").notNull().default("pending"),
+    reason: text("reason"),
+    notes: text("notes"),
+    requestedAt: timestamp("requested_at", { withTimezone: true }).notNull().defaultNow(),
+    approvedAt: timestamp("approved_at", { withTimezone: true }),
+    rejectedAt: timestamp("rejected_at", { withTimezone: true }),
+    cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
+    metadata: jsonb("metadata").notNull().default({}),
+    ...timestamps,
+  },
+  (table) => [
+    index("stock_out_approvals_company_status_idx").on(table.companyId, table.status),
+    index("stock_out_approvals_source_idx").on(table.companyId, table.sourceType, table.sourceId),
+    index("stock_out_approvals_movement_idx").on(table.stockMovementId),
+    index("stock_out_approvals_location_idx").on(table.companyId, table.sourceLocationId),
+    index("stock_out_approvals_approver_idx").on(table.companyId, table.approverUserId),
+  ],
+);
+
 export const stockBalances = pgTable(
   "stock_balances",
   {
@@ -1367,6 +1449,9 @@ export const paymentAccounts = pgTable(
     currencyCode: char("currency_code", { length: 3 })
       .notNull()
       .references(() => currencies.code, { onDelete: "restrict", onUpdate: "cascade" }),
+    verifyEtEnabled: boolean("verify_et_enabled").notNull().default(false),
+    verifyEtBank: varchar("verify_et_bank", { length: 40 }),
+    verifyEtSettlementAccount: varchar("verify_et_settlement_account", { length: 120 }),
     isActive: boolean("is_active").notNull().default(true),
     notes: text("notes"),
     ...softDelete,
@@ -1926,6 +2011,41 @@ export const paymentLines = pgTable(
     index("payment_lines_payment_idx").on(table.paymentId),
     index("payment_lines_method_idx").on(table.paymentMethodId),
     index("payment_lines_account_idx").on(table.paymentAccountId),
+  ],
+);
+
+export const paymentLineVerifications = pgTable(
+  "payment_line_verifications",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    companyId: uuid("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    paymentLineId: uuid("payment_line_id")
+      .notNull()
+      .references(() => paymentLines.id, { onDelete: "cascade", onUpdate: "cascade" }),
+    provider: varchar("provider", { length: 40 }).notNull().default("verify_et"),
+    providerRequestId: varchar("provider_request_id", { length: 120 }),
+    bank: varchar("bank", { length: 40 }).notNull(),
+    reference: varchar("reference", { length: 120 }).notNull(),
+    settlementAccount: varchar("settlement_account", { length: 120 }),
+    status: paymentVerificationStatus("status").notNull().default("pending"),
+    verified: boolean("verified").notNull().default(false),
+    amountMinor: bigint("amount_minor", { mode: "number" }),
+    currencyCode: char("currency_code", { length: 3 }),
+    senderName: varchar("sender_name", { length: 200 }),
+    receiverName: varchar("receiver_name", { length: 200 }),
+    receiverAccount: varchar("receiver_account", { length: 120 }),
+    settlementMatched: boolean("settlement_matched"),
+    rawResponse: jsonb("raw_response").notNull().default({}),
+    errorMessage: text("error_message"),
+    verifiedAt: timestamp("verified_at", { withTimezone: true }),
+    ...timestamps,
+  },
+  (table) => [
+    index("payment_line_verifications_company_idx").on(table.companyId),
+    index("payment_line_verifications_line_idx").on(table.paymentLineId, table.createdAt),
+    index("payment_line_verifications_provider_request_idx").on(table.provider, table.providerRequestId),
   ],
 );
 

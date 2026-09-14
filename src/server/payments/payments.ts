@@ -10,6 +10,7 @@ import {
   expenses,
   paymentAccounts,
   paymentAllocations,
+  paymentLineVerifications,
   paymentLines,
   paymentMethods,
   payments,
@@ -97,6 +98,9 @@ export async function getPaymentAccountList(params: {
       accountNumber: paymentAccounts.accountNumber,
       openingBalanceMinor: paymentAccounts.openingBalanceMinor,
       currencyCode: paymentAccounts.currencyCode,
+      verifyEtEnabled: paymentAccounts.verifyEtEnabled,
+      verifyEtBank: paymentAccounts.verifyEtBank,
+      verifyEtSettlementAccount: paymentAccounts.verifyEtSettlementAccount,
       isActive: paymentAccounts.isActive,
       notes: paymentAccounts.notes,
       deletedAt: paymentAccounts.deletedAt,
@@ -169,6 +173,9 @@ export async function getActivePaymentAccounts(
       paymentMethodName: paymentMethods.name,
       requiresReference: paymentMethods.requiresReference,
       currencyCode: paymentAccounts.currencyCode,
+      verifyEtEnabled: paymentAccounts.verifyEtEnabled,
+      verifyEtBank: paymentAccounts.verifyEtBank,
+      verifyEtSettlementAccount: paymentAccounts.verifyEtSettlementAccount,
     })
     .from(paymentAccounts)
     .innerJoin(paymentMethods, eq(paymentAccounts.paymentMethodId, paymentMethods.id))
@@ -324,11 +331,33 @@ export async function getPaymentDetail(id: string): Promise<PaymentDetail | null
         currencyCode: payments.currencyCode,
         reference: paymentLines.reference,
         note: paymentLines.note,
+        verifyEtEnabled: paymentAccounts.verifyEtEnabled,
+        verificationStatus: sql<PaymentLineRow["verificationStatus"]>`
+          case
+            when ${paymentAccounts.verifyEtEnabled} = false then 'not_required'
+            when ${paymentLineVerifications.status} is null then 'not_verified'
+            else ${paymentLineVerifications.status}::text
+          end
+        `,
+        verificationMessage: paymentLineVerifications.errorMessage,
+        verifiedAmountMinor: paymentLineVerifications.amountMinor,
+        verifiedCurrencyCode: paymentLineVerifications.currencyCode,
+        verifiedAt: sql<string | null>`${paymentLineVerifications.verifiedAt}::text`,
       })
       .from(paymentLines)
       .innerJoin(payments, eq(paymentLines.paymentId, payments.id))
       .innerJoin(paymentMethods, eq(paymentLines.paymentMethodId, paymentMethods.id))
       .innerJoin(paymentAccounts, eq(paymentLines.paymentAccountId, paymentAccounts.id))
+      .leftJoin(
+        paymentLineVerifications,
+        sql`${paymentLineVerifications.id} = (
+          select plv.id
+          from payment_line_verifications plv
+          where plv.payment_line_id = ${paymentLines.id}
+          order by plv.created_at desc
+          limit 1
+        )`,
+      )
       .where(and(eq(paymentLines.paymentId, id), isNull(paymentLines.deletedAt)))
       .orderBy(asc(paymentLines.lineNo));
   } catch {
@@ -348,6 +377,12 @@ export async function getPaymentDetail(id: string): Promise<PaymentDetail | null
         currencyCode: payment.currencyCode,
         reference: payment.reference,
         note: payment.notes,
+        verifyEtEnabled: false,
+        verificationStatus: "not_required",
+        verificationMessage: null,
+        verifiedAmountMinor: null,
+        verifiedCurrencyCode: null,
+        verifiedAt: null,
       },
     ];
   }

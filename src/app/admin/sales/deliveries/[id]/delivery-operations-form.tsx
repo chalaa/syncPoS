@@ -1,7 +1,7 @@
 "use client";
 
 import { PlusIcon, Trash2Icon } from "lucide-react";
-import { type FormEvent, useMemo, useState } from "react";
+import { type FormEvent, type ReactNode, useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import type { DeliveryDetail, DeliveryLotOption, DeliverySerialOption } from "@/server/sales/types";
@@ -44,10 +44,16 @@ export function DeliveryOperationsForm({
   delivery,
   isDraft,
   action,
+  submitLabel = "Post Delivery",
+  submitDisabled = false,
+  children,
 }: {
   delivery: DeliveryDetail;
   isDraft: boolean;
   action: (formData: FormData) => void | Promise<void>;
+  submitLabel?: string;
+  submitDisabled?: boolean;
+  children?: ReactNode;
 }) {
   const { serialOptions, lotOptions } = delivery;
   const [rows, setRows] = useState<DeliveryRow[]>(() =>
@@ -299,10 +305,12 @@ export function DeliveryOperationsForm({
         </table>
       </div>
 
+      {children}
+
       {isDraft ? (
         <div className="mt-5 flex justify-end">
-          <Button type="submit" disabled={validationErrors.length > 0}>
-            Post Delivery
+          <Button type="submit" disabled={submitDisabled || validationErrors.length > 0}>
+            {submitLabel}
           </Button>
         </div>
       ) : null}

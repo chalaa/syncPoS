@@ -37,9 +37,15 @@ const paymentAccountSchema = z.object({
   institutionName: z.string().trim().max(120).optional(),
   accountNumber: z.string().trim().max(80).optional(),
   openingBalance: z.string().trim().default("0"),
+  verifyEtEnabled: z.boolean(),
+  verifyEtBank: z.string().trim().max(40).optional(),
+  verifyEtSettlementAccount: z.string().trim().max(120).optional(),
   isActive: z.boolean(),
   notes: z.string().trim().optional(),
   returnPath: z.string().trim().startsWith("/admin/settings/payments").default("/admin/settings/payments"),
+}).refine((data) => !data.verifyEtEnabled || Boolean(data.verifyEtBank), {
+  message: "Select a Verify.ET bank when verification is enabled.",
+  path: ["verifyEtBank"],
 });
 
 function formValue(formData: FormData, key: string) {
@@ -76,6 +82,9 @@ function accountPayload(formData: FormData) {
     institutionName: formValue(formData, "institutionName"),
     accountNumber: formValue(formData, "accountNumber"),
     openingBalance: formValue(formData, "openingBalance") || "0",
+    verifyEtEnabled: checkboxValue(formData, "verifyEtEnabled"),
+    verifyEtBank: formValue(formData, "verifyEtBank"),
+    verifyEtSettlementAccount: formValue(formData, "verifyEtSettlementAccount"),
     isActive: checkboxValue(formData, "isActive"),
     notes: formValue(formData, "notes"),
     returnPath: formValue(formData, "returnPath") || "/admin/settings/payments?tab=accounts",
@@ -244,6 +253,9 @@ export async function createPaymentAccount(formData: FormData) {
       accountNumber: parsed.data.accountNumber || null,
       openingBalanceMinor,
       currencyCode: company.baseCurrencyCode,
+      verifyEtEnabled: parsed.data.verifyEtEnabled,
+      verifyEtBank: parsed.data.verifyEtEnabled ? parsed.data.verifyEtBank || null : null,
+      verifyEtSettlementAccount: parsed.data.verifyEtEnabled ? parsed.data.verifyEtSettlementAccount || null : null,
       isActive: parsed.data.isActive,
       notes: parsed.data.notes || null,
     });
@@ -292,6 +304,9 @@ export async function updatePaymentAccount(formData: FormData) {
         institutionName: parsed.data.institutionName || null,
         accountNumber: parsed.data.accountNumber || null,
         openingBalanceMinor,
+        verifyEtEnabled: parsed.data.verifyEtEnabled,
+        verifyEtBank: parsed.data.verifyEtEnabled ? parsed.data.verifyEtBank || null : null,
+        verifyEtSettlementAccount: parsed.data.verifyEtEnabled ? parsed.data.verifyEtSettlementAccount || null : null,
         isActive: parsed.data.isActive,
         notes: parsed.data.notes || null,
         updatedAt: sql`now()`,
