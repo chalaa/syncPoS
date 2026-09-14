@@ -230,7 +230,7 @@ export async function createPartner(formData: FormData) {
   const parsed = partnerFormSchema.safeParse(partnerPayload(formData));
 
   if (!parsed.success) {
-    redirect(formErrorPath("/admin/partners/new", parsed.error));
+    redirect(formErrorPath("/admin/partners", parsed.error));
   }
 
   const { company } = await getPartnerFormOptions();
@@ -263,7 +263,7 @@ export async function createPartner(formData: FormData) {
     await upsertPrimaryAddress(partner.id, parsed.data);
   } catch (error) {
     redirect(
-      `/admin/partners/new?error=${encodeURIComponent(
+      `/admin/partners?error=${encodeURIComponent(
         uniqueViolationMessage(error, "Could not create partner."),
       )}`,
     );

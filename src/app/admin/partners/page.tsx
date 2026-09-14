@@ -1,12 +1,13 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
+import { NewPartnerModal } from "@/app/admin/partners/new-partner-modal";
 import { Alert } from "@/components/ui/alert";
 import { Badge, StatusBadge } from "@/components/ui/badge";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
 import {
-  formatPartnerRoles,
+  getPartnerFormOptions,
   getPartnerList,
   minorToDisplay,
 } from "@/server/partners/partners";
@@ -41,7 +42,10 @@ export default async function PartnersPage({ searchParams }: PartnersPageProps) 
   const showDeleted = params.show === "deleted";
   const role = params.role === "customer" || params.role === "supplier" ? params.role : undefined;
   const query = params.q ?? "";
-  const partners = await getPartnerList({ query, showDeleted, role });
+  const [partners, formOptions] = await Promise.all([
+    getPartnerList({ query, showDeleted, role }),
+    canManage ? getPartnerFormOptions() : Promise.resolve(null),
+  ]);
 
   return (
     <PageShell>
@@ -50,10 +54,8 @@ export default async function PartnersPage({ searchParams }: PartnersPageProps) 
         title="Partners & Accounts"
         description="Manage customer profiles, supplier accounts, credit allowances, and primary contacts."
         actions={
-          canManage ? (
-            <Button asChild>
-              <Link href="/admin/partners/new">New partner</Link>
-            </Button>
+          canManage && formOptions ? (
+            <NewPartnerModal paymentTerms={formOptions.paymentTerms} />
           ) : undefined
         }
       />
