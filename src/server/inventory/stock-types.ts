@@ -1,6 +1,9 @@
+import { minorToDisplay } from "@/lib/catalog-utils";
+
 export const stockStatusOptions = [
   "all",
   "in_stock",
+  "low_stock",
   "reserved",
   "out_of_stock",
   "negative",
@@ -12,6 +15,15 @@ export type StockFilterOption = {
   id: string;
   code: string;
   name: string;
+};
+
+export type InventorySummaryMetrics = {
+  totalValuationMinor: number;
+  currencyCode: string;
+  totalSkusOnHand: number;
+  lowStockCount: number;
+  outOfStockCount: number;
+  totalReservedQuantity: number;
 };
 
 export type StockByLocationRow = {
@@ -149,3 +161,19 @@ export type InventoryOperationFormOptions = {
   locations: InventoryOperationFormOption[];
   products: InventoryOperationProductOption[];
 };
+
+export function displayMoneyMinor(value: number, currencyCode: string) {
+  return `${currencyCode} ${minorToDisplay(value)}`;
+}
+
+export function displayQuantity(value: string | number) {
+  const parsed = Number(value);
+
+  if (!Number.isFinite(parsed)) {
+    return String(value);
+  }
+
+  return parsed.toLocaleString("en-US", {
+    maximumFractionDigits: 6,
+  });
+}

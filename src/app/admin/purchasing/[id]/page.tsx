@@ -2,7 +2,6 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import {
-  confirmPurchaseOrder,
   postGoodsReceipt,
   updatePurchaseOrder,
 } from "@/app/admin/purchasing/actions";
@@ -154,11 +153,11 @@ export default async function PurchaseOrderDetailPage({ params, searchParams }: 
         </div>
         <div className="flex flex-wrap items-center gap-2.5">
           <StatusBadge status={order.status} size="lg" />
-          {!isDraft ? (
+          {!isDraft || order.totalMinor === 0 ? (
             <StatusBadge
-              status={order.residualAmountMinor === 0 ? "paid" : order.residualAmountMinor < order.totalMinor ? "partially_paid" : "unpaid"}
+              status={order.totalMinor === 0 || order.residualAmountMinor === 0 ? "paid" : order.residualAmountMinor < order.totalMinor ? "partially_paid" : "unpaid"}
               label={
-                order.residualAmountMinor === 0
+                order.totalMinor === 0 || order.residualAmountMinor === 0
                   ? "Fully Paid"
                   : `Unpaid ${displayPurchaseMoney(order.residualAmountMinor, order.currencyCode)}`
               }
@@ -166,22 +165,15 @@ export default async function PurchaseOrderDetailPage({ params, searchParams }: 
             />
           ) : null}
 
-          {isDraft ? (
-            <form action={confirmPurchaseOrder}>
-              <input type="hidden" name="purchaseOrderId" value={order.id} />
-              <input type="hidden" name="returnPath" value={`/admin/purchasing/${order.id}`} />
-              <Button>Confirm Order</Button>
-            </form>
-          ) : null}
           {canReceive ? (
             <CreateReceiptDialog order={order} locations={options.locations} />
           ) : null}
-          {!isDraft && order.residualAmountMinor > 0 ? (
+          {!isDraft && order.totalMinor > 0 && order.residualAmountMinor > 0 ? (
             <PaymentFormDialog
               title="Register Payment"
-              description={`Create a draft supplier payment for ${order.orderNo}.`}
+              description={`Register and post payment for ${order.orderNo}.`}
               triggerLabel="Register Payment"
-              submitLabel="Create Draft Payment"
+              submitLabel="Post Payment"
               action={registerSupplierPayment}
               hiddenFieldName="purchaseOrderId"
               hiddenFieldValue={order.id}
@@ -248,63 +240,79 @@ export default async function PurchaseOrderDetailPage({ params, searchParams }: 
                 <p className="mt-1 text-sm font-medium">{order.paymentDueDate ?? "-"}</p>
               </div>
             ) : null}
-            <div>
-              <p className="text-xs font-medium uppercase text-muted-foreground">Paid</p>
-              <p className="mt-1 text-sm font-medium">{displayPurchaseMoney(order.paidMinor, order.currencyCode)}</p>
-            </div>
-            <div>
-              <p className="text-xs font-medium uppercase text-muted-foreground">Unpaid</p>
-              <p className="mt-1 text-sm font-medium">{displayPurchaseMoney(order.residualAmountMinor, order.currencyCode)}</p>
-            </div>
+            {order.totalMinor === 0 ? (
+              <div>
+                <p className="text-xs font-medium uppercase text-muted-foreground">Payment</p>
+                <p className="mt-1 text-sm font-bold text-emerald-700">Fully Paid</p>
+              </div>
+            ) : (
+              <>
+                <div>
+                  <p className="text-xs font-medium uppercase text-muted-foreground">Paid</p>
+                  <p className="mt-1 text-sm font-medium">{displayPurchaseMoney(order.paidMinor, order.currencyCode)}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-medium uppercase text-muted-foreground">Unpaid</p>
+                  <p className="mt-1 text-sm font-medium">{displayPurchaseMoney(order.residualAmountMinor, order.currencyCode)}</p>
+                </div>
+              </>
+            )}
           </div>
 
-          <Notebook
-            defaultValue="order-lines"
-            items={[
-              {
-                value: "order-lines",
-                label: "Order Lines",
-                content: (
-                  <div className="overflow-x-auto">
-                    <table className="w-full min-w-[860px] text-left text-sm">
-                      <thead className="text-xs uppercase text-muted-foreground">
-                        <tr className="border-b border-border">
-                          <th className="px-2 py-2">Product</th>
-                          <th className="px-2 py-2 text-right">Ordered</th>
-                          <th className="px-2 py-2 text-right">Received</th>
-                          <th className="px-2 py-2 text-right">Unit Cost</th>
-                          <th className="px-2 py-2 text-right">Tax</th>
-                          <th className="px-2 py-2 text-right">Total</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {order.lines.map((line) => (
-                          <tr key={line.id} className="border-b border-border/70">
-                            <td className="px-2 py-3">
-                              <div className="font-medium">{line.productName}</div>
-                              <div className="text-xs text-muted-foreground">
-                                {line.sku} / {line.trackingMode} / Taxes {line.taxNames ?? "-"}
-                              </div>
-                            </td>
-                            <td className="px-2 py-3 text-right">{line.quantityOrdered}</td>
-                            <td className="px-2 py-3 text-right">{line.quantityReceived}</td>
-                            <td className="px-2 py-3 text-right">{displayPurchaseMoney(line.unitCostMinor, line.currencyCode)}</td>
-                            <td className="px-2 py-3 text-right">{displayPurchaseMoney(line.taxAmountMinor, line.currencyCode)}</td>
-                            <td className="px-2 py-3 text-right">{displayPurchaseMoney(line.lineTotalMinor, line.currencyCode)}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                ),
-              },
-              {
-                value: "other-information",
-                label: "Other Information",
-                content: <p className="text-sm text-muted-foreground">{order.notes || "No notes"}</p>,
-              },
-            ]}
-          />
+          {(() => {
+            const hasTaxInLines = order.lines.some((l) => (l.taxAmountMinor ?? 0) > 0 || Boolean(l.taxNames));
+            return (
+              <Notebook
+                defaultValue="order-lines"
+                items={[
+                  {
+                    value: "order-lines",
+                    label: "Order Lines",
+                    content: (
+                      <div className="overflow-x-auto">
+                        <table className="w-full min-w-[860px] text-left text-sm">
+                          <thead className="text-xs uppercase text-muted-foreground">
+                            <tr className="border-b border-border">
+                              <th className="px-2 py-2">Product</th>
+                              <th className="px-2 py-2 text-right">Ordered</th>
+                              <th className="px-2 py-2 text-right">Received</th>
+                              <th className="px-2 py-2 text-right">Unit Cost</th>
+                              {hasTaxInLines ? <th className="px-2 py-2 text-right">Tax</th> : null}
+                              <th className="px-2 py-2 text-right">Total</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {order.lines.map((line) => (
+                              <tr key={line.id} className="border-b border-border/70">
+                                <td className="px-2 py-3">
+                                  <div className="font-medium">{line.productName}</div>
+                                  <div className="text-xs text-muted-foreground">
+                                    {line.sku} / {line.trackingMode}{line.taxNames ? ` / Taxes ${line.taxNames}` : ""}
+                                  </div>
+                                </td>
+                                <td className="px-2 py-3 text-right">{line.quantityOrdered}</td>
+                                <td className="px-2 py-3 text-right">{line.quantityReceived}</td>
+                                <td className="px-2 py-3 text-right">{displayPurchaseMoney(line.unitCostMinor, line.currencyCode)}</td>
+                                {hasTaxInLines ? (
+                                  <td className="px-2 py-3 text-right">{displayPurchaseMoney(line.taxAmountMinor, line.currencyCode)}</td>
+                                ) : null}
+                                <td className="px-2 py-3 text-right">{displayPurchaseMoney(line.lineTotalMinor, line.currencyCode)}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    ),
+                  },
+                  {
+                    value: "other-information",
+                    label: "Other Information",
+                    content: <p className="text-sm text-muted-foreground">{order.notes || "No notes"}</p>,
+                  },
+                ]}
+              />
+            );
+          })()}
         </section>
       )}
 

@@ -1,9 +1,4 @@
-import { createSalesOrder } from "@/app/admin/sales/actions";
-import { SalesOrderForm } from "@/app/admin/sales/sales-order-form";
-import { ButtonLink } from "@/components/ui/button";
-import { PageHeader, PageShell } from "@/components/ui/page-shell";
-import { requirePermission } from "@/server/auth/session";
-import { getSalesFormOptions } from "@/server/sales/sales";
+import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 
@@ -11,42 +6,8 @@ type NewSalesOrderPageProps = {
   searchParams: Promise<{ error?: string }>;
 };
 
-function todayDate() {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Africa/Addis_Ababa",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(new Date());
-}
-
 export default async function NewSalesOrderPage({ searchParams }: NewSalesOrderPageProps) {
-  await requirePermission("sales:orders:create");
-
-  const [query, options] = await Promise.all([searchParams, getSalesFormOptions()]);
-
-  return (
-    <PageShell>
-      <PageHeader
-        eyebrow="Sales"
-        title="New Quotation"
-        actions={<ButtonLink href="/admin/sales" variant="outline">Back to sales</ButtonLink>}
-      />
-
-      <SalesOrderForm
-        action={createSalesOrder}
-        customers={options.customers}
-        owners={options.owners}
-        products={options.products}
-        productCategories={options.productCategories}
-        productBrands={options.productBrands}
-        productUnits={options.productUnits}
-        locations={options.locations}
-        taxes={options.taxes}
-        availableStock={options.availableStock}
-        error={query.error}
-        defaultDate={todayDate()}
-      />
-    </PageShell>
-  );
+  const params = await searchParams;
+  const queryString = params.error ? `?new=1&error=${encodeURIComponent(params.error)}` : "?new=1";
+  redirect(`/admin/sales${queryString}`);
 }

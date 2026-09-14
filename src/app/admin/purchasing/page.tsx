@@ -9,10 +9,12 @@ import { cn } from "@/lib/utils";
 import { requirePermission } from "@/server/auth/session";
 import {
   displayPurchaseMoney,
+  getPurchaseFormOptions,
   getPurchaseLandedCostList,
   getPurchaseOrderList,
   getPurchaseReceiptList,
 } from "@/server/purchasing/purchasing";
+import { NewPurchaseOrderModal } from "./new-purchase-order-modal";
 import {
   displayPaymentMoney,
   getPaymentList,
@@ -36,8 +38,18 @@ type PurchasingPageProps = {
     partnerId?: string;
     notice?: string;
     error?: string;
+    new?: string;
   }>;
 };
+
+function todayDate() {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Africa/Addis_Ababa",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+}
 
 export default async function PurchasingPage({ searchParams }: PurchasingPageProps) {
   await requirePermission("inventory.receive");
@@ -101,7 +113,10 @@ export default async function PurchasingPage({ searchParams }: PurchasingPagePro
     );
   }
 
-  const orders = await getPurchaseOrderList();
+  const [orders, formOptions] = await Promise.all([
+    getPurchaseOrderList(),
+    getPurchaseFormOptions(),
+  ]);
 
   return (
     <PurchasingLayout
@@ -109,7 +124,20 @@ export default async function PurchasingPage({ searchParams }: PurchasingPagePro
       title="Purchase Orders"
       notice={params.notice}
       error={params.error}
-      actions={<ButtonLink href="/admin/purchasing/new" variant="default">New RFQ</ButtonLink>}
+      actions={
+        <NewPurchaseOrderModal
+          suppliers={formOptions.suppliers}
+          owners={formOptions.owners}
+          products={formOptions.products}
+          productCategories={formOptions.productCategories}
+          productBrands={formOptions.productBrands}
+          productUnits={formOptions.productUnits}
+          locations={formOptions.locations}
+          taxes={formOptions.taxes}
+          initialOpen={params.new === "1" || params.new === "true"}
+          defaultDate={todayDate()}
+        />
+      }
     >
       <PurchaseOrderList orders={orders} />
     </PurchasingLayout>
@@ -334,9 +362,9 @@ function PurchaseOrderList({ orders }: { orders: PurchaseOrderListRow[] }) {
                 <td className="px-4 py-3.5">
                   <div className="flex flex-col gap-1">
                     <span className="text-xs font-semibold capitalize text-foreground">{order.paymentTerm}</span>
-                    {order.residualAmountMinor === 0 ? (
+                    {Number(order.totalMinor) === 0 || Number(order.residualAmountMinor) === 0 ? (
                       <StatusBadge status="paid" label="Fully Paid" />
-                    ) : order.residualAmountMinor < order.totalMinor ? (
+                    ) : Number(order.residualAmountMinor) < Number(order.totalMinor) ? (
                       <StatusBadge
                         status="partially_paid"
                         label={`Due ${displayPurchaseMoney(order.residualAmountMinor, order.currencyCode)}`}

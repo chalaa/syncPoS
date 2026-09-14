@@ -1,5 +1,7 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
   /* Core brand palette */
   --primary: #0B5D4B;            /* Deep Forest Green */

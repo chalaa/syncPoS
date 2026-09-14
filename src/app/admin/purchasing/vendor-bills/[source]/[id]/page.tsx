@@ -59,9 +59,9 @@ export default async function VendorBillDetailPage({ params, searchParams }: Ven
             {bill.source === "vendor_bill" && bill.status === "posted" && bill.residualAmountMinor > 0 ? (
               <PaymentFormDialog
                 title="Register Supplier Payment"
-                description={`Create a draft outbound payment for ${bill.billNo}.`}
+                description={`Register and post payment for ${bill.billNo}.`}
                 triggerLabel="Register Payment"
-                submitLabel="Register Draft Payment"
+                submitLabel="Post Payment"
                 action={registerSupplierPayment}
                 hiddenFieldName="vendorBillId"
                 hiddenFieldValue={bill.id}
@@ -196,45 +196,52 @@ export default async function VendorBillDetailPage({ params, searchParams }: Ven
         </div>
 
         {bill.lines.length > 0 ? (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[860px] text-left text-sm">
-              <thead className="text-xs uppercase text-muted-foreground">
-                <tr className="border-b border-border">
-                  <th className="px-3 py-2">Line</th>
-                  <th className="px-3 py-2 text-right">Quantity</th>
-                  <th className="px-3 py-2 text-right">Unit Price</th>
-                  <th className="px-3 py-2">Taxes</th>
-                  <th className="px-3 py-2 text-right">Tax</th>
-                  <th className="px-3 py-2 text-right">Total</th>
-                </tr>
-              </thead>
-              <tbody>
-                {bill.lines.map((line) => (
-                  <tr key={line.id} className="border-b border-border/70">
-                    <td className="px-3 py-3">
-                      <div className="font-medium">{line.productName ?? line.description}</div>
-                      <div className="text-xs text-muted-foreground">{line.sku ?? line.description}</div>
-                    </td>
-                    <td className="px-3 py-3 text-right">{line.quantity}</td>
-                    <td className="px-3 py-3 text-right">{displayPurchaseMoney(line.unitPriceMinor, line.currencyCode)}</td>
-                    <td className="px-3 py-3">{line.taxNames ?? "-"}</td>
-                    <td className="px-3 py-3 text-right">{displayPurchaseMoney(line.taxAmountMinor, line.currencyCode)}</td>
-                    <td className="px-3 py-3 text-right">{displayPurchaseMoney(line.totalMinor, line.currencyCode)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          (() => {
+            const hasTaxInLines = bill.lines.some((l) => (l.taxAmountMinor ?? 0) > 0 || Boolean(l.taxNames && l.taxNames !== "-"));
+            return (
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[860px] text-left text-sm">
+                  <thead className="text-xs uppercase text-muted-foreground">
+                    <tr className="border-b border-border">
+                      <th className="px-3 py-2">Line</th>
+                      <th className="px-3 py-2 text-right">Quantity</th>
+                      <th className="px-3 py-2 text-right">Unit Price</th>
+                      {hasTaxInLines ? <th className="px-3 py-2">Taxes</th> : null}
+                      {hasTaxInLines ? <th className="px-3 py-2 text-right">Tax</th> : null}
+                      <th className="px-3 py-2 text-right">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {bill.lines.map((line) => (
+                      <tr key={line.id} className="border-b border-border/70">
+                        <td className="px-3 py-3">
+                          <div className="font-medium">{line.productName ?? line.description}</div>
+                          <div className="text-xs text-muted-foreground">{line.sku ?? line.description}</div>
+                        </td>
+                        <td className="px-3 py-3 text-right">{line.quantity}</td>
+                        <td className="px-3 py-3 text-right">{displayPurchaseMoney(line.unitPriceMinor, line.currencyCode)}</td>
+                        {hasTaxInLines ? <td className="px-3 py-3">{line.taxNames ?? "-"}</td> : null}
+                        {hasTaxInLines ? <td className="px-3 py-3 text-right">{displayPurchaseMoney(line.taxAmountMinor, line.currencyCode)}</td> : null}
+                        <td className="px-3 py-3 text-right">{displayPurchaseMoney(line.totalMinor, line.currencyCode)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            );
+          })()
         ) : (
           <div className="grid gap-2 border-t border-border pt-4 text-sm md:grid-cols-3">
             <div>
-              <span className="text-muted-foreground">Untaxed </span>
+              <span className="text-muted-foreground">{bill.taxAmountMinor > 0 ? "Untaxed " : "Subtotal "}</span>
               <span className="font-medium">{displayPurchaseMoney(bill.untaxedAmountMinor, bill.currencyCode)}</span>
             </div>
-            <div>
-              <span className="text-muted-foreground">Tax </span>
-              <span className="font-medium">{displayPurchaseMoney(bill.taxAmountMinor, bill.currencyCode)}</span>
-            </div>
+            {bill.taxAmountMinor > 0 ? (
+              <div>
+                <span className="text-muted-foreground">Tax </span>
+                <span className="font-medium">{displayPurchaseMoney(bill.taxAmountMinor, bill.currencyCode)}</span>
+              </div>
+            ) : null}
             <div>
               <span className="text-muted-foreground">Total </span>
               <span className="font-medium">{displayPurchaseMoney(bill.totalMinor, bill.currencyCode)}</span>

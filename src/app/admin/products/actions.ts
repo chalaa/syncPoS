@@ -7,6 +7,7 @@ import { z } from "zod";
 
 import {
   getDefaultCompany,
+  getProductDetail,
   majorToMinor,
   normalizeCode,
   taxComputationOptions,
@@ -30,6 +31,11 @@ import {
   unitsOfMeasure,
 } from "@/server/db/schema";
 import { requirePermission } from "@/server/auth/session";
+import {
+  findPotentialDuplicates,
+  type DuplicateCheckInput,
+  type DuplicateMatch,
+} from "@/server/catalog/duplicate-detection";
 
 const optionalUuid = z.string().uuid().or(z.literal("")).transform((value) => value || null);
 const specificationFieldSchema = z.object({
@@ -316,9 +322,10 @@ export async function createProduct(formData: FormData) {
   await requirePermission("product.manage");
 
   const parsed = productFormSchema.safeParse(formPayload(formData));
+  const returnPath = formValue(formData, "returnPath");
 
   if (!parsed.success) {
-    redirect(formErrorPath("/admin/products/new", parsed.error));
+    redirect(formErrorPath(returnPath || "/admin/products/new", parsed.error));
   }
 
   const company = await getDefaultCompany();
@@ -357,8 +364,9 @@ export async function createProduct(formData: FormData) {
       }
     });
   } catch (error) {
+    const errorTarget = returnPath || "/admin/products/new";
     redirect(
-      `/admin/products/new?error=${encodeURIComponent(
+      `${errorTarget}${errorTarget.includes("?") ? "&" : "?"}error=${encodeURIComponent(
         uniqueViolationMessage(error, "Could not create product."),
       )}`,
     );
@@ -366,9 +374,148 @@ export async function createProduct(formData: FormData) {
 
   revalidatePath("/admin/products");
   if (!productId) {
-    redirect(`/admin/products/new?error=${encodeURIComponent("Product could not be created.")}`);
+    const errorTarget = returnPath || "/admin/products/new";
+    redirect(`${errorTarget}${errorTarget.includes("?") ? "&" : "?"}error=${encodeURIComponent("Product could not be created.")}`);
   }
+
+  if (returnPath) {
+    redirect(`${returnPath}${returnPath.includes("?") ? "&" : "?"}notice=${encodeURIComponent(`Product "${parsed.data.name}" created successfully.`)}`);
+  }
+
   redirect(`/admin/products/${productId}/edit?notice=${encodeURIComponent("Product created")}`);
+}
+
+export async function checkDuplicateProductAction(input: DuplicateCheckInput): Promise<{
+  duplicates: DuplicateMatch[];
+}> {
+  await requirePermission("product.view");
+  const company = await getDefaultCompany();
+  const duplicates = await findPotentialDuplicates(input, company.id);
+  return { duplicates };
+}
+
+export async function createProductModalAction(formData: FormData): Promise<{
+  success: boolean;
+  error?: string;
+  duplicateDetected?: boolean;
+  duplicates?: DuplicateMatch[];
+  product?: {
+    id: string;
+    sku: string;
+    name: string;
+    standardCostMinor?: number;
+    listPriceMinor?: number;
+    saleTaxIds?: string[];
+    purchaseTaxIds?: string[];
+  };
+}> {
+  try {
+    await requirePermission("product.manage");
+
+    const parsed = productFormSchema.safeParse(formPayload(formData));
+
+    if (!parsed.success) {
+      return {
+        success: false,
+        error: parsed.error.issues[0]?.message ?? "Invalid product data.",
+      };
+    }
+
+    const company = await getDefaultCompany();
+
+    const allowDuplicate = formData.get("allowDuplicate") === "true";
+    if (!allowDuplicate) {
+      const duplicates = await findPotentialDuplicates(
+        {
+          name: parsed.data.name,
+          brandId: parsed.data.brandId,
+          categoryId: parsed.data.categoryId,
+          model: parsed.data.model,
+          standardName: parsed.data.standardName,
+        },
+        company.id
+      );
+
+      const highRiskDuplicates = duplicates.filter((d) => d.similarityScore >= 75);
+      if (highRiskDuplicates.length > 0) {
+        return {
+          success: false,
+          duplicateDetected: true,
+          duplicates: highRiskDuplicates,
+          error: "Potential duplicate product detected.",
+        };
+      }
+    }
+
+    const specifications = productSpecificationsPayload(formData);
+    let createdProduct:
+      | {
+          id: string;
+          sku: string;
+          name: string;
+          standardCostMinor?: number;
+          listPriceMinor?: number;
+          saleTaxIds?: string[];
+          purchaseTaxIds?: string[];
+        }
+      | undefined;
+
+    await db.transaction(async (tx) => {
+      const sku = parsed.data.sku || await generateProductSku(tx, company.id);
+      const [product] = await tx.insert(products).values({
+        companyId: company.id,
+        sku,
+        name: parsed.data.name,
+        standardName: parsed.data.standardName || null,
+        categoryId: parsed.data.categoryId,
+        brandId: parsed.data.brandId,
+        model: parsed.data.model || null,
+        country: parsed.data.country || null,
+        description: parsed.data.description || null,
+        specifications,
+        unitId: parsed.data.unitId,
+        trackingMode: parsed.data.trackingMode,
+        standardCostMinor: majorToMinor(parsed.data.standardCost),
+        listPriceMinor: majorToMinor(parsed.data.listPrice),
+        currencyCode: company.baseCurrencyCode,
+        isActive: true,
+      }).returning({
+        id: products.id,
+        sku: products.sku,
+        name: products.name,
+        standardCostMinor: products.standardCostMinor,
+        listPriceMinor: products.listPriceMinor,
+      });
+      createdProduct = {
+        ...product,
+        saleTaxIds: parsed.data.saleTaxIds,
+        purchaseTaxIds: parsed.data.purchaseTaxIds,
+      };
+
+      if (parsed.data.saleTaxIds.length > 0) {
+        await tx.insert(productSaleTaxes).values(parsed.data.saleTaxIds.map((taxId) => ({ productId: product.id, taxId })));
+      }
+
+      if (parsed.data.purchaseTaxIds.length > 0) {
+        await tx.insert(productPurchaseTaxes).values(parsed.data.purchaseTaxIds.map((taxId) => ({ productId: product.id, taxId })));
+      }
+    });
+
+    revalidatePath("/admin/products");
+    revalidatePath("/admin/sales");
+    revalidatePath("/admin/purchasing");
+
+    if (!createdProduct) {
+      return { success: false, error: "Product could not be created." };
+    }
+
+    return { success: true, product: createdProduct };
+  } catch (error) {
+    return {
+      success: false,
+      error: uniqueViolationMessage(error, "Could not create product."),
+    };
+  }
 }
 
 export async function createProductFromSelector(input: z.input<typeof productSelectorSchema>) {
@@ -1128,3 +1275,110 @@ export async function restoreUnit(formData: FormData) {
   revalidatePath("/admin/products/units");
   redirectWithMessage(returnPath, "notice", "Unit restored");
 }
+
+export async function getProductDetailAction(id: string) {
+  await requirePermission("product.view");
+  if (!id) return null;
+  return getProductDetail(id);
+}
+
+export async function createCategoryModalAction(input: { name: string; description?: string }) {
+  await requirePermission("product.manage");
+  const company = await getDefaultCompany();
+  const name = input.name.trim();
+  if (!name) {
+    throw new Error("Category name is required.");
+  }
+  const code = await generateCompanyCode(db, {
+    companyId: company.id,
+    table: "product_categories",
+    prefix: "CAT",
+  });
+  const [created] = await db
+    .insert(productCategories)
+    .values({
+      companyId: company.id,
+      code,
+      name,
+      description: input.description || null,
+      isActive: true,
+    })
+    .returning({
+      id: productCategories.id,
+      name: productCategories.name,
+      code: productCategories.code,
+      specificationSchema: productCategories.specificationSchema,
+    });
+
+  revalidatePath("/admin/products");
+  revalidatePath("/admin/products/categories");
+  return created;
+}
+
+export async function createBrandModalAction(input: { name: string; country?: string; description?: string }) {
+  await requirePermission("product.manage");
+  const company = await getDefaultCompany();
+  const name = input.name.trim();
+  if (!name) {
+    throw new Error("Brand name is required.");
+  }
+  const code = await generateCompanyCode(db, {
+    companyId: company.id,
+    table: "brands",
+    prefix: "BRD",
+  });
+  const [created] = await db
+    .insert(brands)
+    .values({
+      companyId: company.id,
+      code,
+      name,
+      country: input.country || null,
+      description: input.description || null,
+      isActive: true,
+    })
+    .returning({
+      id: brands.id,
+      name: brands.name,
+      code: brands.code,
+      country: brands.country,
+    });
+
+  revalidatePath("/admin/products");
+  revalidatePath("/admin/products/brands");
+  return created;
+}
+
+export async function createUnitModalAction(input: { name: string; precision?: number }) {
+  await requirePermission("product.manage");
+  const company = await getDefaultCompany();
+  const name = input.name.trim();
+  if (!name) {
+    throw new Error("Unit name is required.");
+  }
+  const code = await generateCompanyCode(db, {
+    companyId: company.id,
+    table: "units_of_measure",
+    prefix: "UOM",
+  });
+  const [created] = await db
+    .insert(unitsOfMeasure)
+    .values({
+      companyId: company.id,
+      code,
+      name,
+      precision: String(input.precision ?? 0),
+      isActive: true,
+    })
+    .returning({
+      id: unitsOfMeasure.id,
+      name: unitsOfMeasure.name,
+      code: unitsOfMeasure.code,
+      precision: unitsOfMeasure.precision,
+    });
+
+  revalidatePath("/admin/products");
+  revalidatePath("/admin/products/units");
+  return created;
+}
+

@@ -1,18 +1,27 @@
 "use client";
 
-import { PlusIcon, Trash2Icon } from "lucide-react";
-import { type FormEvent, useMemo, useState, useTransition } from "react";
+import {
+  ArrowLeft,
+  ArrowRight,
+  Calendar,
+  Check,
+  CheckCircle2,
+  Coins,
+  FileText,
+  Loader2,
+  Package,
+  PlusIcon,
+  ShieldCheck,
+  Tag,
+  Trash2Icon,
+  Truck,
+  Wallet,
+} from "lucide-react";
+import { type FormEvent, forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, useTransition } from "react";
+
+import { useAppStore } from "@/stores/app-store";
 
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { ManyToManyTags } from "@/components/ui/many-to-many-tags";
 import { ManyToOneCreateSelect } from "@/components/ui/many-to-one-create-select";
 import { Notebook } from "@/components/ui/notebook";
 import { ProductSelect, type ProductSelectOption } from "@/app/admin/products/product-select";
@@ -23,8 +32,7 @@ import { createSupplierFromPurchasing } from "@/app/admin/purchasing/actions";
 import type { PurchaseFormOption, PurchaseOrderDetail, PurchaseTaxOption } from "@/server/purchasing/types";
 import type { OwnerOption } from "@/server/owners/types";
 
-const inputClass = "h-10 rounded-md border border-input bg-background px-3 text-sm";
-const tableInputClass = "h-9 w-full rounded-md border border-input bg-background px-2 text-sm";
+const inputClass = "h-10 rounded-lg border border-input bg-background px-3 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0B5D4B]/30 focus-visible:border-[#0B5D4B]";
 
 type PurchaseLineDraft = {
   key: string;
@@ -60,14 +68,6 @@ function newLine(ownerId = ""): PurchaseLineDraft {
 
 function money(value: number) {
   return value.toFixed(2);
-}
-
-function taxLabel(tax: PurchaseTaxOption) {
-  if (tax.computation === "fixed") {
-    return `${tax.code} / ${tax.name} (${money(tax.amountMinor / 100)})`;
-  }
-
-  return `${tax.code} / ${tax.name} (${Number(tax.rate).toFixed(2)}%)`;
 }
 
 function calculateTax(lineAmount: number, quantity: number, tax?: PurchaseTaxOption) {
@@ -167,25 +167,15 @@ function validatePurchaseOrderForm(values: PurchaseFormValues): FormValidationRe
   };
 }
 
-export function PurchaseOrderForm({
-  action,
-  suppliers,
-  owners,
-  products,
-  productCategories,
-  productBrands,
-  productUnits,
-  locations,
-  taxes,
-  error,
-  order,
-  submitLabel = "Create RFQ",
-  defaultDate = "",
-}: {
+export type PurchaseOrderFormHandle = {
+  saveDraft: () => void;
+};
+
+type PurchaseOrderFormProps = {
   action: (formData: FormData) => PurchaseOrderActionResult | Promise<PurchaseOrderActionResult>;
   suppliers: PurchaseFormOption[];
   owners: OwnerOption[];
-  products: PurchaseFormOption[];
+  products: PurchaseFormOption[] | ProductSelectOption[];
   productCategories: Parameters<typeof ProductSelect>[0]["categories"];
   productBrands: Parameters<typeof ProductSelect>[0]["brands"];
   productUnits: Parameters<typeof ProductSelect>[0]["units"];
@@ -195,20 +185,101 @@ export function PurchaseOrderForm({
   order?: PurchaseOrderDetail;
   submitLabel?: string;
   defaultDate?: string;
-}) {
+  isModal?: boolean;
+  onCancel?: () => void;
+};
+
+export const PurchaseOrderForm = forwardRef<PurchaseOrderFormHandle, PurchaseOrderFormProps>(
+  function PurchaseOrderForm({
+    action,
+    suppliers,
+    owners,
+    products,
+    productCategories,
+    productBrands,
+    productUnits,
+    locations,
+    taxes,
+    error,
+    order,
+    submitLabel = "Create RFQ",
+    defaultDate = "",
+    isModal = false,
+    onCancel,
+  }, ref) {
   const [isPending, startTransition] = useTransition();
-  const [editingLineKey, setEditingLineKey] = useState<string | null>(null);
+  const [step, setStep] = useState<1 | 2>(1);
+  const [submitIntent, setSubmitIntent] = useState<"draft" | "confirm">("confirm");
   const [hasSubmitted, setHasSubmitted] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
   const [supplierId, setSupplierId] = useState(order?.supplierId ?? "");
-  const [paymentTerm, setPaymentTerm] = useState<"cash" | "credit">(order?.paymentTerm ?? "credit");
-  const defaultOwnerId = order?.ownerId ?? owners[0]?.id ?? "";
-  const [headerOwnerId, setHeaderOwnerId] = useState(defaultOwnerId);
-  const defaultDeliverToLocationId = order?.deliverToLocationId ?? locations.find((location) => location.code === "WH-001")?.id ?? locations[0]?.id ?? "";
+  const [paymentTerm, setPaymentTerm] = useState<"cash" | "credit">(order?.paymentTerm ?? "cash");
+
+  const selectedLocationId = useAppStore((state) => state.selectedLocationId);
+  const defaultDeliverToLocationId = useMemo(() => {
+    if (order?.deliverToLocationId) return order.deliverToLocationId;
+    if (selectedLocationId && locations.some((loc) => loc.id === selectedLocationId)) return selectedLocationId;
+    return locations.find((location) => location.code === "WH-001")?.id ?? locations[0]?.id ?? "";
+  }, [order?.deliverToLocationId, selectedLocationId, locations]);
+
   const [deliverToLocationId, setDeliverToLocationId] = useState(defaultDeliverToLocationId);
+
+  useEffect(() => {
+    if (!order && selectedLocationId && locations.some((loc) => loc.id === selectedLocationId)) {
+      setDeliverToLocationId(selectedLocationId);
+    }
+  }, [selectedLocationId, locations, order]);
+
+  const findLinkedOwner = useCallback(
+    (locId: string) => {
+      if (!locId) return undefined;
+      const linkedByLocId = owners.find((owner) => (owner as any).locationIds?.includes(locId));
+      if (linkedByLocId) return linkedByLocId;
+      const targetLoc = locations.find((l) => l.id === locId);
+      if (targetLoc?.name) {
+        const locNameLower = targetLoc.name.toLowerCase();
+        const linkedByName = owners.find(
+          (owner) => locNameLower.includes(owner.name.toLowerCase()) || owner.name.toLowerCase().includes(locNameLower),
+        );
+        if (linkedByName) return linkedByName;
+      }
+      return undefined;
+    },
+    [owners, locations],
+  );
+
+  const defaultOwnerId = useMemo(() => {
+    if (order?.ownerId) return order.ownerId;
+    if (deliverToLocationId) {
+      const linkedOwner = findLinkedOwner(deliverToLocationId);
+      if (linkedOwner) return linkedOwner.id;
+    }
+    return owners[0]?.id ?? "";
+  }, [order?.ownerId, deliverToLocationId, findLinkedOwner, owners]);
+
+  const [headerOwnerId, setHeaderOwnerId] = useState(defaultOwnerId);
+
+  useEffect(() => {
+    if (!order && deliverToLocationId) {
+      const linkedOwner = findLinkedOwner(deliverToLocationId);
+      if (linkedOwner) {
+        setHeaderOwnerId(linkedOwner.id);
+        setLines((prev) =>
+          prev.map((line) => ({
+            ...line,
+            ownerId: linkedOwner.id,
+          })),
+        );
+      }
+    }
+  }, [deliverToLocationId, findLinkedOwner, order]);
+
   const [orderDate, setOrderDate] = useState(order?.orderDate ?? defaultDate);
   const [paymentDueDate, setPaymentDueDate] = useState(order?.paymentDueDate ?? defaultDate);
+  const [notes, setNotes] = useState(order?.notes ?? "");
   const [productOptions, setProductOptions] = useState<ProductSelectOption[]>(products);
+  const formRef = useRef<HTMLFormElement>(null);
+
   const [lines, setLines] = useState<PurchaseLineDraft[]>(() =>
     order?.lines.length
       ? order.lines.map((line) => ({
@@ -221,6 +292,7 @@ export function PurchaseOrderForm({
         }))
       : [newLine(defaultOwnerId)],
   );
+
   const validationValues = useMemo<PurchaseFormValues>(
     () => ({
       supplierId,
@@ -236,10 +308,6 @@ export function PurchaseOrderForm({
   const { formErrors, fieldErrors, isValid } = useFormValidation(validationValues, validatePurchaseOrderForm);
   const taxById = useMemo(() => new Map(taxes.map((tax) => [tax.id, tax])), [taxes]);
   const productById = useMemo(() => new Map(productOptions.map((product) => [product.id, product])), [productOptions]);
-  const taxTagOptions = useMemo(
-    () => taxes.map((tax) => ({ id: tax.id, label: taxLabel(tax) })),
-    [taxes],
-  );
 
   const lineTotals = useMemo(
     () =>
@@ -290,8 +358,6 @@ export function PurchaseOrderForm({
     setLines((current) => [...current, line]);
   }
 
-  const editingLine = lines.find((line) => line.key === editingLineKey);
-
   function changeHeaderOwner(ownerId: string) {
     setLines((current) =>
       current.map((line) =>
@@ -305,421 +371,912 @@ export function PurchaseOrderForm({
     return hasSubmitted ? fieldErrors[key] : undefined;
   }
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  function submitWithIntent(intent: "draft" | "confirm") {
+    setSubmitIntent(intent);
     setHasSubmitted(true);
     setServerError(null);
 
     if (!isValid) {
+      setStep(1);
       return;
     }
 
-    const formData = new FormData(event.currentTarget);
-    startTransition(async () => {
-      const result = await action(formData);
+    if (formRef.current) {
+      const formData = new FormData(formRef.current);
+      formData.set("intent", intent);
+      startTransition(async () => {
+        const result = await action(formData);
 
-      if (result?.error) {
-        setServerError(result.error);
-      }
-    });
+        if (result?.error) {
+          setServerError(result.error);
+        }
+      });
+    }
   }
 
+  function handleContinueToStep2() {
+    setHasSubmitted(true);
+    if (!isValid) {
+      return;
+    }
+    setStep(2);
+  }
+
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (step === 1) {
+      handleContinueToStep2();
+      return;
+    }
+    submitWithIntent(submitIntent);
+  }
+  // Expose saveDraft so the parent modal can call it from the close-confirmation dialog.
+  useImperativeHandle(ref, () => ({
+    saveDraft: () => submitWithIntent("draft"),
+  }));
+
   return (
-    <form onSubmit={handleSubmit} className="grid gap-5 rounded-lg border border-border bg-card p-5">
+    <form
+      ref={formRef}
+      onSubmit={handleSubmit}
+      className={cn("grid gap-5", isModal ? "p-0" : "rounded-xl border border-border bg-card p-6 shadow-xs")}
+    >
       {order ? <input type="hidden" name="purchaseOrderId" value={order.id} /> : null}
-      {error || serverError ? <p className="rounded-md border border-destructive/30 p-3 text-sm text-destructive">{serverError ?? error}</p> : null}
+      <input type="hidden" name="returnPath" value={isModal ? "/admin/purchasing" : "/admin/purchasing/new"} />
+      <input type="hidden" name="intent" value={submitIntent} />
+
+      {error || serverError ? (
+        <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-3.5 text-sm text-destructive flex items-center gap-2">
+          <span className="font-semibold">Error:</span> {serverError ?? error}
+        </div>
+      ) : null}
+
       {hasSubmitted && formErrors.length > 0 ? (
-        <div className="rounded-md border border-destructive/30 p-3 text-sm text-destructive">
+        <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-3.5 text-sm text-destructive space-y-1">
           {formErrors.map((formError) => (
-            <p key={formError}>{formError}</p>
+            <p key={formError} className="font-medium">• {formError}</p>
           ))}
         </div>
       ) : null}
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <ManyToOneCreateSelect
-          name="supplierId"
-          label="Supplier"
-          options={suppliers}
-          defaultValue={supplierId}
-          placeholder="Search supplier"
-          entityLabel="Supplier"
-          onCreate={createSupplierFromPurchasing}
-          onValueChange={setSupplierId}
-          error={showFieldError("supplierId")}
-        />
-        <label className="flex flex-col gap-1 text-sm font-medium">
-          Reference
-          <input type="hidden" name="vendorReference" value={order?.vendorReference ?? ""} />
-          <input
-            defaultValue={order?.vendorReference ?? ""}
-            placeholder="Auto"
-            disabled
-            aria-readonly="true"
-            className={cn(inputClass, "cursor-not-allowed bg-muted text-muted-foreground")}
-          />
-        </label>
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-4">
-        <RelatedModelSelect
-          name="ownerId"
-          label="Owner"
-          options={owners}
-          value={headerOwnerId}
-          onValueChange={changeHeaderOwner}
-          required={owners.length > 0}
-          placeholder="Select owner"
-          emptyLabel="No owners found."
-          error={showFieldError("ownerId")}
-        />
-        <label className="flex flex-col gap-1 text-sm font-medium">
-          Payment Term
-          <select
-            name="paymentTerm"
-            value={paymentTerm}
-            onChange={(event) => setPaymentTerm(event.target.value as "cash" | "credit")}
-            className={inputClass}
+      {/* Wizard Stepper Header */}
+      <div className="flex items-center justify-between gap-2 border-b border-border/70 pb-3 mb-1">
+        <div className="flex items-center gap-2 sm:gap-3">
+          <button
+            type="button"
+            onClick={() => setStep(1)}
+            className={cn(
+              "flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all",
+              step === 1
+                ? "bg-gradient-to-r from-[#0B5D4B] to-[#073B35] text-white shadow-xs"
+                : "bg-emerald-500/10 text-[#0B5D4B] hover:bg-emerald-500/20 dark:bg-emerald-950 dark:text-emerald-300"
+            )}
           >
-            <option value="cash">Cash</option>
-            <option value="credit">Credit</option>
-          </select>
-        </label>
-        <label className="flex flex-col gap-1 text-sm font-medium">
-          Order Date
-          <input
-            name="orderDate"
-            type="date"
-            value={orderDate}
-            onChange={(event) => setOrderDate(event.target.value)}
-            className={cn(inputClass, showFieldError("orderDate") ? "border-destructive focus-visible:border-destructive" : "")}
-          />
-          {showFieldError("orderDate") ? <span className="text-sm font-normal text-destructive">{showFieldError("orderDate")}</span> : null}
-        </label>
-        {paymentTerm === "credit" ? (
-          <label className="flex flex-col gap-1 text-sm font-medium">
-            Payment Date
-            <input
-              name="paymentDueDate"
-              type="date"
-              value={paymentDueDate}
-              onChange={(event) => setPaymentDueDate(event.target.value)}
-              className={cn(inputClass, showFieldError("paymentDueDate") ? "border-destructive focus-visible:border-destructive" : "")}
-            />
-            {showFieldError("paymentDueDate") ? <span className="text-sm font-normal text-destructive">{showFieldError("paymentDueDate")}</span> : null}
-          </label>
-        ) : null}
-        <RelatedModelSelect
-          name="deliverToLocationId"
-          label="Deliver to"
-          options={locations}
-          value={deliverToLocationId}
-          onValueChange={setDeliverToLocationId}
-          placeholder="Select on receipt"
-          emptyLabel="No locations found."
-          error={showFieldError("deliverToLocationId")}
-        />
+            <span
+              className={cn(
+                "flex size-5 items-center justify-center rounded-full text-[10px] font-bold",
+                step === 1 ? "bg-white/20 text-white" : "bg-[#0B5D4B] text-white dark:bg-emerald-500"
+              )}
+            >
+              {step === 2 ? <Check className="size-3" /> : "1"}
+            </span>
+            <span>1. Order Details & Lines</span>
+          </button>
+
+          <div className="h-0.5 w-6 bg-border sm:w-10" />
+
+          <button
+            type="button"
+            onClick={() => {
+              if (isValid) {
+                setStep(2);
+              } else {
+                setHasSubmitted(true);
+              }
+            }}
+            className={cn(
+              "flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all",
+              step === 2
+                ? "bg-gradient-to-r from-[#0B5D4B] to-[#073B35] text-white shadow-xs"
+                : "bg-muted/60 text-muted-foreground hover:text-foreground"
+            )}
+          >
+            <span
+              className={cn(
+                "flex size-5 items-center justify-center rounded-full text-[10px] font-bold",
+                step === 2 ? "bg-white/20 text-white" : "bg-muted text-muted-foreground"
+              )}
+            >
+              2
+            </span>
+            <span>2. Review & Confirm</span>
+          </button>
+        </div>
+
+        <div className="hidden sm:flex items-center gap-2 text-xs text-muted-foreground">
+          <span className="font-mono font-medium">Step {step} of 2</span>
+          <span className="text-[11px] font-medium text-[#0B5D4B] dark:text-emerald-400">
+            {step === 1 ? "Drafting specifications" : "Ready for confirmation"}
+          </span>
+        </div>
       </div>
 
-      <Notebook
-        defaultValue="order-lines"
-        items={[
-          {
-            value: "order-lines",
-            label: "Order Lines",
-            content: (
-              <div className="grid gap-4">
-                {lines.map((line) => (
-                  <div key={`${line.key}-fields`} className="hidden">
-                    <input type="hidden" name="productId" value={line.productId} />
-                    <input type="hidden" name="lineOwnerId" value={line.ownerId || headerOwnerId} />
-                    <input type="hidden" name="quantity" value={line.quantity} />
-                    <input type="hidden" name="unitCost" value={line.unitCost} />
-                    <input type="hidden" name="taxIds" value={line.taxIds.join(",")} />
-                  </div>
-                ))}
+      {/* STEP 1: FORM SPECIFICATIONS & LINE ITEMS */}
+      <div className={cn(step === 1 ? "grid gap-5" : "hidden")}>
+        {/* Bento Grid Header Layout */}
+        <div className="relative z-30 grid gap-4 lg:grid-cols-2">
+          {/* Bento Card 1: Sourcing & Logistics */}
+          <div className="relative z-20 rounded-xl border border-border/80 bg-card p-4 shadow-xs flex flex-col gap-4">
+            <div className="flex items-center justify-between pb-2.5 border-b border-border/60">
+            <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+              <div className="flex size-6 items-center justify-center rounded-md bg-[#0B5D4B]/10 text-[#0B5D4B] dark:bg-emerald-950 dark:text-emerald-300">
+                <Truck className="size-3.5" />
+              </div>
+              <span>Sourcing & Logistics</span>
+            </div>
+            <span className="text-[11px] font-medium text-muted-foreground">Vendor & Warehouse</span>
+          </div>
 
-                <div className="hidden overflow-x-auto lg:block">
-                  <table className="w-full min-w-[1140px] border-collapse text-sm">
-                    <thead>
-                      <tr className="border-b border-border text-left text-xs font-semibold uppercase text-muted-foreground">
-                        <th className="px-2 py-2">Product</th>
-                        <th className="w-44 px-2 py-2">Owner</th>
-                        <th className="w-28 px-2 py-2 text-right">Quantity</th>
-                        <th className="w-32 px-2 py-2 text-right">Unit Cost</th>
-                        <th className="w-56 px-2 py-2">Tax</th>
-                        <th className="w-32 px-2 py-2 text-right">Subtotal</th>
-                        <th className="w-32 px-2 py-2 text-right">Total</th>
-                        <th className="w-12 px-2 py-2 text-right"></th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {lines.map((line, index) => (
-                        <tr key={line.key} className="border-b border-border/70">
-                          <td className="px-2 py-3">
-                            <ProductSelect
-                              value={line.productId}
-                              options={productOptions}
-                              categories={productCategories}
-                              brands={productBrands}
-                              units={productUnits}
-                              onValueChange={(productId) => updateLineProduct(line.key, productId)}
-                              onOptionsChange={setProductOptions}
-                              placeholder="Select product"
-                              emptyLabel="No products found."
-                              inputClassName={tableInputClass}
-                              error={showFieldError(fieldKey("productId", line.key))}
-                            />
-                            {showFieldError(fieldKey("productId", line.key)) ? (
-                              <p className="mt-1 text-xs text-destructive">{showFieldError(fieldKey("productId", line.key))}</p>
-                            ) : null}
-                          </td>
-                          <td className="px-2 py-3">
-                            <RelatedModelSelect
-                              value={line.ownerId || headerOwnerId}
-                              options={owners}
-                              onValueChange={(ownerId) => updateLine(line.key, { ownerId })}
-                              placeholder="Select owner"
-                              emptyLabel="No owners found."
-                              inputClassName={tableInputClass}
-                              error={showFieldError(fieldKey("ownerId", line.key))}
-                            />
-                            {showFieldError(fieldKey("ownerId", line.key)) ? (
-                              <p className="mt-1 text-xs text-destructive">{showFieldError(fieldKey("ownerId", line.key))}</p>
-                            ) : null}
-                          </td>
-                          <td className="px-2 py-3">
-                            <input
-                              type="number"
-                              min="0.000001"
-                              step="0.000001"
-                              value={line.quantity}
-                              className={cn(tableInputClass, "text-right", showFieldError(fieldKey("quantity", line.key)) ? "border-destructive focus-visible:border-destructive" : "")}
-                              onChange={(event) => updateLine(line.key, { quantity: event.target.value })}
-                            />
-                            {showFieldError(fieldKey("quantity", line.key)) ? (
-                              <p className="mt-1 text-xs text-destructive">{showFieldError(fieldKey("quantity", line.key))}</p>
-                            ) : null}
-                          </td>
-                          <td className="px-2 py-3">
-                            <input
-                              type="number"
-                              min="0"
-                              step="0.01"
-                              value={line.unitCost}
-                              className={cn(tableInputClass, "text-right", showFieldError(fieldKey("unitCost", line.key)) ? "border-destructive focus-visible:border-destructive" : "")}
-                              onChange={(event) => updateLine(line.key, { unitCost: event.target.value })}
-                            />
-                            {showFieldError(fieldKey("unitCost", line.key)) ? (
-                              <p className="mt-1 text-xs text-destructive">{showFieldError(fieldKey("unitCost", line.key))}</p>
-                            ) : null}
-                          </td>
-                          <td className="px-2 py-3">
-                            <ManyToManyTags
-                              options={taxTagOptions}
-                              value={line.taxIds}
-                              onChange={(taxIds) => updateLine(line.key, { taxIds })}
-                              placeholder="Select tax"
-                            />
-                          </td>
-                          <td className="px-2 py-3 text-right">{money(lineTotals[index]?.subtotal ?? 0)}</td>
-                          <td className="px-2 py-3 text-right">{money(lineTotals[index]?.total ?? 0)}</td>
-                          <td className="px-2 py-3 text-right">
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              disabled={lines.length === 1}
-                              onClick={() => removeLine(line.key)}
-                            >
-                              <Trash2Icon />
-                              <span className="sr-only">Remove line</span>
-                            </Button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+          <div className="grid gap-3.5 sm:grid-cols-2">
+            <div className="sm:col-span-2">
+              <ManyToOneCreateSelect
+                name="supplierId"
+                label="Supplier"
+                options={suppliers}
+                value={supplierId}
+                defaultValue={supplierId}
+                placeholder="Search or add supplier..."
+                entityLabel="Supplier"
+                onCreate={createSupplierFromPurchasing}
+                onValueChange={setSupplierId}
+                error={showFieldError("supplierId")}
+              />
+            </div>
 
-                <div className="grid gap-3 lg:hidden">
-                  {lines.map((line, index) => {
-                    const product = productById.get(line.productId);
-                    const owner = owners.find((item) => item.id === (line.ownerId || headerOwnerId));
-                    const selectedTaxCount = line.taxIds.length;
+            <div className="relative z-20">
+              <RelatedModelSelect
+                name="deliverToLocationId"
+                label="Deliver to Location"
+                options={locations}
+                value={deliverToLocationId}
+                onValueChange={setDeliverToLocationId}
+                placeholder="Select warehouse..."
+                emptyLabel="No locations found."
+                error={showFieldError("deliverToLocationId")}
+              />
+            </div>
 
-                    return (
-                      <div
-                        key={`${line.key}-card`}
-                        className={cn(
-                          "rounded-md border border-border bg-background p-3 text-sm",
-                          hasSubmitted &&
-                            ["productId", "ownerId", "quantity", "unitCost"].some((field) => fieldErrors[fieldKey(field, line.key)])
-                            ? "border-destructive"
-                            : "",
-                        )}
-                      >
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="min-w-0">
-                            <p className="truncate font-semibold">{product ? `${product.code} / ${product.name}` : "No product selected"}</p>
-                            <p className="text-xs text-muted-foreground">
-                              {owner?.name ?? "No owner"} / Qty {line.quantity || "0"} / Unit cost {line.unitCost || "0"} / Taxes {selectedTaxCount}
-                            </p>
+            <input type="hidden" name="vendorReference" value={order?.vendorReference ?? ""} />
+          </div>
+        </div>
+
+        {/* Bento Card 2: Commercial Terms & Schedule */}
+        <div className="relative z-10 rounded-xl border border-border/80 bg-card p-4 shadow-xs flex flex-col gap-4">
+          <div className="flex items-center justify-between pb-2.5 border-b border-border/60">
+            <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+              <div className="flex size-6 items-center justify-center rounded-md bg-[#D9A441]/15 text-[#D9A441] dark:bg-amber-950 dark:text-amber-300">
+                <Wallet className="size-3.5" />
+              </div>
+              <span>Commercial Terms & Schedule</span>
+            </div>
+            <span className="text-[11px] font-medium text-muted-foreground">Payment & Dates</span>
+          </div>
+
+          <div className="grid gap-3.5 sm:grid-cols-2">
+            <div className="relative z-20">
+              <RelatedModelSelect
+                name="ownerId"
+                label="Purchasing Owner"
+                options={owners}
+                value={headerOwnerId}
+                onValueChange={changeHeaderOwner}
+                required={owners.length > 0}
+                placeholder="Select buyer / owner..."
+                emptyLabel="No owners found."
+                error={showFieldError("ownerId")}
+              />
+            </div>
+
+            <div className="flex flex-col gap-1 text-sm font-medium">
+              <span>Payment Term</span>
+              <input type="hidden" name="paymentTerm" value={paymentTerm} />
+              <div className="grid grid-cols-2 gap-1 rounded-lg border border-input bg-muted/40 p-1">
+                <button
+                  type="button"
+                  onClick={() => setPaymentTerm("cash")}
+                  className={cn(
+                    "flex items-center justify-center gap-1.5 rounded-md py-1.5 text-xs font-medium transition-all",
+                    paymentTerm === "cash"
+                      ? "bg-card text-foreground shadow-xs font-bold"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  <Coins className="size-3.5 text-[#D9A441]" />
+                  <span>Cash</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPaymentTerm("credit")}
+                  className={cn(
+                    "flex items-center justify-center gap-1.5 rounded-md py-1.5 text-xs font-medium transition-all",
+                    paymentTerm === "credit"
+                      ? "bg-card text-foreground shadow-xs font-bold"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  <Calendar className="size-3.5 text-[#0B5D4B]" />
+                  <span>Credit</span>
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <label className="flex flex-col gap-1 text-sm font-medium">
+                <span>Order Date</span>
+                <input
+                  name="orderDate"
+                  type="date"
+                  value={orderDate}
+                  onChange={(event) => setOrderDate(event.target.value)}
+                  className={cn(inputClass, showFieldError("orderDate") ? "border-destructive focus-visible:border-destructive" : "")}
+                />
+                {showFieldError("orderDate") ? <span className="text-xs font-normal text-destructive">{showFieldError("orderDate")}</span> : null}
+              </label>
+            </div>
+
+            {paymentTerm === "credit" ? (
+              <div>
+                <label className="flex flex-col gap-1 text-sm font-medium">
+                  <span>Payment Due Date</span>
+                  <input
+                    name="paymentDueDate"
+                    type="date"
+                    value={paymentDueDate}
+                    onChange={(event) => setPaymentDueDate(event.target.value)}
+                    className={cn(inputClass, showFieldError("paymentDueDate") ? "border-destructive focus-visible:border-destructive" : "")}
+                  />
+                  {showFieldError("paymentDueDate") ? <span className="text-xs font-normal text-destructive">{showFieldError("paymentDueDate")}</span> : null}
+                </label>
+              </div>
+            ) : (
+              <div className="hidden sm:flex flex-col justify-end text-xs text-muted-foreground pb-2">
+                <p className="rounded-lg bg-muted/40 px-3 py-2 text-[11px] leading-relaxed text-muted-foreground">
+                  Cash transaction — settled upon goods arrival.
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Notebook with Order Lines & Terms Tabs */}
+      <div className="relative z-10">
+        <Notebook
+          defaultValue="order-lines"
+          items={[
+            {
+              value: "order-lines",
+              label: (
+                <span className="flex items-center gap-2">
+                  <Package className="size-4 text-[#0B5D4B]" />
+                  <span>Order Items</span>
+                  <span className="inline-flex items-center justify-center rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-bold text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
+                    {lines.length}
+                  </span>
+                </span>
+              ),
+              content: (
+                <div className="grid gap-4">
+                  {/* Hidden form data elements for submission */}
+                  {lines.map((line) => (
+                    <div key={`${line.key}-fields`} className="hidden">
+                      <input type="hidden" name="productId" value={line.productId} />
+                      <input type="hidden" name="lineOwnerId" value={line.ownerId || headerOwnerId} />
+                      <input type="hidden" name="quantity" value={line.quantity} />
+                      <input type="hidden" name="unitCost" value={line.unitCost} />
+                      <input type="hidden" name="taxIds" value={line.taxIds.join(",")} />
+                    </div>
+                  ))}
+
+                  {/* Spacious Item Cards List */}
+                  <div className="grid gap-3.5">
+                    {lines.map((line, index) => {
+                      const product = productById.get(line.productId);
+                      const owner = owners.find((item) => item.id === (line.ownerId || headerOwnerId));
+
+                      return (
+                        <div
+                          key={line.key}
+                          style={{ zIndex: lines.length - index + 10 }}
+                          className={cn(
+                            "group relative rounded-xl border border-border/80 bg-card p-4 shadow-xs transition-all duration-200 hover:border-emerald-500/30 hover:shadow-sm focus-within:!z-50",
+                            hasSubmitted &&
+                              ["productId", "ownerId", "quantity", "unitCost"].some((field) => fieldErrors[fieldKey(field, line.key)])
+                              ? "border-destructive/60 bg-destructive/5"
+                              : ""
+                          )}
+                        >
+                        {/* Card Header: Product Selector & Action */}
+                        <div className="flex items-start justify-between gap-3 pb-3 border-b border-border/60">
+                          <div className="flex items-start gap-3 flex-1 min-w-0">
+                            <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10 font-mono text-xs font-bold text-[#0B5D4B] dark:text-emerald-300 border border-emerald-500/20 mt-0.5">
+                              {String(index + 1).padStart(2, "0")}
+                            </span>
+
+                            <div className="flex-1 min-w-0">
+                              <ProductSelect
+                                value={line.productId}
+                                options={productOptions}
+                                categories={productCategories}
+                                brands={productBrands}
+                                units={productUnits}
+                                taxes={taxes}
+                                onValueChange={(productId) => updateLineProduct(line.key, productId)}
+                                onOptionsChange={setProductOptions}
+                                placeholder="Search product by name, SKU, or brand..."
+                                emptyLabel="No products found."
+                                inputClassName="h-10 rounded-lg text-sm font-medium w-full"
+                                error={showFieldError(fieldKey("productId", line.key))}
+                              />
+
+
+
+                              {showFieldError(fieldKey("productId", line.key)) ? (
+                                <p className="mt-1 text-xs text-destructive">{showFieldError(fieldKey("productId", line.key))}</p>
+                              ) : null}
+                            </div>
                           </div>
-                          <div className="shrink-0 text-right font-semibold">{money(lineTotals[index]?.total ?? 0)}</div>
-                        </div>
-                        <div className="mt-3 flex justify-end gap-2">
-                          <Button type="button" variant="outline" size="sm" onClick={() => setEditingLineKey(line.key)}>
-                            Edit
-                          </Button>
+
                           <Button
                             type="button"
                             variant="ghost"
                             size="icon"
                             disabled={lines.length === 1}
                             onClick={() => removeLine(line.key)}
+                            className="size-8 text-muted-foreground/60 transition-colors hover:bg-destructive/10 hover:text-destructive active:scale-95 disabled:opacity-20 shrink-0 ml-1"
+                            title="Remove this item"
                           >
-                            <Trash2Icon />
-                            <span className="sr-only">Remove line</span>
+                            <Trash2Icon className="size-4" />
+                            <span className="sr-only">Remove item</span>
                           </Button>
+                        </div>
+
+                        {/* Card Body: Spacious Financial & Quantity Controls Strip */}
+                        <div
+                          className={cn(
+                            "grid grid-cols-1 gap-4 items-start pt-3.5",
+                            taxes.length > 0 ? "sm:grid-cols-2 lg:grid-cols-4" : "sm:grid-cols-3 lg:grid-cols-3",
+                          )}
+                        >
+                          {/* Quantity */}
+                          <div className="flex flex-col gap-1.5">
+                            <label className="text-xs font-semibold text-foreground flex items-center justify-between">
+                              <span>Quantity</span>
+                              <span className="text-[10px] text-muted-foreground font-normal">Units to order</span>
+                            </label>
+                            <input
+                              type="number"
+                              min="0.000001"
+                              step="any"
+                              value={line.quantity}
+                              placeholder="1"
+                              className={cn(
+                                inputClass,
+                                "w-full text-left font-mono font-semibold text-sm",
+                                showFieldError(fieldKey("quantity", line.key)) ? "border-destructive focus-visible:border-destructive" : ""
+                              )}
+                              onChange={(event) => updateLine(line.key, { quantity: event.target.value })}
+                            />
+                            {showFieldError(fieldKey("quantity", line.key)) ? (
+                              <span className="text-[11px] text-destructive">{showFieldError(fieldKey("quantity", line.key))}</span>
+                            ) : null}
+                          </div>
+
+                          {/* Unit Cost */}
+                          <div className="flex flex-col gap-1.5">
+                            <label className="text-xs font-semibold text-foreground flex items-center justify-between">
+                              <span>Unit Cost</span>
+                              <span className="text-[10px] text-muted-foreground font-normal">In Ethiopian Birr</span>
+                            </label>
+                            <div className="relative flex items-center">
+                              <span className="pointer-events-none absolute left-3 text-xs font-bold text-muted-foreground">
+                                ETB
+                              </span>
+                              <input
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                value={line.unitCost}
+                                placeholder="0.00"
+                                className={cn(
+                                  inputClass,
+                                  "w-full pl-12 text-left font-mono font-semibold text-sm",
+                                  showFieldError(fieldKey("unitCost", line.key)) ? "border-destructive focus-visible:border-destructive" : ""
+                                )}
+                                onChange={(event) => updateLine(line.key, { unitCost: event.target.value })}
+                              />
+                            </div>
+                            {showFieldError(fieldKey("unitCost", line.key)) ? (
+                              <span className="text-[11px] text-destructive">{showFieldError(fieldKey("unitCost", line.key))}</span>
+                            ) : null}
+                          </div>
+
+                          {/* Taxes Pill Selector */}
+                          {taxes.length > 0 ? (
+                            <div className="flex flex-col gap-1.5">
+                              <label className="text-xs font-semibold text-foreground flex items-center justify-between">
+                                <span className="flex items-center gap-1">
+                                  <Tag className="size-3 text-[#0B5D4B]" />
+                                  <span>Taxes</span>
+                                </span>
+                                <span className="text-[10px] text-muted-foreground font-normal">Click to toggle</span>
+                              </label>
+                              <div className="flex flex-wrap gap-1.5 min-h-[40px] items-center p-1 rounded-lg border border-input bg-background">
+                                {taxes.map((tax) => {
+                                  const isSelected = line.taxIds.includes(tax.id);
+                                  return (
+                                    <button
+                                      key={tax.id}
+                                      type="button"
+                                      onClick={() => {
+                                        const nextTaxes = isSelected
+                                          ? line.taxIds.filter((id) => id !== tax.id)
+                                          : [...line.taxIds, tax.id];
+                                        updateLine(line.key, { taxIds: nextTaxes });
+                                      }}
+                                      className={cn(
+                                        "inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium transition-all",
+                                        isSelected
+                                          ? "bg-[#0B5D4B] text-white shadow-xs font-semibold"
+                                          : "bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground"
+                                      )}
+                                    >
+                                      <span className="font-bold">{isSelected ? "✓" : "+"}</span>
+                                      <span>{tax.code} ({tax.computation === "fixed" ? money(tax.amountMinor / 100) : `${Number(tax.rate)}%`})</span>
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          ) : null}
+
+                          {/* Line Financial Total Summary */}
+                          <div className="flex flex-col items-end justify-center rounded-lg bg-muted/40 border border-border/50 p-2.5 h-[62px]">
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Line Total</span>
+                            <span className="font-mono text-base font-extrabold text-[#0B5D4B] dark:text-emerald-400">
+                              ETB {money(lineTotals[index]?.total ?? 0)}
+                            </span>
+                            {taxes.length > 0 && (lineTotals[index]?.taxAmount ?? 0) > 0 ? (
+                              <span className="text-[10px] text-muted-foreground font-mono">
+                                Untaxed: ETB {money(lineTotals[index]?.subtotal ?? 0)}
+                              </span>
+                            ) : null}
+                          </div>
+                        </div>
+
+                        {/* Card Footer: Subtle Line Owner info & override */}
+                        <div className="mt-3 flex items-center justify-between pt-2.5 text-xs text-muted-foreground border-t border-border/50">
+                          <div className="flex items-center gap-2">
+                            <span>Assigned to:</span>
+                            <span className="font-semibold text-foreground">
+                              {owner?.name ?? "Order Owner"}
+                            </span>
+                          </div>
+
+                          <details className="text-right">
+                            <summary className="cursor-pointer text-[#0B5D4B] hover:underline font-medium list-none">
+                              Assign different owner
+                            </summary>
+                            <div className="mt-2 w-56 text-left">
+                              <RelatedModelSelect
+                                value={line.ownerId || headerOwnerId}
+                                options={owners}
+                                onValueChange={(ownerId) => updateLine(line.key, { ownerId })}
+                                placeholder="Select owner"
+                                emptyLabel="No owners found."
+                                inputClassName="h-8 text-xs"
+                              />
+                            </div>
+                          </details>
                         </div>
                       </div>
                     );
                   })}
                 </div>
 
-                <div className="flex flex-wrap items-start justify-between gap-4">
-                  <Button type="button" variant="outline" onClick={addLine}>
-                    <PlusIcon data-icon="inline-start" />
-                    Add line
+                {/* Add Line Action & Financial Summary Widget */}
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={addLine}
+                    className="w-full sm:w-auto gap-2 border-dashed border-[#0B5D4B]/50 bg-emerald-500/5 text-[#0B5D4B] font-semibold hover:bg-emerald-500/10 hover:border-[#0B5D4B] transition-all py-2.5 px-5 rounded-xl text-xs"
+                  >
+                    <PlusIcon className="size-4" />
+                    Add Another Item Line
                   </Button>
-                  <div className="min-w-64 rounded-md border border-border bg-background p-3 text-sm">
-                    <div className="flex justify-between gap-6 py-1">
-                      <span className="text-muted-foreground">Untaxed amount</span>
-                      <span className="font-medium">{money(totals.subtotal)}</span>
+
+                  {/* Financial Grand Summary Card */}
+                  <div className="w-full sm:w-80 rounded-xl border border-border/80 bg-gradient-to-b from-card to-muted/20 p-4 text-xs shadow-xs">
+                    <div className="flex justify-between items-center py-1 text-muted-foreground">
+                      <span>Untaxed Subtotal</span>
+                      <span className="font-mono font-medium text-foreground">ETB {money(totals.subtotal)}</span>
                     </div>
-                    <div className="flex justify-between gap-6 py-1">
-                      <span className="text-muted-foreground">Taxes</span>
-                      <span className="font-medium">{money(totals.taxAmount)}</span>
+                    <div className="flex justify-between items-center py-1 text-muted-foreground">
+                      <span>Applicable Taxes</span>
+                      <span className="font-mono font-medium text-foreground">ETB {money(totals.taxAmount)}</span>
                     </div>
-                    <div className="mt-1 flex justify-between gap-6 border-t border-border pt-2 text-base font-semibold">
-                      <span>Total</span>
-                      <span>{money(totals.total)}</span>
+                    <div className="mt-2.5 flex justify-between items-baseline border-t border-border/80 pt-2.5">
+                      <div>
+                        <span className="text-sm font-bold text-foreground">Total RFQ Value</span>
+                        <p className="text-[10px] text-muted-foreground">Ethiopian Birr (ETB)</p>
+                      </div>
+                      <span className="font-mono text-lg font-extrabold text-[#0B5D4B] dark:text-emerald-400">
+                        ETB {money(totals.total)}
+                      </span>
                     </div>
                   </div>
                 </div>
-
-                <Dialog open={Boolean(editingLine)} onOpenChange={(open) => !open && setEditingLineKey(null)}>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>Order Line</DialogTitle>
-                      <DialogDescription>Add or edit one purchase order line.</DialogDescription>
-                    </DialogHeader>
-                    {editingLine ? (
-                      <div className="grid gap-4">
-                        <label className="flex flex-col gap-1 text-sm font-medium">
-                          Product
-                          <ProductSelect
-                            value={editingLine.productId}
-                            options={productOptions}
-                            categories={productCategories}
-                            brands={productBrands}
-                            units={productUnits}
-                            onValueChange={(productId) => updateLineProduct(editingLine.key, productId)}
-                            onOptionsChange={setProductOptions}
-                            placeholder="Select product"
-                            emptyLabel="No products found."
-                            error={showFieldError(fieldKey("productId", editingLine.key))}
-                          />
-                          {showFieldError(fieldKey("productId", editingLine.key)) ? (
-                            <span className="text-sm font-normal text-destructive">{showFieldError(fieldKey("productId", editingLine.key))}</span>
-                          ) : null}
-                        </label>
-                        <label className="flex flex-col gap-1 text-sm font-medium">
-                          Owner
-                          <RelatedModelSelect
-                            value={editingLine.ownerId || headerOwnerId}
-                            options={owners}
-                            onValueChange={(ownerId) => updateLine(editingLine.key, { ownerId })}
-                            placeholder="Select owner"
-                            emptyLabel="No owners found."
-                            error={showFieldError(fieldKey("ownerId", editingLine.key))}
-                          />
-                          {showFieldError(fieldKey("ownerId", editingLine.key)) ? (
-                            <span className="text-sm font-normal text-destructive">{showFieldError(fieldKey("ownerId", editingLine.key))}</span>
-                          ) : null}
-                        </label>
-                        <div className="grid gap-4 sm:grid-cols-2">
-                          <label className="flex flex-col gap-1 text-sm font-medium">
-                            Quantity
-                            <input
-                              type="number"
-                              min="0.000001"
-                              step="0.000001"
-                              value={editingLine.quantity}
-                              className={cn(inputClass, "text-right", showFieldError(fieldKey("quantity", editingLine.key)) ? "border-destructive focus-visible:border-destructive" : "")}
-                              onChange={(event) => updateLine(editingLine.key, { quantity: event.target.value })}
-                            />
-                            {showFieldError(fieldKey("quantity", editingLine.key)) ? (
-                              <span className="text-sm font-normal text-destructive">{showFieldError(fieldKey("quantity", editingLine.key))}</span>
-                            ) : null}
-                          </label>
-                          <label className="flex flex-col gap-1 text-sm font-medium">
-                            Unit cost
-                            <input
-                              type="number"
-                              min="0"
-                              step="0.01"
-                              value={editingLine.unitCost}
-                              className={cn(inputClass, "text-right", showFieldError(fieldKey("unitCost", editingLine.key)) ? "border-destructive focus-visible:border-destructive" : "")}
-                              onChange={(event) => updateLine(editingLine.key, { unitCost: event.target.value })}
-                            />
-                            {showFieldError(fieldKey("unitCost", editingLine.key)) ? (
-                              <span className="text-sm font-normal text-destructive">{showFieldError(fieldKey("unitCost", editingLine.key))}</span>
-                            ) : null}
-                          </label>
-                        </div>
-                        <label className="grid gap-1 text-sm font-medium">
-                          Taxes
-                          <ManyToManyTags
-                            options={taxTagOptions}
-                            value={editingLine.taxIds}
-                            onChange={(taxIds) => updateLine(editingLine.key, { taxIds })}
-                            placeholder="Select tax"
-                          />
-                        </label>
-                      </div>
-                    ) : null}
-                    <DialogFooter>
-                      <Button type="button" variant="outline" onClick={() => setEditingLineKey(null)}>
-                        Done
-                      </Button>
-                    </DialogFooter>
-                  </DialogContent>
-                </Dialog>
               </div>
             ),
           },
           {
             value: "other-information",
-            label: "Other Information",
+            label: (
+              <span className="flex items-center gap-2">
+                <FileText className="size-4 text-muted-foreground" />
+                <span>Terms & Notes</span>
+                {order?.notes ? <span className="size-1.5 rounded-full bg-[#0B5D4B]" /> : null}
+              </span>
+            ),
             content: (
-              <label className="flex flex-col gap-1 text-sm font-medium">
-                Notes
-                <textarea
-                  name="notes"
-                  defaultValue={order?.notes ?? ""}
-                  className="min-h-28 rounded-md border border-input bg-background px-3 py-2 text-sm"
-                />
-              </label>
+              <div className="flex flex-col gap-2 p-1">
+                <label className="flex flex-col gap-1.5 text-xs font-medium text-foreground">
+                  <span className="flex items-center gap-1.5">
+                    <FileText className="size-3.5 text-[#0B5D4B]" />
+                    <span>Terms of Delivery & Internal Notes</span>
+                  </span>
+                  <textarea
+                    name="notes"
+                    value={notes}
+                    onChange={(event) => setNotes(event.target.value)}
+                    rows={4}
+                    placeholder="Specify delivery timeline, shipping instructions, or terms agreed with the supplier..."
+                    className="rounded-xl border border-input bg-background/80 p-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0B5D4B]/30 resize-y leading-relaxed"
+                  />
+                </label>
+              </div>
             ),
           },
         ]}
       />
+    </div>
+  </div>
 
-      <div className="flex justify-end">
-        <Button disabled={isPending}>{isPending ? (submitLabel.startsWith("Save") ? "Saving..." : "Creating...") : submitLabel}</Button>
+      {/* STEP 2: REVIEW & CONFIRMATION VIEW */}
+      <div className={cn(step === 2 ? "grid gap-5" : "hidden")}>
+        {/* Step 2 Header Banner */}
+        <div className="rounded-xl border border-emerald-500/20 bg-gradient-to-r from-emerald-500/5 via-emerald-500/10 to-transparent p-4 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="flex size-10 items-center justify-center rounded-xl bg-gradient-to-br from-[#0B5D4B] to-[#073B35] text-white shadow-md shadow-[#0B5D4B]/20">
+              <ShieldCheck className="size-5 text-emerald-200" />
+            </div>
+            <div>
+              <h3 className="text-sm font-bold text-foreground tracking-tight">Review & Confirmation</h3>
+              <p className="text-xs text-muted-foreground">
+                Confirm vendor sourcing, warehouse destination, and line costs before executing order confirmation.
+              </p>
+            </div>
+          </div>
+          <span className="hidden sm:inline-flex rounded-full bg-[#D9A441]/15 px-2.5 py-1 text-[11px] font-bold text-[#D9A441] border border-[#D9A441]/30">
+            Final Approval
+          </span>
+        </div>
+
+        {/* Review Bento Cards */}
+        <div className="grid gap-4 sm:grid-cols-2">
+          {/* Vendor & Logistics Card */}
+          <div className="rounded-xl border border-border/80 bg-card p-4 shadow-xs flex flex-col gap-3">
+            <div className="flex items-center justify-between pb-2 border-b border-border/60">
+              <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                <Truck className="size-3.5 text-[#0B5D4B]" />
+                <span>Vendor & Sourcing</span>
+              </div>
+              <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">Logistics</span>
+            </div>
+            <div className="grid grid-cols-2 gap-3 text-xs">
+              <div>
+                <span className="text-muted-foreground text-[11px]">Supplier</span>
+                <p className="font-semibold text-foreground text-sm mt-0.5">
+                  {suppliers.find((s) => s.id === supplierId)?.name || "—"}
+                </p>
+              </div>
+              <div>
+                <span className="text-muted-foreground text-[11px]">Deliver To Warehouse</span>
+                <p className="font-semibold text-foreground text-sm mt-0.5">
+                  {locations.find((l) => l.id === deliverToLocationId)?.name || "—"}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Commercial Terms Card */}
+          <div className="rounded-xl border border-border/80 bg-card p-4 shadow-xs flex flex-col gap-3">
+            <div className="flex items-center justify-between pb-2 border-b border-border/60">
+              <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                <Wallet className="size-3.5 text-[#D9A441]" />
+                <span>Commercial Terms</span>
+              </div>
+              <span
+                className={cn(
+                  "rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider",
+                  paymentTerm === "cash"
+                    ? "bg-amber-500/10 text-amber-700 dark:text-amber-300"
+                    : "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+                )}
+              >
+                {paymentTerm}
+              </span>
+            </div>
+            <div className="grid grid-cols-3 gap-2 text-xs">
+              <div>
+                <span className="text-muted-foreground text-[11px]">Owner</span>
+                <p className="font-semibold text-foreground mt-0.5">
+                  {owners.find((o) => o.id === headerOwnerId)?.name || "—"}
+                </p>
+              </div>
+              <div>
+                <span className="text-muted-foreground text-[11px]">Order Date</span>
+                <p className="font-mono font-semibold text-foreground mt-0.5">
+                  {orderDate || "—"}
+                </p>
+              </div>
+              <div>
+                <span className="text-muted-foreground text-[11px]">Payment Due</span>
+                <p className="font-mono font-semibold text-foreground mt-0.5">
+                  {paymentTerm === "credit" ? (paymentDueDate || "—") : "Upon Receipt"}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Order Items Review Table */}
+        <div className="rounded-xl border border-border/80 bg-card overflow-hidden shadow-xs">
+          <div className="flex items-center justify-between border-b border-border/70 bg-muted/30 px-4 py-3">
+            <div className="flex items-center gap-2">
+              <Package className="size-4 text-[#0B5D4B]" />
+              <span className="text-xs font-bold uppercase tracking-wider text-foreground">Order Lines Breakdown</span>
+              <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[11px] font-bold text-[#0B5D4B] dark:text-emerald-300">
+                {lines.length} {lines.length === 1 ? "Line" : "Lines"}
+              </span>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="border-b border-border/60 bg-muted/20 text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">
+                <tr>
+                  <th className="py-2.5 px-4 w-12 text-center">#</th>
+                  <th className="py-2.5 px-4">Product</th>
+                  <th className="py-2.5 px-4">Owner</th>
+                  <th className="py-2.5 px-4 text-right">Quantity</th>
+                  <th className="py-2.5 px-4 text-right">Unit Cost (ETB)</th>
+                  {taxes.length > 0 ? <th className="py-2.5 px-4">Taxes</th> : null}
+                  <th className="py-2.5 px-4 text-right font-bold text-foreground">Line Total (ETB)</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border/40 font-medium">
+                {lines.map((line, index) => {
+                  const product = productById.get(line.productId);
+                  const lineOwner = owners.find((o) => o.id === (line.ownerId || headerOwnerId));
+                  const selectedTaxes = line.taxIds.map((tid) => taxById.get(tid)).filter(Boolean);
+
+                  return (
+                    <tr key={line.key} className="hover:bg-muted/10 transition-colors">
+                      <td className="py-3 px-4 text-center font-mono text-muted-foreground">
+                        {String(index + 1).padStart(2, "0")}
+                      </td>
+                      <td className="py-3 px-4">
+                        <div className="font-semibold text-foreground">{product?.name || "Unspecified Product"}</div>
+                        {product?.code ? (
+                          <span className="inline-block rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground mt-0.5">
+                            SKU: {product.code}
+                          </span>
+                        ) : null}
+                      </td>
+                      <td className="py-3 px-4 text-muted-foreground">
+                        {lineOwner?.name || "Order Owner"}
+                      </td>
+                      <td className="py-3 px-4 text-right font-mono font-semibold text-foreground">
+                        {line.quantity}
+                      </td>
+                      <td className="py-3 px-4 text-right font-mono text-foreground">
+                        ETB {money(Number(line.unitCost))}
+                      </td>
+                      {taxes.length > 0 ? (
+                        <td className="py-3 px-4">
+                          {selectedTaxes.length === 0 ? (
+                            <span className="text-muted-foreground text-[11px]">None</span>
+                          ) : (
+                            <div className="flex flex-wrap gap-1">
+                              {selectedTaxes.map((tax) => (
+                                <span
+                                  key={tax?.id}
+                                  className="rounded bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-[#0B5D4B] dark:text-emerald-300"
+                                >
+                                  {tax?.code}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </td>
+                      ) : null}
+                      <td className="py-3 px-4 text-right font-mono font-bold text-[#0B5D4B] dark:text-emerald-400">
+                        ETB {money(lineTotals[index]?.total ?? 0)}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Notes Preview if available */}
+        {notes ? (
+          <div className="rounded-xl border border-border/80 bg-muted/20 p-4 text-xs">
+            <div className="flex items-center gap-2 font-bold uppercase tracking-wider text-muted-foreground text-[11px] mb-1.5">
+              <FileText className="size-3.5 text-[#0B5D4B]" />
+              <span>Delivery Terms & Notes</span>
+            </div>
+            <p className="text-foreground whitespace-pre-wrap leading-relaxed">{notes}</p>
+          </div>
+        ) : null}
+
+        {/* Step 2 Grand Totals Box */}
+        <div className="flex justify-end">
+          <div className="w-full sm:w-80 rounded-xl border border-border/80 bg-gradient-to-b from-card to-muted/20 p-4 text-xs shadow-xs">
+            <div className="flex justify-between items-center py-1 text-muted-foreground">
+              <span>{totals.taxAmount > 0 ? "Untaxed Subtotal" : "Subtotal"}</span>
+              <span className="font-mono font-medium text-foreground">ETB {money(totals.subtotal)}</span>
+            </div>
+            {totals.taxAmount > 0 ? (
+              <div className="flex justify-between items-center py-1 text-muted-foreground">
+                <span>Applicable Taxes</span>
+                <span className="font-mono font-medium text-foreground">ETB {money(totals.taxAmount)}</span>
+              </div>
+            ) : null}
+            <div className="mt-2.5 flex justify-between items-baseline border-t border-border/80 pt-2.5">
+              <div>
+                <span className="text-sm font-bold text-foreground">Total Order Value</span>
+                <p className="text-[10px] text-muted-foreground">Ethiopian Birr (ETB)</p>
+              </div>
+              <span className="font-mono text-xl font-extrabold text-[#0B5D4B] dark:text-emerald-400">
+                ETB {money(totals.total)}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Action Footer (Sticky inside modal or pinned bottom) */}
+      <div
+        className={cn(
+          "flex items-center gap-4",
+          isModal
+            ? "sticky bottom-0 z-10 -mx-6 -mb-5 border-t border-border/80 bg-card/95 px-6 py-3.5 backdrop-blur-md justify-between shadow-lg mt-4"
+            : "justify-between mt-4 pt-4 border-t border-border"
+        )}
+      >
+        {step === 1 ? (
+          <>
+            <div className="flex items-center gap-3 text-xs">
+              {isModal ? (
+                <div className="flex items-center gap-1.5 rounded-lg border border-border/60 bg-muted/40 px-2.5 py-1">
+                  <Package className="size-3.5 text-[#0B5D4B]" />
+                  <span className="font-medium text-muted-foreground">
+                    {lines.filter((l) => l.productId).length} / {lines.length} {lines.length === 1 ? "Item specified" : "Items specified"}
+                  </span>
+                </div>
+              ) : null}
+              <div className="hidden sm:flex items-baseline gap-1.5 text-muted-foreground">
+                <span>Total Value:</span>
+                <strong className="font-mono text-base font-extrabold text-[#0B5D4B] dark:text-emerald-400">
+                  ETB {money(totals.total)}
+                </strong>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2.5">
+              {isModal && onCancel ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={onCancel}
+                  disabled={isPending}
+                  className="px-4 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted/80"
+                >
+                  Cancel
+                </Button>
+              ) : null}
+
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => submitWithIntent("draft")}
+                disabled={isPending}
+                className="px-4 text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-muted/80 border-border"
+              >
+                Save as Draft RFQ
+              </Button>
+
+              <Button
+                type="button"
+                onClick={handleContinueToStep2}
+                disabled={isPending}
+                className={cn(
+                  "gap-2 font-semibold text-white shadow-md shadow-[#0B5D4B]/20 transition-all hover:brightness-110 active:scale-[0.99] px-6 text-xs",
+                  "bg-gradient-to-r from-[#0B5D4B] via-[#073B35] to-[#0B5D4B]"
+                )}
+              >
+                <span>Continue to Confirmation</span>
+                <ArrowRight className="size-3.5 text-emerald-200" />
+              </Button>
+            </div>
+          </>
+        ) : (
+          <>
+            <div>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setStep(1)}
+                disabled={isPending}
+                className="gap-1.5 px-4 text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-muted/80"
+              >
+                <ArrowLeft className="size-3.5" />
+                <span>Back to Edit</span>
+              </Button>
+            </div>
+
+            <div className="flex items-center gap-2.5">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => submitWithIntent("draft")}
+                disabled={isPending}
+                className="px-4 text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-muted/80 border-border"
+              >
+                Save as Draft RFQ
+              </Button>
+
+              <Button
+                type="button"
+                onClick={() => submitWithIntent("confirm")}
+                disabled={isPending}
+                className={cn(
+                  "gap-2 font-bold text-white shadow-lg shadow-[#0B5D4B]/25 transition-all hover:brightness-110 active:scale-[0.99] px-7 py-2 text-xs",
+                  "bg-gradient-to-r from-[#0B5D4B] via-[#073B35] to-[#0B5D4B]"
+                )}
+              >
+                {isPending ? (
+                  <>
+                    <Loader2 className="size-4 animate-spin" />
+                    <span>Confirming Order...</span>
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 className="size-4 text-emerald-200" />
+                    <span>Confirm Purchase Order</span>
+                  </>
+                )}
+              </Button>
+            </div>
+          </>
+        )}
       </div>
     </form>
   );
-}
+  }
+);

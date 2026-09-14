@@ -10,7 +10,6 @@ import {
   softDeleteStockLocation,
   updateStockLocation,
 } from "@/app/admin/inventory/locations/actions";
-import { InventoryNavTabs } from "@/app/admin/inventory/inventory-nav-tabs";
 import { Alert } from "@/components/ui/alert";
 import { StatusBadge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -235,8 +234,6 @@ export function LocationManager({
           </LocationDialog>
         }
       />
-
-      <InventoryNavTabs currentHref="/admin/inventory/locations" />
 
       {notice ? <Alert kind="success">{notice}</Alert> : null}
       {error ? <Alert kind="error">{error}</Alert> : null}

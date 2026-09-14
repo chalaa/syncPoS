@@ -4,6 +4,7 @@ import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
 
 import { getDefaultCompany, minorToDisplay } from "@/server/catalog/products";
 import { db } from "@/server/db/client";
+import { getOwnerOptions } from "@/server/owners/owners";
 import {
   customerInvoices,
   deliveries,
@@ -56,15 +57,7 @@ export async function getSalesFormOptions(): Promise<SalesFormOptions> {
       .from(partners)
       .where(and(eq(partners.companyId, company.id), eq(partners.isCustomer, true), isNull(partners.deletedAt)))
       .orderBy(asc(partners.displayName)),
-    db
-      .select({
-        id: owners.id,
-        code: owners.name,
-        name: owners.name,
-      })
-      .from(owners)
-      .where(and(eq(owners.companyId, company.id), isNull(owners.deletedAt)))
-      .orderBy(asc(owners.name)),
+    getOwnerOptions(),
     db
       .select({
         id: products.id,
@@ -178,7 +171,7 @@ export async function getSalesFormOptions(): Promise<SalesFormOptions> {
 export async function getSalesOrderList(): Promise<SalesOrderListRow[]> {
   const company = await getDefaultCompany();
 
-  return db.execute<SalesOrderListRow>(sql`
+  const rows = await db.execute<SalesOrderListRow>(sql`
     select
       so.id as "id",
       so.order_no as "orderNo",
@@ -220,6 +213,13 @@ export async function getSalesOrderList(): Promise<SalesOrderListRow[]> {
     group by so.id, customer.id, own.name, loc.id, pay.paid_minor
     order by so.created_at desc
   `);
+
+  return rows.map((row) => ({
+    ...row,
+    totalMinor: Number(row.totalMinor),
+    paidMinor: Number(row.paidMinor),
+    residualAmountMinor: Number(row.residualAmountMinor),
+  }));
 }
 
 export async function getDeliveryList(params: {
@@ -389,6 +389,7 @@ export async function getCustomerInvoiceList(params: {
       ci.customer_reference as "customerReference",
       ci.status::text as "status",
       case
+        when ci.total_minor <= 0 then 'paid'
         when coalesce((
           select sum(pa.amount_minor)
           from payment_allocations pa
@@ -461,6 +462,7 @@ export async function getCustomerInvoiceDetail(id: string): Promise<CustomerInvo
       ci.customer_reference as "customerReference",
       ci.status::text as "status",
       case
+        when ci.total_minor <= 0 then 'paid'
         when coalesce((
           select sum(pa.amount_minor)
           from payment_allocations pa

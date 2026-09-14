@@ -1,9 +1,14 @@
 "use client";
 
-import { PlusIcon, Trash2Icon } from "lucide-react";
-import { useCallback, useMemo, useState } from "react";
+import { FileText, Package, PlusIcon, Trash2Icon } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+
+import { useAppStore } from "@/stores/app-store";
 
 import { Button } from "@/components/ui/button";
+import { Notebook } from "@/components/ui/notebook";
+import { RelatedModelSelect } from "@/components/ui/related-model-select";
+import { cn } from "@/lib/utils";
 import { useFormValidation, type FormValidationResult } from "@/hooks/use-form-validation";
 import type { InventoryOperationFormOptions } from "@/server/inventory/stock-types";
 
@@ -40,7 +45,8 @@ type ScrapLine = {
 
 type InternalTransferLine = ScrapLine;
 
-const inputClass = "h-10 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus:border-primary";
+const inputClass =
+  "h-10 w-full rounded-xl border border-border/80 bg-background px-3 text-xs font-medium outline-none focus:border-[#0B5D4B] focus:ring-2 focus:ring-[#0B5D4B]/20 transition-all font-sans";
 
 function createAdjustmentLine(): AdjustmentLine {
   return {
@@ -154,6 +160,24 @@ function fieldKey(field: string, lineId: string) {
   return `${field}:${lineId}`;
 }
 
+function findOwnerForLocation(
+  locId: string,
+  owners: InventoryOperationFormOptions["owners"],
+  balances: BalanceOption[],
+): string {
+  if (!locId) return owners[0]?.id ?? "";
+
+  const linkedOwner = owners.find((owner) => (owner as any).locationIds?.includes(locId));
+  if (linkedOwner) return linkedOwner.id;
+
+  const balanceWithOwner = balances.find((b) => b.locationId === locId && b.ownerId);
+  if (balanceWithOwner?.ownerId && owners.some((o) => o.id === balanceWithOwner.ownerId)) {
+    return balanceWithOwner.ownerId;
+  }
+
+  return owners[0]?.id ?? "";
+}
+
 function validateInternalTransferLines({
   lines,
   products,
@@ -221,14 +245,27 @@ export function AdjustmentLinesEditor({
   balances,
   locationId,
   ownerId,
+  initialProductId,
 }: {
   products: InventoryOperationFormOptions["products"];
   balances: BalanceOption[];
   locationId: string;
   ownerId: string;
+  initialProductId?: string;
 }) {
-  const [lines, setLines] = useState<AdjustmentLine[]>(() => [createAdjustmentLine()]);
+  const [lines, setLines] = useState<AdjustmentLine[]>(() => [
+    { ...createAdjustmentLine(), productId: initialProductId ?? "" },
+  ]);
   const productById = useMemo(() => new Map(products.map((product) => [product.id, product])), [products]);
+  const productSelectOptions = useMemo(
+    () =>
+      products.map((p) => ({
+        id: p.id,
+        code: p.code,
+        name: p.name,
+      })),
+    [products],
+  );
   const balanceByKey = useMemo(
     () => new Map(balances.map((balance) => [lineKey(balance.locationId, balance.ownerId ?? "", balance.productId, balance.serialNo, balance.lotNo), balance])),
     [balances],
@@ -259,6 +296,23 @@ export function AdjustmentLinesEditor({
           next.lotNo = "";
         }
 
+        if (values.productId && next.countedQuantity === "") {
+          const bal =
+            balanceByKey.get(
+              lineKey(
+                locationId,
+                ownerId,
+                values.productId,
+                product?.trackingMode === "serial" ? next.serialNo || null : null,
+                product?.trackingMode === "lot" ? next.lotNo || null : null,
+              ),
+            ) ?? productBalanceByKey.get(productLocationKey(locationId, ownerId, values.productId));
+
+          if (bal) {
+            next.countedQuantity = String(Number(bal.quantityOnHand));
+          }
+        }
+
         return next;
       }),
     );
@@ -280,73 +334,148 @@ export function AdjustmentLinesEditor({
   }
 
   return (
-    <div className="mt-5 overflow-x-auto">
-      <table className="w-full min-w-[1180px] text-left text-sm">
-        <thead className="text-xs uppercase text-muted-foreground">
-          <tr className="border-b border-border">
-            <th className="px-2 py-2">Product</th>
-            <th className="px-2 py-2">Serial</th>
-            <th className="px-2 py-2">Lot</th>
-            <th className="px-2 py-2 text-right">On Hand</th>
-            <th className="px-2 py-2 text-right">Counted</th>
-            <th className="px-2 py-2 text-right">Difference</th>
-            <th className="px-2 py-2">Notes</th>
-            <th className="w-12 px-2 py-2">
-              <span className="sr-only">Actions</span>
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {lines.map((line) => {
-            const product = productById.get(line.productId);
-            const trackingMode = product?.trackingMode ?? "none";
-            const balance = currentBalance(line);
-            const onHand = Number(balance?.quantityOnHand ?? 0);
-            const counted = Number(line.countedQuantity || 0);
-            const difference = counted - onHand;
+    <div className="space-y-4">
+      <div className="grid gap-3.5">
+        {lines.map((line, index) => {
+          const product = productById.get(line.productId);
+          const trackingMode = product?.trackingMode ?? "none";
+          const balance = currentBalance(line);
+          const onHand = Number(balance?.quantityOnHand ?? 0);
+          const counted = Number(line.countedQuantity || 0);
+          const difference = counted - onHand;
 
-            return (
-              <tr key={line.id} className="border-b border-border/70 align-top">
-                <td className="px-2 py-3">
-                  <select name="productId" value={line.productId} onChange={(event) => updateLine(line.id, { productId: event.target.value })} className={inputClass}>
-                    <option value="">Select product</option>
-                    {products.map((option) => (
-                      <option key={option.id} value={option.id}>
-                        {option.code} - {option.name} ({option.trackingMode})
-                      </option>
-                    ))}
-                  </select>
-                </td>
-                <td className="px-2 py-3">
-                  <input name="serialNo" value={line.serialNo} readOnly={trackingMode !== "serial"} placeholder={trackingMode === "serial" ? "Serial" : "-"} onChange={(event) => updateLine(line.id, { serialNo: event.target.value })} className={inputClass} />
-                </td>
-                <td className="px-2 py-3">
-                  <input name="lotNo" value={line.lotNo} readOnly={trackingMode !== "lot"} placeholder={trackingMode === "lot" ? "Lot" : "-"} onChange={(event) => updateLine(line.id, { lotNo: event.target.value })} className={inputClass} />
-                </td>
-                <td className="px-2 py-3 text-right">{formatQuantity(onHand)}</td>
-                <td className="px-2 py-3">
-                  <input name="countedQuantity" type="number" min="0" step="0.000001" value={line.countedQuantity} onChange={(event) => updateLine(line.id, { countedQuantity: event.target.value })} className={`${inputClass} text-right`} />
-                </td>
-                <td className="px-2 py-3 text-right font-medium">{formatQuantity(difference)}</td>
-                <td className="px-2 py-3">
-                  <input name="lineNotes" value={line.notes} onChange={(event) => updateLine(line.id, { notes: event.target.value })} className={inputClass} />
-                </td>
-                <td className="px-2 py-3">
-                  <Button type="button" variant="ghost" size="icon" aria-label="Remove line" onClick={() => setLines((current) => (current.length > 1 ? current.filter((item) => item.id !== line.id) : [createAdjustmentLine()]))}>
-                    <Trash2Icon />
+          return (
+            <div
+              key={line.id}
+              style={{ zIndex: lines.length - index + 10 }}
+              className="group relative rounded-2xl border border-border/80 bg-card px-3.5 pt-3 pb-2.5 shadow-2xs transition-all duration-200 hover:border-[#0B5D4B]/30 hover:shadow-xs focus-within:!z-50"
+            >
+              {/* Card Header: Product Name + Counted Quantity on SAME LINE */}
+              <div className="flex items-start gap-2.5 sm:gap-3">
+                <span className="flex h-10 w-8 shrink-0 items-center justify-center rounded-xl bg-emerald-500/10 font-mono text-xs font-bold text-[#0B5D4B] dark:text-emerald-300 border border-emerald-500/20">
+                  {String(index + 1).padStart(2, "0")}
+                </span>
+                <div className="flex-1 min-w-0">
+                  <input type="hidden" name="productId" value={line.productId} />
+                  <RelatedModelSelect
+                    value={line.productId}
+                    options={productSelectOptions}
+                    placeholder="Search product by name, SKU, or brand..."
+                    emptyLabel="No products found."
+                    onValueChange={(val) => updateLine(line.id, { productId: val })}
+                    inputClassName="h-10 rounded-xl text-xs font-semibold w-full"
+                  />
+                  {line.productId ? (
+                    <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] font-mono text-muted-foreground pl-0.5">
+                      <span>On Hand: <strong className="text-foreground">{formatQuantity(onHand)}</strong></span>
+                      <span className="text-border/80">•</span>
+                      <span>Avail: <strong className="text-foreground">{formatQuantity(balance?.quantityAvailable ?? onHand)}</strong></span>
+                      <span className="text-border/80">•</span>
+                      <span>
+                        Var:{" "}
+                        {difference > 0 ? (
+                          <strong className="text-emerald-600 dark:text-emerald-400">+{formatQuantity(difference)}</strong>
+                        ) : difference < 0 ? (
+                          <strong className="text-rose-600 dark:text-rose-400">{formatQuantity(difference)}</strong>
+                        ) : (
+                          <strong className="text-muted-foreground">0</strong>
+                        )}
+                      </span>
+                    </div>
+                  ) : null}
+                </div>
+
+                {/* Counted Quantity field - Same line with Product Name */}
+                <div className="w-28 sm:w-36 shrink-0 space-y-1">
+                  <div className="relative flex items-center h-10">
+                    <input
+                      name="countedQuantity"
+                      required
+                      type="number"
+                      min="0"
+                      step="0.000001"
+                      value={line.countedQuantity}
+                      placeholder="Counted Qty"
+                      onChange={(event) => updateLine(line.id, { countedQuantity: event.target.value })}
+                      className={cn(inputClass, "font-mono font-bold text-foreground pr-10 text-right h-10")}
+                    />
+                    <span className="pointer-events-none absolute right-2.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+                      Qty
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex h-10 items-center shrink-0">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    aria-label="Remove line"
+                    className="size-8 rounded-lg text-muted-foreground/60 hover:text-destructive hover:bg-destructive/10"
+                    onClick={() =>
+                      setLines((current) => (current.length > 1 ? current.filter((item) => item.id !== line.id) : [createAdjustmentLine()]))
+                    }
+                  >
+                    <Trash2Icon className="size-4" />
                   </Button>
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-      <div className="mt-3">
-        <Button type="button" variant="outline" size="sm" onClick={() => setLines((current) => [...current, createAdjustmentLine()])}>
-          <PlusIcon data-icon="inline-start" />
-          Add line
-        </Button>
+                </div>
+              </div>
+
+              {/* Hidden tracking & note inputs for index alignment */}
+              <input type="hidden" name="lineNotes" value={line.notes} />
+              {trackingMode !== "serial" ? <input type="hidden" name="serialNo" value="" /> : null}
+              {trackingMode !== "lot" ? <input type="hidden" name="lotNo" value="" /> : null}
+
+              {/* Serial / Lot tracking inputs (only rendered when product requires tracking) */}
+              {trackingMode !== "none" ? (
+                <div className="mt-3 pt-3 border-t border-border/40">
+                  {trackingMode === "serial" ? (
+                    <div className="space-y-1 max-w-xs">
+                      <span className="text-[11px] font-semibold text-foreground flex items-center justify-between">
+                        <span>Serial No</span>
+                        <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold">Required</span>
+                      </span>
+                      <input
+                        name="serialNo"
+                        value={line.serialNo}
+                        placeholder="Enter serial #"
+                        onChange={(event) => updateLine(line.id, { serialNo: event.target.value })}
+                        className={inputClass}
+                      />
+                    </div>
+                  ) : trackingMode === "lot" ? (
+                    <div className="space-y-1 max-w-xs">
+                      <span className="text-[11px] font-semibold text-foreground flex items-center justify-between">
+                        <span>Lot No</span>
+                        <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold">Required</span>
+                      </span>
+                      <input
+                        name="lotNo"
+                        value={line.lotNo}
+                        placeholder="Enter lot #"
+                        onChange={(event) => updateLine(line.id, { lotNo: event.target.value })}
+                        className={inputClass}
+                      />
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
+
+
+            </div>
+          );
+        })}
       </div>
+
+      <Button
+        type="button"
+        variant="outline"
+        onClick={() => setLines((current) => [...current, createAdjustmentLine()])}
+        className="w-full sm:w-auto gap-2 border-dashed border-[#0B5D4B]/50 bg-emerald-500/5 text-[#0B5D4B] dark:text-emerald-300 font-semibold hover:bg-emerald-500/10 hover:border-[#0B5D4B] transition-all py-2.5 px-5 rounded-xl text-xs"
+      >
+        <PlusIcon className="size-4" />
+        Add Another Item Line
+      </Button>
     </div>
   );
 }
@@ -357,55 +486,138 @@ export function InventoryAdjustmentForm({
   locations,
   products,
   balances,
+  returnPath,
+  onCancel,
+  isModal,
+  initialLocationId: propLocationId,
+  initialOwnerId: propOwnerId,
+  initialProductId,
 }: {
   action: (formData: FormData) => void | Promise<void>;
   owners: InventoryOperationFormOptions["owners"];
   locations: InventoryOperationFormOptions["locations"];
   products: InventoryOperationFormOptions["products"];
   balances: BalanceOption[];
+  returnPath?: string;
+  onCancel?: () => void;
+  isModal?: boolean;
+  initialLocationId?: string;
+  initialOwnerId?: string;
+  initialProductId?: string;
 }) {
-  const [locationId, setLocationId] = useState(locations[0]?.id ?? "");
-  const [ownerId, setOwnerId] = useState(owners[0]?.id ?? "");
+  const selectedLocationId = useAppStore((state) => state.selectedLocationId);
+  const initialLocationId = propLocationId ?? (selectedLocationId && locations.some((l) => l.id === selectedLocationId) ? selectedLocationId : (locations[0]?.id ?? ""));
+  const [locationId, setLocationId] = useState(initialLocationId);
+
+  const initialOwnerId = useMemo(() => {
+    if (propOwnerId) return propOwnerId;
+    return findOwnerForLocation(initialLocationId, owners, balances);
+  }, [balances, initialLocationId, owners, propOwnerId]);
+
+  const [ownerId, setOwnerId] = useState(initialOwnerId);
+
+  useEffect(() => {
+    if (!propOwnerId && initialLocationId) {
+      const autoOwnerId = findOwnerForLocation(initialLocationId, owners, balances);
+      if (autoOwnerId) {
+        setOwnerId(autoOwnerId);
+      }
+    }
+  }, [balances, initialLocationId, owners, propOwnerId]);
+
+  function handleLocationChange(nextLocId: string) {
+    setLocationId(nextLocId);
+    if (nextLocId) {
+      const autoOwnerId = findOwnerForLocation(nextLocId, owners, balances);
+      if (autoOwnerId) {
+        setOwnerId(autoOwnerId);
+      }
+    }
+  }
 
   return (
-    <form action={action} className="rounded-lg border border-border bg-card p-5">
-      <div className="grid gap-4 md:grid-cols-3">
-        <label className="space-y-1">
-          <span className="text-xs font-medium text-muted-foreground">Owner</span>
-          <select name="ownerId" required value={ownerId} onChange={(event) => setOwnerId(event.target.value)} className={inputClass}>
-            <option value="">Select owner</option>
-            {owners.map((owner) => (
-              <option key={owner.id} value={owner.id}>
-                {owner.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="space-y-1">
-          <span className="text-xs font-medium text-muted-foreground">Stock Location</span>
-          <select name="locationId" required value={locationId} onChange={(event) => setLocationId(event.target.value)} className={inputClass}>
-            {locations.map((location) => (
-              <option key={location.id} value={location.id}>
-                {location.code} - {location.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="space-y-1">
-          <span className="text-xs font-medium text-muted-foreground">Reference</span>
-          <input name="sourceNo" placeholder="Auto" className={inputClass} />
-        </label>
+    <form action={action} className={cn(isModal ? "space-y-4" : "rounded-lg border border-border bg-card p-5")}>
+      {returnPath ? <input type="hidden" name="returnPath" value={returnPath} /> : null}
+      <div className="rounded-2xl border border-border/70 bg-muted/20 p-4 shadow-2xs">
+        <div className="grid gap-4 md:grid-cols-2">
+          <label className="space-y-1.5">
+            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Owner</span>
+            <select name="ownerId" required value={ownerId} onChange={(event) => setOwnerId(event.target.value)} className={inputClass}>
+              <option value="">Select owner</option>
+              {owners.map((owner) => (
+                <option key={owner.id} value={owner.id}>
+                  {owner.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="space-y-1.5">
+            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Stock Location</span>
+            <select name="locationId" required value={locationId} onChange={(event) => handleLocationChange(event.target.value)} className={inputClass}>
+              {locations.map((location) => (
+                <option key={location.id} value={location.id}>
+                  {location.code} - {location.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
       </div>
 
-      <AdjustmentLinesEditor products={products} balances={balances} locationId={locationId} ownerId={ownerId} />
+      <Notebook
+        className="mt-4"
+        items={[
+          {
+            value: "lines",
+            label: (
+              <span className="flex items-center gap-2">
+                <Package className="size-4 text-[#0B5D4B]" />
+                <span>Product Lines</span>
+              </span>
+            ),
+            content: (
+              <div className="p-4">
+                <AdjustmentLinesEditor products={products} balances={balances} locationId={locationId} ownerId={ownerId} initialProductId={initialProductId} />
+              </div>
+            ),
+          },
+          {
+            value: "notes",
+            label: (
+              <span className="flex items-center gap-2">
+                <FileText className="size-4 text-muted-foreground" />
+                <span>Terms & Notes</span>
+              </span>
+            ),
+            content: (
+              <div className="p-4">
+                <label className="flex flex-col gap-2 text-xs font-semibold text-foreground">
+                  <span className="flex items-center gap-1.5 text-muted-foreground">
+                    <FileText className="size-3.5 text-[#0B5D4B]" />
+                    <span>Terms & Internal Notes</span>
+                  </span>
+                  <textarea
+                    name="notes"
+                    rows={4}
+                    placeholder="Specify delivery timeline, shipping instructions, or terms agreed for this operation..."
+                    className="w-full rounded-xl border border-input bg-background/80 p-3.5 text-xs text-foreground placeholder:text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-[#0B5D4B]/30 focus-visible:border-[#0B5D4B] transition-all font-sans resize-y leading-relaxed"
+                  />
+                </label>
+              </div>
+            ),
+          },
+        ]}
+      />
 
-      <label className="mt-5 block space-y-1">
-        <span className="text-xs font-medium text-muted-foreground">Notes</span>
-        <textarea name="notes" rows={4} className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus:border-primary" />
-      </label>
-
-      <div className="mt-5 flex justify-end">
-        <Button type="submit">Post Adjustment</Button>
+      <div className="mt-5 flex items-center justify-end gap-3 pt-3 border-t border-border/60">
+        {onCancel ? (
+          <Button type="button" variant="outline" className="rounded-xl border-border text-xs font-semibold hover:bg-muted" onClick={onCancel}>
+            Cancel
+          </Button>
+        ) : null}
+        <Button type="submit" className="rounded-xl bg-gradient-to-r from-[#0B5D4B] to-[#073B35] font-semibold text-xs text-white shadow-sm shadow-[#0B5D4B]/20 hover:brightness-110">
+          Post Adjustment
+        </Button>
       </div>
     </form>
   );
@@ -416,14 +628,27 @@ export function ScrapLinesEditor({
   balances,
   locationId,
   ownerId,
+  initialProductId,
 }: {
   products: InventoryOperationFormOptions["products"];
   balances: BalanceOption[];
   locationId: string;
   ownerId: string;
+  initialProductId?: string;
 }) {
-  const [lines, setLines] = useState<ScrapLine[]>(() => [createScrapLine()]);
+  const [lines, setLines] = useState<ScrapLine[]>(() => [
+    { ...createScrapLine(), productId: initialProductId ?? "" },
+  ]);
   const productById = useMemo(() => new Map(products.map((product) => [product.id, product])), [products]);
+  const productSelectOptions = useMemo(
+    () =>
+      products.map((p) => ({
+        id: p.id,
+        code: p.code,
+        name: p.name,
+      })),
+    [products],
+  );
   const balanceByKey = useMemo(
     () => new Map(balances.map((balance) => [lineKey(balance.locationId, balance.ownerId ?? "", balance.productId, balance.serialNo, balance.lotNo), balance])),
     [balances],
@@ -475,68 +700,132 @@ export function ScrapLinesEditor({
   }
 
   return (
-    <div className="mt-5 overflow-x-auto">
-      <table className="w-full min-w-[1120px] text-left text-sm">
-        <thead className="text-xs uppercase text-muted-foreground">
-          <tr className="border-b border-border">
-            <th className="px-2 py-2">Product</th>
-            <th className="px-2 py-2">Serial</th>
-            <th className="px-2 py-2">Lot</th>
-            <th className="px-2 py-2 text-right">On Hand</th>
-            <th className="px-2 py-2 text-right">Scrap Qty</th>
-            <th className="px-2 py-2">Reason</th>
-            <th className="w-12 px-2 py-2">
-              <span className="sr-only">Actions</span>
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {lines.map((line) => {
-            const product = productById.get(line.productId);
-            const trackingMode = product?.trackingMode ?? "none";
-            const balance = currentBalance(line);
+    <div className="space-y-4">
+      <div className="grid gap-3.5">
+        {lines.map((line, index) => {
+          const product = productById.get(line.productId);
+          const trackingMode = product?.trackingMode ?? "none";
+          const balance = currentBalance(line);
 
-            return (
-              <tr key={line.id} className="border-b border-border/70 align-top">
-                <td className="px-2 py-3">
-                  <select name="productId" value={line.productId} onChange={(event) => updateLine(line.id, { productId: event.target.value })} className={inputClass}>
-                    <option value="">Select product</option>
-                    {products.map((option) => (
-                      <option key={option.id} value={option.id}>
-                        {option.code} - {option.name} ({option.trackingMode})
-                      </option>
-                    ))}
-                  </select>
-                </td>
-                <td className="px-2 py-3">
-                  <input name="serialNo" value={line.serialNo} readOnly={trackingMode !== "serial"} placeholder={trackingMode === "serial" ? "Serial" : "-"} onChange={(event) => updateLine(line.id, { serialNo: event.target.value })} className={inputClass} />
-                </td>
-                <td className="px-2 py-3">
-                  <input name="lotNo" value={line.lotNo} readOnly={trackingMode !== "lot"} placeholder={trackingMode === "lot" ? "Lot" : "-"} onChange={(event) => updateLine(line.id, { lotNo: event.target.value })} className={inputClass} />
-                </td>
-                <td className="px-2 py-3 text-right">{formatQuantity(balance?.quantityOnHand ?? 0)}</td>
-                <td className="px-2 py-3">
-                  <input name="quantity" type="number" min="0.000001" max={balance?.quantityAvailable ?? undefined} step="0.000001" value={line.quantity} onChange={(event) => updateLine(line.id, { quantity: event.target.value })} className={`${inputClass} text-right`} />
-                </td>
-                <td className="px-2 py-3">
-                  <input name="lineNotes" value={line.notes} onChange={(event) => updateLine(line.id, { notes: event.target.value })} className={inputClass} />
-                </td>
-                <td className="px-2 py-3">
-                  <Button type="button" variant="ghost" size="icon" aria-label="Remove line" onClick={() => setLines((current) => (current.length > 1 ? current.filter((item) => item.id !== line.id) : [createScrapLine()]))}>
-                    <Trash2Icon />
+          return (
+            <div
+              key={line.id}
+              style={{ zIndex: lines.length - index + 10 }}
+              className="group relative rounded-2xl border border-border/80 bg-card px-3.5 pt-3 pb-2.5 shadow-2xs transition-all duration-200 hover:border-rose-500/30 hover:shadow-xs focus-within:!z-50"
+            >
+              {/* Card Header: Product Name + Scrap Quantity on SAME LINE */}
+              <div className="flex items-start gap-2.5 sm:gap-3">
+                <span className="flex h-10 w-8 shrink-0 items-center justify-center rounded-lg bg-rose-500/10 font-mono text-xs font-bold text-rose-600 dark:text-rose-400 border border-rose-500/20">
+                  {String(index + 1).padStart(2, "0")}
+                </span>
+                <div className="flex-1 min-w-0">
+                  <input type="hidden" name="productId" value={line.productId} />
+                  <RelatedModelSelect
+                    value={line.productId}
+                    options={productSelectOptions}
+                    placeholder="Search product by name, SKU, or brand..."
+                    emptyLabel="No products found."
+                    onValueChange={(val) => updateLine(line.id, { productId: val })}
+                    inputClassName="h-10 rounded-xl text-xs font-semibold w-full"
+                  />
+                  {line.productId ? (
+                    <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] font-mono text-muted-foreground pl-0.5">
+                      <span>On Hand: <strong className="text-foreground">{formatQuantity(balance?.quantityOnHand ?? 0)}</strong></span>
+                      <span className="text-border/80">•</span>
+                      <span>Avail: <strong className="text-rose-600 dark:text-rose-400 font-bold">{formatQuantity(balance?.quantityAvailable ?? 0)}</strong></span>
+                    </div>
+                  ) : null}
+                </div>
+
+                {/* Scrap Quantity Field: SAME LINE with Product Name */}
+                <div className="w-28 sm:w-36 shrink-0 space-y-1">
+                  <div className="relative flex items-center h-10">
+                    <input
+                      name="quantity"
+                      type="number"
+                      min="0.000001"
+                      max={balance?.quantityAvailable ?? undefined}
+                      step="0.000001"
+                      value={line.quantity}
+                      placeholder="Scrap Qty"
+                      onChange={(event) => updateLine(line.id, { quantity: event.target.value })}
+                      className={cn(inputClass, "font-mono font-bold text-rose-600 dark:text-rose-400 pr-10 text-right h-10")}
+                    />
+                    <span className="pointer-events-none absolute right-2.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+                      Qty
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex h-10 items-center shrink-0">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    aria-label="Remove line"
+                    className="size-8 rounded-lg text-muted-foreground/60 hover:text-destructive hover:bg-destructive/10"
+                    onClick={() => setLines((current) => (current.length > 1 ? current.filter((item) => item.id !== line.id) : [createScrapLine()]))}
+                  >
+                    <Trash2Icon className="size-4" />
                   </Button>
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-      <div className="mt-3">
-        <Button type="button" variant="outline" size="sm" onClick={() => setLines((current) => [...current, createScrapLine()])}>
-          <PlusIcon data-icon="inline-start" />
-          Add line
-        </Button>
+                </div>
+              </div>
+
+              {/* Hidden tracking & note inputs for index alignment */}
+              <input type="hidden" name="lineNotes" value={line.notes} />
+              {trackingMode !== "serial" ? <input type="hidden" name="serialNo" value="" /> : null}
+              {trackingMode !== "lot" ? <input type="hidden" name="lotNo" value="" /> : null}
+
+              {/* Serial / Lot tracking inputs (only rendered when product requires tracking) */}
+              {trackingMode !== "none" ? (
+                <div className="mt-3 pt-3 border-t border-border/40">
+                  {trackingMode === "serial" ? (
+                    <div className="space-y-1 max-w-xs">
+                      <span className="text-[11px] font-semibold text-foreground flex items-center justify-between">
+                        <span>Serial No</span>
+                        <span className="text-[10px] text-rose-600 dark:text-rose-400 font-semibold">Required</span>
+                      </span>
+                      <input
+                        name="serialNo"
+                        value={line.serialNo}
+                        placeholder="Enter serial #"
+                        onChange={(event) => updateLine(line.id, { serialNo: event.target.value })}
+                        className={inputClass}
+                      />
+                    </div>
+                  ) : trackingMode === "lot" ? (
+                    <div className="space-y-1 max-w-xs">
+                      <span className="text-[11px] font-semibold text-foreground flex items-center justify-between">
+                        <span>Lot No</span>
+                        <span className="text-[10px] text-rose-600 dark:text-rose-400 font-semibold">Required</span>
+                      </span>
+                      <input
+                        name="lotNo"
+                        value={line.lotNo}
+                        placeholder="Enter lot #"
+                        onChange={(event) => updateLine(line.id, { lotNo: event.target.value })}
+                        className={inputClass}
+                      />
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
+
+
+            </div>
+          );
+        })}
       </div>
+
+      <Button
+        type="button"
+        variant="outline"
+        onClick={() => setLines((current) => [...current, createScrapLine()])}
+        className="w-full sm:w-auto gap-2 border-dashed border-rose-500/50 bg-rose-500/5 text-rose-600 dark:text-rose-400 font-semibold hover:bg-rose-500/10 hover:border-rose-500 transition-all py-2.5 px-5 rounded-xl text-xs"
+      >
+        <PlusIcon className="size-4" />
+        Add Another Scrap Line
+      </Button>
     </div>
   );
 }
@@ -547,55 +836,138 @@ export function InventoryScrapForm({
   locations,
   products,
   balances,
+  returnPath,
+  onCancel,
+  isModal,
+  initialLocationId: propLocationId,
+  initialOwnerId: propOwnerId,
+  initialProductId,
 }: {
   action: (formData: FormData) => void | Promise<void>;
   owners: InventoryOperationFormOptions["owners"];
   locations: InventoryOperationFormOptions["locations"];
   products: InventoryOperationFormOptions["products"];
   balances: BalanceOption[];
+  returnPath?: string;
+  onCancel?: () => void;
+  isModal?: boolean;
+  initialLocationId?: string;
+  initialOwnerId?: string;
+  initialProductId?: string;
 }) {
-  const [locationId, setLocationId] = useState(locations[0]?.id ?? "");
-  const [ownerId, setOwnerId] = useState(owners[0]?.id ?? "");
+  const selectedLocationId = useAppStore((state) => state.selectedLocationId);
+  const initialLocationId = propLocationId ?? (selectedLocationId && locations.some((l) => l.id === selectedLocationId) ? selectedLocationId : (locations[0]?.id ?? ""));
+  const [locationId, setLocationId] = useState(initialLocationId);
+
+  const initialOwnerId = useMemo(() => {
+    if (propOwnerId) return propOwnerId;
+    return findOwnerForLocation(initialLocationId, owners, balances);
+  }, [balances, initialLocationId, owners, propOwnerId]);
+
+  const [ownerId, setOwnerId] = useState(initialOwnerId);
+
+  useEffect(() => {
+    if (!propOwnerId && initialLocationId) {
+      const autoOwnerId = findOwnerForLocation(initialLocationId, owners, balances);
+      if (autoOwnerId) {
+        setOwnerId(autoOwnerId);
+      }
+    }
+  }, [balances, initialLocationId, owners, propOwnerId]);
+
+  function handleLocationChange(nextLocId: string) {
+    setLocationId(nextLocId);
+    if (nextLocId) {
+      const autoOwnerId = findOwnerForLocation(nextLocId, owners, balances);
+      if (autoOwnerId) {
+        setOwnerId(autoOwnerId);
+      }
+    }
+  }
 
   return (
-    <form action={action} className="rounded-lg border border-border bg-card p-5">
-      <div className="grid gap-4 md:grid-cols-3">
-        <label className="space-y-1">
-          <span className="text-xs font-medium text-muted-foreground">Owner</span>
-          <select name="ownerId" required value={ownerId} onChange={(event) => setOwnerId(event.target.value)} className={inputClass}>
-            <option value="">Select owner</option>
-            {owners.map((owner) => (
-              <option key={owner.id} value={owner.id}>
-                {owner.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="space-y-1">
-          <span className="text-xs font-medium text-muted-foreground">Source Location</span>
-          <select name="locationId" required value={locationId} onChange={(event) => setLocationId(event.target.value)} className={inputClass}>
-            {locations.map((location) => (
-              <option key={location.id} value={location.id}>
-                {location.code} - {location.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="space-y-1">
-          <span className="text-xs font-medium text-muted-foreground">Reference</span>
-          <input name="sourceNo" placeholder="Auto" className={inputClass} />
-        </label>
+    <form action={action} className={cn(isModal ? "space-y-4" : "rounded-lg border border-border bg-card p-5")}>
+      {returnPath ? <input type="hidden" name="returnPath" value={returnPath} /> : null}
+      <div className="rounded-2xl border border-border/70 bg-muted/20 p-4 shadow-2xs">
+        <div className="grid gap-4 md:grid-cols-2">
+          <label className="space-y-1.5">
+            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Owner</span>
+            <select name="ownerId" required value={ownerId} onChange={(event) => setOwnerId(event.target.value)} className={inputClass}>
+              <option value="">Select owner</option>
+              {owners.map((owner) => (
+                <option key={owner.id} value={owner.id}>
+                  {owner.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="space-y-1.5">
+            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Source Location</span>
+            <select name="locationId" required value={locationId} onChange={(event) => handleLocationChange(event.target.value)} className={inputClass}>
+              {locations.map((location) => (
+                <option key={location.id} value={location.id}>
+                  {location.code} - {location.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
       </div>
 
-      <ScrapLinesEditor products={products} balances={balances} locationId={locationId} ownerId={ownerId} />
+      <Notebook
+        className="mt-4"
+        items={[
+          {
+            value: "lines",
+            label: (
+              <span className="flex items-center gap-2">
+                <Package className="size-4 text-rose-600" />
+                <span>Product Lines</span>
+              </span>
+            ),
+            content: (
+              <div className="p-4">
+                <ScrapLinesEditor products={products} balances={balances} locationId={locationId} ownerId={ownerId} initialProductId={initialProductId} />
+              </div>
+            ),
+          },
+          {
+            value: "notes",
+            label: (
+              <span className="flex items-center gap-2">
+                <FileText className="size-4 text-muted-foreground" />
+                <span>Terms & Notes</span>
+              </span>
+            ),
+            content: (
+              <div className="p-4">
+                <label className="flex flex-col gap-2 text-xs font-semibold text-foreground">
+                  <span className="flex items-center gap-1.5 text-muted-foreground">
+                    <FileText className="size-3.5 text-rose-600" />
+                    <span>Write-off Rationale & Internal Notes</span>
+                  </span>
+                  <textarea
+                    name="notes"
+                    rows={4}
+                    placeholder="Specify write-off approval details, damage inspection notes, or disposal terms..."
+                    className="w-full rounded-xl border border-input bg-background/80 p-3.5 text-xs text-foreground placeholder:text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-rose-500/30 focus-visible:border-rose-500 transition-all font-sans resize-y leading-relaxed"
+                  />
+                </label>
+              </div>
+            ),
+          },
+        ]}
+      />
 
-      <label className="mt-5 block space-y-1">
-        <span className="text-xs font-medium text-muted-foreground">Notes</span>
-        <textarea name="notes" rows={4} className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus:border-primary" />
-      </label>
-
-      <div className="mt-5 flex justify-end">
-        <Button type="submit">Post Scrap</Button>
+      <div className="mt-5 flex items-center justify-end gap-3 pt-3 border-t border-border/60">
+        {onCancel ? (
+          <Button type="button" variant="outline" className="rounded-xl border-border text-xs font-semibold hover:bg-muted" onClick={onCancel}>
+            Cancel
+          </Button>
+        ) : null}
+        <Button type="submit" className="rounded-xl bg-rose-600 font-semibold text-xs text-white shadow-sm shadow-rose-600/20 hover:bg-rose-700">
+          Post Scrap / Write-off
+        </Button>
       </div>
     </form>
   );
@@ -606,14 +978,27 @@ export function InternalTransferLinesEditor({
   balances,
   fromLocationId,
   ownerId,
+  initialProductId,
 }: {
   products: InventoryOperationFormOptions["products"];
   balances: BalanceOption[];
   fromLocationId: string;
   ownerId: string;
+  initialProductId?: string;
 }) {
-  const [lines, setLines] = useState<InternalTransferLine[]>(() => [createInternalTransferLine()]);
+  const [lines, setLines] = useState<InternalTransferLine[]>(() => [
+    { ...createInternalTransferLine(), productId: initialProductId ?? "" },
+  ]);
   const productById = useMemo(() => new Map(products.map((product) => [product.id, product])), [products]);
+  const productSelectOptions = useMemo(
+    () =>
+      products.map((p) => ({
+        id: p.id,
+        code: p.code,
+        name: p.name,
+      })),
+    [products],
+  );
   const balanceByKey = useMemo(
     () => new Map(balances.map((balance) => [lineKey(balance.locationId, balance.ownerId ?? "", balance.productId, balance.serialNo, balance.lotNo), balance])),
     [balances],
@@ -671,130 +1056,161 @@ export function InternalTransferLinesEditor({
   }
 
   return (
-    <div className="mt-5 overflow-x-auto">
-      <table className="w-full min-w-[1120px] text-left text-sm">
-        <thead className="text-xs uppercase text-muted-foreground">
-          <tr className="border-b border-border">
-            <th className="px-2 py-2">Product</th>
-            <th className="px-2 py-2">Serial</th>
-            <th className="px-2 py-2">Lot</th>
-            <th className="px-2 py-2 text-right">On Hand</th>
-            <th className="px-2 py-2 text-right">Available</th>
-            <th className="px-2 py-2 text-right">Transfer Qty</th>
-            <th className="px-2 py-2">Notes</th>
-            <th className="w-12 px-2 py-2">
-              <span className="sr-only">Actions</span>
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {lines.map((line) => {
-            const product = productById.get(line.productId);
-            const trackingMode = product?.trackingMode ?? "none";
-            const balance = currentBalance(line);
-            const productError = fieldErrors[fieldKey("productId", line.id)];
-            const serialError = fieldErrors[fieldKey("serialNo", line.id)];
-            const lotError = fieldErrors[fieldKey("lotNo", line.id)];
-            const quantityError = fieldErrors[fieldKey("quantity", line.id)];
+    <div className="space-y-4">
+      <div className="grid gap-3.5">
+        {lines.map((line, index) => {
+          const product = productById.get(line.productId);
+          const trackingMode = product?.trackingMode ?? "none";
+          const balance = currentBalance(line);
+          const productError = fieldErrors[fieldKey("productId", line.id)];
+          const serialError = fieldErrors[fieldKey("serialNo", line.id)];
+          const lotError = fieldErrors[fieldKey("lotNo", line.id)];
+          const quantityError = fieldErrors[fieldKey("quantity", line.id)];
 
-            return (
-              <tr key={line.id} className="border-b border-border/70 align-top">
-                <td className="px-2 py-3">
-                  <select
-                    name="productId"
+          return (
+            <div
+              key={line.id}
+              style={{ zIndex: lines.length - index + 10 }}
+              className="group relative rounded-2xl border border-border/80 bg-card px-3.5 pt-3 pb-2.5 shadow-2xs transition-all duration-200 hover:border-[#0B5D4B]/30 hover:shadow-xs focus-within:!z-50"
+            >
+              {/* Card Header: Product Name + Transfer Quantity on SAME LINE */}
+              <div className="flex items-start gap-2.5 sm:gap-3">
+                <span className="flex h-10 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10 font-mono text-xs font-bold text-[#0B5D4B] dark:text-emerald-300 border border-emerald-500/20">
+                  {String(index + 1).padStart(2, "0")}
+                </span>
+                <div className="flex-1 min-w-0">
+                  <input type="hidden" name="productId" value={line.productId} />
+                  <RelatedModelSelect
                     value={line.productId}
-                    aria-invalid={productError ? "true" : undefined}
-                    aria-describedby={productError ? `transfer-product-error-${line.id}` : undefined}
-                    onChange={(event) => updateLine(line.id, { productId: event.target.value })}
-                    className={`${inputClass} ${productError ? "border-destructive focus:border-destructive" : ""}`}
-                  >
-                    <option value="">Select product</option>
-                    {products.map((option) => (
-                      <option key={option.id} value={option.id}>
-                        {option.code} - {option.name} ({option.trackingMode})
-                      </option>
-                    ))}
-                  </select>
+                    options={productSelectOptions}
+                    placeholder="Search product by name, SKU, or brand..."
+                    emptyLabel="No products found."
+                    onValueChange={(val) => updateLine(line.id, { productId: val })}
+                    inputClassName="h-10 rounded-xl text-xs font-semibold w-full"
+                    error={productError}
+                  />
                   {productError ? (
-                    <p id={`transfer-product-error-${line.id}`} className="mt-1 text-xs text-destructive">
+                    <p id={`transfer-product-error-${line.id}`} className="mt-1 text-[11px] font-medium text-destructive">
                       {productError}
                     </p>
                   ) : null}
-                </td>
-                <td className="px-2 py-3">
-                  <input
-                    name="serialNo"
-                    value={line.serialNo}
-                    readOnly={trackingMode !== "serial"}
-                    placeholder={trackingMode === "serial" ? "Serial" : "-"}
-                    aria-invalid={serialError ? "true" : undefined}
-                    aria-describedby={serialError ? `transfer-serial-error-${line.id}` : undefined}
-                    onChange={(event) => updateLine(line.id, { serialNo: event.target.value })}
-                    className={`${inputClass} ${serialError ? "border-destructive focus:border-destructive" : ""}`}
-                  />
-                  {serialError ? (
-                    <p id={`transfer-serial-error-${line.id}`} className="mt-1 text-xs text-destructive">
-                      {serialError}
-                    </p>
+                  {line.productId ? (
+                    <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] font-mono text-muted-foreground pl-0.5">
+                      <span>On Hand: <strong className="text-foreground">{formatQuantity(balance?.quantityOnHand ?? 0)}</strong></span>
+                      <span className="text-border/80">•</span>
+                      <span>Avail: <strong className="text-emerald-600 dark:text-emerald-400 font-bold">{formatQuantity(balance?.quantityAvailable ?? 0)}</strong></span>
+                    </div>
                   ) : null}
-                </td>
-                <td className="px-2 py-3">
-                  <input
-                    name="lotNo"
-                    value={line.lotNo}
-                    readOnly={trackingMode !== "lot"}
-                    placeholder={trackingMode === "lot" ? "Lot" : "-"}
-                    aria-invalid={lotError ? "true" : undefined}
-                    aria-describedby={lotError ? `transfer-lot-error-${line.id}` : undefined}
-                    onChange={(event) => updateLine(line.id, { lotNo: event.target.value })}
-                    className={`${inputClass} ${lotError ? "border-destructive focus:border-destructive" : ""}`}
-                  />
-                  {lotError ? (
-                    <p id={`transfer-lot-error-${line.id}`} className="mt-1 text-xs text-destructive">
-                      {lotError}
-                    </p>
-                  ) : null}
-                </td>
-                <td className="px-2 py-3 text-right">{formatQuantity(balance?.quantityOnHand ?? 0)}</td>
-                <td className="px-2 py-3 text-right">{formatQuantity(balance?.quantityAvailable ?? 0)}</td>
-                <td className="px-2 py-3">
-                  <input
-                    name="quantity"
-                    type="number"
-                    min="0.000001"
-                    max={balance?.quantityAvailable ?? undefined}
-                    step="0.000001"
-                    value={line.quantity}
-                    aria-invalid={quantityError ? "true" : undefined}
-                    aria-describedby={quantityError ? `transfer-quantity-error-${line.id}` : undefined}
-                    onChange={(event) => updateLine(line.id, { quantity: event.target.value })}
-                    className={`${inputClass} text-right ${quantityError ? "border-destructive focus:border-destructive" : ""}`}
-                  />
+                </div>
+
+                {/* Transfer Quantity Field: SAME LINE with Product Name */}
+                <div className="w-28 sm:w-36 shrink-0 space-y-1">
+                  <div className="relative flex items-center h-10">
+                    <input
+                      name="quantity"
+                      type="number"
+                      min="0.000001"
+                      max={balance?.quantityAvailable ?? undefined}
+                      step="0.000001"
+                      value={line.quantity}
+                      placeholder="Transfer Qty"
+                      onChange={(event) => updateLine(line.id, { quantity: event.target.value })}
+                      className={cn(
+                        inputClass,
+                        "font-mono font-bold text-foreground pr-10 text-right h-10",
+                        quantityError && "border-destructive",
+                      )}
+                    />
+                    <span className="pointer-events-none absolute right-2.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+                      Qty
+                    </span>
+                  </div>
                   {quantityError ? (
-                    <p id={`transfer-quantity-error-${line.id}`} className="mt-1 text-xs text-destructive">
+                    <p id={`transfer-quantity-error-${line.id}`} className="mt-1 text-[11px] font-medium text-destructive">
                       {quantityError}
                     </p>
                   ) : null}
-                </td>
-                <td className="px-2 py-3">
-                  <input name="lineNotes" value={line.notes} onChange={(event) => updateLine(line.id, { notes: event.target.value })} className={inputClass} />
-                </td>
-                <td className="px-2 py-3">
-                  <Button type="button" variant="ghost" size="icon" aria-label="Remove line" onClick={() => setLines((current) => (current.length > 1 ? current.filter((item) => item.id !== line.id) : [createInternalTransferLine()]))}>
-                    <Trash2Icon />
+                </div>
+
+                <div className="flex h-10 items-center shrink-0">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    aria-label="Remove line"
+                    className="size-8 rounded-lg text-muted-foreground/60 hover:text-destructive hover:bg-destructive/10"
+                    onClick={() => setLines((current) => (current.length > 1 ? current.filter((item) => item.id !== line.id) : [createInternalTransferLine()]))}
+                  >
+                    <Trash2Icon className="size-4" />
                   </Button>
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-      <div className="mt-3">
-        <Button type="button" variant="outline" size="sm" onClick={() => setLines((current) => [...current, createInternalTransferLine()])}>
-          <PlusIcon data-icon="inline-start" />
-          Add line
-        </Button>
+                </div>
+              </div>
+
+              {/* Hidden tracking & note inputs for index alignment */}
+              <input type="hidden" name="lineNotes" value={line.notes} />
+              {trackingMode !== "serial" ? <input type="hidden" name="serialNo" value="" /> : null}
+              {trackingMode !== "lot" ? <input type="hidden" name="lotNo" value="" /> : null}
+
+              {/* Serial / Lot tracking inputs (only rendered when product requires tracking) */}
+              {trackingMode !== "none" ? (
+                <div className="mt-3 pt-3 border-t border-border/40">
+                  {trackingMode === "serial" ? (
+                    <div className="space-y-1 max-w-xs">
+                      <span className="text-[11px] font-semibold text-foreground flex items-center justify-between">
+                        <span>Serial No</span>
+                        <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold">Required</span>
+                      </span>
+                      <input
+                        name="serialNo"
+                        value={line.serialNo}
+                        placeholder="Enter serial #"
+                        onChange={(event) => updateLine(line.id, { serialNo: event.target.value })}
+                        className={cn(inputClass, serialError && "border-destructive")}
+                      />
+                      {serialError ? (
+                        <p id={`transfer-serial-error-${line.id}`} className="mt-1 text-[11px] font-medium text-destructive">
+                          {serialError}
+                        </p>
+                      ) : null}
+                    </div>
+                  ) : trackingMode === "lot" ? (
+                    <div className="space-y-1 max-w-xs">
+                      <span className="text-[11px] font-semibold text-foreground flex items-center justify-between">
+                        <span>Lot No</span>
+                        <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold">Required</span>
+                      </span>
+                      <input
+                        name="lotNo"
+                        value={line.lotNo}
+                        placeholder="Enter lot #"
+                        onChange={(event) => updateLine(line.id, { lotNo: event.target.value })}
+                        className={cn(inputClass, lotError && "border-destructive")}
+                      />
+                      {lotError ? (
+                        <p id={`transfer-lot-error-${line.id}`} className="mt-1 text-[11px] font-medium text-destructive">
+                          {lotError}
+                        </p>
+                      ) : null}
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
+
+
+            </div>
+          );
+        })}
       </div>
+
+      <Button
+        type="button"
+        variant="outline"
+        onClick={() => setLines((current) => [...current, createInternalTransferLine()])}
+        className="w-full sm:w-auto gap-2 border-dashed border-[#0B5D4B]/50 bg-emerald-500/5 text-[#0B5D4B] dark:text-emerald-300 font-semibold hover:bg-emerald-500/10 hover:border-[#0B5D4B] transition-all py-2.5 px-5 rounded-xl text-xs"
+      >
+        <PlusIcon className="size-4" />
+        Add Another Transfer Line
+      </Button>
     </div>
   );
 }
@@ -805,23 +1221,59 @@ export function InventoryInternalTransferForm({
   locations,
   products,
   balances,
+  returnPath,
+  onCancel,
+  isModal,
+  initialLocationId: propLocationId,
+  initialOwnerId: propOwnerId,
+  initialProductId,
 }: {
   action: (formData: FormData) => void | Promise<void>;
   owners: InventoryOperationFormOptions["owners"];
   locations: InventoryOperationFormOptions["locations"];
   products: InventoryOperationFormOptions["products"];
   balances: BalanceOption[];
+  returnPath?: string;
+  onCancel?: () => void;
+  isModal?: boolean;
+  initialLocationId?: string;
+  initialOwnerId?: string;
+  initialProductId?: string;
 }) {
-  const [ownerId, setOwnerId] = useState(owners[0]?.id ?? "");
-  const [fromLocationId, setFromLocationId] = useState(locations[0]?.id ?? "");
+  const selectedLocationId = useAppStore((state) => state.selectedLocationId);
+  const initialFromLocationId = propLocationId ?? (selectedLocationId && locations.some((l) => l.id === selectedLocationId) ? selectedLocationId : (locations[0]?.id ?? ""));
+  const [fromLocationId, setFromLocationId] = useState(initialFromLocationId);
+
+  const initialOwnerId = useMemo(() => {
+    if (propOwnerId) return propOwnerId;
+    return findOwnerForLocation(initialFromLocationId, owners, balances);
+  }, [balances, initialFromLocationId, owners, propOwnerId]);
+
+  const [ownerId, setOwnerId] = useState(initialOwnerId);
   const [toLocationId, setToLocationId] = useState("");
   const [formErrors, setFormErrors] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (!propOwnerId && initialFromLocationId) {
+      const autoOwnerId = findOwnerForLocation(initialFromLocationId, owners, balances);
+      if (autoOwnerId) {
+        setOwnerId(autoOwnerId);
+      }
+    }
+  }, [balances, initialFromLocationId, owners, propOwnerId]);
 
   function changeFromLocation(value: string) {
     setFromLocationId(value);
 
     if (toLocationId === value) {
       setToLocationId("");
+    }
+
+    if (value) {
+      const autoOwnerId = findOwnerForLocation(value, owners, balances);
+      if (autoOwnerId) {
+        setOwnerId(autoOwnerId);
+      }
     }
   }
 
@@ -839,15 +1291,15 @@ export function InventoryInternalTransferForm({
         lineNo: index + 1,
         productId,
         quantity: Number(quantities[index] ?? 0),
-        serialNo: serialNumbers[index]?.trim() || null,
-        lotNo: lotNumbers[index]?.trim() || null,
+        serialNo: String(serialNumbers[index] ?? "").trim(),
+        lotNo: String(lotNumbers[index] ?? "").trim(),
       }))
-      .filter((line) => line.productId || line.quantity > 0 || line.serialNo || line.lotNo);
+      .filter((line) => line.productId && line.quantity > 0);
 
     const errors: string[] = [];
 
     if (!selectedOwnerId) {
-      errors.push("Select an owner before posting the transfer.");
+      errors.push("Select an owner.");
     }
 
     if (!selectedFromLocationId || !selectedToLocationId) {
@@ -889,15 +1341,14 @@ export function InventoryInternalTransferForm({
       const balance = findBalance(balances, products, {
         locationId: selectedFromLocationId,
         ownerId: selectedOwnerId,
-        productId: product.id,
-        serialNo: line.serialNo,
-        lotNo: line.lotNo,
+        productId: line.productId,
+        serialNo: line.serialNo || null,
+        lotNo: line.lotNo || null,
       });
-      const availableQuantity = Number(balance?.quantityAvailable ?? 0);
 
-      if (!balance || availableQuantity < line.quantity) {
-        const message = `Only ${formatQuantity(availableQuantity)} available.`;
-        errors.push(`Line ${line.lineNo}: ${message} Product: ${product.code}.`);
+      if (!balance || Number(balance.quantityAvailable) < line.quantity) {
+        const available = balance ? formatQuantity(balance.quantityAvailable) : "0";
+        errors.push(`Line ${line.lineNo}: insufficient available stock for ${product.name} (available: ${available}).`);
       }
     }
 
@@ -911,68 +1362,112 @@ export function InventoryInternalTransferForm({
   }
 
   return (
-    <form action={action} onSubmit={validateBeforeSubmit} className="rounded-lg border border-border bg-card p-5">
+    <form action={action} onSubmit={validateBeforeSubmit} className={cn(isModal ? "space-y-4" : "rounded-lg border border-border bg-card p-5")}>
+      {returnPath ? <input type="hidden" name="returnPath" value={returnPath} /> : null}
       {formErrors.length > 0 ? (
-        <div className="mb-4 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-          <ul className="list-disc space-y-1 pl-5">
-            {formErrors.map((error) => (
-              <li key={error}>{error}</li>
+        <div className="rounded-2xl border border-destructive/40 bg-destructive/10 p-3.5 text-xs text-destructive shadow-xs">
+          <p className="font-semibold uppercase tracking-wider">Please resolve these errors before transferring:</p>
+          <ul className="mt-1.5 list-disc pl-4 space-y-0.5 font-medium">
+            {formErrors.map((error, index) => (
+              <li key={index}>{error}</li>
             ))}
           </ul>
         </div>
       ) : null}
 
-      <div className="grid gap-4 md:grid-cols-4">
-        <label className="space-y-1">
-          <span className="text-xs font-medium text-muted-foreground">Owner</span>
-          <select name="ownerId" required value={ownerId} onChange={(event) => setOwnerId(event.target.value)} className={inputClass}>
-            <option value="">Select owner</option>
-            {owners.map((owner) => (
-              <option key={owner.id} value={owner.id}>
-                {owner.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="space-y-1">
-          <span className="text-xs font-medium text-muted-foreground">From Location</span>
-          <select name="fromLocationId" required value={fromLocationId} onChange={(event) => changeFromLocation(event.target.value)} className={inputClass}>
-            <option value="">Select source</option>
-            {locations.map((location) => (
-              <option key={location.id} value={location.id}>
-                {location.code} - {location.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="space-y-1">
-          <span className="text-xs font-medium text-muted-foreground">To Location</span>
-          <select name="toLocationId" required value={toLocationId} onChange={(event) => setToLocationId(event.target.value)} className={inputClass}>
-            <option value="">Select destination</option>
-            {locations
-              .filter((location) => location.id !== fromLocationId)
-              .map((location) => (
+      <div className="rounded-2xl border border-border/70 bg-muted/20 p-4 shadow-2xs">
+        <div className="grid gap-4 md:grid-cols-3">
+          <label className="space-y-1.5">
+            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Owner</span>
+            <select name="ownerId" required value={ownerId} onChange={(event) => setOwnerId(event.target.value)} className={inputClass}>
+              <option value="">Select owner</option>
+              {owners.map((owner) => (
+                <option key={owner.id} value={owner.id}>
+                  {owner.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="space-y-1.5">
+            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">From Location</span>
+            <select name="fromLocationId" required value={fromLocationId} onChange={(event) => changeFromLocation(event.target.value)} className={inputClass}>
+              {locations.map((location) => (
                 <option key={location.id} value={location.id}>
                   {location.code} - {location.name}
                 </option>
               ))}
-          </select>
-        </label>
-        <label className="space-y-1">
-          <span className="text-xs font-medium text-muted-foreground">Reference</span>
-          <input name="sourceNo" placeholder="Auto" className={inputClass} />
-        </label>
+            </select>
+          </label>
+          <label className="space-y-1.5">
+            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">To Location</span>
+            <select name="toLocationId" required value={toLocationId} onChange={(event) => setToLocationId(event.target.value)} className={inputClass}>
+              <option value="">Select destination</option>
+              {locations
+                .filter((location) => location.id !== fromLocationId)
+                .map((location) => (
+                  <option key={location.id} value={location.id}>
+                    {location.code} - {location.name}
+                  </option>
+                ))}
+            </select>
+          </label>
+        </div>
       </div>
 
-      <InternalTransferLinesEditor products={products} balances={balances} fromLocationId={fromLocationId} ownerId={ownerId} />
+      <Notebook
+        className="mt-4"
+        items={[
+          {
+            value: "lines",
+            label: (
+              <span className="flex items-center gap-2">
+                <Package className="size-4 text-[#0B5D4B]" />
+                <span>Product Lines</span>
+              </span>
+            ),
+            content: (
+              <div className="p-4">
+                <InternalTransferLinesEditor products={products} balances={balances} fromLocationId={fromLocationId} ownerId={ownerId} initialProductId={initialProductId} />
+              </div>
+            ),
+          },
+          {
+            value: "notes",
+            label: (
+              <span className="flex items-center gap-2">
+                <FileText className="size-4 text-muted-foreground" />
+                <span>Terms & Notes</span>
+              </span>
+            ),
+            content: (
+              <div className="p-4">
+                <label className="flex flex-col gap-2 text-xs font-semibold text-foreground">
+                  <span className="flex items-center gap-1.5 text-muted-foreground">
+                    <FileText className="size-3.5 text-[#0B5D4B]" />
+                    <span>Transfer Terms & Internal Notes</span>
+                  </span>
+                  <textarea
+                    name="notes"
+                    rows={4}
+                    placeholder="Specify dispatch instructions, driver name, or transfer terms..."
+                    className="w-full rounded-xl border border-input bg-background/80 p-3.5 text-xs text-foreground placeholder:text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-[#0B5D4B]/30 focus-visible:border-[#0B5D4B] transition-all font-sans resize-y leading-relaxed"
+                  />
+                </label>
+              </div>
+            ),
+          },
+        ]}
+      />
 
-      <label className="mt-5 block space-y-1">
-        <span className="text-xs font-medium text-muted-foreground">Notes</span>
-        <textarea name="notes" rows={4} className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus:border-primary" />
-      </label>
-
-      <div className="mt-5 flex justify-end">
-        <Button type="submit">Post Internal Transfer</Button>
+      <div className="mt-5 flex items-center justify-end gap-3 pt-3 border-t border-border/60">
+        {onCancel ? (
+          <Button type="button" variant="outline" className="rounded-xl border-border text-xs font-semibold hover:bg-muted" onClick={onCancel}>
+            Cancel
+          </Button>
+        ) : null}
+        <Button type="submit" className="rounded-xl bg-gradient-to-r from-[#0B5D4B] to-[#073B35] font-semibold text-xs text-white shadow-sm shadow-[#0B5D4B]/20 hover:brightness-110">
+          Post Internal Transfer
+        </Button>
       </div>
     </form>
   );

@@ -32,55 +32,6 @@ export default async function NewInventoryOperationPage({ searchParams }: NewInv
       {query.error ? <Alert kind="error">{query.error}</Alert> : null}
 
       <form action={createInventoryOperation} className="rounded-lg border border-border bg-card p-5">
-        <div className="grid gap-4 md:grid-cols-4">
-          <label className="space-y-1">
-            <span className="text-xs font-medium text-muted-foreground">Owner</span>
-            <select name="ownerId" required defaultValue={options.owners[0]?.id ?? ""} className={inputClass()}>
-              <option value="">Select owner</option>
-              {options.owners.map((owner) => (
-                <option key={owner.id} value={owner.id}>
-                  {owner.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="space-y-1">
-            <span className="text-xs font-medium text-muted-foreground">Operation Type</span>
-            <select name="movementType" required defaultValue="adjustment" className={inputClass()}>
-              <option value="adjustment">Adjustment</option>
-              <option value="scrap">Scrap</option>
-              <option value="customer_return">Customer Return</option>
-              <option value="supplier_return">Supplier Return</option>
-            </select>
-          </label>
-          <label className="space-y-1">
-            <span className="text-xs font-medium text-muted-foreground">From Location</span>
-            <select name="fromLocationId" defaultValue="" className={inputClass()}>
-              <option value="">Select source</option>
-              {options.locations.map((location) => (
-                <option key={location.id} value={location.id}>
-                  {location.code} - {location.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="space-y-1">
-            <span className="text-xs font-medium text-muted-foreground">To Location</span>
-            <select name="toLocationId" defaultValue="" className={inputClass()}>
-              <option value="">Select destination</option>
-              {options.locations.map((location) => (
-                <option key={location.id} value={location.id}>
-                  {location.code} - {location.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="space-y-1">
-            <span className="text-xs font-medium text-muted-foreground">Source Reference</span>
-            <input name="sourceNo" className={inputClass()} />
-          </label>
-        </div>
-
         <OperationLinesEditor products={options.products} />
 
         <label className="mt-5 block space-y-1">

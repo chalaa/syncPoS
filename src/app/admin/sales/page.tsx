@@ -10,7 +10,8 @@ import { getPaymentList } from "@/server/payments/payments";
 import type { PaymentListRow } from "@/server/payments/types";
 import { displayReturnMoney, getCustomerReturnList } from "@/server/returns/returns";
 import type { CustomerReturnListRow } from "@/server/returns/types";
-import { displaySalesMoney, getCustomerInvoiceList, getDeliveryList, getSalesOrderList } from "@/server/sales/sales";
+import { NewSalesOrderModal } from "@/app/admin/sales/new-sales-order-modal";
+import { displaySalesMoney, getCustomerInvoiceList, getDeliveryList, getSalesFormOptions, getSalesOrderList } from "@/server/sales/sales";
 import type { CustomerInvoiceListRow, DeliveryListRow, SalesOrderListRow } from "@/server/sales/types";
 
 export const dynamic = "force-dynamic";
@@ -23,8 +24,18 @@ type SalesPageProps = {
     partnerId?: string;
     notice?: string;
     error?: string;
+    new?: string;
   }>;
 };
+
+function todayDate() {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Africa/Addis_Ababa",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+}
 
 export default async function SalesPage({ searchParams }: SalesPageProps) {
   await requirePermission("sales:orders:create");
@@ -86,7 +97,10 @@ export default async function SalesPage({ searchParams }: SalesPageProps) {
     );
   }
 
-  const orders = await getSalesOrderList();
+  const [orders, formOptions] = await Promise.all([
+    getSalesOrderList(),
+    getSalesFormOptions(),
+  ]);
 
   return (
     <SalesLayout
@@ -94,7 +108,21 @@ export default async function SalesPage({ searchParams }: SalesPageProps) {
       title="Quotations / Orders"
       notice={params.notice}
       error={params.error}
-      actions={<ButtonLink href="/admin/sales/new" variant="default">New Quotation</ButtonLink>}
+      actions={
+        <NewSalesOrderModal
+          customers={formOptions.customers}
+          owners={formOptions.owners}
+          products={formOptions.products}
+          productCategories={formOptions.productCategories}
+          productBrands={formOptions.productBrands}
+          productUnits={formOptions.productUnits}
+          locations={formOptions.locations}
+          taxes={formOptions.taxes}
+          availableStock={formOptions.availableStock}
+          initialOpen={params.new === "1" || params.new === "true"}
+          defaultDate={todayDate()}
+        />
+      }
     >
       <SalesOrderList orders={orders} />
     </SalesLayout>
@@ -447,7 +475,7 @@ function SalesOrderList({ orders }: { orders: SalesOrderListRow[] }) {
                 <td className="px-4 py-3.5">
                   <div className="flex flex-col gap-1">
                     <span className="text-xs font-semibold capitalize text-foreground">{order.paymentTerm}</span>
-                    {order.residualAmountMinor === 0 ? (
+                    {order.residualAmountMinor === 0 || order.totalMinor === 0 ? (
                       <StatusBadge status="paid" label="Fully Paid" />
                     ) : order.residualAmountMinor < order.totalMinor ? (
                       <StatusBadge

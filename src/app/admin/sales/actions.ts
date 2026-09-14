@@ -53,7 +53,7 @@ const salesOrderHeaderSchema = z.object({
   sourceLocationId: z.string().uuid().or(z.literal("")).transform((value) => value || null),
   customerReference: z.string().trim().max(80).optional(),
   fsNumber: z.string().trim().max(80).optional(),
-  paymentTerm: z.enum(["cash", "credit"]).default("credit"),
+  paymentTerm: z.enum(["cash", "credit"]).default("cash"),
   orderDate: z.string().trim().optional(),
   validUntil: z.string().trim().optional(),
   reserveOnConfirm: z.boolean(),
@@ -1197,12 +1197,316 @@ async function normalizeSalesLineScope(
   return normalizedLines;
 }
 
+async function executeSalesOrderConfirmationTx(
+  tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
+  {
+    company,
+    user,
+    orderId,
+  }: {
+    company: { id: string; baseCurrencyCode: string };
+    user: { id: string };
+    orderId: string;
+  },
+) {
+  const [order] = await tx
+    .select({
+      id: salesOrders.id,
+      orderNo: salesOrders.orderNo,
+      status: salesOrders.status,
+      customerId: salesOrders.customerId,
+      ownerId: salesOrders.ownerId,
+      sourceLocationId: salesOrders.sourceLocationId,
+      totalMinor: salesOrders.totalMinor,
+      reserveOnConfirm: salesOrders.reserveOnConfirm,
+    })
+    .from(salesOrders)
+    .where(and(eq(salesOrders.id, orderId), eq(salesOrders.companyId, company.id), isNull(salesOrders.deletedAt)))
+    .limit(1);
+
+  if (!order) {
+    throw new Error("Sales order does not exist.");
+  }
+
+  if (order.status !== "quotation") {
+    return { notice: "Quotation already confirmed" };
+  }
+
+  const lines = await tx
+    .select({
+      id: salesOrderLines.id,
+      lineNo: salesOrderLines.lineNo,
+      ownerId: salesOrderLines.ownerId,
+      sourceLocationId: salesOrderLines.sourceLocationId,
+      productId: salesOrderLines.productId,
+      productName: products.name,
+      sku: products.sku,
+      quantityOrdered: salesOrderLines.quantityOrdered,
+      quantityDelivered: salesOrderLines.quantityDelivered,
+      unitId: salesOrderLines.unitId,
+      currencyCode: salesOrderLines.currencyCode,
+    })
+    .from(salesOrderLines)
+    .innerJoin(products, eq(salesOrderLines.productId, products.id))
+    .where(and(eq(salesOrderLines.salesOrderId, order.id), isNull(salesOrderLines.deletedAt)))
+    .orderBy(salesOrderLines.lineNo);
+
+  if (lines.length === 0) {
+    throw new Error("Sales order has no lines.");
+  }
+
+  if (!order.sourceLocationId) {
+    throw new Error("Select a source location before confirming the quotation.");
+  }
+
+  const [creditSummary] = await tx.execute<{
+    customerName: string;
+    creditLimitMinor: number;
+    receivableResidualMinor: number;
+  }>(sql`
+    select
+      p.display_name as "customerName",
+      p.credit_limit_minor as "creditLimitMinor",
+      coalesce((
+        select sum(greatest(open_invoices.total_minor - open_invoices.paid_minor, 0))
+        from (
+          select
+            ci.id,
+            ci.total_minor,
+            coalesce((
+              select sum(pa.amount_minor)
+              from payment_allocations pa
+              inner join payments pay on pay.id = pa.payment_id
+              where pa.customer_invoice_id = ci.id
+                and pa.deleted_at is null
+                and pay.deleted_at is null
+                and pay.status = 'posted'
+            ), 0) as paid_minor
+          from customer_invoices ci
+          where ci.company_id = ${company.id}
+            and ci.customer_id = ${order.customerId}
+            and ci.deleted_at is null
+            and ci.status <> 'cancelled'
+        ) open_invoices
+      ), 0)::bigint as "receivableResidualMinor"
+    from partners p
+    where p.id = ${order.customerId}
+      and p.company_id = ${company.id}
+      and p.deleted_at is null
+    limit 1
+  `);
+
+  if (!creditSummary) {
+    throw new Error("Customer does not exist.");
+  }
+
+  const creditLimitMinor = Number(creditSummary.creditLimitMinor);
+  const receivableResidualMinor = Number(creditSummary.receivableResidualMinor);
+  const orderTotalMinor = Number(order.totalMinor);
+
+  if (creditLimitMinor > 0) {
+    const creditUsedAfterOrder = receivableResidualMinor + orderTotalMinor;
+
+    if (creditUsedAfterOrder > creditLimitMinor) {
+      const overLimitMinor = creditUsedAfterOrder - creditLimitMinor;
+
+      throw new Error(
+        `${creditSummary.customerName} is over the credit limit. Limit ${formatMoneyForError(
+          creditLimitMinor,
+          company.baseCurrencyCode,
+        )}, current unpaid ${formatMoneyForError(
+          receivableResidualMinor,
+          company.baseCurrencyCode,
+        )}, this order ${formatMoneyForError(orderTotalMinor, company.baseCurrencyCode)}, over by ${formatMoneyForError(
+          overLimitMinor,
+          company.baseCurrencyCode,
+        )}.`,
+      );
+    }
+  }
+
+  if (order.reserveOnConfirm) {
+    if (!order.sourceLocationId) {
+      throw new Error("A source location is required to reserve stock.");
+    }
+
+    for (const line of lines) {
+      const lineOwnerId = line.ownerId ?? order.ownerId;
+      const lineSourceLocationId = line.sourceLocationId ?? order.sourceLocationId;
+
+      if (!lineOwnerId) {
+        throw new Error(`Owner is required on sales order line ${line.lineNo}.`);
+      }
+
+      if (!lineSourceLocationId) {
+        throw new Error(`Source location is required on sales order line ${line.lineNo}.`);
+      }
+
+      const [sourceLocation] = await tx
+        .select({
+          code: locations.code,
+          name: locations.name,
+        })
+        .from(locations)
+        .where(eq(locations.id, lineSourceLocationId))
+        .limit(1);
+      const sourceLocationName = sourceLocation
+        ? `${sourceLocation.code} / ${sourceLocation.name}`
+        : "the selected source location";
+
+      const balances = await tx
+        .select({
+          id: stockBalances.id,
+          productSerialId: stockBalances.productSerialId,
+          productLotId: stockBalances.productLotId,
+          quantityAvailable: stockBalances.quantityAvailable,
+        })
+        .from(stockBalances)
+        .where(
+          and(
+            eq(stockBalances.companyId, company.id),
+            eq(stockBalances.ownerId, lineOwnerId),
+            eq(stockBalances.locationId, lineSourceLocationId),
+            eq(stockBalances.productId, line.productId),
+            sql`cast(${stockBalances.quantityAvailable} as numeric) > 0`,
+            isNull(stockBalances.deletedAt),
+          ),
+        )
+        .orderBy(
+          asc(stockBalances.productSerialId),
+          asc(stockBalances.productLotId),
+          asc(stockBalances.createdAt),
+        );
+      const quantity = Number(line.quantityOrdered);
+      const available = balances.reduce((sum, balance) => sum + Number(balance.quantityAvailable), 0);
+
+      if (available < quantity) {
+        throw new Error(
+          `Insufficient stock available for ${line.sku} / ${line.productName} in ${sourceLocationName}. Required ${quantity}, available ${available}.`,
+        );
+      }
+
+      let remainingToReserve = quantity;
+
+      for (const balance of balances) {
+        if (remainingToReserve <= 0) {
+          break;
+        }
+
+        const reserveQuantity = Math.min(Number(balance.quantityAvailable), remainingToReserve);
+        const reservationNo = documentNo("RSV");
+
+        await tx.insert(stockReservations).values({
+          companyId: company.id,
+          reservationNo,
+          locationId: lineSourceLocationId,
+          productId: line.productId,
+          productSerialId: balance.productSerialId,
+          productLotId: balance.productLotId,
+          partnerId: order.customerId,
+          sourceType: "sales_order_line",
+          sourceId: line.id,
+          sourceNo: order.orderNo,
+          quantity: String(reserveQuantity),
+          status: "active",
+        });
+
+        await tx
+          .update(stockBalances)
+          .set({
+            quantityReserved: sql`${stockBalances.quantityReserved} + ${String(reserveQuantity)}`,
+            quantityAvailable: sql`${stockBalances.quantityAvailable} - ${String(reserveQuantity)}`,
+            updatedAt: sql`now()`,
+          })
+          .where(eq(stockBalances.id, balance.id));
+
+        remainingToReserve -= reserveQuantity;
+      }
+
+      await tx
+        .update(salesOrderLines)
+        .set({
+          quantityReserved: line.quantityOrdered,
+          updatedAt: sql`now()`,
+        })
+        .where(eq(salesOrderLines.id, line.id));
+    }
+  }
+
+  await tx
+    .update(salesOrders)
+    .set({
+      status: "confirmed",
+      confirmedAt: new Date(),
+      confirmedBy: user.id,
+      updatedAt: sql`now()`,
+    })
+    .where(eq(salesOrders.id, order.id));
+
+  const [existingDelivery] = await tx
+    .select({ id: deliveries.id })
+    .from(deliveries)
+    .where(and(eq(deliveries.salesOrderId, order.id), isNull(deliveries.deletedAt)))
+    .limit(1);
+
+  if (!existingDelivery) {
+    const deliveryNo = documentNo("DO");
+    const [delivery] = await tx
+      .insert(deliveries)
+      .values({
+        companyId: company.id,
+        salesOrderId: order.id,
+        customerId: order.customerId,
+        sourceLocationId: order.sourceLocationId,
+        deliveryNo,
+        status: "draft",
+        notes: `Draft delivery generated from ${order.orderNo}.`,
+      })
+      .returning({ id: deliveries.id });
+
+    const deliveryLineValues = lines
+      .map((line) => {
+        const quantityRemaining = Number(line.quantityOrdered) - Number(line.quantityDelivered);
+
+        return {
+          deliveryId: delivery.id,
+          salesOrderLineId: line.id,
+          lineNo: line.lineNo,
+          productId: line.productId,
+          unitId: line.unitId,
+          quantityDelivered: String(quantityRemaining),
+          currencyCode: line.currencyCode,
+        };
+      })
+      .filter((line) => Number(line.quantityDelivered) > 0);
+
+    if (deliveryLineValues.length > 0) {
+      await tx.insert(deliveryLines).values(deliveryLineValues);
+    }
+  }
+
+  await tx.insert(auditLogs).values({
+    companyId: company.id,
+    actorUserId: user.id,
+    action: "sales_order.confirm",
+    entityType: "sales_order",
+    entityId: order.id,
+    severity: "info",
+    metadata: { orderNo: order.orderNo, reserveOnConfirm: order.reserveOnConfirm },
+  });
+
+  return { notice: "Sales order confirmed" };
+}
+
 export async function createSalesOrder(formData: FormData) {
   const user = await requirePermission("sales:orders:create");
-  const { header, lines } = parseSalesOrderForm(formData, "/admin/sales/new");
+  const returnPath = formValue(formData, "returnPath") || "/admin/sales";
+  const intent = formValue(formData, "intent") || "confirm";
+  const { header, lines } = parseSalesOrderForm(formData, returnPath);
   const company = await getDefaultCompany();
   let createdOrderId: string | undefined;
   let orderNo = "";
+  let noticeMessage = "Quotation created";
 
   try {
     await db.transaction(async (tx) => {
@@ -1306,19 +1610,39 @@ export async function createSalesOrder(formData: FormData) {
         severity: "info",
         metadata: { orderNo },
       });
+
+      if (intent === "confirm") {
+        const confirmResult = await executeSalesOrderConfirmationTx(tx, {
+          company,
+          user,
+          orderId: order.id,
+        });
+        if (confirmResult?.notice) {
+          noticeMessage = confirmResult.notice;
+        }
+      }
     });
   } catch (error) {
-    redirectWithError("/admin/sales/new", uniqueViolationMessage(error, error instanceof Error ? error.message : "Could not create quotation."));
+    const message = uniqueViolationMessage(
+      error,
+      error instanceof Error ? error.message : "Could not create quotation.",
+    );
+    return { error: message };
   }
 
   revalidatePath("/admin/sales");
-  redirect(`/admin/sales/${createdOrderId}?notice=${encodeURIComponent("Quotation created")}`);
+  if (createdOrderId) {
+    revalidatePath(`/admin/sales/${createdOrderId}`);
+  }
+  revalidatePath("/admin/inventory");
+  redirect(`/admin/sales/${createdOrderId}?notice=${encodeURIComponent(noticeMessage)}`);
 }
 
 export async function updateSalesOrder(formData: FormData) {
   const user = await requirePermission("sales:orders:create");
   const salesOrderId = formValue(formData, "salesOrderId");
   const errorPath = salesOrderId ? `/admin/sales/${salesOrderId}` : "/admin/sales";
+  const intent = formValue(formData, "intent") || "draft";
   const { header, lines } = parseSalesOrderForm(formData, errorPath);
 
   if (!header.salesOrderId) {
@@ -1327,6 +1651,7 @@ export async function updateSalesOrder(formData: FormData) {
 
   const orderId = header.salesOrderId;
   const company = await getDefaultCompany();
+  let noticeMessage = "Quotation updated";
 
   try {
     await db.transaction(async (tx) => {
@@ -1376,11 +1701,11 @@ export async function updateSalesOrder(formData: FormData) {
 
       const normalizedLines = await normalizeSalesLineScope(tx, company.id, owner.id, header.sourceLocationId, lines);
       const prepared = await prepareSalesLines(tx, company.id, normalizedLines);
-      const existingLines = await tx
+      const existingLineRows = await tx
         .select({ id: salesOrderLines.id })
         .from(salesOrderLines)
         .where(eq(salesOrderLines.salesOrderId, existingOrder.id));
-      const existingLineIds = existingLines.map((line) => line.id);
+      const existingLineIds = existingLineRows.map((line) => line.id);
 
       if (existingLineIds.length > 0) {
         await tx.delete(salesOrderLineTaxes).where(inArray(salesOrderLineTaxes.salesOrderLineId, existingLineIds));
@@ -1453,14 +1778,30 @@ export async function updateSalesOrder(formData: FormData) {
         severity: "info",
         metadata: { orderNo: existingOrder.orderNo },
       });
+
+      if (intent === "confirm") {
+        const confirmResult = await executeSalesOrderConfirmationTx(tx, {
+          company,
+          user,
+          orderId: existingOrder.id,
+        });
+        if (confirmResult?.notice) {
+          noticeMessage = confirmResult.notice;
+        }
+      }
     });
   } catch (error) {
-    redirectWithError(errorPath, uniqueViolationMessage(error, error instanceof Error ? error.message : "Could not update quotation."));
+    const message = uniqueViolationMessage(
+      error,
+      error instanceof Error ? error.message : "Could not update quotation.",
+    );
+    return { error: message };
   }
 
   revalidatePath("/admin/sales");
   revalidatePath(`/admin/sales/${orderId}`);
-  redirect(`/admin/sales/${orderId}?notice=${encodeURIComponent("Quotation updated")}`);
+  revalidatePath("/admin/inventory");
+  redirect(`/admin/sales/${orderId}?notice=${encodeURIComponent(noticeMessage)}`);
 }
 
 export async function confirmSalesOrder(formData: FormData) {
@@ -1475,289 +1816,18 @@ export async function confirmSalesOrder(formData: FormData) {
   }
 
   const company = await getDefaultCompany();
-  const customerLocation = await getOrCreatePartnerStockLocation(company.id, "customer");
+  let noticeMessage = "Sales order confirmed";
 
   try {
     await db.transaction(async (tx) => {
-      const [order] = await tx
-        .select({
-          id: salesOrders.id,
-          orderNo: salesOrders.orderNo,
-          status: salesOrders.status,
-          customerId: salesOrders.customerId,
-          ownerId: salesOrders.ownerId,
-          sourceLocationId: salesOrders.sourceLocationId,
-          totalMinor: salesOrders.totalMinor,
-          reserveOnConfirm: salesOrders.reserveOnConfirm,
-        })
-        .from(salesOrders)
-        .where(and(eq(salesOrders.id, parsed.data.salesOrderId), eq(salesOrders.companyId, company.id), isNull(salesOrders.deletedAt)))
-        .limit(1);
-
-      if (!order) {
-        throw new Error("Sales order does not exist.");
-      }
-
-      if (order.status !== "quotation") {
-        return;
-      }
-
-      const lines = await tx
-        .select({
-          id: salesOrderLines.id,
-          lineNo: salesOrderLines.lineNo,
-          ownerId: salesOrderLines.ownerId,
-          sourceLocationId: salesOrderLines.sourceLocationId,
-          productId: salesOrderLines.productId,
-          productName: products.name,
-          sku: products.sku,
-          quantityOrdered: salesOrderLines.quantityOrdered,
-          quantityDelivered: salesOrderLines.quantityDelivered,
-          unitId: salesOrderLines.unitId,
-          currencyCode: salesOrderLines.currencyCode,
-        })
-        .from(salesOrderLines)
-        .innerJoin(products, eq(salesOrderLines.productId, products.id))
-        .where(and(eq(salesOrderLines.salesOrderId, order.id), isNull(salesOrderLines.deletedAt)))
-        .orderBy(salesOrderLines.lineNo);
-
-      if (lines.length === 0) {
-        throw new Error("Sales order has no lines.");
-      }
-
-      if (!order.sourceLocationId) {
-        throw new Error("Select a source location before confirming the quotation.");
-      }
-
-      const [creditSummary] = await tx.execute<{
-        customerName: string;
-        creditLimitMinor: number;
-        receivableResidualMinor: number;
-      }>(sql`
-        select
-          p.display_name as "customerName",
-          p.credit_limit_minor as "creditLimitMinor",
-          coalesce((
-            select sum(greatest(open_invoices.total_minor - open_invoices.paid_minor, 0))
-            from (
-              select
-                ci.id,
-                ci.total_minor,
-                coalesce((
-                  select sum(pa.amount_minor)
-                  from payment_allocations pa
-                  inner join payments pay on pay.id = pa.payment_id
-                  where pa.customer_invoice_id = ci.id
-                    and pa.deleted_at is null
-                    and pay.deleted_at is null
-                    and pay.status = 'posted'
-                ), 0) as paid_minor
-              from customer_invoices ci
-              where ci.company_id = ${company.id}
-                and ci.customer_id = ${order.customerId}
-                and ci.deleted_at is null
-                and ci.status <> 'cancelled'
-            ) open_invoices
-          ), 0)::bigint as "receivableResidualMinor"
-        from partners p
-        where p.id = ${order.customerId}
-          and p.company_id = ${company.id}
-          and p.deleted_at is null
-        limit 1
-      `);
-
-      if (!creditSummary) {
-        throw new Error("Customer does not exist.");
-      }
-
-      const creditLimitMinor = Number(creditSummary.creditLimitMinor);
-      const receivableResidualMinor = Number(creditSummary.receivableResidualMinor);
-      const orderTotalMinor = Number(order.totalMinor);
-
-      if (creditLimitMinor > 0) {
-        const creditUsedAfterOrder = receivableResidualMinor + orderTotalMinor;
-
-        if (creditUsedAfterOrder > creditLimitMinor) {
-          const overLimitMinor = creditUsedAfterOrder - creditLimitMinor;
-
-          throw new Error(
-            `${creditSummary.customerName} is over the credit limit. Limit ${formatMoneyForError(
-              creditLimitMinor,
-              company.baseCurrencyCode,
-            )}, current unpaid ${formatMoneyForError(
-              receivableResidualMinor,
-              company.baseCurrencyCode,
-            )}, this order ${formatMoneyForError(orderTotalMinor, company.baseCurrencyCode)}, over by ${formatMoneyForError(
-              overLimitMinor,
-              company.baseCurrencyCode,
-            )}.`,
-          );
-        }
-      }
-
-      if (order.reserveOnConfirm) {
-        if (!order.sourceLocationId) {
-          throw new Error("A source location is required to reserve stock.");
-        }
-
-        for (const line of lines) {
-          const lineOwnerId = line.ownerId ?? order.ownerId;
-          const lineSourceLocationId = line.sourceLocationId ?? order.sourceLocationId;
-
-          if (!lineOwnerId) {
-            throw new Error(`Owner is required on sales order line ${line.lineNo}.`);
-          }
-
-          if (!lineSourceLocationId) {
-            throw new Error(`Source location is required on sales order line ${line.lineNo}.`);
-          }
-
-          const [sourceLocation] = await tx
-            .select({
-              code: locations.code,
-              name: locations.name,
-            })
-            .from(locations)
-            .where(eq(locations.id, lineSourceLocationId))
-            .limit(1);
-          const sourceLocationName = sourceLocation
-            ? `${sourceLocation.code} / ${sourceLocation.name}`
-            : "the selected source location";
-
-          const balances = await tx
-            .select({
-              id: stockBalances.id,
-              productSerialId: stockBalances.productSerialId,
-              productLotId: stockBalances.productLotId,
-              quantityAvailable: stockBalances.quantityAvailable,
-            })
-            .from(stockBalances)
-            .where(
-              and(
-                eq(stockBalances.companyId, company.id),
-                eq(stockBalances.ownerId, lineOwnerId),
-                eq(stockBalances.locationId, lineSourceLocationId),
-                eq(stockBalances.productId, line.productId),
-                sql`cast(${stockBalances.quantityAvailable} as numeric) > 0`,
-                isNull(stockBalances.deletedAt),
-              ),
-            )
-            .orderBy(
-              asc(stockBalances.productSerialId),
-              asc(stockBalances.productLotId),
-              asc(stockBalances.createdAt),
-            );
-          const quantity = Number(line.quantityOrdered);
-          const available = balances.reduce((sum, balance) => sum + Number(balance.quantityAvailable), 0);
-
-          if (available < quantity) {
-            throw new Error(
-              `Insufficient stock available for ${line.sku} / ${line.productName} in ${sourceLocationName}. Required ${quantity}, available ${available}.`,
-            );
-          }
-
-          let remainingToReserve = quantity;
-
-          for (const balance of balances) {
-            if (remainingToReserve <= 0) {
-              break;
-            }
-
-            const reserveQuantity = Math.min(Number(balance.quantityAvailable), remainingToReserve);
-            const reservationNo = documentNo("RSV");
-
-            await tx.insert(stockReservations).values({
-              companyId: company.id,
-              reservationNo,
-              locationId: lineSourceLocationId,
-              productId: line.productId,
-              productSerialId: balance.productSerialId,
-              productLotId: balance.productLotId,
-              partnerId: order.customerId,
-              sourceType: "sales_order_line",
-              sourceId: line.id,
-              sourceNo: order.orderNo,
-              quantity: String(reserveQuantity),
-              status: "active",
-            });
-
-            await tx
-              .update(stockBalances)
-              .set({
-                quantityReserved: sql`${stockBalances.quantityReserved} + ${String(reserveQuantity)}`,
-                quantityAvailable: sql`${stockBalances.quantityAvailable} - ${String(reserveQuantity)}`,
-                updatedAt: sql`now()`,
-              })
-              .where(eq(stockBalances.id, balance.id));
-
-            remainingToReserve -= reserveQuantity;
-          }
-
-          await tx
-            .update(salesOrderLines)
-            .set({
-              quantityReserved: line.quantityOrdered,
-              updatedAt: sql`now()`,
-            })
-            .where(eq(salesOrderLines.id, line.id));
-        }
-      }
-
-      await tx
-        .update(salesOrders)
-        .set({
-          status: "confirmed",
-          confirmedAt: new Date(),
-          confirmedBy: user.id,
-          updatedAt: sql`now()`,
-        })
-        .where(eq(salesOrders.id, order.id));
-
-      const [existingDelivery] = await tx
-        .select({ id: deliveries.id })
-        .from(deliveries)
-        .where(and(eq(deliveries.salesOrderId, order.id), isNull(deliveries.deletedAt)))
-        .limit(1);
-
-      if (!existingDelivery) {
-        const deliveryLinesToCreate = lines
-          .map((line) => {
-            const quantityRemaining = Number(line.quantityOrdered) - Number(line.quantityDelivered);
-
-            return {
-              id: line.id,
-              lineNo: line.lineNo,
-              sourceLocationId: line.sourceLocationId,
-              productId: line.productId,
-              unitId: line.unitId,
-              selectedQuantity: quantityRemaining,
-              currencyCode: line.currencyCode,
-            };
-          })
-          .filter((line) => line.selectedQuantity > 0);
-
-        if (deliveryLinesToCreate.length > 0) {
-          await createGroupedDraftDeliveries(tx, {
-            companyId: company.id,
-            userId: user.id,
-            order,
-            lines: deliveryLinesToCreate,
-            notePrefix: "Draft delivery generated from",
-            autoPostDirect: true,
-            customerLocationId: customerLocation.id,
-          });
-        }
-      }
-
-      await tx.insert(auditLogs).values({
-        companyId: company.id,
-        actorUserId: user.id,
-        action: "sales_order.confirm",
-        entityType: "sales_order",
-        entityId: order.id,
-        severity: "info",
-        metadata: { orderNo: order.orderNo, reserveOnConfirm: order.reserveOnConfirm },
+      const confirmResult = await executeSalesOrderConfirmationTx(tx, {
+        company,
+        user,
+        orderId: parsed.data.salesOrderId,
       });
+      if (confirmResult?.notice) {
+        noticeMessage = confirmResult.notice;
+      }
     });
   } catch (error) {
     redirectWithError(`/admin/sales/${parsed.data.salesOrderId}`, error instanceof Error ? error.message : "Could not confirm quotation.");
@@ -1765,7 +1835,8 @@ export async function confirmSalesOrder(formData: FormData) {
 
   revalidatePath("/admin/sales");
   revalidatePath(`/admin/sales/${parsed.data.salesOrderId}`);
-  redirect(`${parsed.data.returnPath ?? `/admin/sales/${parsed.data.salesOrderId}`}?notice=${encodeURIComponent("Quotation confirmed")}`);
+  revalidatePath("/admin/inventory");
+  redirect(`${parsed.data.returnPath ?? `/admin/sales/${parsed.data.salesOrderId}`}?notice=${encodeURIComponent(noticeMessage)}`);
 }
 
 export async function createDeliveryFromSalesOrder(formData: FormData) {
@@ -3330,7 +3401,9 @@ export async function registerCustomerPayment(formData: FormData) {
           partnerId: customerId,
           paymentNo: documentNo("PAY-IN"),
           paymentType: "inbound",
-          status: "draft",
+          status: "posted",
+          postedAt: new Date(),
+          postedBy: user.id,
           paymentMethodId: firstLine.paymentMethodId,
           paymentAccountId: firstLine.paymentAccountId,
           amountMinor,
@@ -3358,20 +3431,24 @@ export async function registerCustomerPayment(formData: FormData) {
       await tx.insert(auditLogs).values({
         companyId: company.id,
         actorUserId: user.id,
-        action: "customer_payment.register",
+        action: "customer_payment.post",
         entityType: "payment",
         entityId: payment.id,
         severity: "info",
         metadata: { paymentNo: payment.paymentNo, customerInvoiceId: target ? null : invoice.id, salesOrderId: target?.salesOrderId ?? null },
       });
     });
+
+    if (parsed.data.customerInvoiceId) {
+      await updateCustomerInvoicePaymentStatus(parsed.data.customerInvoiceId);
+    }
   } catch (error) {
     redirectWithError(returnPath, error instanceof Error ? error.message : "Could not register customer payment.");
   }
 
   revalidatePath("/admin/sales");
   revalidatePath(returnPath);
-  redirect(`/admin/sales/payments/${paymentId}?notice=${encodeURIComponent("Customer payment registered as draft")}`);
+  redirect(`${returnPath}?notice=${encodeURIComponent("Payment posted successfully.")}`);
 }
 
 export async function postCustomerPayment(formData: FormData) {

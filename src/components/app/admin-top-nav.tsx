@@ -100,6 +100,18 @@ export function AdminShell({
     ? getActiveSubmenuLabel(activeMenu.submenus, currentHref, pathname)
     : "Menu";
 
+  const [isHydrated, setIsHydrated] = useState(false);
+
+  useEffect(() => {
+    setIsHydrated(useAppStore.persist.hasHydrated());
+    const unsub = useAppStore.persist.onFinishHydration(() => {
+      setIsHydrated(true);
+    });
+    return () => {
+      unsub();
+    };
+  }, []);
+
   useEffect(() => {
     if (window.matchMedia("(max-width: 767px)").matches) {
       setAdminNavOpen(false);
@@ -107,6 +119,8 @@ export function AdminShell({
   }, [pathname, setAdminNavOpen]);
 
   useEffect(() => {
+    if (!isHydrated) return;
+
     if (!shopLocations.length) {
       if (selectedLocationId) {
         setSelectedLocationId(null);
@@ -114,12 +128,31 @@ export function AdminShell({
       return;
     }
 
-    const selectedShopIsAvailable = shopLocations.some((shop) => shop.id === selectedLocationId);
+    let activeId = selectedLocationId;
+
+    if (!activeId && typeof window !== "undefined") {
+      try {
+        const stored = localStorage.getItem("syncpos-selected-location");
+        if (stored && shopLocations.some((shop) => shop.id === stored)) {
+          activeId = stored;
+          setSelectedLocationId(stored);
+          return;
+        }
+      } catch {}
+    }
+
+    const selectedShopIsAvailable = shopLocations.some((shop) => shop.id === activeId);
 
     if (!selectedShopIsAvailable) {
-      setSelectedLocationId(shopLocations[0]?.id ?? null);
+      const defaultId = shopLocations[0]?.id ?? null;
+      setSelectedLocationId(defaultId);
+      if (typeof window !== "undefined" && defaultId) {
+        try {
+          localStorage.setItem("syncpos-selected-location", defaultId);
+        } catch {}
+      }
     }
-  }, [selectedLocationId, setSelectedLocationId, shopLocations]);
+  }, [isHydrated, selectedLocationId, setSelectedLocationId, shopLocations]);
 
   function closeMobileSubmenu(event: MouseEvent<HTMLAnchorElement>) {
     event.currentTarget.closest("details")?.removeAttribute("open");
@@ -417,13 +450,27 @@ function ShopSelector({
     return null;
   }
 
+  function handleSelect(nextValue: string) {
+    const nextId = nextValue || null;
+    onChange(nextId);
+    if (typeof window !== "undefined") {
+      try {
+        if (nextId) {
+          localStorage.setItem("syncpos-selected-location", nextId);
+        } else {
+          localStorage.removeItem("syncpos-selected-location");
+        }
+      } catch {}
+    }
+  }
+
   return (
     <label className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
       <span className="hidden xl:inline">Shop</span>
       <select
         aria-label="Default sales shop"
         value={selectedLocationId ?? locations[0]?.id ?? ""}
-        onChange={(event) => onChange(event.target.value || null)}
+        onChange={(event) => handleSelect(event.target.value)}
         className="h-9 w-28 rounded-md border border-input bg-background px-2 text-xs text-foreground sm:w-40 lg:w-48"
       >
         {locations.map((location) => (

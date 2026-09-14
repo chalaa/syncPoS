@@ -22,6 +22,8 @@ import {
 } from "@/server/db/schema";
 import { approveStockOutApprovals, requireStockOutApproval } from "@/server/inventory/stock-approvals";
 import { getOrCreateSystemStockLocation } from "@/server/inventory/system-locations";
+import { getInventoryOperationDetail } from "@/server/inventory/stock";
+import type { InventoryOperationDetail } from "@/server/inventory/stock-types";
 
 const operationTypes = ["transfer", "adjustment", "scrap", "customer_return", "supplier_return"] as const;
 
@@ -76,7 +78,13 @@ function formValues(formData: FormData, key: string) {
 }
 
 function redirectWithError(path: string, message: string): never {
-  redirect(`${path}?error=${encodeURIComponent(message)}`);
+  const separator = path.includes("?") ? "&" : "?";
+  redirect(`${path}${separator}error=${encodeURIComponent(message)}`);
+}
+
+function redirectWithNotice(path: string, message: string): never {
+  const separator = path.includes("?") ? "&" : "?";
+  redirect(`${path}${separator}notice=${encodeURIComponent(message)}`);
 }
 
 function parseLines(formData: FormData) {
@@ -477,6 +485,8 @@ async function removeFromBalance(
 
 export async function createInventoryAdjustment(formData: FormData) {
   const user = await requirePermission("inventory.receive");
+  const returnPath = formValue(formData, "returnPath");
+  const fallbackPath = returnPath || "/admin/inventory/operations/adjustments/new";
   const parsed = adjustmentSchema.safeParse({
     ownerId: formValue(formData, "ownerId"),
     locationId: formValue(formData, "locationId"),
@@ -486,11 +496,11 @@ export async function createInventoryAdjustment(formData: FormData) {
   const inputLines = parseCountLines(formData);
 
   if (!parsed.success) {
-    redirectWithError("/admin/inventory/operations/adjustments/new", parsed.error.issues[0]?.message ?? "Invalid adjustment.");
+    redirectWithError(fallbackPath, parsed.error.issues[0]?.message ?? "Invalid adjustment.");
   }
 
   if (inputLines.length === 0) {
-    redirectWithError("/admin/inventory/operations/adjustments/new", "At least one counted line is required.");
+    redirectWithError(fallbackPath, "At least one counted line is required.");
   }
 
   const company = await getDefaultCompany();
@@ -705,16 +715,21 @@ export async function createInventoryAdjustment(formData: FormData) {
       });
     });
   } catch (error) {
-    redirectWithError("/admin/inventory/operations/adjustments/new", error instanceof Error ? error.message : "Could not post adjustment.");
+    redirectWithError(fallbackPath, error instanceof Error ? error.message : "Could not post adjustment.");
   }
 
   revalidatePath("/admin/inventory");
   revalidatePath("/admin/inventory/operations");
-  redirect(`/admin/inventory/operations/${movementId}?notice=${encodeURIComponent("Inventory adjustment posted")}`);
+  if (returnPath) {
+    redirectWithNotice(returnPath, "Inventory adjustment posted");
+  }
+  redirectWithNotice(`/admin/inventory/operations/${movementId}`, "Inventory adjustment posted");
 }
 
 export async function createScrapOperation(formData: FormData) {
   const user = await requirePermission("inventory.receive");
+  const returnPath = formValue(formData, "returnPath");
+  const fallbackPath = returnPath || "/admin/inventory/operations/scrap/new";
   const parsed = scrapSchema.safeParse({
     ownerId: formValue(formData, "ownerId"),
     locationId: formValue(formData, "locationId"),
@@ -724,11 +739,11 @@ export async function createScrapOperation(formData: FormData) {
   const inputLines = parseScrapLines(formData);
 
   if (!parsed.success) {
-    redirectWithError("/admin/inventory/operations/scrap/new", parsed.error.issues[0]?.message ?? "Invalid scrap operation.");
+    redirectWithError(fallbackPath, parsed.error.issues[0]?.message ?? "Invalid scrap operation.");
   }
 
   if (inputLines.length === 0) {
-    redirectWithError("/admin/inventory/operations/scrap/new", "At least one scrap line is required.");
+    redirectWithError(fallbackPath, "At least one scrap line is required.");
   }
 
   const company = await getDefaultCompany();
@@ -893,16 +908,21 @@ export async function createScrapOperation(formData: FormData) {
       });
     });
   } catch (error) {
-    redirectWithError("/admin/inventory/operations/scrap/new", error instanceof Error ? error.message : "Could not post scrap operation.");
+    redirectWithError(fallbackPath, error instanceof Error ? error.message : "Could not post scrap operation.");
   }
 
   revalidatePath("/admin/inventory");
   revalidatePath("/admin/inventory/operations");
-  redirect(`/admin/inventory/operations/${movementId}?notice=${encodeURIComponent("Scrap operation posted")}`);
+  if (returnPath) {
+    redirectWithNotice(returnPath, "Scrap operation posted");
+  }
+  redirectWithNotice(`/admin/inventory/operations/${movementId}`, "Scrap operation posted");
 }
 
 export async function createInternalTransferOperation(formData: FormData) {
   const user = await requirePermission("inventory.receive");
+  const returnPath = formValue(formData, "returnPath");
+  const fallbackPath = returnPath || "/admin/inventory/operations/internal-transfers/new";
   const parsed = internalTransferSchema.safeParse({
     ownerId: formValue(formData, "ownerId"),
     fromLocationId: formValue(formData, "fromLocationId"),
@@ -913,15 +933,15 @@ export async function createInternalTransferOperation(formData: FormData) {
   const inputLines = parseScrapLines(formData);
 
   if (!parsed.success) {
-    redirectWithError("/admin/inventory/operations/internal-transfers/new", parsed.error.issues[0]?.message ?? "Invalid internal transfer.");
+    redirectWithError(fallbackPath, parsed.error.issues[0]?.message ?? "Invalid internal transfer.");
   }
 
   if (parsed.data.fromLocationId === parsed.data.toLocationId) {
-    redirectWithError("/admin/inventory/operations/internal-transfers/new", "Source and destination locations must be different.");
+    redirectWithError(fallbackPath, "Source and destination locations must be different.");
   }
 
   if (inputLines.length === 0) {
-    redirectWithError("/admin/inventory/operations/internal-transfers/new", "At least one transfer line is required.");
+    redirectWithError(fallbackPath, "At least one transfer line is required.");
   }
 
   const company = await getDefaultCompany();
@@ -1096,12 +1116,15 @@ export async function createInternalTransferOperation(formData: FormData) {
       });
     });
   } catch (error) {
-    redirectWithError("/admin/inventory/operations/internal-transfers/new", error instanceof Error ? error.message : "Could not post internal transfer.");
+    redirectWithError(fallbackPath, error instanceof Error ? error.message : "Could not post internal transfer.");
   }
 
   revalidatePath("/admin/inventory");
   revalidatePath("/admin/inventory/operations");
-  redirect(`/admin/inventory/operations/${movementId}?notice=${encodeURIComponent("Internal transfer posted")}`);
+  if (returnPath) {
+    redirectWithNotice(returnPath, "Internal transfer posted");
+  }
+  redirectWithNotice(`/admin/inventory/operations/${movementId}`, "Internal transfer posted");
 }
 
 export async function createInventoryOperation(formData: FormData) {
@@ -1528,13 +1551,18 @@ export async function postInventoryOperation(formData: FormData) {
       });
     });
   } catch (error) {
-    redirectWithError(`/admin/inventory/operations/${parsed.data.movementId}`, error instanceof Error ? error.message : "Could not post operation.");
+    const returnPath = formValue(formData, "returnPath");
+    redirectWithError(returnPath || `/admin/inventory/operations/${parsed.data.movementId}`, error instanceof Error ? error.message : "Could not post operation.");
   }
 
+  const returnPath = formValue(formData, "returnPath");
   revalidatePath("/admin/inventory");
   revalidatePath("/admin/inventory/operations");
   revalidatePath(`/admin/inventory/operations/${parsed.data.movementId}`);
-  redirect(`/admin/inventory/operations/${parsed.data.movementId}?notice=${encodeURIComponent("Inventory operation posted")}`);
+  if (returnPath) {
+    redirectWithNotice(returnPath, "Inventory operation posted");
+  }
+  redirectWithNotice(`/admin/inventory/operations/${parsed.data.movementId}`, "Inventory operation posted");
 }
 
 export async function requestInventoryOperationApproval(formData: FormData) {
@@ -1704,10 +1732,20 @@ export async function cancelInventoryOperation(formData: FormData) {
       });
     });
   } catch (error) {
-    redirectWithError(`/admin/inventory/operations/${parsed.data.movementId}`, error instanceof Error ? error.message : "Could not cancel operation.");
+    const returnPath = formValue(formData, "returnPath");
+    redirectWithError(returnPath || `/admin/inventory/operations/${parsed.data.movementId}`, error instanceof Error ? error.message : "Could not cancel operation.");
   }
 
+  const returnPath = formValue(formData, "returnPath");
   revalidatePath("/admin/inventory/operations");
   revalidatePath(`/admin/inventory/operations/${parsed.data.movementId}`);
-  redirect(`/admin/inventory/operations/${parsed.data.movementId}?notice=${encodeURIComponent("Inventory operation cancelled")}`);
+  if (returnPath) {
+    redirectWithNotice(returnPath, "Inventory operation cancelled");
+  }
+  redirectWithNotice(`/admin/inventory/operations/${parsed.data.movementId}`, "Inventory operation cancelled");
+}
+
+export async function getOperationDetailAction(id: string): Promise<InventoryOperationDetail | null> {
+  await requirePermission("inventory.view");
+  return getInventoryOperationDetail(id);
 }

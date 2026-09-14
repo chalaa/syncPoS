@@ -1,7 +1,8 @@
 "use client";
 
 import { PlusIcon, SearchIcon } from "lucide-react";
-import { useEffect, useMemo, useRef, useState, useTransition, type CSSProperties } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+
 import { createPortal } from "react-dom";
 
 import { Button } from "@/components/ui/button";
@@ -14,6 +15,9 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
+import { filterAndSortByFuzzy } from "@/lib/search-utils";
+
+import { useResizableDropdown } from "./use-resizable-dropdown";
 
 export type ManyToOneOption = {
   id: string;
@@ -33,6 +37,7 @@ type ManyToOneCreateSelectProps = {
   name: string;
   label: string;
   options: ManyToOneOption[];
+  value?: string | null;
   defaultValue?: string | null;
   placeholder?: string;
   entityLabel?: string;
@@ -47,6 +52,7 @@ export function ManyToOneCreateSelect({
   name,
   label,
   options,
+  value,
   defaultValue,
   placeholder = "Search or create",
   entityLabel = "Customer",
@@ -54,75 +60,127 @@ export function ManyToOneCreateSelect({
   onValueChange,
   error: fieldError,
 }: ManyToOneCreateSelectProps) {
-  const [items, setItems] = useState(options);
-  const [selectedId, setSelectedId] = useState(defaultValue ?? "");
+  const [internalValue, setInternalValue] = useState(defaultValue ?? "");
+  const [createdItems, setCreatedItems] = useState<ManyToOneOption[]>([]);
   const [query, setQuery] = useState("");
   const [isOpen, setIsOpen] = useState(false);
-  const [dropdownStyle, setDropdownStyle] = useState<CSSProperties | undefined>();
+  const [openUpward, setOpenUpward] = useState(false);
+  const [mounted, setMounted] = useState(false);
+  const [coords, setCoords] = useState<{ top: number; bottom: number; left: number; width: number }>({
+    top: 0,
+    bottom: 0,
+    left: 0,
+    width: 0,
+  });
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const rootRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const dropdownRef = useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
+  const { height: dropdownHeight, hasCustomHeight, dropdownRef, handleResizeStart } = useResizableDropdown(
+    isOpen,
+    openUpward,
+  );
 
-  const selected = items.find((item) => item.id === selectedId);
+  const selectedId = value !== undefined ? (value ?? "") : internalValue;
+
+  const allItems = useMemo(() => {
+    const map = new Map<string, ManyToOneOption>();
+    for (const opt of options) {
+      map.set(opt.id, opt);
+    }
+    for (const opt of createdItems) {
+      map.set(opt.id, opt);
+    }
+    return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }, [options, createdItems]);
+
+  const selected = allItems.find((item) => item.id === selectedId);
   const selectedLabel = selected ? selected.name : "";
   const trimmedQuery = query.trim();
   const filteredItems = useMemo(() => {
-    const normalized = trimmedQuery.toLowerCase();
-
-    if (!normalized) {
-      return items;
+    if (!trimmedQuery) {
+      return allItems;
     }
 
-    return items.filter((item) =>
-      `${item.code} ${item.name}`.toLowerCase().includes(normalized),
+    return filterAndSortByFuzzy(
+      allItems,
+      trimmedQuery,
+      (item) => `${item.code} ${item.name}`,
     );
-  }, [items, trimmedQuery]);
+  }, [allItems, trimmedQuery]);
   const visibleItems = filteredItems.slice(0, 50);
 
-  function floatingDropdownStyle() {
-    const inputRect = inputRef.current?.getBoundingClientRect();
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
-    if (!inputRect) {
-      return undefined;
+  useEffect(() => {
+    if (!isOpen || !inputRef.current) return;
+
+    function updatePositionAndPlacement() {
+      if (!inputRef.current) return;
+      const rect = inputRef.current.getBoundingClientRect();
+
+      // If inside modal/dialog, check if input has scrolled out of view
+      const modalEl = inputRef.current.closest('[role="dialog"]');
+      if (modalEl) {
+        const modalRect = modalEl.getBoundingClientRect();
+        if (rect.bottom < modalRect.top + 10 || rect.top > modalRect.bottom - 10) {
+          setIsOpen(false);
+          return;
+        }
+      } else {
+        if (rect.bottom < 10 || rect.top > window.innerHeight - 10) {
+          setIsOpen(false);
+          return;
+        }
+      }
+
+      setCoords({
+        top: rect.top,
+        bottom: rect.bottom,
+        left: rect.left,
+        width: rect.width,
+      });
+
+      // Calculate placement
+      const winHeight = window.innerHeight;
+      const spaceBelowViewport = winHeight - rect.bottom - 24;
+      const spaceAboveViewport = rect.top - 24;
+
+      if (modalEl) {
+        const modalRect = modalEl.getBoundingClientRect();
+        const spaceToModalBottom = modalRect.bottom - rect.bottom - 70;
+        const spaceInsideModalAbove = rect.top - modalRect.top - 20;
+
+        if (spaceToModalBottom < 320 && spaceInsideModalAbove > spaceToModalBottom) {
+          setOpenUpward(true);
+          return;
+        }
+      }
+
+      if (spaceBelowViewport < 340 && spaceAboveViewport > spaceBelowViewport) {
+        setOpenUpward(true);
+      } else {
+        setOpenUpward(false);
+      }
     }
 
-    const viewportPadding = 8;
-    const maxWidth = Math.max(window.innerWidth - viewportPadding * 2, inputRect.width);
-    const width = Math.min(Math.max(inputRect.width, 240), 512, maxWidth);
-    const left = Math.min(
-      Math.max(inputRect.left, viewportPadding),
-      Math.max(window.innerWidth - width - viewportPadding, viewportPadding),
-    );
+    updatePositionAndPlacement();
+    window.addEventListener("scroll", updatePositionAndPlacement, true);
+    window.addEventListener("resize", updatePositionAndPlacement);
 
-    return {
-      left,
-      top: inputRect.bottom + 4,
-      width,
+    return () => {
+      window.removeEventListener("scroll", updatePositionAndPlacement, true);
+      window.removeEventListener("resize", updatePositionAndPlacement);
     };
-  }
+  }, [isOpen]);
 
   useEffect(() => {
     if (!isOpen) {
       return;
-    }
-
-    function closeList() {
-      setIsOpen(false);
-      setQuery("");
-      setDropdownStyle(undefined);
-    }
-
-    function closeFloatingList(event: Event) {
-      const target = event.target;
-
-      if (target instanceof Node && dropdownRef.current?.contains(target)) {
-        return;
-      }
-
-      closeList();
     }
 
     function closeWhenClickOutside(event: PointerEvent) {
@@ -132,35 +190,71 @@ export function ManyToOneCreateSelect({
         return;
       }
 
-      closeList();
+      setIsOpen(false);
+      setQuery("");
     }
 
     document.addEventListener("pointerdown", closeWhenClickOutside);
-    window.addEventListener("resize", closeFloatingList);
-    window.addEventListener("scroll", closeFloatingList, true);
 
     return () => {
       document.removeEventListener("pointerdown", closeWhenClickOutside);
-      window.removeEventListener("resize", closeFloatingList);
-      window.removeEventListener("scroll", closeFloatingList, true);
     };
-  }, [isOpen]);
+  }, [isOpen, dropdownRef]);
+
+  useEffect(() => {
+    if (!isOpen || !dropdownRef.current) return;
+    const el = dropdownRef.current;
+
+    function stopScrollBubbling(e: Event) {
+      e.stopPropagation();
+    }
+
+    el.addEventListener("wheel", stopScrollBubbling, { passive: true });
+    el.addEventListener("touchmove", stopScrollBubbling, { passive: true });
+
+    return () => {
+      el.removeEventListener("wheel", stopScrollBubbling);
+      el.removeEventListener("touchmove", stopScrollBubbling);
+    };
+  }, [isOpen, dropdownRef]);
 
   function selectItem(option: ManyToOneOption) {
-    setSelectedId(option.id);
+    setInternalValue(option.id);
     onValueChange?.(option.id);
     setQuery("");
     setIsOpen(false);
-    setDropdownStyle(undefined);
     setError(null);
     inputRef.current?.blur();
   }
 
   function openSelectionList() {
+    if (inputRef.current) {
+      const rect = inputRef.current.getBoundingClientRect();
+      setCoords({
+        top: rect.top,
+        bottom: rect.bottom,
+        left: rect.left,
+        width: rect.width,
+      });
+      const winHeight = window.innerHeight;
+      const spaceBelow = winHeight - rect.bottom - 24;
+      const spaceAbove = rect.top - 24;
+      const modalEl = inputRef.current.closest('[role="dialog"]');
+      if (modalEl) {
+        const modalRect = modalEl.getBoundingClientRect();
+        const spaceToModalBottom = modalRect.bottom - rect.bottom - 70;
+        const spaceInsideModalAbove = rect.top - modalRect.top - 20;
+        if (spaceToModalBottom < 320 && spaceInsideModalAbove > spaceToModalBottom) {
+          setOpenUpward(true);
+          setQuery("");
+          setIsOpen(true);
+          return;
+        }
+      }
+      setOpenUpward(spaceBelow < 340 && spaceAbove > spaceBelow);
+    }
     setQuery("");
-    setDropdownStyle(floatingDropdownStyle());
     setIsOpen(true);
-    requestAnimationFrame(() => inputRef.current?.focus());
   }
 
   function createCustomer(input: CreateCustomerInput) {
@@ -169,18 +263,11 @@ export function ManyToOneCreateSelect({
       try {
         const created = await onCreate(input);
 
-        setItems((current) => {
-          if (current.some((item) => item.id === created.id)) {
-            return current;
-          }
-
-          return [...current, created].sort((a, b) => a.name.localeCompare(b.name));
-        });
-        setSelectedId(created.id);
+        setCreatedItems((prev) => [...prev, created]);
+        setInternalValue(created.id);
         onValueChange?.(created.id);
         setQuery("");
         setIsOpen(false);
-        setDropdownStyle(undefined);
         setIsDialogOpen(false);
         inputRef.current?.blur();
       } catch (caught) {
@@ -189,64 +276,137 @@ export function ManyToOneCreateSelect({
     });
   }
 
-  const dropdown = isOpen && dropdownStyle
-    ? createPortal(
-        <div
-          ref={dropdownRef}
-          onMouseDown={(event) => event.preventDefault()}
-          className="fixed z-[1000] max-h-72 overflow-y-auto rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-lg"
-          style={dropdownStyle}
-        >
-          {!trimmedQuery && filteredItems.length > 0 ? (
-            <div className="px-3 py-2 text-xs font-normal text-muted-foreground">
-              Select {entityLabel.toLowerCase()}
-            </div>
-          ) : null}
-          {visibleItems.map((item) => (
+  const resizeHandle = (
+    <div
+      onPointerDown={handleResizeStart}
+      className={cn(
+        "group flex h-3.5 w-full shrink-0 cursor-ns-resize items-center justify-center bg-muted/40 transition-colors hover:bg-muted active:bg-muted/80 select-none",
+        openUpward ? "border-b border-border/60 rounded-t-md" : "border-t border-border/60 rounded-b-md",
+      )}
+      title="Drag to resize height"
+    >
+      <div className="h-1 w-8 rounded-full bg-muted-foreground/30 transition-colors group-hover:bg-muted-foreground/70" />
+    </div>
+  );
+
+  const winHeight = typeof window !== "undefined" ? window.innerHeight : 800;
+  const winWidth = typeof window !== "undefined" ? window.innerWidth : 1000;
+  const availableSpaceDownward = Math.max(140, winHeight - coords.bottom - 20);
+  const availableSpaceUpward = Math.max(140, coords.top - 20);
+  const effectiveMaxHeight = openUpward ? availableSpaceUpward : availableSpaceDownward;
+  const shouldFixHeight = (hasCustomHeight && visibleItems.length > 3) || visibleItems.length > 5;
+  const effectiveHeight = shouldFixHeight ? Math.min(dropdownHeight, effectiveMaxHeight) : undefined;
+
+  function handleDropdownWheel(event: React.WheelEvent<HTMLDivElement>) {
+    // Prevent react-remove-scroll on document from cancelling the wheel event
+    event.stopPropagation();
+    const scrollEl = listRef.current;
+    if (!scrollEl) return;
+
+    const { scrollTop, scrollHeight, clientHeight } = scrollEl;
+    const isScrollable = scrollHeight > clientHeight + 1;
+    const isAtTop = scrollTop <= 0 && event.deltaY < 0;
+    const isAtBottom = scrollTop + clientHeight >= scrollHeight - 2 && event.deltaY > 0;
+
+    if (!isScrollable || isAtTop || isAtBottom) {
+      // Forward wheel event to modal scroll container or window
+      const modalScrollEl = inputRef.current?.closest('[role="dialog"]')?.querySelector('.overflow-y-auto');
+      if (modalScrollEl) {
+        modalScrollEl.scrollTop += event.deltaY;
+      } else {
+        window.scrollBy(0, event.deltaY);
+      }
+    }
+  }
+
+  const dropdownContent = (
+    <div
+      ref={dropdownRef}
+      onPointerDown={(event) => event.stopPropagation()}
+      onWheel={handleDropdownWheel}
+      onTouchMove={(event) => event.stopPropagation()}
+      style={{
+        position: "fixed",
+        left: `${Math.max(8, Math.min(coords.left, winWidth - Math.max(coords.width, 240) - 8))}px`,
+        width: `${Math.max(coords.width, 240)}px`,
+        zIndex: 999999,
+        pointerEvents: "auto",
+        maxHeight: `${effectiveMaxHeight}px`,
+        height: effectiveHeight ? `${effectiveHeight}px` : undefined,
+        ...(openUpward
+          ? { bottom: `${Math.max(8, winHeight - coords.top + 6)}px` }
+          : { top: `${coords.bottom + 6}px` }),
+      }}
+      className="flex flex-col rounded-md border border-border bg-popover text-popover-foreground shadow-2xl overflow-hidden resize-y pointer-events-auto select-auto"
+    >
+      {openUpward ? resizeHandle : null}
+
+      <div ref={listRef} className="flex-1 overflow-y-auto p-1">
+        {!trimmedQuery && filteredItems.length > 0 ? (
+          <div className="px-3 py-2 text-xs font-normal text-muted-foreground">
+            Select {entityLabel.toLowerCase()}
+          </div>
+        ) : null}
+        {visibleItems.map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            onPointerDown={(event) => {
+              event.preventDefault();
+              selectItem(item);
+            }}
+            onClick={() => selectItem(item)}
+            className="flex w-full flex-col rounded px-3 py-2 text-left text-sm text-foreground transition-colors hover:bg-secondary/80"
+          >
+            <span className="font-medium">{item.name}</span>
+            <span className="text-xs text-muted-foreground">{item.code}</span>
+          </button>
+        ))}
+
+        {trimmedQuery ? (
+          <div className="border-t border-border pt-1">
             <button
-              key={item.id}
               type="button"
-              onClick={() => selectItem(item)}
-              className="flex w-full flex-col rounded px-3 py-2 text-left text-sm text-foreground transition-colors hover:bg-secondary/80"
+              onPointerDown={(event) => {
+                event.preventDefault();
+                createCustomer({ displayName: trimmedQuery });
+              }}
+              onClick={() => createCustomer({ displayName: trimmedQuery })}
+              disabled={isPending}
+              className="flex w-full items-center gap-2 rounded px-3 py-2 text-left text-sm text-foreground transition-colors hover:bg-secondary/80 disabled:opacity-60"
             >
-              <span className="font-medium">{item.name}</span>
-              <span className="text-xs text-muted-foreground">{item.code}</span>
+              <PlusIcon className="size-4" />
+              {isPending ? "Creating..." : `Create "${trimmedQuery}"`}
             </button>
-          ))}
+            <button
+              type="button"
+              onPointerDown={(event) => {
+                event.preventDefault();
+                setIsOpen(false);
+                setIsDialogOpen(true);
+              }}
+              onClick={() => {
+                setIsOpen(false);
+                setIsDialogOpen(true);
+              }}
+              className="flex w-full items-center gap-2 rounded px-3 py-2 text-left text-sm text-foreground transition-colors hover:bg-secondary/80"
+            >
+              <PlusIcon className="size-4" />
+              Create and Edit...
+            </button>
+          </div>
+        ) : null}
 
-          {trimmedQuery ? (
-            <div className="border-t border-border pt-1">
-              <button
-                type="button"
-                onClick={() => createCustomer({ displayName: trimmedQuery })}
-                disabled={isPending}
-                className="flex w-full items-center gap-2 rounded px-3 py-2 text-left text-sm text-foreground transition-colors hover:bg-secondary/80 disabled:opacity-60"
-              >
-                <PlusIcon className="size-4" />
-                {isPending ? "Creating..." : `Create "${trimmedQuery}"`}
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setIsOpen(false);
-                  setDropdownStyle(undefined);
-                  setIsDialogOpen(true);
-                }}
-                className="flex w-full items-center gap-2 rounded px-3 py-2 text-left text-sm text-foreground transition-colors hover:bg-secondary/80"
-              >
-                <PlusIcon className="size-4" />
-                Create and Edit...
-              </button>
-            </div>
-          ) : null}
+        {filteredItems.length === 0 && !trimmedQuery ? (
+          <p className="px-3 py-4 text-sm text-muted-foreground">No {entityLabel.toLowerCase()}s found.</p>
+        ) : null}
+      </div>
 
-          {filteredItems.length === 0 && !trimmedQuery ? (
-            <p className="px-3 py-4 text-sm text-muted-foreground">No {entityLabel.toLowerCase()}s found.</p>
-          ) : null}
-        </div>,
-        document.body,
-      )
-    : null;
+      {!openUpward ? resizeHandle : null}
+    </div>
+  );
+
+  const dropdown = isOpen && mounted ? createPortal(dropdownContent, document.body) : null;
 
   return (
     <div ref={rootRef} className="relative flex flex-col gap-1 text-sm font-medium">
@@ -259,7 +419,6 @@ export function ManyToOneCreateSelect({
           value={isOpen ? query : selectedLabel}
           onChange={(event) => {
             setQuery(event.target.value);
-            setDropdownStyle(floatingDropdownStyle());
             setIsOpen(true);
           }}
           onFocus={openSelectionList}
@@ -281,11 +440,11 @@ export function ManyToOneCreateSelect({
           placeholder={selectedLabel || placeholder}
           className={cn(inputClass, "w-full pl-9", fieldError ? "border-destructive focus-visible:border-destructive" : "")}
         />
+
+        {dropdown}
       </div>
 
       {fieldError ? <p className="text-sm font-normal text-destructive">{fieldError}</p> : null}
-
-      {dropdown}
 
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
 

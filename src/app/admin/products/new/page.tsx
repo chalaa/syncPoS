@@ -1,6 +1,6 @@
-import { getCatalogFormOptions } from "@/server/catalog/products";
+import { redirect } from "next/navigation";
+
 import { requirePermission } from "@/server/auth/session";
-import { ProductForm } from "../product-form";
 
 export const dynamic = "force-dynamic";
 
@@ -15,18 +15,12 @@ type NewProductPageProps = {
 export default async function NewProductPage({ searchParams }: NewProductPageProps) {
   await requirePermission("product.manage");
 
-  const [params, options] = await Promise.all([searchParams, getCatalogFormOptions()]);
+  const params = await searchParams;
+  const search = new URLSearchParams();
+  search.set("new", "1");
+  if (params.name) search.set("name", params.name);
+  if (params.notice) search.set("notice", params.notice);
+  if (params.error) search.set("error", params.error);
 
-  return (
-    <ProductForm
-      mode="create"
-      categories={options.categories}
-      brands={options.brands}
-      units={options.units}
-      taxes={options.taxes}
-      initialProductName={params.name}
-      notice={params.notice}
-      error={params.error}
-    />
-  );
+  redirect(`/admin/products?${search.toString()}`);
 }

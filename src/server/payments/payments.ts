@@ -446,7 +446,13 @@ export async function getPurchaseOrderPaymentSummary(purchaseOrderId: string): P
   const postedPaidMinor = summary?.paidMinor ?? 0;
   const residualAmountMinor = Math.max(totalMinor - postedPaidMinor, 0);
   const paymentStatus =
-    postedPaidMinor <= 0 ? "not_paid" : residualAmountMinor <= 0 ? "paid" : "partial";
+    totalMinor <= 0
+      ? "paid"
+      : postedPaidMinor <= 0
+        ? "not_paid"
+        : residualAmountMinor <= 0
+          ? "paid"
+          : "partial";
 
   return {
     paymentCount: summary?.paymentCount ?? 0,
@@ -486,7 +492,13 @@ export async function getSalesOrderPaymentSummary(salesOrderId: string): Promise
   const postedPaidMinor = summary?.paidMinor ?? 0;
   const residualAmountMinor = Math.max(totalMinor - postedPaidMinor, 0);
   const paymentStatus =
-    postedPaidMinor <= 0 ? "not_paid" : residualAmountMinor <= 0 ? "paid" : "partial";
+    totalMinor <= 0
+      ? "paid"
+      : postedPaidMinor <= 0
+        ? "not_paid"
+        : residualAmountMinor <= 0
+          ? "paid"
+          : "partial";
 
   return {
     paymentCount: summary?.paymentCount ?? 0,
@@ -526,7 +538,13 @@ export async function getVendorBillPaymentSummary(vendorBillId: string): Promise
   const postedPaidMinor = summary?.paidMinor ?? 0;
   const residualAmountMinor = Math.max(totalMinor - postedPaidMinor, 0);
   const paymentStatus =
-    postedPaidMinor <= 0 ? "not_paid" : residualAmountMinor <= 0 ? "paid" : "partial";
+    totalMinor <= 0
+      ? "paid"
+      : postedPaidMinor <= 0
+        ? "not_paid"
+        : residualAmountMinor <= 0
+          ? "paid"
+          : "partial";
 
   return {
     paymentCount: summary?.paymentCount ?? 0,
@@ -566,7 +584,13 @@ export async function getCustomerInvoicePaymentSummary(customerInvoiceId: string
   const postedPaidMinor = summary?.paidMinor ?? 0;
   const residualAmountMinor = Math.max(totalMinor - postedPaidMinor, 0);
   const paymentStatus =
-    postedPaidMinor <= 0 ? "not_paid" : residualAmountMinor <= 0 ? "paid" : "partial";
+    totalMinor <= 0
+      ? "paid"
+      : postedPaidMinor <= 0
+        ? "not_paid"
+        : residualAmountMinor <= 0
+          ? "paid"
+          : "partial";
 
   return {
     paymentCount: summary?.paymentCount ?? 0,

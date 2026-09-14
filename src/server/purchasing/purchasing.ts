@@ -4,6 +4,7 @@ import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
 
 import { getDefaultCompany, minorToDisplay } from "@/server/catalog/products";
 import { db } from "@/server/db/client";
+import { getOwnerOptions } from "@/server/owners/owners";
 import {
   goodsReceipts,
   goodsReceiptLines,
@@ -70,14 +71,7 @@ export async function getPurchaseFormOptions() {
         ),
       )
       .orderBy(asc(partners.displayName)),
-    db
-      .select({
-        id: owners.id,
-        name: owners.name,
-      })
-      .from(owners)
-      .where(and(eq(owners.companyId, company.id), isNull(owners.deletedAt)))
-      .orderBy(asc(owners.name)),
+    getOwnerOptions(),
     db
       .select({
         id: products.id,
@@ -216,7 +210,12 @@ export async function getPurchaseOrderList(): Promise<PurchaseOrderListRow[]> {
     order by po.created_at desc
   `);
 
-  return rows;
+  return rows.map((row) => ({
+    ...row,
+    totalMinor: Number(row.totalMinor),
+    paidMinor: Number(row.paidMinor),
+    residualAmountMinor: Number(row.residualAmountMinor),
+  }));
 }
 
 export async function getPurchaseReceiptList(purchaseOrderId?: string): Promise<PurchaseReceiptListRow[]> {
@@ -273,6 +272,7 @@ export async function getPurchaseVendorBillList(
       string_agg(distinct pr.name, ', ' order by pr.name) as "productSummary",
       'vendor_bill' as "source",
       case
+        when vb.total_minor <= 0 then 'paid'
         when coalesce(sum(pa.amount_minor) filter (where pay.status = 'posted' and pay.deleted_at is null and pa.deleted_at is null), 0) <= 0 then 'not_paid'
         when vb.total_minor - coalesce(sum(pa.amount_minor) filter (where pay.status = 'posted' and pay.deleted_at is null and pa.deleted_at is null), 0) <= 0 then 'paid'
         else 'partial'
@@ -311,7 +311,7 @@ export async function getPurchaseVendorBillList(
       partner.display_name as "supplierName",
       null as "productSummary",
       'placeholder' as "source",
-      'not_paid' as "paymentStatus",
+      case when sbp.amount_minor <= 0 then 'paid' else 'not_paid' end as "paymentStatus",
       sbp.currency_code as "currencyCode",
       sbp.amount_minor as "untaxedAmountMinor",
       0::bigint as "taxAmountMinor",
@@ -423,7 +423,7 @@ export async function getPurchaseVendorBillDetail(
         taxAmountMinor: sql<number>`0::bigint`,
         totalMinor: supplierBillPlaceholders.amountMinor,
         residualAmountMinor: sql<number>`case when ${supplierBillPlaceholders.status} = 'cancelled' then 0::bigint else ${supplierBillPlaceholders.amountMinor} end`,
-        paymentStatus: sql<string>`'not_paid'`,
+        paymentStatus: sql<string>`case when ${supplierBillPlaceholders.amountMinor} <= 0 then 'paid' else 'not_paid' end`,
         currencyCode: supplierBillPlaceholders.currencyCode,
         purchaseOrderId: purchaseOrders.id,
         orderNo: purchaseOrders.orderNo,
@@ -465,6 +465,7 @@ export async function getPurchaseVendorBillDetail(
         ), 0), 0)::bigint
       end as "residualAmountMinor",
       case
+        when vb.total_minor <= 0 then 'paid'
         when coalesce((
           select sum(pa.amount_minor)
           from payment_allocations pa
@@ -862,6 +863,7 @@ export async function getPurchaseOrderDetail(id: string): Promise<PurchaseOrderD
           ), 0), 0)::bigint
         end as "residualAmountMinor",
         case
+          when vb.total_minor <= 0 then 'paid'
           when coalesce((
             select sum(pa.amount_minor)
             from payment_allocations pa

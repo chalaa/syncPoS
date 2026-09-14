@@ -8,7 +8,7 @@ import { z } from "zod";
 import { requirePermission } from "@/server/auth/session";
 import { getDefaultCompany, uniqueViolationMessage } from "@/server/catalog/products";
 import { db } from "@/server/db/client";
-import { auditLogs, owners } from "@/server/db/schema";
+import { auditLogs, ownerLocations, owners } from "@/server/db/schema";
 
 const ownerSchema = z.object({
   ownerId: z.string().uuid().optional(),
@@ -44,6 +44,10 @@ export async function createOwner(formData: FormData) {
     redirectWithMessage("/admin/settings/owners", "error", parsed.error.issues[0]?.message ?? "Invalid owner.");
   }
 
+  const locationIds = formData
+    .getAll("locationIds")
+    .filter((val): val is string => typeof val === "string" && val.length > 0);
+
   const company = await getDefaultCompany();
 
   try {
@@ -56,6 +60,16 @@ export async function createOwner(formData: FormData) {
         })
         .returning({ id: owners.id });
 
+      if (locationIds.length > 0) {
+        await tx.insert(ownerLocations).values(
+          locationIds.map((locationId) => ({
+            ownerId: owner.id,
+            locationId,
+            isPrimary: true,
+          })),
+        );
+      }
+
       await tx.insert(auditLogs).values({
         companyId: company.id,
         actorUserId: user.id,
@@ -63,7 +77,7 @@ export async function createOwner(formData: FormData) {
         entityType: "owner",
         entityId: owner.id,
         severity: "info",
-        metadata: { name: parsed.data.name },
+        metadata: { name: parsed.data.name, locationIds },
       });
     });
   } catch (error) {
@@ -91,6 +105,10 @@ export async function updateOwner(formData: FormData) {
   }
 
   const ownerId = parsed.data.ownerId;
+  const locationIds = formData
+    .getAll("locationIds")
+    .filter((val): val is string => typeof val === "string" && val.length > 0);
+
   const company = await getDefaultCompany();
 
   try {
@@ -108,6 +126,18 @@ export async function updateOwner(formData: FormData) {
         throw new Error("Owner does not exist.");
       }
 
+      await tx.delete(ownerLocations).where(eq(ownerLocations.ownerId, ownerId));
+
+      if (locationIds.length > 0) {
+        await tx.insert(ownerLocations).values(
+          locationIds.map((locationId) => ({
+            ownerId: owner.id,
+            locationId,
+            isPrimary: true,
+          })),
+        );
+      }
+
       await tx.insert(auditLogs).values({
         companyId: company.id,
         actorUserId: user.id,
@@ -115,7 +145,7 @@ export async function updateOwner(formData: FormData) {
         entityType: "owner",
         entityId: owner.id,
         severity: "info",
-        metadata: { name: parsed.data.name },
+        metadata: { name: parsed.data.name, locationIds },
       });
     });
   } catch (error) {

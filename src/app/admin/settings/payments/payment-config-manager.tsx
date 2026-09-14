@@ -84,16 +84,11 @@ function MethodForm({
       <input type="hidden" name="returnPath" value={returnPath} />
       {record ? <input type="hidden" name="id" value={record.id} /> : null}
 
-      <div className="grid gap-4 sm:grid-cols-[0.7fr_1fr]">
-        <label className="flex flex-col gap-1 text-sm font-medium">
-          Code
-          <input name="code" placeholder={record ? undefined : "Auto"} defaultValue={record?.code} className={inputClass} />
-        </label>
-        <label className="flex flex-col gap-1 text-sm font-medium">
-          Name
-          <input name="name" required defaultValue={record?.name} className={inputClass} />
-        </label>
-      </div>
+      <label className="flex flex-col gap-1 text-sm font-medium">
+        Name
+        <input name="name" required defaultValue={record?.name} className={inputClass} />
+      </label>
+      {record ? <input type="hidden" name="code" value={record.code} /> : null}
 
       <label className="flex flex-col gap-1 text-sm font-medium">
         Type
@@ -174,16 +169,11 @@ function AccountForm({
         </select>
       </label>
 
-      <div className="grid gap-4 sm:grid-cols-[0.7fr_1fr]">
-        <label className="flex flex-col gap-1 text-sm font-medium">
-          Code
-          <input name="code" placeholder={record ? undefined : "Auto"} defaultValue={record?.code} className={inputClass} />
-        </label>
-        <label className="flex flex-col gap-1 text-sm font-medium">
-          Name
-          <input name="name" required defaultValue={record?.name} className={inputClass} />
-        </label>
-      </div>
+      <label className="flex flex-col gap-1 text-sm font-medium">
+        Name
+        <input name="name" required defaultValue={record?.name} className={inputClass} />
+      </label>
+      {record ? <input type="hidden" name="code" value={record.code} /> : null}
 
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="flex flex-col gap-1 text-sm font-medium">

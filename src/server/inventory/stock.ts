@@ -4,6 +4,7 @@ import { and, asc, desc, eq, ilike, inArray, isNull, lte, or, sql } from "drizzl
 import { alias } from "drizzle-orm/pg-core";
 
 import { getDefaultCompany, minorToDisplay } from "@/server/catalog/products";
+import { getOwnerOptions } from "@/server/owners/owners";
 import { db } from "@/server/db/client";
 import {
   locations,
@@ -19,34 +20,21 @@ import { stockLocationTypeOptions, stockSelectableLocationTypeOptions } from "@/
 import {
   stockStatusOptions,
   inventoryOperationViewOptions,
+  displayMoneyMinor,
+  displayQuantity,
   type InventoryOperationDetail,
   type InventoryOperationDetailLine,
   type InventoryOperationFormOptions,
   type InventoryOperationListRow,
   type InventoryOperationView,
+  type InventorySummaryMetrics,
   type ProductStockCardRow,
   type SerialHistoryRow,
   type StockByLocationRow,
   type StockStatusOption,
 } from "@/server/inventory/stock-types";
 
-export { inventoryOperationViewOptions, stockStatusOptions };
-
-export function displayMoneyMinor(value: number, currencyCode: string) {
-  return `${currencyCode} ${minorToDisplay(value)}`;
-}
-
-export function displayQuantity(value: string | number) {
-  const parsed = Number(value);
-
-  if (!Number.isFinite(parsed)) {
-    return String(value);
-  }
-
-  return parsed.toLocaleString("en-US", {
-    maximumFractionDigits: 6,
-  });
-}
+export { displayMoneyMinor, displayQuantity, inventoryOperationViewOptions, stockStatusOptions };
 
 export function parseStockStatus(value?: string): StockStatusOption {
   return stockStatusOptions.includes(value as StockStatusOption)
@@ -73,6 +61,10 @@ export function parseInventoryOperationView(value?: string): InventoryOperationV
 function stockStatusSql(status: StockStatusOption) {
   if (status === "in_stock") {
     return sql`cast(${stockBalances.quantityOnHand} as numeric) > 0`;
+  }
+
+  if (status === "low_stock") {
+    return sql`cast(${stockBalances.quantityAvailable} as numeric) > 0 and cast(${stockBalances.quantityAvailable} as numeric) <= 5`;
   }
 
   if (status === "reserved") {
@@ -129,14 +121,7 @@ export async function getInventoryFilterOptions() {
 export async function getInventoryOperationFormOptions(): Promise<InventoryOperationFormOptions> {
   const company = await getDefaultCompany();
   const [ownerRows, locationRows, productRows] = await Promise.all([
-    db
-      .select({
-        id: owners.id,
-        name: owners.name,
-      })
-      .from(owners)
-      .where(and(eq(owners.companyId, company.id), isNull(owners.deletedAt)))
-      .orderBy(asc(owners.name)),
+    getOwnerOptions(),
     db
       .select({
         id: locations.id,
@@ -607,4 +592,47 @@ export async function getSerialHistory(params: {
     .leftJoin(currentLocations, eq(productSerials.currentLocationId, currentLocations.id))
     .where(and(...filters))
     .orderBy(desc(stockMovements.movementDate), desc(stockMovementLines.lineNo));
+}
+
+export async function getInventorySummaryMetrics(): Promise<InventorySummaryMetrics> {
+  const company = await getDefaultCompany();
+  const [row] = await db.execute<{
+    totalValuationMinor: string | number;
+    currencyCode: string | null;
+    totalSkusOnHand: number;
+    lowStockCount: number;
+    outOfStockCount: number;
+    totalReservedQuantity: string | number;
+  }>(sql`
+    with product_totals as (
+      select
+        p.id as product_id,
+        coalesce(sum(cast(sb.quantity_on_hand as numeric)), 0) as on_hand,
+        coalesce(sum(cast(sb.quantity_available as numeric)), 0) as available,
+        coalesce(sum(cast(sb.quantity_reserved as numeric)), 0) as reserved,
+        coalesce(sum(cast(sb.quantity_on_hand as numeric) * sb.average_cost_minor), 0)::bigint as valuation_minor,
+        max(sb.currency_code) as currency_code
+      from products p
+      left join stock_balances sb on sb.product_id = p.id and sb.deleted_at is null and sb.company_id = ${company.id}
+      where p.company_id = ${company.id} and p.deleted_at is null
+      group by p.id
+    )
+    select
+      coalesce(sum(valuation_minor), 0)::bigint as "totalValuationMinor",
+      coalesce(max(currency_code), 'ETB') as "currencyCode",
+      count(*) filter (where on_hand > 0)::int as "totalSkusOnHand",
+      count(*) filter (where available > 0 and available <= 5)::int as "lowStockCount",
+      count(*) filter (where on_hand <= 0)::int as "outOfStockCount",
+      coalesce(sum(reserved), 0)::numeric as "totalReservedQuantity"
+    from product_totals
+  `);
+
+  return {
+    totalValuationMinor: Number(row?.totalValuationMinor ?? 0),
+    currencyCode: row?.currencyCode || "ETB",
+    totalSkusOnHand: Number(row?.totalSkusOnHand ?? 0),
+    lowStockCount: Number(row?.lowStockCount ?? 0),
+    outOfStockCount: Number(row?.outOfStockCount ?? 0),
+    totalReservedQuantity: Number(row?.totalReservedQuantity ?? 0),
+  };
 }

@@ -6,21 +6,30 @@ import { cn } from "@/lib/utils";
 
 type NotebookItem = {
   value: string;
-  label: string;
+  label: ReactNode;
   content: ReactNode;
 };
 
 export function Notebook({
   items,
   defaultValue,
+  value,
+  onValueChange,
   className,
 }: {
   items: NotebookItem[];
   defaultValue?: string;
+  value?: string;
+  onValueChange?: (val: string) => void;
   className?: string;
 }) {
   const fallbackValue = items[0]?.value ?? "";
-  const [activeValue, setActiveValue] = useState(defaultValue ?? fallbackValue);
+  const [internalValue, setInternalValue] = useState(defaultValue ?? fallbackValue);
+  const activeValue = value !== undefined ? value : internalValue;
+  const setActiveValue = (nextVal: string) => {
+    setInternalValue(nextVal);
+    onValueChange?.(nextVal);
+  };
   const baseId = useId();
   const resolvedActiveValue = items.some((item) => item.value === activeValue)
     ? activeValue

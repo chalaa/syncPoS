@@ -252,16 +252,11 @@ function RoleForm({
       <input type="hidden" name="returnPath" value={returnPath} />
       {role ? <input type="hidden" name="id" value={role.id} /> : null}
 
-      <div className="grid gap-4 sm:grid-cols-[0.7fr_1fr]">
-        <label className="flex flex-col gap-1 text-sm font-medium">
-          Code
-          <input name="code" placeholder={role ? undefined : "Auto"} defaultValue={role?.code} className={inputClass} />
-        </label>
-        <label className="flex flex-col gap-1 text-sm font-medium">
-          Name
-          <input name="name" required defaultValue={role?.name} className={inputClass} />
-        </label>
-      </div>
+      <label className="flex flex-col gap-1 text-sm font-medium">
+        Name
+        <input name="name" required defaultValue={role?.name} className={inputClass} />
+      </label>
+      {role ? <input type="hidden" name="code" value={role.code} /> : null}
 
       <label className="flex flex-col gap-1 text-sm font-medium">
         Description

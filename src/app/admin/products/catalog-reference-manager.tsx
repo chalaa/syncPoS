@@ -26,8 +26,6 @@ import { useState } from "react";
 
 const inputClass =
   "h-10 rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring";
-const readonlyInputClass =
-  "h-10 rounded-md border border-input bg-muted px-3 text-sm text-muted-foreground outline-none";
 const textareaClass =
   "min-h-24 rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
@@ -135,18 +133,8 @@ function ReferenceForm({
       <input type="hidden" name="returnPath" value={returnPath} />
       {record ? <input type="hidden" name="id" value={record.id} /> : null}
 
+      {record ? <input type="hidden" name="code" value={record.code} /> : null}
       <div className="grid gap-4 sm:grid-cols-2">
-        {record ? (
-          <label className="flex flex-col gap-1 text-sm font-medium">
-            Code
-            <input
-              name="code"
-              defaultValue={record.code}
-              readOnly
-              className={readonlyInputClass}
-            />
-          </label>
-        ) : null}
         <label className="flex flex-col gap-1 text-sm font-medium">
           Name
           <input

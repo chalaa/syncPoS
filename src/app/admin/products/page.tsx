@@ -4,12 +4,12 @@ import { SearchIcon } from "lucide-react";
 import { Alert } from "@/components/ui/alert";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
-import { cn } from "@/lib/utils";
-import { getProductList, minorToDisplay } from "@/server/catalog/products";
-import { restoreProduct, softDeleteProduct } from "./actions";
+import { getCatalogFormOptions, getProductDetail, getProductList } from "@/server/catalog/products";
 import { requirePermission } from "@/server/auth/session";
 
+import { NewProductModal } from "./new-product-modal";
 import { ProductNavTabs } from "@/app/admin/products/product-nav-tabs";
+import { ProductListTable } from "./product-list-table";
 
 export const dynamic = "force-dynamic";
 
@@ -19,6 +19,9 @@ type ProductsPageProps = {
     show?: string;
     notice?: string;
     error?: string;
+    new?: string;
+    name?: string;
+    productId?: string;
   }>;
 };
 
@@ -28,7 +31,11 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
   const params = await searchParams;
   const showDeleted = params.show === "deleted";
   const query = params.q ?? "";
-  const products = await getProductList({ query, showDeleted });
+  const [products, formOptions, initialProductDetail] = await Promise.all([
+    getProductList({ query, showDeleted }),
+    getCatalogFormOptions(),
+    params.productId ? getProductDetail(params.productId) : Promise.resolve(null),
+  ]);
 
   return (
     <PageShell>
@@ -36,10 +43,17 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
         eyebrow="Catalog Management"
         title="Products & Pricing"
         actions={
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <ButtonLink href="/admin/products/import" variant="outline">Import</ButtonLink>
             <ButtonLink href="/admin/products/export" variant="outline">Export</ButtonLink>
-            <ButtonLink href="/admin/products/new" variant="default">New product</ButtonLink>
+            <NewProductModal
+              categories={formOptions.categories}
+              brands={formOptions.brands}
+              units={formOptions.units}
+              taxes={formOptions.taxes}
+              initialOpen={params.new === "1" || params.new === "true"}
+              initialProductName={params.name}
+            />
           </div>
         }
       />
@@ -76,101 +90,13 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
           </div>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[920px] text-left text-sm">
-            <thead>
-              <tr className="border-b border-border bg-muted/40 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                <th className="px-4 py-3">Item Code</th>
-                <th className="px-4 py-3">Product</th>
-                <th className="px-4 py-3">Standard Name</th>
-                <th className="px-4 py-3">Tracking</th>
-                <th className="px-4 py-3">Unit</th>
-                <th className="px-4 py-3 text-right">Cost</th>
-                <th className="px-4 py-3 text-right">Price</th>
-                <th className="px-4 py-3 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border/60">
-              {products.map((product) => (
-                <tr key={product.id} className="transition-colors hover:bg-secondary/40">
-                  <td className="px-4 py-3.5 font-semibold text-primary">
-                    <Link href={`/admin/products/${product.id}`} className="underline-offset-4 hover:underline">
-                      {product.sku}
-                    </Link>
-                  </td>
-                  <td className="px-4 py-3.5">
-                    <div className="font-medium text-foreground">{product.name}</div>
-                    <div className="text-xs text-muted-foreground">
-                      {[product.brandName, product.categoryName, product.model]
-                        .filter(Boolean)
-                        .join(" · ") || "No category"}
-                    </div>
-                    {product.country ? (
-                      <div className="text-xs text-muted-foreground">Country: {product.country}</div>
-                    ) : null}
-                  </td>
-                  <td className="px-4 py-3.5 text-xs text-muted-foreground">{product.standardName ?? "—"}</td>
-                  <td className="px-4 py-3.5">
-                    <span className="inline-flex items-center rounded border border-border/80 bg-secondary px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wider text-secondary-foreground">
-                      {product.trackingMode}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3.5 text-xs font-medium text-foreground">{product.unitCode}</td>
-                  <td className="px-4 py-3.5 text-right font-mono text-xs text-muted-foreground">
-                    {product.currencyCode} {minorToDisplay(product.standardCostMinor)}
-                  </td>
-                  <td className="px-4 py-3.5 text-right font-mono text-xs font-bold text-foreground">
-                    {product.currencyCode} {minorToDisplay(product.listPriceMinor)}
-                  </td>
-                  <td className="px-4 py-3.5">
-                    <div className="flex justify-end gap-2">
-                      {!showDeleted ? (
-                        <>
-                          <ButtonLink
-                            href={`/admin/products/${product.id}`}
-                            variant="outline"
-                            size="sm"
-                          >
-                            Open
-                          </ButtonLink>
-                          <ButtonLink
-                            href={`/admin/products/${product.id}/edit`}
-                            variant="outline"
-                            size="sm"
-                          >
-                            Edit
-                          </ButtonLink>
-                          <form action={softDeleteProduct}>
-                            <input type="hidden" name="id" value={product.id} />
-                            <Button variant="destructive" size="sm">
-                              Delete
-                            </Button>
-                          </form>
-                        </>
-                      ) : (
-                        <form action={restoreProduct}>
-                          <input type="hidden" name="id" value={product.id} />
-                          <Button variant="outline" size="sm">
-                            Restore
-                          </Button>
-                        </form>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-              {products.length === 0 ? (
-                <tr>
-                  <td colSpan={8} className="px-4 py-12 text-center text-sm text-muted-foreground">
-                    No products found matching the criteria.
-                  </td>
-                </tr>
-              ) : null}
-            </tbody>
-          </table>
-        </div>
+        <ProductListTable
+          products={products}
+          showDeleted={showDeleted}
+          initialProductId={params.productId}
+          initialProductDetail={initialProductDetail}
+        />
       </section>
     </PageShell>
   );
 }
-

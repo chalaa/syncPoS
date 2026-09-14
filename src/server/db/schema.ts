@@ -527,6 +527,25 @@ export const userLocationAccess = pgTable(
   ],
 );
 
+export const ownerLocations = pgTable(
+  "owner_locations",
+  {
+    ownerId: uuid("owner_id")
+      .notNull()
+      .references(() => owners.id, { onDelete: "cascade", onUpdate: "cascade" }),
+    locationId: uuid("location_id")
+      .notNull()
+      .references(() => locations.id, { onDelete: "cascade", onUpdate: "cascade" }),
+    isPrimary: boolean("is_primary").notNull().default(false),
+    ...timestamps,
+  },
+  (table) => [
+    primaryKey({ columns: [table.ownerId, table.locationId] }),
+    index("owner_locations_owner_idx").on(table.ownerId),
+    index("owner_locations_location_idx").on(table.locationId),
+  ],
+);
+
 export const devices = pgTable(
   "devices",
   {
@@ -1632,7 +1651,7 @@ export const purchaseOrders = pgTable(
     }),
     orderNo: varchar("order_no", { length: 60 }).notNull(),
     vendorReference: varchar("vendor_reference", { length: 80 }),
-    paymentTerm: purchasePaymentTerm("payment_term").notNull().default("credit"),
+    paymentTerm: purchasePaymentTerm("payment_term").notNull().default("cash"),
     status: purchaseOrderStatus("status").notNull().default("draft"),
     orderDate: date("order_date").notNull().defaultNow(),
     paymentDueDate: date("payment_due_date"),
@@ -2163,7 +2182,7 @@ export const salesOrders = pgTable(
     orderNo: varchar("order_no", { length: 60 }).notNull(),
     customerReference: varchar("customer_reference", { length: 80 }),
     fsNumber: varchar("fs_number", { length: 80 }),
-    paymentTerm: salesPaymentTerm("payment_term").notNull().default("credit"),
+    paymentTerm: salesPaymentTerm("payment_term").notNull().default("cash"),
     status: salesOrderStatus("status").notNull().default("quotation"),
     orderDate: date("order_date").notNull().defaultNow(),
     validUntil: date("valid_until"),

@@ -7,6 +7,7 @@ import {
   minorToDisplay,
   normalizeCode,
 } from "@/lib/catalog-utils";
+import { filterAndSortByFuzzy } from "@/lib/search-utils";
 import {
   brands,
   companies,
@@ -133,19 +134,25 @@ export async function getProductList(params: { query?: string; showDeleted?: boo
   const company = await getDefaultCompany();
   const query = params.query?.trim();
   const deletedFilter = params.showDeleted ? isNotNull(products.deletedAt) : isNull(products.deletedAt);
-  const searchFilter = query
-    ? or(
-        ilike(products.sku, `%${query}%`),
-        ilike(products.name, `%${query}%`),
-        ilike(products.standardName, `%${query}%`),
-        ilike(products.model, `%${query}%`),
-        ilike(products.country, `%${query}%`),
+  const tokens = query ? query.split(/\s+/).filter(Boolean) : [];
+
+  const tokenFilters = tokens.length > 0
+    ? tokens.map((token) =>
+        or(
+          ilike(products.sku, `%${token}%`),
+          ilike(products.name, `%${token}%`),
+          ilike(products.standardName, `%${token}%`),
+          ilike(products.model, `%${token}%`),
+          ilike(products.country, `%${token}%`),
+          ilike(productCategories.name, `%${token}%`),
+          ilike(brands.name, `%${token}%`),
+        ),
       )
-    : undefined;
+    : [];
 
-  const filters = [eq(products.companyId, company.id), deletedFilter, searchFilter].filter(Boolean);
+  const filters = [eq(products.companyId, company.id), deletedFilter, ...tokenFilters].filter(Boolean);
 
-  return db
+  let results = await db
     .select({
       id: products.id,
       sku: products.sku,
@@ -170,6 +177,51 @@ export async function getProductList(params: { query?: string; showDeleted?: boo
     .leftJoin(unitsOfMeasure, eq(products.unitId, unitsOfMeasure.id))
     .where(and(...filters))
     .orderBy(desc(products.createdAt));
+
+  // If tokenized SQL found no matches and a query was entered, it may be a misspelling (e.g. "bosh", "hamer").
+  // Fall back to candidate pool and apply typo-tolerant fuzzy matching.
+  if (results.length === 0 && query) {
+    const allCandidates = await db
+      .select({
+        id: products.id,
+        sku: products.sku,
+        name: products.name,
+        standardName: products.standardName,
+        model: products.model,
+        country: products.country,
+        specifications: products.specifications,
+        trackingMode: products.trackingMode,
+        standardCostMinor: products.standardCostMinor,
+        listPriceMinor: products.listPriceMinor,
+        currencyCode: products.currencyCode,
+        isActive: products.isActive,
+        deletedAt: products.deletedAt,
+        categoryName: productCategories.name,
+        brandName: brands.name,
+        unitCode: unitsOfMeasure.code,
+      })
+      .from(products)
+      .leftJoin(productCategories, eq(products.categoryId, productCategories.id))
+      .leftJoin(brands, eq(products.brandId, brands.id))
+      .leftJoin(unitsOfMeasure, eq(products.unitId, unitsOfMeasure.id))
+      .where(and(eq(products.companyId, company.id), deletedFilter))
+      .orderBy(desc(products.createdAt));
+
+    results = filterAndSortByFuzzy(
+      allCandidates,
+      query,
+      (p) => `${p.sku} ${p.name} ${p.brandName ?? ""} ${p.categoryName ?? ""} ${p.model ?? ""}`,
+    );
+  } else if (results.length > 0 && query) {
+    // Rank matched results by relevance
+    results = filterAndSortByFuzzy(
+      results,
+      query,
+      (p) => `${p.sku} ${p.name} ${p.brandName ?? ""} ${p.categoryName ?? ""} ${p.model ?? ""}`,
+    );
+  }
+
+  return results;
 }
 
 export async function getCatalogReferenceList(params: {

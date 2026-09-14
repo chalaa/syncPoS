@@ -62,11 +62,6 @@ export default async function NewExpensePage({ searchParams }: NewExpensePagePro
           </label>
 
           <label className="flex flex-col gap-1 text-sm font-medium">
-            Payment Status
-            <input value="Unpaid" readOnly className={`${inputClass} text-muted-foreground`} />
-          </label>
-
-          <label className="flex flex-col gap-1 text-sm font-medium">
             Employee
             <select name="employeeId" className={inputClass}>
               <option value="">No employee</option>

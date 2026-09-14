@@ -1,4 +1,5 @@
 import type { CategorySelectOption, SelectOption } from "@/server/catalog/types";
+import type { OwnerOption } from "@/server/owners/types";
 import type { PurchaseFormOption, PurchaseTaxOption } from "@/server/purchasing/types";
 
 export type SalesFormOption = PurchaseFormOption;
@@ -92,7 +93,7 @@ export type SalesFormOptions = {
     baseCurrencyCode: string;
   };
   customers: SalesFormOption[];
-  owners: SalesFormOption[];
+  owners: OwnerOption[];
   products: SalesFormOption[];
   productCategories: CategorySelectOption[];
   productBrands: SelectOption[];

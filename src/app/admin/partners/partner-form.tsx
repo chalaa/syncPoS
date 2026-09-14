@@ -149,27 +149,7 @@ export function PartnerForm({ mode, partner, paymentTerms, error }: PartnerFormP
       <form action={action} className="grid gap-5 rounded-xl border border-border bg-card p-6 shadow-xs">
           {partner ? <input type="hidden" name="id" value={partner.id} /> : null}
 
-          <div className="grid gap-4 md:grid-cols-2">
-            <label className="grid gap-1 text-sm font-medium">
-              Code
-              <input
-                name="code"
-                defaultValue={partner?.code}
-                placeholder={partner ? undefined : "Auto"}
-                maxLength={40}
-                className="h-10 rounded-md border border-input bg-background px-3 font-normal text-foreground"
-              />
-            </label>
-            <label className="grid gap-1 text-sm font-medium">
-              TIN
-              <input
-                name="tin"
-                defaultValue={partner?.tin ?? ""}
-                maxLength={30}
-                className="h-10 rounded-md border border-input bg-background px-3 font-normal text-foreground"
-              />
-            </label>
-          </div>
+          {partner ? <input type="hidden" name="code" value={partner.code} /> : null}
 
           <div className="grid gap-4 md:grid-cols-2">
             <label className="grid gap-1 text-sm font-medium">

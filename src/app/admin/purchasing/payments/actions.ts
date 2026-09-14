@@ -192,7 +192,9 @@ export async function registerSupplierPayment(formData: FormData) {
           partnerId: supplierId,
           paymentNo: paymentNo("PAY-OUT"),
           paymentType: "outbound",
-          status: "draft",
+          status: "posted",
+          postedAt: new Date(),
+          postedBy: user.id,
           paymentMethodId: firstLine.paymentMethodId,
           paymentAccountId: firstLine.paymentAccountId,
           amountMinor,
@@ -220,20 +222,24 @@ export async function registerSupplierPayment(formData: FormData) {
       await tx.insert(auditLogs).values({
         companyId: company.id,
         actorUserId: user.id,
-        action: "supplier_payment.register",
+        action: "supplier_payment.post",
         entityType: "payment",
         entityId: payment.id,
         severity: "info",
         metadata: { paymentNo: payment.paymentNo, vendorBillId: target ? null : bill.id, purchaseOrderId: target?.purchaseOrderId ?? null },
       });
     });
+
+    if (parsed.data.vendorBillId) {
+      await updateVendorBillPaymentStatus(parsed.data.vendorBillId);
+    }
   } catch (error) {
     redirectWithError(returnPath, error instanceof Error ? error.message : "Could not register supplier payment.");
   }
 
   revalidatePath("/admin/purchasing");
   revalidatePath(returnPath);
-  redirect(`/admin/purchasing/payments/${paymentId}?notice=${encodeURIComponent("Supplier payment registered as draft")}`);
+  redirect(`${returnPath}?notice=${encodeURIComponent("Payment posted successfully.")}`);
 }
 
 export async function postSupplierPayment(formData: FormData) {

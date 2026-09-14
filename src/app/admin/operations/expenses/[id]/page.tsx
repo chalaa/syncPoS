@@ -53,9 +53,9 @@ export default async function ExpenseDetailPage({ params, searchParams }: Expens
             {canPay ? (
               <PaymentFormDialog
                 title="Register Expense Payment"
-                description={`Create a draft outbound payment for ${expense.expenseNo}.`}
+                description={`Register and post payment for ${expense.expenseNo}.`}
                 triggerLabel="Register Payment"
-                submitLabel="Register Draft Payment"
+                submitLabel="Post Payment"
                 action={registerExpensePayment}
                 hiddenFieldName="expenseId"
                 hiddenFieldValue={expense.id}

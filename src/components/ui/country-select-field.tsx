@@ -21,6 +21,7 @@ type CountrySelectFieldProps = {
   required?: boolean;
   disabled?: boolean;
   className?: string;
+  menuPlacement?: "auto" | "bottom" | "top";
   onValueChange?: (value: string) => void;
 };
 
@@ -47,16 +48,25 @@ export function CountrySelectField({
   required,
   disabled,
   className,
+  menuPlacement = "top",
   onValueChange,
 }: CountrySelectFieldProps) {
   const generatedId = useId();
   const [internalValue, setInternalValue] = useState(defaultValue ?? "");
+  const [isOpen, setIsOpen] = useState(false);
   const isControlled = value !== undefined;
   const selectedValue = isControlled ? value ?? "" : internalValue;
   const selectedOption = useMemo(() => optionFromCountryName(selectedValue), [selectedValue]);
 
   return (
-    <div className={cn("grid gap-1 text-sm font-medium", className)}>
+    <div
+      className={cn(
+        "relative grid gap-1 text-sm font-medium",
+        isOpen ? "z-50" : "z-0",
+        "focus-within:z-40",
+        className,
+      )}
+    >
       <Label htmlFor={generatedId}>{label}</Label>
       <input type="hidden" name={name} value={selectedValue} required={required} />
       <CountrySelect
@@ -66,6 +76,24 @@ export function CountrySelectField({
         placeholder=""
         isDisabled={disabled}
         isClearable={!required}
+        menuPlacement={menuPlacement}
+        maxMenuHeight={380}
+        menuPortalTarget={typeof document !== "undefined" ? document.body : undefined}
+        menuPosition="fixed"
+        onMenuOpen={() => setIsOpen(true)}
+        onMenuClose={() => setIsOpen(false)}
+        styles={{
+          menuPortal: (base) => ({
+            ...base,
+            zIndex: 999999,
+            pointerEvents: "auto",
+          }),
+          menu: (base) => ({
+            ...base,
+            zIndex: 999999,
+            pointerEvents: "auto",
+          }),
+        }}
         onChange={(option) => {
           const country = Array.isArray(option) ? "" : option?.name ?? "";
           setInternalValue(country);
