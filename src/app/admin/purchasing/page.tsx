@@ -1,6 +1,8 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 
+import { TableFilterSelect } from "@/components/ui/table-filter-select";
+import { TableSearchInput } from "@/components/ui/table-search-input";
 import { Alert } from "@/components/ui/alert";
 import { Badge, StatusBadge } from "@/components/ui/badge";
 import { Button, ButtonLink } from "@/components/ui/button";
@@ -41,6 +43,9 @@ type PurchasingPageProps = {
     notice?: string;
     error?: string;
     new?: string;
+    q?: string;
+    status?: string;
+    paymentTerm?: string;
   }>;
 };
 
@@ -60,8 +65,11 @@ export default async function PurchasingPage({ searchParams }: PurchasingPagePro
 
   const params = await searchParams;
   const view = params.view ?? "orders";
+  const query = params.q ?? "";
+  const status = params.status ?? "";
+  const paymentTerm = params.paymentTerm ?? "";
 
-  const allOrders = await getPurchaseOrderList();
+  const allOrders = await getPurchaseOrderList({ query, status, paymentTerm });
 
   if (view === "receipts") {
     const receipts = await getPurchaseReceiptList(params.purchaseOrderId);
@@ -315,8 +323,42 @@ function LandedCostList({ landedCosts }: { landedCosts: PurchaseLandedCostListRo
 }
 
 function PurchaseOrderList({ orders }: { orders: PurchaseOrderListRow[] }) {
+  const statusOptions = [
+    { value: "draft", label: "Draft" },
+    { value: "confirmed", label: "Confirmed" },
+    { value: "partially_received", label: "Partially Received" },
+    { value: "received", label: "Received" },
+    { value: "cancelled", label: "Cancelled" },
+  ];
+
+  const paymentTermOptions = [
+    { value: "cash", label: "Cash" },
+    { value: "credit", label: "Credit" },
+  ];
+
   return (
     <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-xs">
+      <div className="flex flex-col gap-3 border-b border-border bg-muted/20 p-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0 flex-1 sm:max-w-md">
+          <TableSearchInput
+            placeholder="Search order #, supplier name, or ref..."
+          />
+        </div>
+        <div className="flex flex-wrap items-center gap-3">
+          <TableFilterSelect
+            paramName="status"
+            label="Status"
+            options={statusOptions}
+            allLabel="All Statuses"
+          />
+          <TableFilterSelect
+            paramName="paymentTerm"
+            label="Term"
+            options={paymentTermOptions}
+            allLabel="All Terms"
+          />
+        </div>
+      </div>
       <div className="overflow-x-auto">
         <table className="w-full min-w-[1080px] text-left text-sm">
           <thead>

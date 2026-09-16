@@ -166,8 +166,18 @@ export async function getPurchaseFormOptions() {
   };
 }
 
-export async function getPurchaseOrderList(): Promise<PurchaseOrderListRow[]> {
+export async function getPurchaseOrderList(params?: {
+  query?: string;
+  status?: string;
+  paymentTerm?: string;
+}): Promise<PurchaseOrderListRow[]> {
   const company = await getDefaultCompany();
+  const query = params?.query?.trim();
+  const statusFilter = params?.status ? sql`and po.status = ${params.status}` : sql``;
+  const paymentTermFilter = params?.paymentTerm ? sql`and po.payment_term = ${params.paymentTerm}` : sql``;
+  const searchFilter = query
+    ? sql`and (po.order_no ilike ${`%${query}%`} or p.display_name ilike ${`%${query}%`} or po.vendor_reference ilike ${`%${query}%`})`
+    : sql``;
 
   const rows = await db.execute<PurchaseOrderListRow>(sql`
     select
@@ -206,6 +216,9 @@ export async function getPurchaseOrderList(): Promise<PurchaseOrderListRow[]> {
     ) pay on true
     where po.company_id = ${company.id}
       and po.deleted_at is null
+      ${statusFilter}
+      ${paymentTermFilter}
+      ${searchFilter}
     group by po.id, p.display_name, own.name, l.code, pay.paid_minor
     order by po.created_at desc
   `);

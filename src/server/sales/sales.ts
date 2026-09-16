@@ -168,8 +168,18 @@ export async function getSalesFormOptions(): Promise<SalesFormOptions> {
   };
 }
 
-export async function getSalesOrderList(): Promise<SalesOrderListRow[]> {
+export async function getSalesOrderList(params?: {
+  query?: string;
+  status?: string;
+  paymentTerm?: string;
+}): Promise<SalesOrderListRow[]> {
   const company = await getDefaultCompany();
+  const query = params?.query?.trim();
+  const statusFilter = params?.status ? sql`and so.status = ${params.status}` : sql``;
+  const paymentTermFilter = params?.paymentTerm ? sql`and so.payment_term = ${params.paymentTerm}` : sql``;
+  const searchFilter = query
+    ? sql`and (so.order_no ilike ${`%${query}%`} or customer.display_name ilike ${`%${query}%`} or so.customer_reference ilike ${`%${query}%`} or so.fs_number ilike ${`%${query}%`})`
+    : sql``;
 
   const rows = await db.execute<SalesOrderListRow>(sql`
     select
@@ -210,6 +220,9 @@ export async function getSalesOrderList(): Promise<SalesOrderListRow[]> {
     ) pay on true
     where so.company_id = ${company.id}
       and so.deleted_at is null
+      ${statusFilter}
+      ${paymentTermFilter}
+      ${searchFilter}
     group by so.id, customer.id, own.name, loc.id, pay.paid_minor
     order by so.created_at desc
   `);

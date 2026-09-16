@@ -19,6 +19,7 @@ import { NewInventoryOperationModal } from "@/app/admin/inventory/operations/new
 import { OperationDetailModal } from "@/app/admin/inventory/operations/operation-detail-modal";
 import { StatusBadge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { TableFilterSelect } from "@/components/ui/table-filter-select";
 import { TableSearchInput } from "@/components/ui/table-search-input";
 import { cn } from "@/lib/utils";
 import {
@@ -136,10 +137,25 @@ export function OperationsTableClient({
             })}
           </div>
 
-          <TableSearchInput
-            defaultValue={query}
-            placeholder="Search movement number, source document reference, or notes..."
-          />
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0 flex-1 sm:max-w-md">
+              <TableSearchInput
+                defaultValue={query}
+                placeholder="Search movement number, source document reference, or notes..."
+              />
+            </div>
+            <TableFilterSelect
+              paramName="status"
+              label="Status"
+              options={[
+                { value: "draft", label: "Draft" },
+                { value: "confirmed", label: "Confirmed" },
+                { value: "done", label: "Done" },
+                { value: "cancelled", label: "Cancelled" },
+              ]}
+              allLabel="All Statuses"
+            />
+          </div>
         </div>
 
         {/* Operations Table */}
