@@ -133,7 +133,7 @@ export function ProductSelect({
             variant="outline"
             size="icon"
             onClick={() => setIsDetailOpen(true)}
-            className="size-10 shrink-0 rounded-lg border-border/80 text-muted-foreground transition-all hover:border-[#0B5D4B]/40 hover:bg-emerald-500/10 hover:text-[#0B5D4B] dark:hover:text-emerald-300 active:scale-95"
+            className="size-9 sm:size-10 shrink-0 rounded-lg border-border/80 text-muted-foreground transition-all hover:border-[#0B5D4B]/40 hover:bg-emerald-500/10 hover:text-[#0B5D4B] dark:hover:text-emerald-300 active:scale-95"
             title="View product details"
           >
             <Eye className="size-4" />
@@ -149,7 +149,7 @@ export function ProductSelect({
             setInitialName("");
             setIsDialogOpen(true);
           }}
-          className="size-10 shrink-0 rounded-lg border-border/80 text-muted-foreground transition-all hover:border-[#0B5D4B]/40 hover:bg-emerald-500/10 hover:text-[#0B5D4B] dark:hover:text-emerald-300 active:scale-95"
+          className="size-9 sm:size-10 shrink-0 rounded-lg border-border/80 text-muted-foreground transition-all hover:border-[#0B5D4B]/40 hover:bg-emerald-500/10 hover:text-[#0B5D4B] dark:hover:text-emerald-300 active:scale-95"
           title="Add new product"
         >
           <PackagePlus className="size-4" />

@@ -127,12 +127,13 @@ export function ManyToOneCreateSelect({
       const modalEl = inputRef.current.closest('[role="dialog"]');
       if (modalEl) {
         const modalRect = modalEl.getBoundingClientRect();
-        if (rect.bottom < modalRect.top + 10 || rect.top > modalRect.bottom - 10) {
+        // Relax bounds check on mobile to prevent soft keyboard or minor scrolling from closing dropdown
+        if (rect.bottom < modalRect.top - 20 || rect.top > modalRect.bottom + 20) {
           setIsOpen(false);
           return;
         }
       } else {
-        if (rect.bottom < 10 || rect.top > window.innerHeight - 10) {
+        if (rect.bottom < -20 || rect.top > window.innerHeight + 20) {
           setIsOpen(false);
           return;
         }
@@ -147,21 +148,21 @@ export function ManyToOneCreateSelect({
 
       // Calculate placement
       const winHeight = window.innerHeight;
-      const spaceBelowViewport = winHeight - rect.bottom - 24;
-      const spaceAboveViewport = rect.top - 24;
+      const spaceBelowViewport = winHeight - rect.bottom - 12;
+      const spaceAboveViewport = rect.top - 12;
 
       if (modalEl) {
         const modalRect = modalEl.getBoundingClientRect();
-        const spaceToModalBottom = modalRect.bottom - rect.bottom - 70;
+        const spaceToModalBottom = modalRect.bottom - rect.bottom - 40;
         const spaceInsideModalAbove = rect.top - modalRect.top - 20;
 
-        if (spaceToModalBottom < 320 && spaceInsideModalAbove > spaceToModalBottom) {
+        if (spaceToModalBottom < 260 && spaceInsideModalAbove > spaceToModalBottom) {
           setOpenUpward(true);
           return;
         }
       }
 
-      if (spaceBelowViewport < 340 && spaceAboveViewport > spaceBelowViewport) {
+      if (spaceBelowViewport < 260 && spaceAboveViewport > spaceBelowViewport) {
         setOpenUpward(true);
       } else {
         setOpenUpward(false);
@@ -291,11 +292,16 @@ export function ManyToOneCreateSelect({
 
   const winHeight = typeof window !== "undefined" ? window.innerHeight : 800;
   const winWidth = typeof window !== "undefined" ? window.innerWidth : 1000;
-  const availableSpaceDownward = Math.max(140, winHeight - coords.bottom - 20);
-  const availableSpaceUpward = Math.max(140, coords.top - 20);
+  const isMobile = winWidth < 640;
+  const availableSpaceDownward = Math.max(140, winHeight - coords.bottom - 12);
+  const availableSpaceUpward = Math.max(140, coords.top - 12);
   const effectiveMaxHeight = openUpward ? availableSpaceUpward : availableSpaceDownward;
   const shouldFixHeight = (hasCustomHeight && visibleItems.length > 3) || visibleItems.length > 5;
   const effectiveHeight = shouldFixHeight ? Math.min(dropdownHeight, effectiveMaxHeight) : undefined;
+  const dropdownWidth = isMobile ? Math.min(winWidth - 16, Math.max(coords.width, 280)) : Math.max(coords.width, 240);
+  const dropdownLeft = isMobile
+    ? Math.max(8, Math.min(coords.left, winWidth - dropdownWidth - 8))
+    : Math.max(8, Math.min(coords.left, winWidth - dropdownWidth - 8));
 
   function handleDropdownWheel(event: React.WheelEvent<HTMLDivElement>) {
     // Prevent react-remove-scroll on document from cancelling the wheel event
@@ -327,15 +333,15 @@ export function ManyToOneCreateSelect({
       onTouchMove={(event) => event.stopPropagation()}
       style={{
         position: "fixed",
-        left: `${Math.max(8, Math.min(coords.left, winWidth - Math.max(coords.width, 240) - 8))}px`,
-        width: `${Math.max(coords.width, 240)}px`,
+        left: `${dropdownLeft}px`,
+        width: `${dropdownWidth}px`,
         zIndex: 999999,
         pointerEvents: "auto",
         maxHeight: `${effectiveMaxHeight}px`,
         height: effectiveHeight ? `${effectiveHeight}px` : undefined,
         ...(openUpward
-          ? { bottom: `${Math.max(8, winHeight - coords.top + 6)}px` }
-          : { top: `${coords.bottom + 6}px` }),
+          ? { bottom: `${Math.max(8, winHeight - coords.top + 4)}px` }
+          : { top: `${coords.bottom + 4}px` }),
       }}
       className="flex flex-col rounded-md border border-border bg-popover text-popover-foreground shadow-2xl overflow-hidden resize-y pointer-events-auto select-auto"
     >

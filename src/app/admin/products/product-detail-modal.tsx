@@ -191,14 +191,14 @@ export function ProductDetailModal({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="fixed flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-border/80 bg-card p-0 shadow-2xl transition-all"
+        className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex max-h-[92vh] sm:max-h-[90vh] w-[calc(100%-1rem)] sm:w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-border/80 bg-card p-0 shadow-2xl transition-all"
         showCloseButton={false}
       >
         {/* Top Ethiopian Accent Gradient Stripe */}
         <div className="h-1.5 w-full shrink-0 bg-gradient-to-r from-[#0B5D4B] via-[#073B35] to-[#D9A441]" />
 
         {/* Modal Header */}
-        <DialogHeader className="shrink-0 border-b border-border/70 bg-gradient-to-b from-muted/30 to-background px-6 py-4.5">
+        <DialogHeader className="shrink-0 border-b border-border/70 bg-gradient-to-b from-muted/30 to-background px-4 py-3 sm:px-6 sm:py-4.5">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             {/* Left: Product Icon & Titles */}
             <div className="flex items-start gap-3.5 min-w-0">
@@ -320,15 +320,15 @@ export function ProductDetailModal({
               Product details are currently unavailable.
             </div>
           ) : (
-            <div className="space-y-5 p-6">
+            <div className="space-y-4 sm:space-y-5 p-4 sm:p-6">
               {/* Executive Commercial & Stock Highlights Strip */}
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+              <div className="grid grid-cols-2 gap-2.5 sm:gap-3 sm:grid-cols-3 lg:grid-cols-5">
                 {/* 1. Selling Price Card */}
                 <button
                   type="button"
                   onClick={() => setActiveTab("pricing")}
                   className={cn(
-                    "group flex flex-col justify-between rounded-xl border p-3.5 text-left transition-all",
+                    "group flex flex-col justify-between rounded-xl border p-3 sm:p-3.5 text-left transition-all",
                     activeTab === "pricing"
                       ? "border-[#0B5D4B] bg-[#0B5D4B]/5 shadow-xs"
                       : "border-border bg-card hover:border-[#0B5D4B]/40 hover:bg-secondary/30",
@@ -350,12 +350,12 @@ export function ProductDetailModal({
                   </div>
                 </button>
 
-                {/* 2. Purchase Cost & Margin Card */}
+                {/* 2. Standard Cost Card */}
                 <button
                   type="button"
                   onClick={() => setActiveTab("pricing")}
                   className={cn(
-                    "group flex flex-col justify-between rounded-xl border p-3.5 text-left transition-all",
+                    "group flex flex-col justify-between rounded-xl border p-3 sm:p-3.5 text-left transition-all",
                     activeTab === "pricing"
                       ? "border-[#0B5D4B] bg-[#0B5D4B]/5 shadow-xs"
                       : "border-border bg-card hover:border-[#0B5D4B]/40 hover:bg-secondary/30",
@@ -363,23 +363,17 @@ export function ProductDetailModal({
                 >
                   <div className="flex items-center justify-between">
                     <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                      Standard Cost
+                      Std Cost
                     </span>
-                    <Percent className="size-4 text-amber-600 opacity-80 group-hover:scale-110 transition-transform" />
+                    <Receipt className="size-4 text-amber-600 opacity-80 group-hover:scale-110 transition-transform" />
                   </div>
                   <div className="mt-2">
                     <div className="text-lg font-bold tracking-tight text-foreground font-mono">
                       {formatMoneyMinor(product.standardCostMinor, product.currencyCode)}
                     </div>
-                    <div className="flex items-center gap-1 text-[10px]">
-                      {marginPercent > 0 ? (
-                        <span className="font-semibold text-emerald-600">
-                          +{marginPercent.toFixed(1)}% margin
-                        </span>
-                      ) : (
-                        <span className="text-muted-foreground">At cost / zero price</span>
-                      )}
-                    </div>
+                    <span className="text-[10px] text-muted-foreground">
+                      {product.purchaseTaxNames || "No purchase tax"}
+                    </span>
                   </div>
                 </button>
 
@@ -388,7 +382,7 @@ export function ProductDetailModal({
                   type="button"
                   onClick={() => setActiveTab("inventory")}
                   className={cn(
-                    "group flex flex-col justify-between rounded-xl border p-3.5 text-left transition-all",
+                    "group flex flex-col justify-between rounded-xl border p-3 sm:p-3.5 text-left transition-all",
                     activeTab === "inventory"
                       ? "border-[#0B5D4B] bg-[#0B5D4B]/5 shadow-xs"
                       : "border-border bg-card hover:border-[#0B5D4B]/40 hover:bg-secondary/30",
@@ -418,7 +412,7 @@ export function ProductDetailModal({
                   type="button"
                   onClick={() => setActiveTab("inventory")}
                   className={cn(
-                    "group flex flex-col justify-between rounded-xl border p-3.5 text-left transition-all",
+                    "group flex flex-col justify-between rounded-xl border p-3 sm:p-3.5 text-left transition-all",
                     activeTab === "inventory"
                       ? "border-[#0B5D4B] bg-[#0B5D4B]/5 shadow-xs"
                       : "border-border bg-card hover:border-[#0B5D4B]/40 hover:bg-secondary/30",
@@ -444,7 +438,7 @@ export function ProductDetailModal({
                 </button>
 
                 {/* 5. Inventory Valuation */}
-                <div className="flex flex-col justify-between rounded-xl border border-border bg-secondary/30 p-3.5 text-left">
+                <div className="col-span-2 sm:col-span-1 flex flex-col justify-between rounded-xl border border-border bg-secondary/30 p-3 sm:p-3.5 text-left">
                   <div className="flex items-center justify-between">
                     <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                       Inventory Value
@@ -463,7 +457,7 @@ export function ProductDetailModal({
               </div>
 
               {/* Segmented Pill Navigation Bar */}
-              <div className="flex items-center gap-1.5 rounded-xl border border-border/80 bg-muted/50 p-1">
+              <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar rounded-xl border border-border/80 bg-muted/50 p-1">
                 {tabs.map((tab) => {
                   const Icon = tab.icon;
                   const isActive = activeTab === tab.id;
@@ -473,17 +467,16 @@ export function ProductDetailModal({
                       type="button"
                       onClick={() => setActiveTab(tab.id)}
                       className={cn(
-                        "flex flex-1 items-center justify-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold transition-all outline-none",
+                        "flex shrink-0 flex-1 min-w-[80px] sm:min-w-0 items-center justify-center gap-1.5 sm:gap-2 rounded-lg px-2.5 sm:px-3 py-2 text-xs font-semibold transition-all outline-none whitespace-nowrap",
                         isActive
                           ? "bg-card text-[#0B5D4B] shadow-xs ring-1 ring-black/5 font-bold"
                           : "text-muted-foreground hover:bg-card/60 hover:text-foreground",
                       )}
                     >
                       <Icon
-                        className={cn("size-3.5", isActive ? "text-[#0B5D4B]" : "text-muted-foreground")}
+                        className={cn("size-3.5 shrink-0", isActive ? "text-[#0B5D4B]" : "text-muted-foreground")}
                       />
-                      <span className="hidden sm:inline">{tab.label}</span>
-                      <span className="sm:hidden">{tab.label.split(" ")[0]}</span>
+                      <span>{tab.label}</span>
                       {tab.count !== undefined && tab.count > 0 ? (
                         <span
                           className={cn(

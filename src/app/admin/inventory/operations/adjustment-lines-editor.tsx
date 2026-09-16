@@ -350,8 +350,8 @@ export function AdjustmentLinesEditor({
               style={{ zIndex: lines.length - index + 10 }}
               className="group relative rounded-2xl border border-border/80 bg-card px-3.5 pt-3 pb-2.5 shadow-2xs transition-all duration-200 hover:border-[#0B5D4B]/30 hover:shadow-xs focus-within:!z-50"
             >
-              {/* Card Header: Product Name + Counted Quantity on SAME LINE */}
-              <div className="flex items-start gap-2.5 sm:gap-3">
+              {/* Card Header: Product Name + Quantity */}
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-start gap-2.5 sm:gap-3">
                 <span className="flex h-10 w-8 shrink-0 items-center justify-center rounded-xl bg-emerald-500/10 font-mono text-xs font-bold text-[#0B5D4B] dark:text-emerald-300 border border-emerald-500/20">
                   {String(index + 1).padStart(2, "0")}
                 </span>
@@ -713,8 +713,8 @@ export function ScrapLinesEditor({
               style={{ zIndex: lines.length - index + 10 }}
               className="group relative rounded-2xl border border-border/80 bg-card px-3.5 pt-3 pb-2.5 shadow-2xs transition-all duration-200 hover:border-rose-500/30 hover:shadow-xs focus-within:!z-50"
             >
-              {/* Card Header: Product Name + Scrap Quantity on SAME LINE */}
-              <div className="flex items-start gap-2.5 sm:gap-3">
+              {/* Card Header: Product Name + Scrap Quantity */}
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-start gap-2.5 sm:gap-3">
                 <span className="flex h-10 w-8 shrink-0 items-center justify-center rounded-lg bg-rose-500/10 font-mono text-xs font-bold text-rose-600 dark:text-rose-400 border border-rose-500/20">
                   {String(index + 1).padStart(2, "0")}
                 </span>
@@ -1073,8 +1073,8 @@ export function InternalTransferLinesEditor({
               style={{ zIndex: lines.length - index + 10 }}
               className="group relative rounded-2xl border border-border/80 bg-card px-3.5 pt-3 pb-2.5 shadow-2xs transition-all duration-200 hover:border-[#0B5D4B]/30 hover:shadow-xs focus-within:!z-50"
             >
-              {/* Card Header: Product Name + Transfer Quantity on SAME LINE */}
-              <div className="flex items-start gap-2.5 sm:gap-3">
+              {/* Card Header: Product Name + Transfer Quantity */}
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-start gap-2.5 sm:gap-3">
                 <span className="flex h-10 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10 font-mono text-xs font-bold text-[#0B5D4B] dark:text-emerald-300 border border-emerald-500/20">
                   {String(index + 1).padStart(2, "0")}
                 </span>
