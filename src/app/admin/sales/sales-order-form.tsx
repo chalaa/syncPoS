@@ -916,46 +916,46 @@ export const SalesOrderForm = forwardRef<SalesOrderFormHandle, SalesOrderFormPro
                           return (
                             <div
                               key={line.key}
-                              className="group relative rounded-xl border border-border/80 bg-card p-3.5 shadow-xs transition-all duration-200 hover:border-emerald-500/40 hover:shadow-sm flex flex-wrap items-center justify-between gap-3"
+                              className="group relative rounded-xl border border-border/70 bg-card/80 px-3 py-2.5 shadow-xs transition-all duration-200 hover:border-emerald-500/40 hover:bg-card flex items-center justify-between gap-2.5 text-xs"
                             >
-                              <div className="flex items-center gap-3 min-w-0 flex-1">
-                                <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10 font-mono text-xs font-bold text-[#0B5D4B] dark:text-emerald-300 border border-emerald-500/20">
+                              <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                                <span className="flex size-6 shrink-0 items-center justify-center rounded-md bg-emerald-500/10 font-mono text-[11px] font-bold text-[#0B5D4B] dark:text-emerald-300 border border-emerald-500/20">
                                   {String(index + 1).padStart(2, "0")}
                                 </span>
 
                                 <div className="min-w-0 flex-1">
                                   <div className="flex items-center gap-2 flex-wrap">
-                                    <h4 className="text-sm font-bold text-foreground truncate">
+                                    <h4 className="text-xs font-bold text-foreground truncate">
                                       {product ? product.name : <span className="text-muted-foreground italic">No product selected</span>}
                                     </h4>
                                     {product?.code ? (
-                                      <span className="rounded bg-muted/60 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
-                                        SKU: {product.code}
+                                      <span className="rounded bg-muted/60 px-1.5 py-0.5 font-mono text-[9px] text-muted-foreground">
+                                        {product.code}
                                       </span>
                                     ) : null}
                                   </div>
 
-                                  <div className="flex flex-wrap items-center gap-2 sm:gap-3 mt-1 text-xs text-muted-foreground">
-                                    <span>Qty: <strong className="text-foreground font-mono">{line.quantity || "1"}</strong></span>
-                                    <span className="text-border">•</span>
-                                    <span>Price: <strong className="text-foreground font-mono">ETB {money(Number(line.unitPrice) || 0)}</strong></span>
+                                  <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground mt-0.5 font-mono">
+                                    <span>Qty: <strong className="text-foreground">{line.quantity || "1"}</strong></span>
+                                    <span>•</span>
+                                    <span>Price: <strong className="text-foreground">ETB {money(Number(line.unitPrice) || 0)}</strong></span>
                                     {Number(line.discount) > 0 ? (
                                       <>
-                                        <span className="text-border">•</span>
-                                        <span>Disc: <strong className="text-amber-600 dark:text-amber-400 font-mono">ETB {money(Number(line.discount))}</strong></span>
+                                        <span>•</span>
+                                        <span>Disc: <strong className="text-amber-600 dark:text-amber-400">ETB {money(Number(line.discount))}</strong></span>
                                       </>
                                     ) : null}
-                                    <span className="text-border">•</span>
-                                    <span>Total: <strong className="text-[#0B5D4B] dark:text-emerald-400 font-mono font-bold">ETB {money(lineTotals[index]?.total ?? 0)}</strong></span>
+                                    <span>•</span>
+                                    <span>Total: <strong className="text-[#0B5D4B] dark:text-emerald-400 font-bold">ETB {money(lineTotals[index]?.total ?? 0)}</strong></span>
                                   </div>
                                 </div>
                               </div>
 
-                              <div className="flex items-center gap-2 shrink-0">
+                              <div className="flex items-center gap-1 shrink-0">
                                 {line.productId && availableStock !== null ? (
                                   <div
                                     className={cn(
-                                      "hidden sm:flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-mono font-semibold border",
+                                      "hidden sm:flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-mono font-semibold border mr-1",
                                       availableStock > 0
                                         ? "bg-emerald-50 border-emerald-200 text-emerald-800 dark:bg-emerald-950/40 dark:border-emerald-800/40 dark:text-emerald-300"
                                         : "bg-amber-50 border-amber-200 text-amber-800 dark:bg-amber-950/40 dark:border-amber-800/40 dark:text-amber-300",
@@ -968,13 +968,14 @@ export const SalesOrderForm = forwardRef<SalesOrderFormHandle, SalesOrderFormPro
 
                                 <Button
                                   type="button"
-                                  variant="outline"
-                                  size="sm"
+                                  variant="ghost"
+                                  size="icon"
                                   onClick={() => toggleEditLine(line.key)}
-                                  className="h-8 gap-1.5 text-xs font-semibold text-[#0B5D4B] border-emerald-500/30 hover:bg-emerald-500/10 hover:border-[#0B5D4B]"
+                                  className="size-7 text-[#0B5D4B] hover:bg-emerald-500/10 hover:text-[#0B5D4B] active:scale-95 transition-all"
+                                  title="Edit this product line"
                                 >
                                   <Pencil className="size-3.5" />
-                                  Edit
+                                  <span className="sr-only">Edit item</span>
                                 </Button>
 
                                 <Button
@@ -983,10 +984,10 @@ export const SalesOrderForm = forwardRef<SalesOrderFormHandle, SalesOrderFormPro
                                   size="icon"
                                   disabled={lines.length === 1}
                                   onClick={() => removeLine(line.key)}
-                                  className="size-8 text-muted-foreground/60 transition-colors hover:bg-destructive/10 hover:text-destructive active:scale-95 disabled:opacity-20 shrink-0"
-                                  title="Remove this item"
+                                  className="size-7 text-muted-foreground/60 hover:bg-destructive/10 hover:text-destructive active:scale-95 disabled:opacity-20 transition-all"
+                                  title="Remove item"
                                 >
-                                  <Trash2Icon className="size-4" />
+                                  <Trash2Icon className="size-3.5" />
                                   <span className="sr-only">Remove item</span>
                                 </Button>
                               </div>
@@ -1061,13 +1062,13 @@ export const SalesOrderForm = forwardRef<SalesOrderFormHandle, SalesOrderFormPro
 
                                     <Button
                                       type="button"
-                                      variant="outline"
+                                      variant="default"
                                       size="sm"
                                       onClick={() => toggleEditLine(line.key)}
-                                      className="h-8 gap-1 text-xs font-semibold text-emerald-700 dark:text-emerald-300 border-emerald-500/30 bg-emerald-500/5 hover:bg-emerald-500/15"
+                                      className="h-8 gap-1.5 text-xs font-bold bg-[#0B5D4B] text-white hover:bg-[#073B35] shadow-xs px-3 rounded-lg transition-all"
                                     >
-                                      <Check className="size-3.5 text-emerald-600" />
-                                      Done
+                                      <Check className="size-3.5" />
+                                      Update
                                     </Button>
                                   </>
                                 ) : null}
