@@ -342,6 +342,10 @@ export const SalesOrderForm = forwardRef<SalesOrderFormHandle, SalesOrderFormPro
     () => new Set(lines.filter((l) => !l.productId).map((l) => l.key)),
   );
 
+  const [savedLineKeys, setSavedLineKeys] = useState<Set<string>>(
+    () => new Set(order?.lines ? order.lines.map((l) => l.id) : []),
+  );
+
   function toggleEditLine(key: string) {
     setEditingLineKeys((prev) => {
       const next = new Set(prev);
@@ -350,6 +354,15 @@ export const SalesOrderForm = forwardRef<SalesOrderFormHandle, SalesOrderFormPro
       } else {
         next.add(key);
       }
+      return next;
+    });
+  }
+
+  function finishEditingLine(key: string) {
+    setSavedLineKeys((prev) => new Set([...prev, key]));
+    setEditingLineKeys((prev) => {
+      const next = new Set(prev);
+      next.delete(key);
       return next;
     });
   }
@@ -1064,11 +1077,11 @@ export const SalesOrderForm = forwardRef<SalesOrderFormHandle, SalesOrderFormPro
                                       type="button"
                                       variant="default"
                                       size="sm"
-                                      onClick={() => toggleEditLine(line.key)}
+                                      onClick={() => finishEditingLine(line.key)}
                                       className="h-8 gap-1.5 text-xs font-bold bg-[#0B5D4B] text-white hover:bg-[#073B35] shadow-xs px-3 rounded-lg transition-all"
                                     >
                                       <Check className="size-3.5" />
-                                      Update
+                                      {savedLineKeys.has(line.key) ? "Update" : "Done"}
                                     </Button>
                                   </>
                                 ) : null}
