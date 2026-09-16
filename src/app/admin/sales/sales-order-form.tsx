@@ -339,7 +339,7 @@ export const SalesOrderForm = forwardRef<SalesOrderFormHandle, SalesOrderFormPro
   );
 
   const [editingLineKeys, setEditingLineKeys] = useState<Set<string>>(
-    () => new Set(lines.map((l) => l.key)),
+    () => new Set(lines.filter((l) => !l.productId).map((l) => l.key)),
   );
 
   function toggleEditLine(key: string) {
@@ -497,7 +497,7 @@ export const SalesOrderForm = forwardRef<SalesOrderFormHandle, SalesOrderFormPro
   function addLine() {
     const line = newLine(headerOwnerId, effectiveSourceLocationId);
     setLines((current) => [...current, line]);
-    setEditingLineKeys((prev) => new Set([...prev, line.key]));
+    setEditingLineKeys(new Set([line.key]));
   }
 
   function changeHeaderOwner(ownerId: string) {
@@ -910,7 +910,7 @@ export const SalesOrderForm = forwardRef<SalesOrderFormHandle, SalesOrderFormPro
                           ["productId", "ownerId", "sourceLocationId", "quantity", "unitPrice", "discount"].some(
                             (field) => fieldErrors[fieldKey(field, line.key)],
                           );
-                        const isEditing = editingLineKeys.has(line.key) || hasLineErrors || !line.productId;
+                        const isEditing = editingLineKeys.has(line.key) || hasLineErrors;
 
                         if (!isEditing) {
                           return (
