@@ -367,14 +367,6 @@ export function PaymentConfigManager({
             placeholder={methodTab ? "Search method code, name, or notes..." : "Search account code, name, institution, or number..."}
             className="sm:max-w-xl"
           />
-          <div className="flex rounded-lg border border-border bg-muted/60 p-1 text-sm">
-            <Button asChild variant={!showDeleted ? "secondary" : "ghost"} size="sm" className="h-7 text-xs">
-              <Link href={methodTab ? "/admin/settings/payments" : "/admin/settings/payments?tab=accounts"}>Active</Link>
-            </Button>
-            <Button asChild variant={showDeleted ? "secondary" : "ghost"} size="sm" className="h-7 text-xs">
-              <Link href={methodTab ? "/admin/settings/payments?show=deleted" : "/admin/settings/payments?tab=accounts&show=deleted"}>Deleted</Link>
-            </Button>
-          </div>
         </div>
 
         {methodTab ? (

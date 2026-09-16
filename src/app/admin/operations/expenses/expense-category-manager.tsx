@@ -146,19 +146,11 @@ export function ExpenseCategoryManager({
       {error ? <Alert kind="error">{error}</Alert> : null}
 
       <section className="rounded-lg border border-border bg-card">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border p-4">
+        <div className="border-b border-border p-4">
           <TableSearchInput
             defaultValue={query}
             placeholder="Search code or name..."
           />
-          <div className="flex rounded-md border border-border bg-muted p-1 text-sm">
-            <Button asChild variant={!showDeleted ? "secondary" : "ghost"} size="sm">
-              <Link href="/admin/operations/expenses/categories">Active</Link>
-            </Button>
-            <Button asChild variant={showDeleted ? "secondary" : "ghost"} size="sm">
-              <Link href="/admin/operations/expenses/categories?show=deleted">Deleted</Link>
-            </Button>
-          </div>
         </div>
 
         <div className="overflow-x-auto">

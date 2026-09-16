@@ -217,20 +217,12 @@ export function TaxManager({
       {error ? <Alert kind="error">{error}</Alert> : null}
 
       <section className="rounded-xl border border-border bg-card shadow-xs">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border p-4">
+        <div className="border-b border-border p-4">
           <TableSearchInput
             defaultValue={query}
             placeholder="Search code or name..."
             className="sm:max-w-md"
           />
-          <div className="flex rounded-lg border border-border bg-muted/60 p-1 text-sm">
-            <Button asChild variant={!showDeleted ? "secondary" : "ghost"} size="sm" className="h-7 text-xs">
-              <Link href="/admin/products/taxes">Active</Link>
-            </Button>
-            <Button asChild variant={showDeleted ? "secondary" : "ghost"} size="sm" className="h-7 text-xs">
-              <Link href="/admin/products/taxes?show=deleted">Deleted</Link>
-            </Button>
-          </div>
         </div>
 
         <div className="overflow-x-auto">

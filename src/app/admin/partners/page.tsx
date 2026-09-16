@@ -66,19 +66,11 @@ export default async function PartnersPage({ searchParams }: PartnersPageProps) 
 
       <div className="grid gap-5">
         <section className="rounded-xl border border-border bg-card shadow-xs">
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border p-4">
+          <div className="border-b border-border p-4">
             <TableSearchInput
               defaultValue={query}
               placeholder="Search code, name, legal name, TIN..."
             />
-            <div className="flex rounded-lg border border-border bg-muted/40 p-1 text-sm">
-              <Button asChild variant={!showDeleted ? "secondary" : "ghost"} size="sm">
-                <Link href="/admin/partners">Active</Link>
-              </Button>
-              <Button asChild variant={showDeleted ? "secondary" : "ghost"} size="sm">
-                <Link href="/admin/partners?show=deleted">Deleted</Link>
-              </Button>
-            </div>
           </div>
 
           <div className="flex gap-2 border-b border-border px-4 py-2.5 text-sm">

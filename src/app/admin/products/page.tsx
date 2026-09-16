@@ -81,19 +81,11 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
       {params.error ? <Alert kind="error">{params.error}</Alert> : null}
 
       <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-xs">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border bg-muted/20 p-4">
+        <div className="border-b border-border bg-muted/20 p-4">
           <TableSearchInput
             defaultValue={query}
             placeholder="Search item code, SKU, product name, or model..."
           />
-          <div className="flex rounded-xl border border-border bg-muted p-1 text-sm">
-            <Button asChild variant={!showDeleted ? "secondary" : "ghost"} size="sm" className="rounded-lg text-xs font-semibold">
-              <Link href="/admin/products">Active Items</Link>
-            </Button>
-            <Button asChild variant={showDeleted ? "secondary" : "ghost"} size="sm" className="rounded-lg text-xs font-semibold">
-              <Link href="/admin/products?show=deleted">Deleted Archive</Link>
-            </Button>
-          </div>
         </div>
 
         <ProductListTable
