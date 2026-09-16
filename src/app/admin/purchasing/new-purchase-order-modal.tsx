@@ -56,6 +56,21 @@ export function NewPurchaseOrderModal({
     }
   }, [initialOpen]);
 
+  useEffect(() => {
+    if (!open) return;
+
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+      return "";
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+    };
+  }, [open]);
+
   /** Remove ?new= from the URL without navigation */
   function cleanUrl() {
     if (typeof window !== "undefined" && window.location.search.includes("new=")) {
@@ -72,7 +87,7 @@ export function NewPurchaseOrderModal({
     cleanUrl();
   }
 
-  /** X button — show confirmation first */
+  /** Close attempt — show confirmation first */
   function handleCloseRequest() {
     setConfirmClose(true);
   }
@@ -90,8 +105,9 @@ export function NewPurchaseOrderModal({
   function handleOpenChange(nextOpen: boolean) {
     if (nextOpen) {
       setOpen(true);
+    } else {
+      handleCloseRequest();
     }
-    // All close attempts go through handleCloseRequest.
   }
 
   return (
@@ -109,8 +125,14 @@ export function NewPurchaseOrderModal({
         <DialogContent
           className="fixed left-1/2 top-1/2 z-50 -translate-x-1/2 -translate-y-1/2 w-[calc(100%-1rem)] sm:w-full max-w-6xl max-h-[92vh] sm:max-h-[90vh] p-0 gap-0 flex flex-col rounded-2xl border border-border/80 bg-card shadow-2xl overflow-y-auto outline-none"
           showCloseButton={false}
-          onPointerDownOutside={(event) => event.preventDefault()}
-          onInteractOutside={(event) => event.preventDefault()}
+          onPointerDownOutside={(event) => {
+            event.preventDefault();
+            handleCloseRequest();
+          }}
+          onInteractOutside={(event) => {
+            event.preventDefault();
+            handleCloseRequest();
+          }}
           onEscapeKeyDown={(event) => {
             event.preventDefault();
             handleCloseRequest();
