@@ -69,6 +69,13 @@ export async function createSession(userId: string) {
     path: "/",
     expires: expiresAt,
   });
+  cookieStore.set("syncpos_logged_in", "1", {
+    httpOnly: false,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    expires: expiresAt,
+  });
 }
 
 export async function destroySession() {
@@ -83,6 +90,7 @@ export async function destroySession() {
   }
 
   cookieStore.delete(sessionCookieName);
+  cookieStore.delete("syncpos_logged_in");
 }
 
 export const getCurrentUser = cache(async () => {

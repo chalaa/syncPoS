@@ -1,20 +1,29 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { ArrowLeft, Lock, ShieldCheck, User } from "lucide-react";
 
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { getCurrentUser } from "@/server/auth/session";
 
 import { login } from "./actions";
+import { LoginClientGuard } from "./login-guard";
 
 type LoginPageProps = {
   searchParams: Promise<{ error?: string }>;
 };
 
 export default async function LoginPage({ searchParams }: LoginPageProps) {
+  const currentUser = await getCurrentUser();
+  if (currentUser) {
+    redirect("/admin");
+  }
+
   const params = await searchParams;
 
   return (
     <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-background px-4 py-12 text-foreground sm:px-6">
+      <LoginClientGuard />
       {/* Subtle brand ambient accents */}
       <div
         className="pointer-events-none absolute -top-40 left-1/2 -z-10 size-[600px] -translate-x-1/2 rounded-full bg-primary/5 blur-3xl"
