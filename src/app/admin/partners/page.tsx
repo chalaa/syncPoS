@@ -5,6 +5,7 @@ import { NewPartnerModal } from "@/app/admin/partners/new-partner-modal";
 import { Alert } from "@/components/ui/alert";
 import { Badge, StatusBadge } from "@/components/ui/badge";
 import { Button, ButtonLink } from "@/components/ui/button";
+import { TableFilterSelect } from "@/components/ui/table-filter-select";
 import { TableSearchInput } from "@/components/ui/table-search-input";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
 import {
@@ -26,6 +27,8 @@ type PartnersPageProps = {
     view?: string;
     notice?: string;
     error?: string;
+    status?: string;
+    paymentTerm?: string;
   }>;
 };
 
@@ -43,10 +46,24 @@ export default async function PartnersPage({ searchParams }: PartnersPageProps) 
   const showDeleted = params.show === "deleted";
   const role = params.role === "customer" || params.role === "supplier" ? params.role : undefined;
   const query = params.q ?? "";
+  const status = params.status ?? "";
+  const paymentTermId = params.paymentTerm ?? "";
+
   const [partners, formOptions] = await Promise.all([
-    getPartnerList({ query, showDeleted, role }),
-    canManage ? getPartnerFormOptions() : Promise.resolve(null),
+    getPartnerList({ query, showDeleted, role, status, paymentTermId }),
+    getPartnerFormOptions(),
   ]);
+
+  const statusOptions = [
+    { value: "active", label: "Active" },
+    { value: "blocked", label: "Blocked" },
+    { value: "inactive", label: "Inactive" },
+  ];
+
+  const paymentTermOptions = (formOptions?.paymentTerms ?? []).map((pt) => ({
+    value: pt.id,
+    label: `${pt.code} (${pt.name})`,
+  }));
 
   return (
     <PageShell>
@@ -66,11 +83,27 @@ export default async function PartnersPage({ searchParams }: PartnersPageProps) 
 
       <div className="grid gap-5">
         <section className="rounded-xl border border-border bg-card shadow-xs">
-          <div className="border-b border-border p-4">
-            <TableSearchInput
-              defaultValue={query}
-              placeholder="Search code, name, legal name, TIN..."
-            />
+          <div className="flex flex-col gap-3 border-b border-border p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0 flex-1 sm:max-w-md">
+              <TableSearchInput
+                defaultValue={query}
+                placeholder="Search code, name, legal name, TIN..."
+              />
+            </div>
+            <div className="flex flex-wrap items-center gap-3">
+              <TableFilterSelect
+                paramName="status"
+                label="Status"
+                options={statusOptions}
+                allLabel="All Statuses"
+              />
+              <TableFilterSelect
+                paramName="paymentTerm"
+                label="Payment Term"
+                options={paymentTermOptions}
+                allLabel="All Terms"
+              />
+            </div>
           </div>
 
           <div className="flex gap-2 border-b border-border px-4 py-2.5 text-sm">

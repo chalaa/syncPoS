@@ -6,6 +6,7 @@ import { NewExpenseModal } from "@/app/admin/operations/expenses/new-expense-mod
 import { Alert } from "@/components/ui/alert";
 import { StatusBadge } from "@/components/ui/badge";
 import { Button, ButtonLink } from "@/components/ui/button";
+import { TableFilterSelect } from "@/components/ui/table-filter-select";
 import { TableSearchInput } from "@/components/ui/table-search-input";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
 import { requirePermission, getUserPermissionCodes } from "@/server/auth/session";
@@ -16,7 +17,14 @@ import { PERMISSIONS, userHasPermission } from "@/server/iam/permissions";
 export const dynamic = "force-dynamic";
 
 type ExpensesPageProps = {
-  searchParams: Promise<{ q?: string; show?: string; notice?: string; error?: string }>;
+  searchParams: Promise<{
+    q?: string;
+    show?: string;
+    notice?: string;
+    error?: string;
+    category?: string;
+    paymentStatus?: string;
+  }>;
 };
 
 function statusLabel(value: string) {
@@ -33,6 +41,8 @@ export default async function ExpensesPage({ searchParams }: ExpensesPageProps) 
   const params = await searchParams;
   const query = params.q?.trim() ?? "";
   const showCancelled = params.show === "cancelled";
+  const categoryId = params.category ?? "";
+  const paymentStatus = params.paymentStatus ?? "";
 
   const [expenses, options] = await Promise.all([
     getExpenseList({
@@ -41,9 +51,17 @@ export default async function ExpensesPage({ searchParams }: ExpensesPageProps) 
       userId: user.id,
       employeeId: user.employeeId,
       canSeeAll,
+      categoryId,
+      paymentStatus,
     }),
     getExpenseFormOptions(),
   ]);
+
+  const categoryOptions = options.categories.map((c) => ({ value: c.id, label: c.name }));
+  const paymentStatusOptions = [
+    { value: "unpaid", label: "Unpaid" },
+    { value: "paid", label: "Paid" },
+  ];
 
   return (
     <PageShell>
@@ -68,18 +86,34 @@ export default async function ExpensesPage({ searchParams }: ExpensesPageProps) 
       {params.error ? <Alert kind="error">{params.error}</Alert> : null}
 
       <section className="rounded-xl border border-border bg-card shadow-xs">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border p-4">
-          <TableSearchInput
-            defaultValue={query}
-            placeholder="Search expense, category, or description..."
-          />
-          <div className="flex rounded-lg border border-border bg-muted/40 p-1 text-sm">
-            <Button asChild variant={!showCancelled ? "secondary" : "ghost"} size="sm">
-              <Link href="/admin/operations/expenses">Normal</Link>
-            </Button>
-            <Button asChild variant={showCancelled ? "secondary" : "ghost"} size="sm">
-              <Link href="/admin/operations/expenses?show=cancelled">Cancelled</Link>
-            </Button>
+        <div className="flex flex-col gap-3 border-b border-border p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0 flex-1 sm:max-w-md">
+            <TableSearchInput
+              defaultValue={query}
+              placeholder="Search expense, category, or description..."
+            />
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <TableFilterSelect
+              paramName="category"
+              label="Category"
+              options={categoryOptions}
+              allLabel="All Categories"
+            />
+            <TableFilterSelect
+              paramName="paymentStatus"
+              label="Payment"
+              options={paymentStatusOptions}
+              allLabel="All Payments"
+            />
+            <div className="flex rounded-lg border border-border bg-muted/40 p-1 text-sm">
+              <Button asChild variant={!showCancelled ? "secondary" : "ghost"} size="sm">
+                <Link href="/admin/operations/expenses">Normal</Link>
+              </Button>
+              <Button asChild variant={showCancelled ? "secondary" : "ghost"} size="sm">
+                <Link href="/admin/operations/expenses?show=cancelled">Cancelled</Link>
+              </Button>
+            </div>
           </div>
         </div>
 

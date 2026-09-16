@@ -66,6 +66,8 @@ export async function getPartnerList(params: {
   query?: string;
   showDeleted?: boolean;
   role?: "customer" | "supplier";
+  status?: string;
+  paymentTermId?: string;
 }) {
   const company = await getDefaultCompany();
   const query = params.query?.trim();
@@ -76,6 +78,9 @@ export async function getPartnerList(params: {
       : params.role === "supplier"
         ? eq(partners.isSupplier, true)
         : undefined;
+  const statusFilter = params.status ? eq(partners.status, params.status as any) : undefined;
+  const paymentTermFilter = params.paymentTermId ? eq(partners.paymentTermId, params.paymentTermId) : undefined;
+
   const searchFilter = query
     ? or(
         ilike(partners.code, `%${query}%`),
@@ -84,7 +89,14 @@ export async function getPartnerList(params: {
         ilike(partners.tin, `%${query}%`),
       )
     : undefined;
-  const filters = [eq(partners.companyId, company.id), deletedFilter, roleFilter, searchFilter].filter(Boolean);
+  const filters = [
+    eq(partners.companyId, company.id),
+    deletedFilter,
+    roleFilter,
+    statusFilter,
+    paymentTermFilter,
+    searchFilter,
+  ].filter(Boolean);
 
   return db
     .select({

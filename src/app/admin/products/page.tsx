@@ -3,6 +3,7 @@ import { Download, Upload } from "lucide-react";
 
 import { Alert } from "@/components/ui/alert";
 import { Button, ButtonLink } from "@/components/ui/button";
+import { TableFilterSelect } from "@/components/ui/table-filter-select";
 import { TableSearchInput } from "@/components/ui/table-search-input";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
 import { getCatalogFormOptions, getProductDetail, getProductList } from "@/server/catalog/products";
@@ -24,6 +25,9 @@ type ProductsPageProps = {
     new?: string;
     name?: string;
     productId?: string;
+    category?: string;
+    brand?: string;
+    status?: string;
   }>;
 };
 
@@ -35,11 +39,22 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
   const params = await searchParams;
   const showDeleted = params.show === "deleted";
   const query = params.q ?? "";
+  const categoryId = params.category ?? "";
+  const brandId = params.brand ?? "";
+  const status = params.status ?? "";
+
   const [products, formOptions, initialProductDetail] = await Promise.all([
-    getProductList({ query, showDeleted }),
+    getProductList({ query, showDeleted, categoryId, brandId, status }),
     getCatalogFormOptions(),
     params.productId ? getProductDetail(params.productId) : Promise.resolve(null),
   ]);
+
+  const categoryOptions = formOptions.categories.map((c) => ({ value: c.id, label: c.name }));
+  const brandOptions = formOptions.brands.map((b) => ({ value: b.id, label: b.name }));
+  const statusOptions = [
+    { value: "active", label: "Active" },
+    { value: "inactive", label: "Inactive" },
+  ];
 
   return (
     <PageShell>
@@ -81,11 +96,33 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
       {params.error ? <Alert kind="error">{params.error}</Alert> : null}
 
       <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-xs">
-        <div className="border-b border-border bg-muted/20 p-4">
-          <TableSearchInput
-            defaultValue={query}
-            placeholder="Search item code, SKU, product name, or model..."
-          />
+        <div className="flex flex-col gap-3 border-b border-border bg-muted/20 p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0 flex-1 sm:max-w-md">
+            <TableSearchInput
+              defaultValue={query}
+              placeholder="Search item code, SKU, product name, or model..."
+            />
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <TableFilterSelect
+              paramName="category"
+              label="Category"
+              options={categoryOptions}
+              allLabel="All Categories"
+            />
+            <TableFilterSelect
+              paramName="brand"
+              label="Brand"
+              options={brandOptions}
+              allLabel="All Brands"
+            />
+            <TableFilterSelect
+              paramName="status"
+              label="Status"
+              options={statusOptions}
+              allLabel="All Statuses"
+            />
+          </div>
         </div>
 
         <ProductListTable

@@ -24,10 +24,19 @@ function addressText(value: unknown) {
 export async function getStockLocationList(params: {
   query?: string;
   showDeleted?: boolean;
+  type?: string;
+  status?: string;
 }): Promise<StockLocationRecord[]> {
   const company = await getDefaultCompany();
   const query = params.query?.trim();
   const deletedFilter = params.showDeleted ? isNotNull(locations.deletedAt) : isNull(locations.deletedAt);
+  const typeFilter = params.type ? eq(locations.locationType, params.type as any) : undefined;
+  const statusFilter =
+    params.status === "active"
+      ? eq(locations.isActive, true)
+      : params.status === "inactive"
+        ? eq(locations.isActive, false)
+        : undefined;
   const searchFilter = query
     ? or(
         ilike(locations.code, `%${query}%`),
@@ -52,6 +61,8 @@ export async function getStockLocationList(params: {
         eq(locations.companyId, company.id),
         inArray(locations.locationType, [...stockLocationTypeOptions]),
         deletedFilter,
+        typeFilter,
+        statusFilter,
         searchFilter,
       ),
     )

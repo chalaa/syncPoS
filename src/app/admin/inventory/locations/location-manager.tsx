@@ -4,6 +4,7 @@ import { EditIcon, PlusIcon, RotateCcwIcon, Trash2Icon } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
+import { TableFilterSelect } from "@/components/ui/table-filter-select";
 import { TableSearchInput } from "@/components/ui/table-search-input";
 import {
   createStockLocation,
@@ -240,12 +241,32 @@ export function LocationManager({
       {error ? <Alert kind="error">{error}</Alert> : null}
 
       <section className="rounded-xl border border-border bg-card shadow-xs">
-        <div className="border-b border-border p-4">
-          <div className="max-w-md">
+        <div className="flex flex-col gap-3 border-b border-border p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0 flex-1 sm:max-w-md">
             <TableSearchInput
               placeholder="Search code or name..."
               defaultValue={query}
               paramName="q"
+            />
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <TableFilterSelect
+              paramName="type"
+              label="Type"
+              options={stockLocationTypeOptions.map((t) => ({
+                value: t,
+                label: formatStockLocationType(t),
+              }))}
+              allLabel="All Types"
+            />
+            <TableFilterSelect
+              paramName="status"
+              label="Status"
+              options={[
+                { value: "active", label: "Active" },
+                { value: "inactive", label: "Inactive" },
+              ]}
+              allLabel="All Statuses"
             />
           </div>
         </div>

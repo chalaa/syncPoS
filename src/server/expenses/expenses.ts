@@ -57,10 +57,15 @@ export async function getExpenseList(params: {
   userId?: string;
   employeeId?: string | null;
   canSeeAll?: boolean;
+  categoryId?: string;
+  paymentStatus?: string;
 }): Promise<ExpenseListRow[]> {
   const company = await getDefaultCompany();
   const query = params.query?.trim();
   const statusFilter = params.showCancelled ? undefined : sql`e.status <> 'cancelled'`;
+  const categoryFilter = params.categoryId ? sql`e.category_id = ${params.categoryId}` : undefined;
+  const paymentStatusFilter = params.paymentStatus ? sql`e.payment_status = ${params.paymentStatus}` : undefined;
+
   const searchFilter = query
     ? sql`(e.expense_no ilike ${`%${query}%`} or e.description ilike ${`%${query}%`} or ec.name ilike ${`%${query}%`})`
     : undefined;
@@ -112,6 +117,8 @@ export async function getExpenseList(params: {
       and e.deleted_at is null
       ${ownerFilter}
       ${statusFilter ? sql`and ${statusFilter}` : sql``}
+      ${categoryFilter ? sql`and ${categoryFilter}` : sql``}
+      ${paymentStatusFilter ? sql`and ${paymentStatusFilter}` : sql``}
       ${searchFilter ? sql`and ${searchFilter}` : sql``}
     group by e.id, ec.id, emp.id, vendor.id, loc.id
     order by e.expense_date desc, e.expense_no desc

@@ -131,10 +131,25 @@ export async function getCatalogFormOptions() {
   };
 }
 
-export async function getProductList(params: { query?: string; showDeleted?: boolean }) {
+export async function getProductList(params: {
+  query?: string;
+  showDeleted?: boolean;
+  categoryId?: string;
+  brandId?: string;
+  status?: string;
+}) {
   const company = await getDefaultCompany();
   const query = params.query?.trim();
   const deletedFilter = params.showDeleted ? isNotNull(products.deletedAt) : isNull(products.deletedAt);
+  const categoryFilter = params.categoryId ? eq(products.categoryId, params.categoryId) : undefined;
+  const brandFilter = params.brandId ? eq(products.brandId, params.brandId) : undefined;
+  const statusFilter =
+    params.status === "active"
+      ? eq(products.isActive, true)
+      : params.status === "inactive"
+        ? eq(products.isActive, false)
+        : undefined;
+
   const tokens = query ? query.split(/\s+/).filter(Boolean) : [];
 
   const tokenFilters = tokens.length > 0
@@ -151,7 +166,14 @@ export async function getProductList(params: { query?: string; showDeleted?: boo
       )
     : [];
 
-  const filters = [eq(products.companyId, company.id), deletedFilter, ...tokenFilters].filter(Boolean);
+  const filters = [
+    eq(products.companyId, company.id),
+    deletedFilter,
+    categoryFilter,
+    brandFilter,
+    statusFilter,
+    ...tokenFilters,
+  ].filter(Boolean);
 
   let results = await db
     .select({

@@ -10,6 +10,8 @@ type LocationsPageProps = {
     show?: string;
     notice?: string;
     error?: string;
+    type?: string;
+    status?: string;
   }>;
 };
 
@@ -19,8 +21,11 @@ export default async function LocationsPage({ searchParams }: LocationsPageProps
   const params = await searchParams;
   const query = params.q ?? "";
   const showDeleted = params.show === "deleted";
+  const type = params.type ?? "";
+  const status = params.status ?? "";
+
   const [records, users] = await Promise.all([
-    getStockLocationList({ query, showDeleted }),
+    getStockLocationList({ query, showDeleted, type, status }),
     getStockLocationUserOptions(),
   ]);
   const returnPath = `/admin/inventory/locations${showDeleted ? "?show=deleted" : ""}`;
