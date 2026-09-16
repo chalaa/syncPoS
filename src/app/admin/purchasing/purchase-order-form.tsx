@@ -741,18 +741,18 @@ export const PurchaseOrderForm = forwardRef<PurchaseOrderFormHandle, PurchaseOrd
                           </Button>
                         </div>
 
-                        {/* Card Body: Spacious Financial & Quantity Controls Strip */}
+                        {/* Card Body: Financial & Quantity Controls Strip */}
                         <div
                           className={cn(
-                            "grid grid-cols-1 gap-4 items-start pt-3.5",
+                            "grid grid-cols-2 gap-3 items-start pt-3.5",
                             taxes.length > 0 ? "sm:grid-cols-2 lg:grid-cols-4" : "sm:grid-cols-3 lg:grid-cols-3",
                           )}
                         >
                           {/* Quantity */}
-                          <div className="flex flex-col gap-1.5">
+                          <div className="flex flex-col gap-1.5 col-span-1">
                             <label className="text-xs font-semibold text-foreground flex items-center justify-between">
                               <span>Quantity</span>
-                              <span className="text-[10px] text-muted-foreground font-normal">Units to order</span>
+                              <span className="text-[10px] text-muted-foreground font-normal">Units</span>
                             </label>
                             <input
                               type="number"
@@ -773,10 +773,10 @@ export const PurchaseOrderForm = forwardRef<PurchaseOrderFormHandle, PurchaseOrd
                           </div>
 
                           {/* Unit Cost */}
-                          <div className="flex flex-col gap-1.5">
+                          <div className="flex flex-col gap-1.5 col-span-1">
                             <label className="text-xs font-semibold text-foreground flex items-center justify-between">
                               <span>Unit Cost</span>
-                              <span className="text-[10px] text-muted-foreground font-normal">In Ethiopian Birr</span>
+                              <span className="text-[10px] text-muted-foreground font-normal">ETB</span>
                             </label>
                             <div className="relative flex items-center">
                               <span className="pointer-events-none absolute left-3 text-xs font-bold text-muted-foreground">
@@ -803,7 +803,7 @@ export const PurchaseOrderForm = forwardRef<PurchaseOrderFormHandle, PurchaseOrd
 
                           {/* Taxes Pill Selector */}
                           {taxes.length > 0 ? (
-                            <div className="flex flex-col gap-1.5">
+                            <div className="flex flex-col gap-1.5 col-span-2 sm:col-span-1">
                               <label className="text-xs font-semibold text-foreground flex items-center justify-between">
                                 <span className="flex items-center gap-1">
                                   <Tag className="size-3 text-[#0B5D4B]" />
@@ -841,7 +841,7 @@ export const PurchaseOrderForm = forwardRef<PurchaseOrderFormHandle, PurchaseOrd
                           ) : null}
 
                           {/* Line Financial Total Summary */}
-                          <div className="flex flex-col items-end justify-center rounded-lg bg-muted/40 border border-border/50 p-2.5 h-[62px]">
+                          <div className="flex flex-col items-end justify-center rounded-lg bg-muted/40 border border-border/50 p-2.5 h-[62px] col-span-2 sm:col-span-1">
                             <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Line Total</span>
                             <span className="font-mono text-base font-extrabold text-[#0B5D4B] dark:text-emerald-400">
                               ETB {money(lineTotals[index]?.total ?? 0)}

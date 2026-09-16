@@ -61,12 +61,12 @@ export function NewPartnerModal({
       ) : null}
 
       <DialogContent
-        className="fixed left-1/2 top-1/2 z-50 -translate-x-1/2 -translate-y-1/2 w-[calc(100%-1.5rem)] max-w-3xl sm:max-w-3xl p-0 gap-0 flex flex-col rounded-2xl border border-border/80 bg-card shadow-2xl overflow-hidden outline-none max-h-[90vh]"
+        className="fixed left-1/2 top-1/2 z-50 -translate-x-1/2 -translate-y-1/2 w-[calc(100%-1rem)] sm:w-full max-w-3xl p-0 gap-0 flex flex-col rounded-2xl border border-border/80 bg-card shadow-2xl overflow-y-auto outline-none max-h-[92vh] sm:max-h-[90vh]"
         showCloseButton={false}
       >
-        <div className="h-1.5 w-full bg-gradient-to-r from-[#0B5D4B] via-[#073B35] to-[#D9A441] shrink-0" />
+        <div className="h-1.5 w-full bg-gradient-to-r from-[#0B5D4B] via-[#073B35] to-[#D9A441]" />
 
-        <DialogHeader className="shrink-0 border-b border-border/70 bg-background/95 px-6 py-4 backdrop-blur-md flex flex-row items-center justify-between gap-4">
+        <DialogHeader className="border-b border-border/70 bg-background/95 px-4 sm:px-6 py-4 backdrop-blur-md flex flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#0B5D4B] to-[#073B35] text-white shadow-md shadow-[#0B5D4B]/25 ring-1 ring-white/20">
               <Building2 className="h-5 w-5 text-emerald-200" />
@@ -91,7 +91,7 @@ export function NewPartnerModal({
           </Button>
         </DialogHeader>
 
-        <form action={createPartner} className="flex flex-col flex-1 overflow-y-auto p-6 gap-4">
+        <form action={createPartner} className="flex flex-col p-4 sm:p-6 gap-4">
           <div className="grid gap-4 md:grid-cols-2">
             <label className="flex flex-col gap-1.5 text-xs font-semibold text-foreground">
               <span>

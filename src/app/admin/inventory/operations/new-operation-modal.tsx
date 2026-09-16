@@ -143,7 +143,7 @@ export function NewInventoryOperationModal({
       ) : null}
 
       <DialogContent
-        className="fixed left-1/2 top-1/2 z-50 -translate-x-1/2 -translate-y-1/2 w-[calc(100%-1.5rem)] max-w-6xl sm:max-w-6xl max-h-[92vh] p-0 sm:p-0 gap-0 flex flex-col rounded-2xl border border-border/80 bg-card shadow-2xl overflow-hidden outline-none"
+        className="fixed left-1/2 top-1/2 z-50 -translate-x-1/2 -translate-y-1/2 w-[calc(100%-1rem)] sm:w-full max-w-6xl max-h-[92vh] sm:max-h-[90vh] p-0 gap-0 flex flex-col rounded-2xl border border-border/80 bg-card shadow-2xl overflow-y-auto outline-none"
         showCloseButton={false}
         onPointerDownOutside={(event) => event.preventDefault()}
         onInteractOutside={(event) => event.preventDefault()}
@@ -153,10 +153,10 @@ export function NewInventoryOperationModal({
         }}
       >
         {/* Top Brand Accent Line - Identical to Purchase & Sales Modals */}
-        <div className="h-1.5 w-full bg-gradient-to-r from-[#0B5D4B] via-[#073B35] to-[#D9A441] shrink-0" />
+        <div className="h-1.5 w-full bg-gradient-to-r from-[#0B5D4B] via-[#073B35] to-[#D9A441]" />
 
         {/* Modal Header */}
-        <DialogHeader className="shrink-0 border-b border-border/70 bg-background/95 px-6 py-4 backdrop-blur-md flex flex-row items-center justify-between gap-4">
+        <DialogHeader className="border-b border-border/70 bg-background/95 px-4 sm:px-6 py-4 backdrop-blur-md flex flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#0B5D4B] to-[#073B35] text-white shadow-md shadow-[#0B5D4B]/25 ring-1 ring-white/20">
               <Boxes className="h-5 w-5 text-emerald-200" />
@@ -192,12 +192,12 @@ export function NewInventoryOperationModal({
         </DialogHeader>
 
         {/* Operation Selector Pill Tabs */}
-        <div className="flex items-center justify-between border-b border-border/70 bg-muted/20 px-6 py-3 backdrop-blur-md">
+        <div className="flex items-center justify-between border-b border-border/70 bg-muted/20 px-4 sm:px-6 py-3 backdrop-blur-md overflow-x-auto no-scrollbar">
           <div className="flex items-center gap-2">
-            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider shrink-0">
               Operation Mode:
             </span>
-            <div className="flex items-center gap-1 rounded-xl border border-border/70 bg-card p-1 shadow-2xs">
+            <div className="flex items-center gap-1 rounded-xl border border-border/70 bg-card p-1 shadow-2xs shrink-0">
               {(["transfer", "adjustment", "scrap"] as const).map((type) => {
                 const cfg = OPERATION_CONFIG[type];
                 const TabIcon = cfg.icon;
@@ -209,7 +209,7 @@ export function NewInventoryOperationModal({
                     type="button"
                     onClick={() => setActiveType(type)}
                     className={cn(
-                      "inline-flex items-center gap-2 rounded-lg px-3.5 py-1.5 text-xs font-semibold transition-all cursor-pointer",
+                      "inline-flex items-center gap-2 rounded-lg px-3.5 py-1.5 text-xs font-semibold transition-all cursor-pointer whitespace-nowrap",
                       isActive
                         ? "bg-gradient-to-r from-[#0B5D4B] to-[#073B35] text-white shadow-xs"
                         : "text-muted-foreground hover:bg-muted hover:text-foreground",
@@ -225,7 +225,7 @@ export function NewInventoryOperationModal({
         </div>
 
         {/* Modal Form Body */}
-        <div className="flex-1 overflow-y-auto px-6 py-5">
+        <div className="px-4 sm:px-6 py-4 sm:py-5">
           {activeType === "transfer" && (
             <InventoryInternalTransferForm
               action={createInternalTransferOperation}

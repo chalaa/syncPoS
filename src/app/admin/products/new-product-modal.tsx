@@ -601,16 +601,16 @@ export function NewProductModal({
       ) : null}
 
       <DialogContent
-        className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[calc(100%-1rem)] sm:w-full max-w-3xl max-h-[92vh] sm:max-h-[90vh] p-0 overflow-hidden flex flex-col rounded-2xl border border-border/80 bg-card shadow-2xl z-[60]"
+        className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[calc(100%-1rem)] sm:w-full max-w-3xl max-h-[92vh] sm:max-h-[90vh] p-0 overflow-y-auto flex flex-col rounded-2xl border border-border/80 bg-card shadow-2xl z-[60] outline-none"
         overlayClassName="z-[60]"
         showCloseButton={false}
       >
-        <form ref={formRef} onSubmit={handleSubmit} className="flex flex-col h-full overflow-hidden">
+        <form ref={formRef} onSubmit={handleSubmit} className="flex flex-col min-h-0">
           {/* Top Brand Accent Line */}
-          <div className="h-1.5 w-full bg-gradient-to-r from-[#0B5D4B] via-[#073B35] to-[#D9A441] shrink-0" />
+          <div className="h-1.5 w-full bg-gradient-to-r from-[#0B5D4B] via-[#073B35] to-[#D9A441]" />
 
           {/* Modal Header */}
-          <DialogHeader className="shrink-0 border-b border-border/70 bg-background/95 px-6 py-4 backdrop-blur-md flex flex-row items-center justify-between gap-4">
+          <DialogHeader className="border-b border-border/70 bg-background/95 px-4 sm:px-6 py-4 backdrop-blur-md flex flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#0B5D4B] to-[#073B35] text-white shadow-md shadow-[#0B5D4B]/20">
                 <PackagePlus className="h-5 w-5 text-emerald-200" />
@@ -642,7 +642,7 @@ export function NewProductModal({
           </DialogHeader>
 
           {/* Stepper Navigation Bar */}
-          <div className="shrink-0 border-b border-border/70 bg-secondary/30 px-4 sm:px-6 py-2.5 overflow-x-auto no-scrollbar">
+          <div className="border-b border-border/70 bg-secondary/30 px-4 sm:px-6 py-2.5 overflow-x-auto no-scrollbar">
             <div className="grid grid-cols-3 gap-2 min-w-[320px] sm:min-w-0">
               {steps.map((s) => {
                 const isCurrent = step === s.id;
@@ -699,7 +699,7 @@ export function NewProductModal({
           </div>
 
           {/* Form Content Body */}
-          <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4">
+          <div className="p-4 sm:p-6 space-y-4">
             {error ? <Alert kind="error">{error}</Alert> : null}
 
             {units.length === 0 ? (

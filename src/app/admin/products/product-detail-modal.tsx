@@ -191,14 +191,14 @@ export function ProductDetailModal({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex max-h-[92vh] sm:max-h-[90vh] w-[calc(100%-1rem)] sm:w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-border/80 bg-card p-0 shadow-2xl transition-all"
+        className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex max-h-[92vh] sm:max-h-[90vh] w-[calc(100%-1rem)] sm:w-full max-w-5xl flex-col overflow-y-auto rounded-2xl border border-border/80 bg-card p-0 shadow-2xl transition-all outline-none"
         showCloseButton={false}
       >
         {/* Top Ethiopian Accent Gradient Stripe */}
-        <div className="h-1.5 w-full shrink-0 bg-gradient-to-r from-[#0B5D4B] via-[#073B35] to-[#D9A441]" />
+        <div className="h-1.5 w-full bg-gradient-to-r from-[#0B5D4B] via-[#073B35] to-[#D9A441]" />
 
         {/* Modal Header */}
-        <DialogHeader className="shrink-0 border-b border-border/70 bg-gradient-to-b from-muted/30 to-background px-4 py-3 sm:px-6 sm:py-4.5">
+        <DialogHeader className="border-b border-border/70 bg-gradient-to-b from-muted/30 to-background px-4 py-3 sm:px-6 sm:py-4.5">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             {/* Left: Product Icon & Titles */}
             <div className="flex items-start gap-3.5 min-w-0">
@@ -308,8 +308,8 @@ export function ProductDetailModal({
           </div>
         </DialogHeader>
 
-        {/* Modal Scrollable Body */}
-        <div className="flex-1 overflow-y-auto">
+        {/* Modal Content */}
+        <div>
           {isLoading && !product ? (
             <div className="flex min-h-[360px] flex-col items-center justify-center gap-3 p-8 text-muted-foreground">
               <Loader2 className="size-9 animate-spin text-[#0B5D4B]" />
