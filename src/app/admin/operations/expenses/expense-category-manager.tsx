@@ -1,6 +1,6 @@
 "use client";
 
-import { EditIcon, PlusIcon, RotateCcwIcon, SearchIcon, Trash2Icon } from "lucide-react";
+import { EditIcon, PlusIcon, RotateCcwIcon, Trash2Icon } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
@@ -12,6 +12,7 @@ import {
 } from "@/app/admin/operations/expenses/actions";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { TableSearchInput } from "@/components/ui/table-search-input";
 import {
   Dialog,
   DialogClose,
@@ -146,19 +147,10 @@ export function ExpenseCategoryManager({
 
       <section className="rounded-lg border border-border bg-card">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border p-4">
-          <form className="flex min-w-0 flex-1 gap-2">
-            <input
-              name="q"
-              defaultValue={query}
-              placeholder="Search code or name"
-              className="h-10 min-w-0 flex-1 rounded-md border border-input bg-background px-3 text-sm"
-            />
-            {showDeleted ? <input type="hidden" name="show" value="deleted" /> : null}
-            <Button variant="outline">
-              <SearchIcon data-icon="inline-start" />
-              Search
-            </Button>
-          </form>
+          <TableSearchInput
+            defaultValue={query}
+            placeholder="Search code or name..."
+          />
           <div className="flex rounded-md border border-border bg-muted p-1 text-sm">
             <Button asChild variant={!showDeleted ? "secondary" : "ghost"} size="sm">
               <Link href="/admin/operations/expenses/categories">Active</Link>

@@ -1,3 +1,5 @@
+"use client";
+
 import {
   BanknoteIcon,
   BarChart3Icon,
@@ -12,9 +14,11 @@ import {
   ShoppingCartIcon,
 } from "lucide-react";
 import Link from "next/link";
-import type { ReactNode } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { type ReactNode, useTransition } from "react";
 
 import { Button } from "@/components/ui/button";
+import { TableSearchInput } from "@/components/ui/table-search-input";
 import { displayReportMoney } from "@/server/reports/reports";
 import type { ReportSummary } from "@/server/reports/types";
 
@@ -72,20 +76,34 @@ export function ReportFilters({
   paymentType?: string;
   children?: ReactNode;
 }) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const [, startTransition] = useTransition();
+
+  function updateParam(name: string, value: string) {
+    const params = new URLSearchParams(searchParams.toString());
+    if (value.trim()) {
+      params.set(name, value.trim());
+    } else {
+      params.delete(name);
+    }
+
+    startTransition(() => {
+      router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+    });
+  }
+
   return (
-    <form className="mb-6 grid gap-3 rounded-xl border border-border bg-card p-4 shadow-xs md:grid-cols-5">
-      <label className="space-y-1">
+    <div className="mb-6 grid gap-3 rounded-xl border border-border bg-card p-4 shadow-xs md:grid-cols-5">
+      <div className="space-y-1 md:col-span-2">
         <span className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
           <SearchIcon className="size-3.5" />
           Search
         </span>
-        <input
-          name="q"
-          defaultValue={query ?? ""}
-          placeholder="Filter keywords..."
-          className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/15"
-        />
-      </label>
+        <TableSearchInput defaultValue={query ?? ""} placeholder="Filter keywords..." />
+      </div>
+
       <label className="space-y-1">
         <span className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
           <CalendarIcon className="size-3.5" />
@@ -95,9 +113,11 @@ export function ReportFilters({
           name="dateFrom"
           type="date"
           defaultValue={dateFrom ?? ""}
-          className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/15"
+          onChange={(e) => updateParam("dateFrom", e.target.value)}
+          className="h-10 w-full rounded-xl border border-input bg-background px-3 text-sm outline-none transition-colors focus:border-primary focus:ring-1 focus:ring-ring"
         />
       </label>
+
       <label className="space-y-1">
         <span className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
           <CalendarIcon className="size-3.5" />
@@ -107,9 +127,11 @@ export function ReportFilters({
           name="dateTo"
           type="date"
           defaultValue={dateTo ?? ""}
-          className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/15"
+          onChange={(e) => updateParam("dateTo", e.target.value)}
+          className="h-10 w-full rounded-xl border border-input bg-background px-3 text-sm outline-none transition-colors focus:border-primary focus:ring-1 focus:ring-ring"
         />
       </label>
+
       {status !== undefined ? (
         <label className="space-y-1">
           <span className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
@@ -119,11 +141,13 @@ export function ReportFilters({
           <input
             name="status"
             defaultValue={status}
+            onChange={(e) => updateParam("status", e.target.value)}
             placeholder="posted, draft..."
-            className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/15"
+            className="h-10 w-full rounded-xl border border-input bg-background px-3 text-sm outline-none transition-colors focus:border-primary focus:ring-1 focus:ring-ring"
           />
         </label>
       ) : null}
+
       {paymentType !== undefined ? (
         <label className="space-y-1">
           <span className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
@@ -133,7 +157,8 @@ export function ReportFilters({
           <select
             name="paymentType"
             defaultValue={paymentType}
-            className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/15"
+            onChange={(e) => updateParam("paymentType", e.target.value)}
+            className="h-10 w-full rounded-xl border border-input bg-background px-3 text-sm outline-none transition-colors focus:border-primary focus:ring-1 focus:ring-ring"
           >
             <option value="">All Types</option>
             <option value="inbound">Inbound</option>
@@ -141,19 +166,18 @@ export function ReportFilters({
           </select>
         </label>
       ) : null}
+
       {children}
-      <div className="flex items-end gap-2">
-        <Button type="submit" className="h-9 font-medium shadow-xs">
-          Apply Filters
-        </Button>
+
+      <div className="flex items-end gap-2 md:col-span-5 md:justify-end">
         <Button asChild variant="outline" className="h-9 gap-1.5">
-          <Link href=".">
+          <Link href={pathname}>
             <RotateCcwIcon className="size-3.5" />
-            Reset
+            Reset Filters
           </Link>
         </Button>
       </div>
-    </form>
+    </div>
   );
 }
 

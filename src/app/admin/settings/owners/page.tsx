@@ -1,7 +1,8 @@
 import Link from "next/link";
-import { Plus, Search, RotateCcw, Trash2, Check, Store } from "lucide-react";
+import { Plus, RotateCcw, Trash2, Check, Store } from "lucide-react";
 import { and, asc, eq, isNull } from "drizzle-orm";
 
+import { TableSearchInput } from "@/components/ui/table-search-input";
 import {
   createOwner,
   restoreOwner,
@@ -116,19 +117,13 @@ export default async function OwnersPage({ searchParams }: OwnersPageProps) {
         {/* Owners & Linked Shops List */}
         <div className="rounded-xl border border-border bg-card shadow-xs">
           <div className="flex flex-col gap-3 border-b border-border p-4 sm:flex-row sm:items-center sm:justify-between">
-            <form className="flex min-w-0 flex-1 gap-2 sm:max-w-md">
-              {showDeleted ? <input type="hidden" name="show" value="deleted" /> : null}
-              <input
-                name="q"
-                defaultValue={query}
-                className={inputClass}
+            <div className="min-w-0 flex-1 sm:max-w-md">
+              <TableSearchInput
                 placeholder="Search owner names..."
+                defaultValue={query}
+                paramName="q"
               />
-              <Button type="submit" variant="outline" size="sm">
-                <Search className="size-3.5" data-icon="inline-start" />
-                Search
-              </Button>
-            </form>
+            </div>
             <div className="flex rounded-lg border border-border bg-muted/60 p-1 text-sm">
               <Button asChild variant={!showDeleted ? "secondary" : "ghost"} size="sm" className="h-7 text-xs">
                 <Link href="/admin/settings/owners">Active</Link>

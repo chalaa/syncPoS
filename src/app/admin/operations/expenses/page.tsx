@@ -1,4 +1,4 @@
-import { BanknoteIcon, FolderIcon, PlusIcon, SearchIcon } from "lucide-react";
+import { BanknoteIcon, FolderIcon } from "lucide-react";
 import Link from "next/link";
 
 import { cancelExpense } from "@/app/admin/operations/expenses/actions";
@@ -6,6 +6,7 @@ import { NewExpenseModal } from "@/app/admin/operations/expenses/new-expense-mod
 import { Alert } from "@/components/ui/alert";
 import { StatusBadge } from "@/components/ui/badge";
 import { Button, ButtonLink } from "@/components/ui/button";
+import { TableSearchInput } from "@/components/ui/table-search-input";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
 import { requirePermission, getUserPermissionCodes } from "@/server/auth/session";
 import { displayExpenseMoney, getExpenseFormOptions, getExpenseList } from "@/server/expenses/expenses";
@@ -68,19 +69,10 @@ export default async function ExpensesPage({ searchParams }: ExpensesPageProps) 
 
       <section className="rounded-xl border border-border bg-card shadow-xs">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border p-4">
-          <form className="flex min-w-0 flex-1 gap-2">
-            <input
-              name="q"
-              defaultValue={query}
-              placeholder="Search expense, category, or description"
-              className="h-9 min-w-0 flex-1 rounded-md border border-input bg-background px-3 text-sm outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/15"
-            />
-            {showCancelled ? <input type="hidden" name="show" value="cancelled" /> : null}
-            <Button variant="outline" className="h-9">
-              <SearchIcon data-icon="inline-start" />
-              Search
-            </Button>
-          </form>
+          <TableSearchInput
+            defaultValue={query}
+            placeholder="Search expense, category, or description..."
+          />
           <div className="flex rounded-lg border border-border bg-muted/40 p-1 text-sm">
             <Button asChild variant={!showCancelled ? "secondary" : "ghost"} size="sm">
               <Link href="/admin/operations/expenses">Normal</Link>

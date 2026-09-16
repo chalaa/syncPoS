@@ -19,6 +19,7 @@ import { NewInventoryOperationModal } from "@/app/admin/inventory/operations/new
 import { OperationDetailModal } from "@/app/admin/inventory/operations/operation-detail-modal";
 import { StatusBadge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { TableSearchInput } from "@/components/ui/table-search-input";
 import { cn } from "@/lib/utils";
 import {
   displayMoneyMinor,
@@ -135,34 +136,10 @@ export function OperationsTableClient({
             })}
           </div>
 
-          {/* Search form */}
-          <form method="GET" className="flex items-center gap-3">
-            <input type="hidden" name="view" value={view} />
-            <div className="relative flex-1">
-              <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-              <input
-                name="q"
-                defaultValue={query}
-                placeholder="Search movement number, source document reference, or notes..."
-                className="h-10 w-full rounded-xl border border-border/80 bg-background pl-9 pr-4 text-xs outline-none focus:border-[#0B5D4B] focus:ring-2 focus:ring-[#0B5D4B]/20 transition-all font-medium"
-              />
-            </div>
-            <Button
-              type="submit"
-              variant="outline"
-              size="sm"
-              className="h-10 px-4 text-xs font-semibold border-border/80"
-            >
-              Filter
-            </Button>
-            {query && (
-              <Button asChild variant="ghost" size="sm" className="h-10 px-3 text-xs text-muted-foreground">
-                <Link href={view === "all" ? "/admin/inventory/operations" : `/admin/inventory/operations?view=${view}`}>
-                  Reset
-                </Link>
-              </Button>
-            )}
-          </form>
+          <TableSearchInput
+            defaultValue={query}
+            placeholder="Search movement number, source document reference, or notes..."
+          />
         </div>
 
         {/* Operations Table */}

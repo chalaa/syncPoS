@@ -1,9 +1,10 @@
 "use client";
 
-import { EditIcon, PlusIcon, RotateCcwIcon, SearchIcon, Trash2Icon } from "lucide-react";
+import { EditIcon, PlusIcon, RotateCcwIcon, Trash2Icon } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
+import { TableSearchInput } from "@/components/ui/table-search-input";
 import {
   createStockLocation,
   restoreStockLocation,
@@ -240,19 +241,13 @@ export function LocationManager({
 
       <section className="rounded-xl border border-border bg-card shadow-xs">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border p-4">
-          <form className="flex min-w-0 flex-1 gap-2 sm:max-w-md">
-            <input
-              name="q"
-              defaultValue={query}
+          <div className="min-w-0 flex-1 sm:max-w-md">
+            <TableSearchInput
               placeholder="Search code or name..."
-              className="h-9 min-w-0 flex-1 rounded-md border border-input bg-background px-3 text-sm focus-visible:ring-1 focus-visible:ring-ring"
+              defaultValue={query}
+              paramName="q"
             />
-            {showDeleted ? <input type="hidden" name="show" value="deleted" /> : null}
-            <Button variant="outline" size="sm">
-              <SearchIcon className="size-3.5" data-icon="inline-start" />
-              Search
-            </Button>
-          </form>
+          </div>
           <div className="flex rounded-lg border border-border bg-muted/60 p-1 text-sm">
             <Button asChild variant={!showDeleted ? "secondary" : "ghost"} size="sm" className="h-7 text-xs">
               <Link href="/admin/inventory/locations">Active</Link>

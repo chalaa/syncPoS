@@ -1,23 +1,19 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowDownLeft,
   ArrowUpRight,
   Barcode,
   Boxes,
-  Calendar,
   Eye,
-  Filter,
-  Layers,
   MapPin,
-  Package,
-  RotateCcw,
-  Search,
 } from "lucide-react";
 
-import { Badge, StatusBadge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { TableSearchInput } from "@/components/ui/table-search-input";
 import { cn } from "@/lib/utils";
 import {
   displayMoneyMinor,
@@ -60,24 +56,27 @@ export function ProductStockCardFilters({
   asOfDate: string;
   products: StockFilterOption[];
 }) {
-  const hasFilters = Boolean(query || productId || asOfDate);
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  function updateParam(key: string, value: string) {
+    const params = new URLSearchParams(searchParams.toString());
+    if (!value) {
+      params.delete(key);
+    } else {
+      params.set(key, value);
+    }
+    router.push(`/admin/inventory/stock-card?${params.toString()}`);
+  }
 
   return (
-    <form method="GET" className="border-b border-border/80 bg-card p-4 space-y-3">
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 items-end">
+    <div className="border-b border-border/80 bg-card p-4">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 items-end">
         {/* Search */}
-        <label className="flex flex-col gap-1 text-xs font-semibold text-muted-foreground">
+        <div className="flex flex-col gap-1 text-xs font-semibold text-muted-foreground">
           <span>Search Movements</span>
-          <div className="relative">
-            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-            <input
-              name="q"
-              defaultValue={query}
-              placeholder="Movement no, source doc..."
-              className="h-9.5 w-full rounded-xl border border-input bg-background pl-9 pr-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0B5D4B]/30 focus-visible:border-[#0B5D4B] transition-colors"
-            />
-          </div>
-        </label>
+          <TableSearchInput defaultValue={query} placeholder="Movement no, source doc..." />
+        </div>
 
         {/* Product Select */}
         <label className="flex flex-col gap-1 text-xs font-semibold text-muted-foreground">
@@ -85,7 +84,8 @@ export function ProductStockCardFilters({
           <select
             name="productId"
             defaultValue={productId}
-            className="h-9.5 rounded-xl border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0B5D4B]/30 focus-visible:border-[#0B5D4B] transition-colors"
+            onChange={(e) => updateParam("productId", e.target.value)}
+            className="h-10 rounded-xl border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring transition-colors"
           >
             <option value="">All Products</option>
             {products.map((p) => (
@@ -103,28 +103,12 @@ export function ProductStockCardFilters({
             name="asOfDate"
             type="date"
             defaultValue={asOfDate}
-            className="h-9.5 rounded-xl border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0B5D4B]/30 focus-visible:border-[#0B5D4B] transition-colors"
+            onChange={(e) => updateParam("asOfDate", e.target.value)}
+            className="h-10 rounded-xl border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring transition-colors"
           />
         </label>
-
-        {/* Actions */}
-        <div className="flex items-center gap-2">
-          <Button
-            type="submit"
-            className="h-9.5 flex-1 gap-2 rounded-xl bg-gradient-to-r from-[#0B5D4B] to-[#073B35] font-semibold text-white shadow-xs shadow-[#0B5D4B]/20 hover:brightness-110"
-          >
-            <Filter className="size-3.5 text-emerald-200" />
-            Filter
-          </Button>
-
-          {hasFilters && (
-            <Button asChild variant="outline" className="h-9.5 rounded-xl text-xs font-semibold text-muted-foreground">
-              <Link href="/admin/inventory/stock-card">Reset</Link>
-            </Button>
-          )}
-        </div>
       </div>
-    </form>
+    </div>
   );
 }
 
@@ -212,24 +196,31 @@ export function SerialHistoryFilters({
   serialQuery: string;
   asOfDate: string;
 }) {
-  const hasFilters = Boolean(serialQuery || asOfDate);
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  function updateParam(key: string, value: string) {
+    const params = new URLSearchParams(searchParams.toString());
+    if (!value) {
+      params.delete(key);
+    } else {
+      params.set(key, value);
+    }
+    router.push(`/admin/inventory/serial-history?${params.toString()}`);
+  }
 
   return (
-    <form method="GET" className="border-b border-border/80 bg-card p-4">
+    <div className="border-b border-border/80 bg-card p-4">
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 items-end">
         {/* Serial input */}
-        <label className="flex flex-col gap-1 text-xs font-semibold text-muted-foreground sm:col-span-2 lg:col-span-1">
+        <div className="flex flex-col gap-1 text-xs font-semibold text-muted-foreground sm:col-span-2 lg:col-span-1">
           <span>Serial or Machine Tag</span>
-          <div className="relative">
-            <Barcode className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-            <input
-              name="serial"
-              defaultValue={serialQuery}
-              placeholder="Serial number, engine, chassis..."
-              className="h-9.5 w-full rounded-xl border border-input bg-background pl-9 pr-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0B5D4B]/30 focus-visible:border-[#0B5D4B] transition-colors"
-            />
-          </div>
-        </label>
+          <TableSearchInput
+            paramName="serial"
+            defaultValue={serialQuery}
+            placeholder="Serial number, engine, chassis..."
+          />
+        </div>
 
         {/* As of Date */}
         <label className="flex flex-col gap-1 text-xs font-semibold text-muted-foreground">
@@ -238,28 +229,12 @@ export function SerialHistoryFilters({
             name="asOfDate"
             type="date"
             defaultValue={asOfDate}
-            className="h-9.5 rounded-xl border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0B5D4B]/30 focus-visible:border-[#0B5D4B] transition-colors"
+            onChange={(e) => updateParam("asOfDate", e.target.value)}
+            className="h-10 rounded-xl border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring transition-colors"
           />
         </label>
-
-        {/* Actions */}
-        <div className="flex items-center gap-2">
-          <Button
-            type="submit"
-            className="h-9.5 flex-1 gap-2 rounded-xl bg-gradient-to-r from-[#0B5D4B] to-[#073B35] font-semibold text-white shadow-xs shadow-[#0B5D4B]/20 hover:brightness-110"
-          >
-            <Search className="size-3.5 text-emerald-200" />
-            Lookup Serial
-          </Button>
-
-          {hasFilters && (
-            <Button asChild variant="outline" className="h-9.5 rounded-xl text-xs font-semibold text-muted-foreground">
-              <Link href="/admin/inventory/serial-history">Reset</Link>
-            </Button>
-          )}
-        </div>
       </div>
-    </form>
+    </div>
   );
 }
 

@@ -1,8 +1,9 @@
 import Link from "next/link";
-import { Download, Upload, SearchIcon } from "lucide-react";
+import { Download, Upload } from "lucide-react";
 
 import { Alert } from "@/components/ui/alert";
 import { Button, ButtonLink } from "@/components/ui/button";
+import { TableSearchInput } from "@/components/ui/table-search-input";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
 import { getCatalogFormOptions, getProductDetail, getProductList } from "@/server/catalog/products";
 import { requirePermission, getUserPermissionCodes } from "@/server/auth/session";
@@ -81,21 +82,10 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
 
       <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-xs">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border bg-muted/20 p-4">
-          <form className="flex min-w-0 flex-1 gap-2">
-            <div className="relative min-w-0 flex-1">
-              <SearchIcon className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground pointer-events-none" />
-              <input
-                name="q"
-                defaultValue={query}
-                placeholder="Search item code, SKU, product name, or model..."
-                className="h-10 w-full rounded-xl border border-input bg-background pl-9 pr-3 text-sm font-normal text-foreground transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-              />
-            </div>
-            {showDeleted ? <input type="hidden" name="show" value="deleted" /> : null}
-            <Button variant="secondary" className="gap-1.5 font-medium">
-              Search
-            </Button>
-          </form>
+          <TableSearchInput
+            defaultValue={query}
+            placeholder="Search item code, SKU, product name, or model..."
+          />
           <div className="flex rounded-xl border border-border bg-muted p-1 text-sm">
             <Button asChild variant={!showDeleted ? "secondary" : "ghost"} size="sm" className="rounded-lg text-xs font-semibold">
               <Link href="/admin/products">Active Items</Link>

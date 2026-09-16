@@ -21,6 +21,7 @@ import {
 
 import { StatusBadge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { TableSearchInput } from "@/components/ui/table-search-input";
 import { cn } from "@/lib/utils";
 import {
   displayMoneyMinor,
@@ -110,26 +111,13 @@ export function StockFilters({
         )}
       </div>
 
-      {/* Inputs Form */}
-      <form
-        method="GET"
-        className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 items-end"
-      >
-        <input type="hidden" name="status" value={status} />
-
+      {/* Inputs Bar */}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 items-end">
         {/* Search */}
-        <label className="flex flex-col gap-1 text-xs font-semibold text-muted-foreground">
+        <div className="flex flex-col gap-1 text-xs font-semibold text-muted-foreground">
           <span>Search Product / Serial</span>
-          <div className="relative">
-            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-            <input
-              name="q"
-              defaultValue={query}
-              placeholder="Item code, SKU, serial, name..."
-              className="h-9.5 w-full rounded-xl border border-input bg-background pl-9 pr-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0B5D4B]/30 focus-visible:border-[#0B5D4B] transition-colors"
-            />
-          </div>
-        </label>
+          <TableSearchInput defaultValue={query} placeholder="Item code, SKU, serial, name..." />
+        </div>
 
         {/* Location Select */}
         <label className="flex flex-col gap-1 text-xs font-semibold text-muted-foreground">
@@ -137,7 +125,8 @@ export function StockFilters({
           <select
             name="locationId"
             defaultValue={locationId}
-            className="h-9.5 rounded-xl border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0B5D4B]/30 focus-visible:border-[#0B5D4B] transition-colors"
+            onChange={(e) => updateParam("locationId", e.target.value)}
+            className="h-10 rounded-xl border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring transition-colors"
           >
             <option value="">All Locations</option>
             {locations.map((loc) => (
@@ -155,19 +144,11 @@ export function StockFilters({
             name="asOfDate"
             type="date"
             defaultValue={asOfDate}
-            className="h-9.5 rounded-xl border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0B5D4B]/30 focus-visible:border-[#0B5D4B] transition-colors"
+            onChange={(e) => updateParam("asOfDate", e.target.value)}
+            className="h-10 rounded-xl border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring transition-colors"
           />
         </label>
-
-        {/* Filter Action */}
-        <Button
-          type="submit"
-          className="h-9.5 gap-2 rounded-xl bg-gradient-to-r from-[#0B5D4B] to-[#073B35] font-semibold text-white shadow-xs shadow-[#0B5D4B]/20 hover:brightness-110 active:scale-[0.99] transition-all"
-        >
-          <Filter className="size-3.5 text-emerald-200" />
-          Apply Filter
-        </Button>
-      </form>
+      </div>
     </div>
   );
 }

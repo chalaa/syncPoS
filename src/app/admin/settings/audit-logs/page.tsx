@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
+import { TableSearchInput } from "@/components/ui/table-search-input";
 import { requirePermission } from "@/server/auth/session";
 import { getAuditLogList } from "@/server/audit/audit-logs";
 
@@ -60,35 +61,15 @@ export default async function AuditLogsPage({ searchParams }: AuditLogsPageProps
       <PageHeader eyebrow="Settings" title="Audit Logs" />
 
       <section className="mb-5 rounded-lg border border-border bg-card p-4">
-        <form className="grid gap-3 lg:grid-cols-[1.4fr_0.8fr_0.8fr_0.8fr_auto] lg:items-end">
-          <label className="grid gap-1 text-sm font-medium">
+        <div className="grid gap-3 lg:grid-cols-[1.4fr_1fr_1fr] lg:items-end">
+          <div className="grid gap-1 text-sm font-medium">
             Search
-            <input name="q" defaultValue={params.q ?? ""} className={inputClass} placeholder="Action, entity, actor, metadata" />
-          </label>
-          <label className="grid gap-1 text-sm font-medium">
-            Severity
-            <select name="severity" defaultValue={params.severity ?? ""} className={inputClass}>
-              <option value="">All severities</option>
-              <option value="info">Info</option>
-              <option value="warning">Warning</option>
-              <option value="critical">Critical</option>
-            </select>
-          </label>
-          <label className="grid gap-1 text-sm font-medium">
-            Action
-            <input name="action" defaultValue={params.action ?? ""} className={inputClass} placeholder="verify_et" />
-          </label>
-          <label className="grid gap-1 text-sm font-medium">
-            Entity
-            <input name="entityType" defaultValue={params.entityType ?? ""} className={inputClass} placeholder="payment_line" />
-          </label>
-          <div className="flex gap-2">
-            <Button type="submit">Apply</Button>
-            <Button asChild type="button" variant="outline">
-              <Link href="/admin/settings/audit-logs">Clear</Link>
-            </Button>
+            <TableSearchInput defaultValue={params.q ?? ""} placeholder="Action, entity, actor, metadata..." />
           </div>
-        </form>
+          <Button asChild variant="outline" className="w-fit">
+            <Link href="/admin/settings/audit-logs">Clear Filters</Link>
+          </Button>
+        </div>
       </section>
 
       <section className="overflow-x-auto rounded-lg border border-border bg-card">

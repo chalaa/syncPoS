@@ -1,12 +1,13 @@
 "use client";
 
-import { EditIcon, PlusIcon, RotateCcwIcon, SearchIcon, Trash2Icon } from "lucide-react";
+import { EditIcon, PlusIcon, RotateCcwIcon, Trash2Icon } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
 import { Alert } from "@/components/ui/alert";
 import { StatusBadge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { TableSearchInput } from "@/components/ui/table-search-input";
 import {
   Dialog,
   DialogClose,
@@ -361,20 +362,11 @@ export function PaymentConfigManager({
               <Link href="/admin/settings/payments?tab=accounts">Accounts</Link>
             </Button>
           </div>
-          <form className="flex min-w-0 flex-1 gap-2 sm:max-w-xl">
-            {!methodTab ? <input type="hidden" name="tab" value="accounts" /> : null}
-            {showDeleted ? <input type="hidden" name="show" value="deleted" /> : null}
-            <input
-              name="q"
-              defaultValue={query}
-              placeholder={methodTab ? "Search method code, name, or notes..." : "Search account code, name, institution, or number..."}
-              className="h-9 min-w-0 flex-1 rounded-md border border-input bg-background px-3 text-sm focus-visible:ring-1 focus-visible:ring-ring"
-            />
-            <Button variant="outline" size="sm">
-              <SearchIcon className="size-3.5" data-icon="inline-start" />
-              Search
-            </Button>
-          </form>
+          <TableSearchInput
+            defaultValue={query}
+            placeholder={methodTab ? "Search method code, name, or notes..." : "Search account code, name, institution, or number..."}
+            className="sm:max-w-xl"
+          />
           <div className="flex rounded-lg border border-border bg-muted/60 p-1 text-sm">
             <Button asChild variant={!showDeleted ? "secondary" : "ghost"} size="sm" className="h-7 text-xs">
               <Link href={methodTab ? "/admin/settings/payments" : "/admin/settings/payments?tab=accounts"}>Active</Link>
