@@ -509,6 +509,17 @@ export const SalesOrderForm = forwardRef<SalesOrderFormHandle, SalesOrderFormPro
 
   function addLine() {
     const line = newLine(headerOwnerId, effectiveSourceLocationId);
+
+    setSavedLineKeys((prev) => {
+      const next = new Set(prev);
+      for (const l of lines) {
+        if (l.productId) {
+          next.add(l.key);
+        }
+      }
+      return next;
+    });
+
     setLines((current) => [...current, line]);
     setEditingLineKeys(new Set([line.key]));
   }
@@ -1073,16 +1084,18 @@ export const SalesOrderForm = forwardRef<SalesOrderFormHandle, SalesOrderFormPro
                                       <span>{availableStock !== null ? availableStock.toFixed(2) : "0"}</span>
                                     </div>
 
-                                    <Button
-                                      type="button"
-                                      variant="default"
-                                      size="sm"
-                                      onClick={() => finishEditingLine(line.key)}
-                                      className="h-8 gap-1.5 text-xs font-bold bg-[#0B5D4B] text-white hover:bg-[#073B35] shadow-xs px-3 rounded-lg transition-all"
-                                    >
-                                      <Check className="size-3.5" />
-                                      {savedLineKeys.has(line.key) ? "Update" : "Done"}
-                                    </Button>
+                                    {savedLineKeys.has(line.key) ? (
+                                      <Button
+                                        type="button"
+                                        variant="default"
+                                        size="sm"
+                                        onClick={() => finishEditingLine(line.key)}
+                                        className="h-8 gap-1.5 text-xs font-bold bg-[#0B5D4B] text-white hover:bg-[#073B35] shadow-xs px-3 rounded-lg transition-all"
+                                      >
+                                        <Check className="size-3.5" />
+                                        Update
+                                      </Button>
+                                    ) : null}
                                   </>
                                 ) : null}
 
