@@ -77,7 +77,7 @@ export default async function ReportsPage() {
         description="Monitor real-time ledger records, cash movements, sales velocities, and stock valuations."
       />
 
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+      <section className="-mx-4 mb-6 flex gap-2.5 overflow-x-auto px-4 pb-2 pt-0.5 no-scrollbar snap-x snap-mandatory sm:mx-0 sm:grid sm:grid-cols-2 sm:px-0 sm:pb-0 md:grid-cols-2 xl:grid-cols-3">
         {reports.map((report) => {
           const Icon = report.icon;
 
@@ -85,24 +85,24 @@ export default async function ReportsPage() {
             <Link
               key={report.href}
               href={report.href}
-              className={`group flex flex-col justify-between rounded-xl border border-border bg-card p-5 shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/50 hover:shadow-md ${report.accent} border-l-4`}
+              className={`group flex w-[78vw] min-w-[220px] max-w-[280px] shrink-0 snap-start flex-col justify-between rounded-xl border border-border bg-card p-4 shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/50 hover:shadow-md sm:w-auto sm:min-w-0 sm:max-w-none sm:p-5 ${report.accent} border-l-4`}
             >
               <div>
                 <div className="flex items-center justify-between">
-                  <div className="rounded-lg border border-primary/15 bg-primary/10 p-2.5 text-primary transition-colors group-hover:bg-primary group-hover:text-primary-foreground">
-                    <Icon className="size-5" />
+                  <div className="rounded-lg border border-primary/15 bg-primary/10 p-2 text-primary transition-colors group-hover:bg-primary group-hover:text-primary-foreground sm:p-2.5">
+                    <Icon className="size-4.5 sm:size-5" />
                   </div>
                   <ArrowUpRightIcon className="size-4 text-muted-foreground transition-transform duration-200 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:text-primary" />
                 </div>
-                <h2 className="mt-4 text-base font-bold tracking-tight text-foreground transition-colors group-hover:text-primary">
+                <h2 className="mt-3 text-sm font-bold tracking-tight text-foreground transition-colors group-hover:text-primary sm:mt-4 sm:text-base">
                   {report.title}
                 </h2>
-                <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
+                <p className="mt-1 text-xs leading-relaxed text-muted-foreground line-clamp-2 sm:text-sm">
                   {report.description}
                 </p>
               </div>
 
-              <div className="mt-5 flex items-center gap-1.5 text-xs font-semibold text-primary">
+              <div className="mt-4 flex items-center gap-1.5 text-xs font-semibold text-primary sm:mt-5">
                 <span>View Analytics</span>
                 <span className="transition-transform duration-200 group-hover:translate-x-1">&rarr;</span>
               </div>

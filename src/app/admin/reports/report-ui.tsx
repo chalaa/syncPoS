@@ -159,7 +159,7 @@ export function ReportFilters({
 
 export function ReportSummaryCards({ summary }: { summary: ReportSummary }) {
   return (
-    <div className="mb-6 grid gap-3.5 sm:grid-cols-2 md:grid-cols-4">
+    <div className="-mx-4 mb-6 flex gap-2.5 overflow-x-auto px-4 pb-2 pt-0.5 no-scrollbar snap-x snap-mandatory sm:mx-0 sm:grid sm:grid-cols-2 sm:px-0 sm:pb-0 md:grid-cols-4">
       <SummaryCard label="Total Records" value={String(summary.count)} border="border-l-slate-400" />
       <SummaryCard
         label="Gross Total"
@@ -199,9 +199,9 @@ export function SummaryCard({
   highlight?: string;
 }) {
   return (
-    <article className={`rounded-xl border border-border bg-card p-4 shadow-xs transition-all hover:shadow-sm ${border} border-l-4`}>
-      <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{label}</p>
-      <p className={`mt-1.5 text-xl tracking-tight ${highlight}`}>{value}</p>
+    <article className={`flex w-[68vw] min-w-[190px] max-w-[240px] shrink-0 snap-start flex-col justify-between rounded-xl border border-border bg-card p-3 shadow-xs transition-all hover:shadow-sm sm:w-auto sm:min-w-0 sm:max-w-none sm:p-4 ${border} border-l-4`}>
+      <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground truncate sm:text-xs">{label}</p>
+      <p className={`mt-1 font-mono text-lg tracking-tight sm:text-xl ${highlight}`}>{value}</p>
     </article>
   );
 }

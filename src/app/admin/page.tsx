@@ -47,7 +47,7 @@ export default async function AdminDashboardPage() {
       </div>
 
       {/* KPI Metrics Grid */}
-      <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <section className="-mx-4 mb-6 flex gap-2.5 overflow-x-auto px-4 pb-2 pt-0.5 no-scrollbar snap-x snap-mandatory sm:mx-0 sm:grid sm:grid-cols-2 sm:px-0 sm:pb-0 lg:grid-cols-3">
         {report.metrics.map((metric) => {
           const toneBorder =
             metric.tone === "success"
@@ -71,18 +71,18 @@ export default async function AdminDashboardPage() {
             <Link
               key={metric.label}
               href={metric.href}
-              className={`group relative flex flex-col justify-between rounded-lg border border-border ${toneBorder} border-t-3 bg-card p-5 shadow-xs transition-all duration-150 hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md`}
+              className={`group relative flex w-[72vw] min-w-[200px] max-w-[260px] shrink-0 snap-start flex-col justify-between rounded-xl border border-border ${toneBorder} border-t-3 bg-card p-3.5 shadow-xs transition-all duration-150 hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md sm:w-auto sm:min-w-0 sm:max-w-none sm:p-5`}
             >
               <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5 truncate">
                   <span className={`size-2 shrink-0 rounded-full ${toneDot}`} />
-                  <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground truncate sm:text-xs">
                     {metric.label}
                   </p>
                 </div>
-                <ArrowUpRight className="size-4 text-muted-foreground opacity-0 transition-all duration-150 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:text-primary group-hover:opacity-100" />
+                <ArrowUpRight className="size-4 shrink-0 text-muted-foreground opacity-0 transition-all duration-150 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:text-primary group-hover:opacity-100" />
               </div>
-              <p className="mt-3 text-2xl font-bold tracking-tight text-foreground transition-colors group-hover:text-primary">
+              <p className="mt-2 text-xl font-bold tracking-tight text-foreground transition-colors group-hover:text-primary sm:text-2xl">
                 {metric.value}
               </p>
             </Link>
