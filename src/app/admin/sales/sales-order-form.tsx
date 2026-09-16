@@ -10,6 +10,7 @@ import {
   FileText,
   Loader2,
   Package,
+  Pencil,
   PlusIcon,
   ShieldCheck,
   Tag,
@@ -337,6 +338,22 @@ export const SalesOrderForm = forwardRef<SalesOrderFormHandle, SalesOrderFormPro
       : [newLine(defaultOwnerId, initialSourceLocationId)],
   );
 
+  const [editingLineKeys, setEditingLineKeys] = useState<Set<string>>(
+    () => new Set(lines.map((l) => l.key)),
+  );
+
+  function toggleEditLine(key: string) {
+    setEditingLineKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
+  }
+
   const effectiveSourceLocationId = sourceLocationId || selectedShopId;
 
   const availableQuantityByDomain = useMemo(() => {
@@ -460,6 +477,11 @@ export const SalesOrderForm = forwardRef<SalesOrderFormHandle, SalesOrderFormPro
 
   function removeLine(key: string) {
     setLines((current) => (current.length === 1 ? current : current.filter((line) => line.key !== key)));
+    setEditingLineKeys((prev) => {
+      const next = new Set(prev);
+      next.delete(key);
+      return next;
+    });
   }
 
   function updateLineProduct(key: string, productId: string) {
@@ -475,6 +497,7 @@ export const SalesOrderForm = forwardRef<SalesOrderFormHandle, SalesOrderFormPro
   function addLine() {
     const line = newLine(headerOwnerId, effectiveSourceLocationId);
     setLines((current) => [...current, line]);
+    setEditingLineKeys((prev) => new Set([...prev, line.key]));
   }
 
   function changeHeaderOwner(ownerId: string) {
@@ -873,7 +896,7 @@ export const SalesOrderForm = forwardRef<SalesOrderFormHandle, SalesOrderFormPro
                       </div>
                     ))}
 
-                    {/* Spacious Item Cards List */}
+                    {/* Item Cards List */}
                     <div className="grid gap-3.5">
                       {lines.map((line, index) => {
                         const product = productById.get(line.productId);
@@ -887,6 +910,89 @@ export const SalesOrderForm = forwardRef<SalesOrderFormHandle, SalesOrderFormPro
                           ["productId", "ownerId", "sourceLocationId", "quantity", "unitPrice", "discount"].some(
                             (field) => fieldErrors[fieldKey(field, line.key)],
                           );
+                        const isEditing = editingLineKeys.has(line.key) || hasLineErrors || !line.productId;
+
+                        if (!isEditing) {
+                          return (
+                            <div
+                              key={line.key}
+                              className="group relative rounded-xl border border-border/80 bg-card p-3.5 shadow-xs transition-all duration-200 hover:border-emerald-500/40 hover:shadow-sm flex flex-wrap items-center justify-between gap-3"
+                            >
+                              <div className="flex items-center gap-3 min-w-0 flex-1">
+                                <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10 font-mono text-xs font-bold text-[#0B5D4B] dark:text-emerald-300 border border-emerald-500/20">
+                                  {String(index + 1).padStart(2, "0")}
+                                </span>
+
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <h4 className="text-sm font-bold text-foreground truncate">
+                                      {product ? product.name : <span className="text-muted-foreground italic">No product selected</span>}
+                                    </h4>
+                                    {product?.code ? (
+                                      <span className="rounded bg-muted/60 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
+                                        SKU: {product.code}
+                                      </span>
+                                    ) : null}
+                                  </div>
+
+                                  <div className="flex flex-wrap items-center gap-2 sm:gap-3 mt-1 text-xs text-muted-foreground">
+                                    <span>Qty: <strong className="text-foreground font-mono">{line.quantity || "1"}</strong></span>
+                                    <span className="text-border">•</span>
+                                    <span>Price: <strong className="text-foreground font-mono">ETB {money(Number(line.unitPrice) || 0)}</strong></span>
+                                    {Number(line.discount) > 0 ? (
+                                      <>
+                                        <span className="text-border">•</span>
+                                        <span>Disc: <strong className="text-amber-600 dark:text-amber-400 font-mono">ETB {money(Number(line.discount))}</strong></span>
+                                      </>
+                                    ) : null}
+                                    <span className="text-border">•</span>
+                                    <span>Total: <strong className="text-[#0B5D4B] dark:text-emerald-400 font-mono font-bold">ETB {money(lineTotals[index]?.total ?? 0)}</strong></span>
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-2 shrink-0">
+                                {line.productId && availableStock !== null ? (
+                                  <div
+                                    className={cn(
+                                      "hidden sm:flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-mono font-semibold border",
+                                      availableStock > 0
+                                        ? "bg-emerald-50 border-emerald-200 text-emerald-800 dark:bg-emerald-950/40 dark:border-emerald-800/40 dark:text-emerald-300"
+                                        : "bg-amber-50 border-amber-200 text-amber-800 dark:bg-amber-950/40 dark:border-amber-800/40 dark:text-amber-300",
+                                    )}
+                                  >
+                                    <span className="text-[9px] uppercase font-sans font-bold text-muted-foreground">Avail:</span>
+                                    <span>{availableStock.toFixed(2)}</span>
+                                  </div>
+                                ) : null}
+
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => toggleEditLine(line.key)}
+                                  className="h-8 gap-1.5 text-xs font-semibold text-[#0B5D4B] border-emerald-500/30 hover:bg-emerald-500/10 hover:border-[#0B5D4B]"
+                                >
+                                  <Pencil className="size-3.5" />
+                                  Edit
+                                </Button>
+
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  disabled={lines.length === 1}
+                                  onClick={() => removeLine(line.key)}
+                                  className="size-8 text-muted-foreground/60 transition-colors hover:bg-destructive/10 hover:text-destructive active:scale-95 disabled:opacity-20 shrink-0"
+                                  title="Remove this item"
+                                >
+                                  <Trash2Icon className="size-4" />
+                                  <span className="sr-only">Remove item</span>
+                                </Button>
+                              </div>
+                            </div>
+                          );
+                        }
 
                         return (
                           <div
@@ -940,17 +1046,30 @@ export const SalesOrderForm = forwardRef<SalesOrderFormHandle, SalesOrderFormPro
 
                               <div className="flex items-center gap-2 shrink-0 ml-1">
                                 {line.productId ? (
-                                  <div
-                                    className={cn(
-                                      "hidden sm:flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-mono font-semibold border",
-                                      availableStock !== null && availableStock > 0
-                                        ? "bg-emerald-50 border-emerald-200 text-emerald-800 dark:bg-emerald-950/40 dark:border-emerald-800/40 dark:text-emerald-300"
-                                        : "bg-amber-50 border-amber-200 text-amber-800 dark:bg-amber-950/40 dark:border-amber-800/40 dark:text-amber-300",
-                                    )}
-                                  >
-                                    <span className="text-[10px] uppercase font-sans font-bold text-muted-foreground">Avail:</span>
-                                    <span>{availableStock !== null ? availableStock.toFixed(2) : "0"}</span>
-                                  </div>
+                                  <>
+                                    <div
+                                      className={cn(
+                                        "hidden sm:flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-mono font-semibold border",
+                                        availableStock !== null && availableStock > 0
+                                          ? "bg-emerald-50 border-emerald-200 text-emerald-800 dark:bg-emerald-950/40 dark:border-emerald-800/40 dark:text-emerald-300"
+                                          : "bg-amber-50 border-amber-200 text-amber-800 dark:bg-amber-950/40 dark:border-amber-800/40 dark:text-amber-300",
+                                      )}
+                                    >
+                                      <span className="text-[10px] uppercase font-sans font-bold text-muted-foreground">Avail:</span>
+                                      <span>{availableStock !== null ? availableStock.toFixed(2) : "0"}</span>
+                                    </div>
+
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => toggleEditLine(line.key)}
+                                      className="h-8 gap-1 text-xs font-semibold text-emerald-700 dark:text-emerald-300 border-emerald-500/30 bg-emerald-500/5 hover:bg-emerald-500/15"
+                                    >
+                                      <Check className="size-3.5 text-emerald-600" />
+                                      Done
+                                    </Button>
+                                  </>
                                 ) : null}
 
                                 <Button
@@ -1200,7 +1319,7 @@ export const SalesOrderForm = forwardRef<SalesOrderFormHandle, SalesOrderFormPro
                         className="w-full sm:w-auto gap-2 border-dashed border-[#0B5D4B]/50 bg-emerald-500/5 text-[#0B5D4B] font-semibold hover:bg-emerald-500/10 hover:border-[#0B5D4B] transition-all py-2.5 px-5 rounded-xl text-xs"
                       >
                         <PlusIcon className="size-4" />
-                        Add Another Item Line
+                        + Add Product
                       </Button>
 
                       {/* Financial Grand Summary Card */}

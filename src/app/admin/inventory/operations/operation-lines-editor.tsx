@@ -169,7 +169,7 @@ export function OperationLinesEditor({ products }: { products: InventoryOperatio
       <div className="mt-3">
         <Button type="button" variant="outline" size="sm" onClick={addLine}>
           <PlusIcon data-icon="inline-start" />
-          Add line
+          + Add Product
         </Button>
       </div>
     </div>

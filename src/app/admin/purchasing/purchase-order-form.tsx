@@ -10,6 +10,7 @@ import {
   FileText,
   Loader2,
   Package,
+  Pencil,
   PlusIcon,
   ShieldCheck,
   Tag,
@@ -293,6 +294,22 @@ export const PurchaseOrderForm = forwardRef<PurchaseOrderFormHandle, PurchaseOrd
       : [newLine(defaultOwnerId)],
   );
 
+  const [editingLineKeys, setEditingLineKeys] = useState<Set<string>>(
+    () => new Set(lines.map((l) => l.key)),
+  );
+
+  function toggleEditLine(key: string) {
+    setEditingLineKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
+  }
+
   const validationValues = useMemo<PurchaseFormValues>(
     () => ({
       supplierId,
@@ -340,6 +357,11 @@ export const PurchaseOrderForm = forwardRef<PurchaseOrderFormHandle, PurchaseOrd
 
   function removeLine(key: string) {
     setLines((current) => (current.length === 1 ? current : current.filter((line) => line.key !== key)));
+    setEditingLineKeys((prev) => {
+      const next = new Set(prev);
+      next.delete(key);
+      return next;
+    });
   }
 
   function updateLineProduct(key: string, productId: string) {
@@ -356,6 +378,7 @@ export const PurchaseOrderForm = forwardRef<PurchaseOrderFormHandle, PurchaseOrd
     const line = newLine(headerOwnerId);
 
     setLines((current) => [...current, line]);
+    setEditingLineKeys((prev) => new Set([...prev, line.key]));
   }
 
   function changeHeaderOwner(ownerId: string) {
@@ -678,11 +701,79 @@ export const PurchaseOrderForm = forwardRef<PurchaseOrderFormHandle, PurchaseOrd
                     </div>
                   ))}
 
-                  {/* Spacious Item Cards List */}
+                  {/* Item Cards List */}
                   <div className="grid gap-3.5">
                     {lines.map((line, index) => {
                       const product = productById.get(line.productId);
                       const owner = owners.find((item) => item.id === (line.ownerId || headerOwnerId));
+                      const hasError =
+                        hasSubmitted &&
+                        ["productId", "ownerId", "quantity", "unitCost"].some(
+                          (field) => fieldErrors[fieldKey(field, line.key)],
+                        );
+                      const isEditing = editingLineKeys.has(line.key) || hasError || !line.productId;
+
+                      if (!isEditing) {
+                        return (
+                          <div
+                            key={line.key}
+                            className="group relative rounded-xl border border-border/80 bg-card p-3.5 shadow-xs transition-all duration-200 hover:border-emerald-500/40 hover:shadow-sm flex flex-wrap items-center justify-between gap-3"
+                          >
+                            <div className="flex items-center gap-3 min-w-0 flex-1">
+                              <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10 font-mono text-xs font-bold text-[#0B5D4B] dark:text-emerald-300 border border-emerald-500/20">
+                                {String(index + 1).padStart(2, "0")}
+                              </span>
+
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <h4 className="text-sm font-bold text-foreground truncate">
+                                    {product ? product.name : <span className="text-muted-foreground italic">No product selected</span>}
+                                  </h4>
+                                  {product?.code ? (
+                                    <span className="rounded bg-muted/60 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
+                                      SKU: {product.code}
+                                    </span>
+                                  ) : null}
+                                </div>
+
+                                <div className="flex flex-wrap items-center gap-2 sm:gap-3 mt-1 text-xs text-muted-foreground">
+                                  <span>Qty: <strong className="text-foreground font-mono">{line.quantity || "1"}</strong></span>
+                                  <span className="text-border">•</span>
+                                  <span>Cost: <strong className="text-foreground font-mono">ETB {money(Number(line.unitCost) || 0)}</strong></span>
+                                  <span className="text-border">•</span>
+                                  <span>Total: <strong className="text-[#0B5D4B] dark:text-emerald-400 font-mono font-bold">ETB {money(lineTotals[index]?.total ?? 0)}</strong></span>
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-2 shrink-0">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => toggleEditLine(line.key)}
+                                className="h-8 gap-1.5 text-xs font-semibold text-[#0B5D4B] border-emerald-500/30 hover:bg-emerald-500/10 hover:border-[#0B5D4B]"
+                              >
+                                <Pencil className="size-3.5" />
+                                Edit
+                              </Button>
+
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                disabled={lines.length === 1}
+                                onClick={() => removeLine(line.key)}
+                                className="size-8 text-muted-foreground/60 transition-colors hover:bg-destructive/10 hover:text-destructive active:scale-95 disabled:opacity-20 shrink-0"
+                                title="Remove this item"
+                              >
+                                <Trash2Icon className="size-4" />
+                                <span className="sr-only">Remove item</span>
+                              </Button>
+                            </div>
+                          </div>
+                        );
+                      }
 
                       return (
                         <div
@@ -690,211 +781,221 @@ export const PurchaseOrderForm = forwardRef<PurchaseOrderFormHandle, PurchaseOrd
                           style={{ zIndex: lines.length - index + 10 }}
                           className={cn(
                             "group relative rounded-xl border border-border/80 bg-card p-4 shadow-xs transition-all duration-200 hover:border-emerald-500/30 hover:shadow-sm focus-within:!z-50",
-                            hasSubmitted &&
-                              ["productId", "ownerId", "quantity", "unitCost"].some((field) => fieldErrors[fieldKey(field, line.key)])
-                              ? "border-destructive/60 bg-destructive/5"
-                              : ""
+                            hasError ? "border-destructive/60 bg-destructive/5" : "",
                           )}
                         >
-                        {/* Card Header: Product Selector & Action */}
-                        <div className="flex items-start justify-between gap-3 pb-3 border-b border-border/60">
-                          <div className="flex items-start gap-3 flex-1 min-w-0">
-                            <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10 font-mono text-xs font-bold text-[#0B5D4B] dark:text-emerald-300 border border-emerald-500/20 mt-0.5">
-                              {String(index + 1).padStart(2, "0")}
-                            </span>
+                          {/* Card Header: Product Selector & Action */}
+                          <div className="flex items-start justify-between gap-3 pb-3 border-b border-border/60">
+                            <div className="flex items-start gap-3 flex-1 min-w-0">
+                              <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10 font-mono text-xs font-bold text-[#0B5D4B] dark:text-emerald-300 border border-emerald-500/20 mt-0.5">
+                                {String(index + 1).padStart(2, "0")}
+                              </span>
 
-                            <div className="flex-1 min-w-0">
-                              <ProductSelect
-                                value={line.productId}
-                                options={productOptions}
-                                categories={productCategories}
-                                brands={productBrands}
-                                units={productUnits}
-                                taxes={taxes}
-                                onValueChange={(productId) => updateLineProduct(line.key, productId)}
-                                onOptionsChange={setProductOptions}
-                                placeholder="Search product by name, SKU, or brand..."
-                                emptyLabel="No products found."
-                                inputClassName="h-10 rounded-lg text-sm font-medium w-full"
-                                error={showFieldError(fieldKey("productId", line.key))}
+                              <div className="flex-1 min-w-0">
+                                <ProductSelect
+                                  value={line.productId}
+                                  options={productOptions}
+                                  categories={productCategories}
+                                  brands={productBrands}
+                                  units={productUnits}
+                                  taxes={taxes}
+                                  onValueChange={(productId) => updateLineProduct(line.key, productId)}
+                                  onOptionsChange={setProductOptions}
+                                  placeholder="Search product by name, SKU, or brand..."
+                                  emptyLabel="No products found."
+                                  inputClassName="h-10 rounded-lg text-sm font-medium w-full"
+                                  error={showFieldError(fieldKey("productId", line.key))}
+                                />
+
+                                {showFieldError(fieldKey("productId", line.key)) ? (
+                                  <p className="mt-1 text-xs text-destructive">{showFieldError(fieldKey("productId", line.key))}</p>
+                                ) : null}
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-2 shrink-0 ml-1">
+                              {line.productId ? (
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => toggleEditLine(line.key)}
+                                  className="h-8 gap-1 text-xs font-semibold text-emerald-700 dark:text-emerald-300 border-emerald-500/30 bg-emerald-500/5 hover:bg-emerald-500/15"
+                                >
+                                  <Check className="size-3.5 text-emerald-600" />
+                                  Done
+                                </Button>
+                              ) : null}
+
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                disabled={lines.length === 1}
+                                onClick={() => removeLine(line.key)}
+                                className="size-8 text-muted-foreground/60 transition-colors hover:bg-destructive/10 hover:text-destructive active:scale-95 disabled:opacity-20 shrink-0"
+                                title="Remove this item"
+                              >
+                                <Trash2Icon className="size-4" />
+                                <span className="sr-only">Remove item</span>
+                              </Button>
+                            </div>
+                          </div>
+
+                          {/* Card Body: Financial & Quantity Controls Strip */}
+                          <div
+                            className={cn(
+                              "grid grid-cols-2 gap-3 items-start pt-3.5",
+                              taxes.length > 0 ? "sm:grid-cols-2 lg:grid-cols-4" : "sm:grid-cols-3 lg:grid-cols-3",
+                            )}
+                          >
+                            {/* Quantity */}
+                            <div className="flex flex-col gap-1.5 col-span-1">
+                              <label className="text-xs font-semibold text-foreground flex items-center justify-between">
+                                <span>Quantity</span>
+                                <span className="text-[10px] text-muted-foreground font-normal">Units</span>
+                              </label>
+                              <input
+                                type="number"
+                                min="0.000001"
+                                step="any"
+                                value={line.quantity}
+                                placeholder="1"
+                                className={cn(
+                                  inputClass,
+                                  "w-full text-left font-mono font-semibold text-sm",
+                                  showFieldError(fieldKey("quantity", line.key)) ? "border-destructive focus-visible:border-destructive" : "",
+                                )}
+                                onChange={(event) => updateLine(line.key, { quantity: event.target.value })}
                               />
+                              {showFieldError(fieldKey("quantity", line.key)) ? (
+                                <span className="text-[11px] text-destructive">{showFieldError(fieldKey("quantity", line.key))}</span>
+                              ) : null}
+                            </div>
 
+                            {/* Unit Cost */}
+                            <div className="flex flex-col gap-1.5 col-span-1">
+                              <label className="text-xs font-semibold text-foreground flex items-center justify-between">
+                                <span>Unit Cost</span>
+                                <span className="text-[10px] text-muted-foreground font-normal">ETB</span>
+                              </label>
+                              <div className="relative flex items-center">
+                                <span className="pointer-events-none absolute left-3 text-xs font-bold text-muted-foreground">
+                                  ETB
+                                </span>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  step="0.01"
+                                  value={line.unitCost}
+                                  placeholder="0.00"
+                                  className={cn(
+                                    inputClass,
+                                    "w-full pl-12 text-left font-mono font-semibold text-sm",
+                                    showFieldError(fieldKey("unitCost", line.key)) ? "border-destructive focus-visible:border-destructive" : "",
+                                  )}
+                                  onChange={(event) => updateLine(line.key, { unitCost: event.target.value })}
+                                />
+                              </div>
+                              {showFieldError(fieldKey("unitCost", line.key)) ? (
+                                <span className="text-[11px] text-destructive">{showFieldError(fieldKey("unitCost", line.key))}</span>
+                              ) : null}
+                            </div>
 
+                            {/* Taxes Pill Selector */}
+                            {taxes.length > 0 ? (
+                              <div className="flex flex-col gap-1.5 col-span-2 sm:col-span-1">
+                                <label className="text-xs font-semibold text-foreground flex items-center justify-between">
+                                  <span className="flex items-center gap-1">
+                                    <Tag className="size-3 text-[#0B5D4B]" />
+                                    <span>Taxes</span>
+                                  </span>
+                                  <span className="text-[10px] text-muted-foreground font-normal">Click to toggle</span>
+                                </label>
+                                <div className="flex flex-wrap gap-1.5 min-h-[40px] items-center p-1 rounded-lg border border-input bg-background">
+                                  {taxes.map((tax) => {
+                                    const isSelected = line.taxIds.includes(tax.id);
+                                    return (
+                                      <button
+                                        key={tax.id}
+                                        type="button"
+                                        onClick={() => {
+                                          const nextTaxes = isSelected
+                                            ? line.taxIds.filter((id) => id !== tax.id)
+                                            : [...line.taxIds, tax.id];
+                                          updateLine(line.key, { taxIds: nextTaxes });
+                                        }}
+                                        className={cn(
+                                          "inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium transition-all",
+                                          isSelected
+                                            ? "bg-[#0B5D4B] text-white shadow-xs font-semibold"
+                                            : "bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground",
+                                        )}
+                                      >
+                                        <span className="font-bold">{isSelected ? "✓" : "+"}</span>
+                                        <span>{tax.code} ({tax.computation === "fixed" ? money(tax.amountMinor / 100) : `${Number(tax.rate)}%`})</span>
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            ) : null}
 
-                              {showFieldError(fieldKey("productId", line.key)) ? (
-                                <p className="mt-1 text-xs text-destructive">{showFieldError(fieldKey("productId", line.key))}</p>
+                            {/* Line Financial Total Summary */}
+                            <div className="flex flex-col items-end justify-center rounded-lg bg-muted/40 border border-border/50 p-2.5 h-[62px] col-span-2 sm:col-span-1">
+                              <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Line Total</span>
+                              <span className="font-mono text-base font-extrabold text-[#0B5D4B] dark:text-emerald-400">
+                                ETB {money(lineTotals[index]?.total ?? 0)}
+                              </span>
+                              {taxes.length > 0 && (lineTotals[index]?.taxAmount ?? 0) > 0 ? (
+                                <span className="text-[10px] text-muted-foreground font-mono">
+                                  Untaxed: ETB {money(lineTotals[index]?.subtotal ?? 0)}
+                                </span>
                               ) : null}
                             </div>
                           </div>
 
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            disabled={lines.length === 1}
-                            onClick={() => removeLine(line.key)}
-                            className="size-8 text-muted-foreground/60 transition-colors hover:bg-destructive/10 hover:text-destructive active:scale-95 disabled:opacity-20 shrink-0 ml-1"
-                            title="Remove this item"
-                          >
-                            <Trash2Icon className="size-4" />
-                            <span className="sr-only">Remove item</span>
-                          </Button>
-                        </div>
-
-                        {/* Card Body: Financial & Quantity Controls Strip */}
-                        <div
-                          className={cn(
-                            "grid grid-cols-2 gap-3 items-start pt-3.5",
-                            taxes.length > 0 ? "sm:grid-cols-2 lg:grid-cols-4" : "sm:grid-cols-3 lg:grid-cols-3",
-                          )}
-                        >
-                          {/* Quantity */}
-                          <div className="flex flex-col gap-1.5 col-span-1">
-                            <label className="text-xs font-semibold text-foreground flex items-center justify-between">
-                              <span>Quantity</span>
-                              <span className="text-[10px] text-muted-foreground font-normal">Units</span>
-                            </label>
-                            <input
-                              type="number"
-                              min="0.000001"
-                              step="any"
-                              value={line.quantity}
-                              placeholder="1"
-                              className={cn(
-                                inputClass,
-                                "w-full text-left font-mono font-semibold text-sm",
-                                showFieldError(fieldKey("quantity", line.key)) ? "border-destructive focus-visible:border-destructive" : ""
-                              )}
-                              onChange={(event) => updateLine(line.key, { quantity: event.target.value })}
-                            />
-                            {showFieldError(fieldKey("quantity", line.key)) ? (
-                              <span className="text-[11px] text-destructive">{showFieldError(fieldKey("quantity", line.key))}</span>
-                            ) : null}
-                          </div>
-
-                          {/* Unit Cost */}
-                          <div className="flex flex-col gap-1.5 col-span-1">
-                            <label className="text-xs font-semibold text-foreground flex items-center justify-between">
-                              <span>Unit Cost</span>
-                              <span className="text-[10px] text-muted-foreground font-normal">ETB</span>
-                            </label>
-                            <div className="relative flex items-center">
-                              <span className="pointer-events-none absolute left-3 text-xs font-bold text-muted-foreground">
-                                ETB
+                          {/* Card Footer: Subtle Line Owner info & override */}
+                          <div className="mt-3 flex items-center justify-between pt-2.5 text-xs text-muted-foreground border-t border-border/50">
+                            <div className="flex items-center gap-2">
+                              <span>Assigned to:</span>
+                              <span className="font-semibold text-foreground">
+                                {owner?.name ?? "Order Owner"}
                               </span>
-                              <input
-                                type="number"
-                                min="0"
-                                step="0.01"
-                                value={line.unitCost}
-                                placeholder="0.00"
-                                className={cn(
-                                  inputClass,
-                                  "w-full pl-12 text-left font-mono font-semibold text-sm",
-                                  showFieldError(fieldKey("unitCost", line.key)) ? "border-destructive focus-visible:border-destructive" : ""
-                                )}
-                                onChange={(event) => updateLine(line.key, { unitCost: event.target.value })}
-                              />
                             </div>
-                            {showFieldError(fieldKey("unitCost", line.key)) ? (
-                              <span className="text-[11px] text-destructive">{showFieldError(fieldKey("unitCost", line.key))}</span>
-                            ) : null}
-                          </div>
 
-                          {/* Taxes Pill Selector */}
-                          {taxes.length > 0 ? (
-                            <div className="flex flex-col gap-1.5 col-span-2 sm:col-span-1">
-                              <label className="text-xs font-semibold text-foreground flex items-center justify-between">
-                                <span className="flex items-center gap-1">
-                                  <Tag className="size-3 text-[#0B5D4B]" />
-                                  <span>Taxes</span>
-                                </span>
-                                <span className="text-[10px] text-muted-foreground font-normal">Click to toggle</span>
-                              </label>
-                              <div className="flex flex-wrap gap-1.5 min-h-[40px] items-center p-1 rounded-lg border border-input bg-background">
-                                {taxes.map((tax) => {
-                                  const isSelected = line.taxIds.includes(tax.id);
-                                  return (
-                                    <button
-                                      key={tax.id}
-                                      type="button"
-                                      onClick={() => {
-                                        const nextTaxes = isSelected
-                                          ? line.taxIds.filter((id) => id !== tax.id)
-                                          : [...line.taxIds, tax.id];
-                                        updateLine(line.key, { taxIds: nextTaxes });
-                                      }}
-                                      className={cn(
-                                        "inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium transition-all",
-                                        isSelected
-                                          ? "bg-[#0B5D4B] text-white shadow-xs font-semibold"
-                                          : "bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground"
-                                      )}
-                                    >
-                                      <span className="font-bold">{isSelected ? "✓" : "+"}</span>
-                                      <span>{tax.code} ({tax.computation === "fixed" ? money(tax.amountMinor / 100) : `${Number(tax.rate)}%`})</span>
-                                    </button>
-                                  );
-                                })}
+                            <details className="text-right">
+                              <summary className="cursor-pointer text-[#0B5D4B] hover:underline font-medium list-none">
+                                Assign different owner
+                              </summary>
+                              <div className="mt-2 w-56 text-left">
+                                <RelatedModelSelect
+                                  value={line.ownerId || headerOwnerId}
+                                  options={owners}
+                                  onValueChange={(ownerId) => updateLine(line.key, { ownerId })}
+                                  placeholder="Select owner"
+                                  emptyLabel="No owners found."
+                                  inputClassName="h-8 text-xs"
+                                />
                               </div>
-                            </div>
-                          ) : null}
-
-                          {/* Line Financial Total Summary */}
-                          <div className="flex flex-col items-end justify-center rounded-lg bg-muted/40 border border-border/50 p-2.5 h-[62px] col-span-2 sm:col-span-1">
-                            <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Line Total</span>
-                            <span className="font-mono text-base font-extrabold text-[#0B5D4B] dark:text-emerald-400">
-                              ETB {money(lineTotals[index]?.total ?? 0)}
-                            </span>
-                            {taxes.length > 0 && (lineTotals[index]?.taxAmount ?? 0) > 0 ? (
-                              <span className="text-[10px] text-muted-foreground font-mono">
-                                Untaxed: ETB {money(lineTotals[index]?.subtotal ?? 0)}
-                              </span>
-                            ) : null}
+                            </details>
                           </div>
                         </div>
+                      );
+                    })}
+                  </div>
 
-                        {/* Card Footer: Subtle Line Owner info & override */}
-                        <div className="mt-3 flex items-center justify-between pt-2.5 text-xs text-muted-foreground border-t border-border/50">
-                          <div className="flex items-center gap-2">
-                            <span>Assigned to:</span>
-                            <span className="font-semibold text-foreground">
-                              {owner?.name ?? "Order Owner"}
-                            </span>
-                          </div>
-
-                          <details className="text-right">
-                            <summary className="cursor-pointer text-[#0B5D4B] hover:underline font-medium list-none">
-                              Assign different owner
-                            </summary>
-                            <div className="mt-2 w-56 text-left">
-                              <RelatedModelSelect
-                                value={line.ownerId || headerOwnerId}
-                                options={owners}
-                                onValueChange={(ownerId) => updateLine(line.key, { ownerId })}
-                                placeholder="Select owner"
-                                emptyLabel="No owners found."
-                                inputClassName="h-8 text-xs"
-                              />
-                            </div>
-                          </details>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-
-                {/* Add Line Action & Financial Summary Widget */}
-                <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={addLine}
-                    className="w-full sm:w-auto gap-2 border-dashed border-[#0B5D4B]/50 bg-emerald-500/5 text-[#0B5D4B] font-semibold hover:bg-emerald-500/10 hover:border-[#0B5D4B] transition-all py-2.5 px-5 rounded-xl text-xs"
-                  >
-                    <PlusIcon className="size-4" />
-                    Add Another Item Line
-                  </Button>
+                  {/* Add Line Action & Financial Summary Widget */}
+                  <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={addLine}
+                      className="w-full sm:w-auto gap-2 border-dashed border-[#0B5D4B]/50 bg-emerald-500/5 text-[#0B5D4B] font-semibold hover:bg-emerald-500/10 hover:border-[#0B5D4B] transition-all py-2.5 px-5 rounded-xl text-xs"
+                    >
+                      <PlusIcon className="size-4" />
+                      + Add Product
+                    </Button>
 
                   {/* Financial Grand Summary Card */}
                   <div className="w-full sm:w-80 rounded-xl border border-border/80 bg-gradient-to-b from-card to-muted/20 p-4 text-xs shadow-xs">
