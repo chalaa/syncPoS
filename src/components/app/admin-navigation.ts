@@ -155,6 +155,7 @@ export const adminMenuItems: AdminMenuItem[] = [
       { label: "Owners", href: "/admin/settings/owners", permission: PERMISSIONS.COMPANY.MANAGE },
       { label: "Payments", href: "/admin/settings/payments", permission: PERMISSIONS.COMPANY.MANAGE },
       { label: "Audit Logs", href: "/admin/settings/audit-logs", permission: PERMISSIONS.COMPANY.MANAGE },
+      { label: "Archived", href: "/admin/settings/archived", permission: PERMISSIONS.COMPANY.MANAGE },
     ],
   },
   {
