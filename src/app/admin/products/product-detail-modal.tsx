@@ -264,22 +264,22 @@ export function ProductDetailModal({
 
         {/* Modal Header */}
         <DialogHeader className="border-b border-border/70 bg-gradient-to-b from-muted/30 to-background px-4 py-3 sm:px-6 sm:py-4.5">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="flex items-start justify-between gap-2.5 sm:gap-4">
             {/* Left: Product Icon & Titles */}
-            <div className="flex items-start gap-3.5 min-w-0">
-              <div className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-[#0B5D4B] to-[#073B35] text-white shadow-md shadow-[#0B5D4B]/25 ring-1 ring-white/10">
-                <Boxes className="size-6 text-emerald-200" />
+            <div className="flex items-start gap-3 sm:gap-3.5 min-w-0">
+              <div className="flex size-10 sm:size-12 shrink-0 items-center justify-center rounded-xl sm:rounded-2xl bg-gradient-to-br from-[#0B5D4B] to-[#073B35] text-white shadow-md shadow-[#0B5D4B]/25 ring-1 ring-white/10">
+                <Boxes className="size-5 sm:size-6 text-emerald-200" />
               </div>
 
               <div className="min-w-0 space-y-1.5">
                 <div className="flex flex-wrap items-center gap-2">
-                  <DialogTitle className="text-xl font-bold tracking-tight text-foreground sm:text-2xl truncate">
+                  <DialogTitle className="text-lg font-bold tracking-tight text-foreground sm:text-2xl truncate">
                     {isLoading && !product ? "Loading Product..." : product?.name ?? "Product Details"}
                   </DialogTitle>
                   {product ? (
                     <span
                       className={cn(
-                        "inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold",
+                        "inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] sm:text-xs font-semibold",
                         product.isActive
                           ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20"
                           : "bg-muted text-muted-foreground border border-border",
@@ -348,23 +348,23 @@ export function ProductDetailModal({
               </div>
             </div>
 
-            {/* Right: Quick Action Buttons & Close */}
-            <div className="flex items-center gap-2 self-start">
+            {/* Right: Quick Action Buttons & Close (Pinned to top end) */}
+            <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 self-start mt-0.5">
               {product ? (
                 <ButtonLink
                   href={`/admin/products/${product.id}/edit`}
                   variant="outline"
                   size="sm"
-                  className="gap-1.5 font-medium border-border/80 hover:border-[#0B5D4B]/40 hover:text-[#0B5D4B]"
+                  className="px-2 sm:px-3 gap-1.5 font-medium border-border/80 hover:border-[#0B5D4B]/40 hover:text-[#0B5D4B]"
                 >
                   <Pencil className="size-3.5" />
-                  Edit Product
+                  <span className="hidden sm:inline">Edit Product</span>
                 </ButtonLink>
               ) : null}
 
               <DialogClose
                 type="button"
-                className="rounded-full p-2 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="rounded-full p-1.5 sm:p-2 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 aria-label="Close dialog"
               >
                 <X className="size-5" />
