@@ -1436,7 +1436,7 @@ export function NewProductModal({
             </div>
 
             {/* Warning Confirmation Footer */}
-            <div className="shrink-0 border-t border-border/80 bg-background/95 px-6 py-3.5 backdrop-blur-md flex items-center justify-between gap-3">
+            <div className="shrink-0 border-t border-border/80 bg-background/95 px-4 sm:px-6 py-3 sm:py-3.5 backdrop-blur-md flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-between gap-2.5 sm:gap-3">
               <Button
                 type="button"
                 variant="outline"
@@ -1444,10 +1444,10 @@ export function NewProductModal({
                   setShowDuplicateWarning(false);
                 }}
                 disabled={isPending}
-                className="h-10 gap-2 px-4 font-medium"
+                className="h-10 w-full sm:w-auto gap-2 px-4 text-xs sm:text-sm font-medium justify-center"
               >
                 <ArrowLeft className="size-4" />
-                Close & Edit Details
+                <span>Close & Edit Details</span>
               </Button>
 
               {step === 3 ? (
@@ -1455,7 +1455,7 @@ export function NewProductModal({
                   type="button"
                   onClick={() => handleFinalSubmit(true)}
                   disabled={isPending}
-                  className="h-10 gap-2 bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white font-semibold shadow-md shadow-amber-600/20 transition-all"
+                  className="h-10 w-full sm:w-auto gap-2 px-4 text-xs sm:text-sm bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white font-semibold shadow-md shadow-amber-600/20 transition-all justify-center"
                 >
                   {isPending ? (
                     <>
