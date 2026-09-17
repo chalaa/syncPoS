@@ -8,6 +8,7 @@ import { Button, ButtonLink } from "@/components/ui/button";
 import { DeleteConfirmationDialog } from "@/components/ui/delete-confirmation-dialog";
 import { ProductDetailModal } from "./product-detail-modal";
 import { restoreProduct, softDeleteProduct } from "./actions";
+import { useTranslation } from "@/lib/i18n/use-translation";
 import type { ProductDetail } from "@/server/catalog/types";
 
 export type ProductListItem = {
@@ -46,6 +47,7 @@ export function ProductListTable({
     initialProductId ?? null,
   );
   const [modalOpen, setModalOpen] = useState(Boolean(initialProductId));
+  const { t } = useTranslation();
 
   // Sync state if initialProductId changes via searchParams
   useEffect(() => {
@@ -95,14 +97,14 @@ export function ProductListTable({
         <table className="w-full min-w-[920px] text-left text-sm">
           <thead>
             <tr className="border-b border-border bg-muted/40 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-              <th className="px-4 py-3">Item Code</th>
+              <th className="px-4 py-3">{t("field.sku")}</th>
               <th className="px-4 py-3">Product Info</th>
-              <th className="px-4 py-3">Taxonomy</th>
-              <th className="px-4 py-3">Tracking</th>
-              <th className="px-4 py-3">UoM</th>
-              <th className="px-4 py-3 text-right">Standard Cost</th>
-              <th className="px-4 py-3 text-right">List Price</th>
-              <th className="px-4 py-3 text-right">Actions</th>
+              <th className="px-4 py-3">{t("product.category")}</th>
+              <th className="px-4 py-3">{t("field.tracking")}</th>
+              <th className="px-4 py-3">{t("field.unit")}</th>
+              <th className="px-4 py-3 text-right">{t("product.stdCost")}</th>
+              <th className="px-4 py-3 text-right">{t("product.sellingPrice")}</th>
+              <th className="px-4 py-3 text-right">{t("action.actions")}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border/60">

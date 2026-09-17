@@ -25,6 +25,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
+import { useTranslation } from "@/lib/i18n/use-translation";
 import type { ExpenseCategoryRow } from "@/server/expenses/types";
 
 type ExpenseCategoryMutation = (formData: FormData) => Promise<void>;
@@ -54,6 +55,7 @@ function CategoryForm({
   record?: ExpenseCategoryRow;
   returnPath: string;
 }) {
+  const { t } = useTranslation();
   return (
     <form action={action} className="flex flex-col gap-4">
       <DialogHeader>
@@ -88,10 +90,10 @@ function CategoryForm({
       <DialogFooter>
         <DialogClose asChild>
           <Button type="button" variant="outline">
-            Cancel
+            {t("action.cancel")}
           </Button>
         </DialogClose>
-        <Button>{record ? "Save changes" : "Create"}</Button>
+        <Button>{record ? t("action.save") : t("action.create")}</Button>
       </DialogFooter>
     </form>
   );
@@ -128,6 +130,7 @@ export function ExpenseCategoryManager({
   error,
   returnPath,
 }: ExpenseCategoryManagerProps) {
+  const { t } = useTranslation();
   return (
     <PageShell>
       <PageHeader
@@ -158,11 +161,11 @@ export function ExpenseCategoryManager({
           <table className="w-full min-w-[760px] text-left text-sm">
             <thead className="text-xs uppercase text-muted-foreground">
               <tr className="border-b border-border">
-                <th className="px-4 py-3">Code</th>
-                <th className="px-4 py-3">Name</th>
-                <th className="px-4 py-3">Description</th>
-                <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3 text-right">Actions</th>
+                <th className="px-4 py-3">{t("field.code")}</th>
+                <th className="px-4 py-3">{t("field.name")}</th>
+                <th className="px-4 py-3">{t("field.description")}</th>
+                <th className="px-4 py-3">{t("field.status")}</th>
+                <th className="px-4 py-3 text-right">{t("action.actions")}</th>
               </tr>
             </thead>
             <tbody>

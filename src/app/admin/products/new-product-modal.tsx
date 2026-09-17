@@ -59,6 +59,7 @@ import {
 import { ManyToManyTags, type ManyToManyTagOption } from "@/components/ui/many-to-many-tags";
 import { RelatedModelSelect } from "@/components/ui/related-model-select";
 import { cn } from "@/lib/utils";
+import { useTranslation } from "@/lib/i18n/use-translation";
 import type {
   CategorySelectOption,
   SelectOption,
@@ -226,6 +227,7 @@ export function NewProductModal({
   const [duplicateMatches, setDuplicateMatches] = useState<DuplicateMatch[]>([]);
   const [showDuplicateWarning, setShowDuplicateWarning] = useState(false);
   const [isCheckingDuplicates, setIsCheckingDuplicates] = useState(false);
+  const { t } = useTranslation();
   const [liveDuplicate, setLiveDuplicate] = useState<DuplicateMatch | null>(null);
 
   // Debounced live duplicate detection on Step 1
@@ -618,7 +620,7 @@ export function NewProductModal({
               <div className="space-y-0.5">
                 <div className="flex items-center gap-2">
                   <DialogTitle className="text-lg font-bold tracking-tight text-foreground">
-                    Register New Product
+                    {t("modal.newProduct.title")}
                   </DialogTitle>
                   <Badge variant="accent" size="sm" className="hidden sm:inline-flex text-[10px]">
                     Step {step} of 3
@@ -1229,7 +1231,7 @@ export function NewProductModal({
                   disabled={isPending}
                   className="h-10 gap-1.5 px-4 font-medium"
                 >
-                  <ArrowLeft className="size-4" /> Back
+                  <ArrowLeft className="size-4" /> {t("action.back")}
                 </Button>
               ) : (
                 <Button
@@ -1239,7 +1241,7 @@ export function NewProductModal({
                   disabled={isPending}
                   className="h-10 px-4"
                 >
-                  Cancel
+                  {t("action.cancel")}
                 </Button>
               )}
             </div>
@@ -1257,7 +1259,7 @@ export function NewProductModal({
                   disabled={isPending || (step === 1 && !productName.trim())}
                   className="h-10 gap-1.5 bg-[#0B5D4B] hover:bg-[#073B35] px-5 font-semibold text-white shadow-md shadow-[#0B5D4B]/20 transition-all"
                 >
-                  <span>Next Step</span>
+                  <span>{t("action.next")}</span>
                   <ArrowRight className="size-4" />
                 </Button>
               ) : (
@@ -1276,7 +1278,7 @@ export function NewProductModal({
                   ) : (
                     <>
                       <PackagePlus className="size-4 text-emerald-200" />
-                      <span>Create Product</span>
+                      <span>{t("action.submit")}</span>
                     </>
                   )}
                 </Button>

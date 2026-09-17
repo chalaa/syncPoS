@@ -23,6 +23,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
+import { useTranslation } from "@/lib/i18n/use-translation";
 import type { CatalogReferenceRecord, ProductSpecificationField } from "@/server/catalog/types";
 import { useState } from "react";
 
@@ -125,8 +126,9 @@ function ReferenceForm({
   showSpecifications?: boolean;
   showCountry?: boolean;
 }) {
+  const { t } = useTranslation();
   return (
-    <form action={action} className="flex flex-col gap-4">
+    <form action={action} className="space-y-4">
       <DialogHeader>
         <DialogTitle>{title}</DialogTitle>
         <DialogDescription>{description}</DialogDescription>
@@ -199,10 +201,10 @@ function ReferenceForm({
       <DialogFooter>
         <DialogClose asChild>
           <Button type="button" variant="outline">
-            Cancel
+            {t("action.cancel")}
           </Button>
         </DialogClose>
-        <Button>{record ? "Save changes" : "Create"}</Button>
+        <Button>{record ? t("action.save") : t("action.create")}</Button>
       </DialogFooter>
     </form>
   );
@@ -267,6 +269,7 @@ export function CatalogReferenceManager({
   softDeleteAction,
   restoreAction,
 }: ReferenceManagerProps) {
+  const { t } = useTranslation();
   return (
     <PageShell>
       <PageHeader
@@ -311,12 +314,12 @@ export function CatalogReferenceManager({
           <table className="w-full min-w-[760px] text-left text-sm">
             <thead className="border-b border-border bg-muted/50 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               <tr>
-                <th className="px-4 py-3">Code</th>
-                <th className="px-4 py-3">Name</th>
+                <th className="px-4 py-3">{t("field.code")}</th>
+                <th className="px-4 py-3">{t("field.name")}</th>
                 {showPrecision ? <th className="px-4 py-3">Precision</th> : null}
                 {showCountry ? <th className="px-4 py-3">Country</th> : null}
-                <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3 text-right">Actions</th>
+                <th className="px-4 py-3">{t("field.status")}</th>
+                <th className="px-4 py-3 text-right">{t("action.actions")}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">

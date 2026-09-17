@@ -101,6 +101,7 @@ export function AdminShell({
   const activeSubmenuLabel = activeMenu
     ? getActiveSubmenuLabel(activeMenu.submenus, currentHref, pathname)
     : "Menu";
+  const { t } = useTranslation();
 
   const [isHydrated, setIsHydrated] = useState(false);
 
@@ -226,6 +227,7 @@ export function AdminShell({
         <nav className="flex flex-1 flex-col gap-1 overflow-y-auto p-3">
           {adminMenuItems.map((item) => {
             const isActive = activeMenu.key === item.key && activeMenu.label === item.label;
+            const itemLabel = t(`nav.${item.key}`, item.label);
 
             return (
               <Button
@@ -238,10 +240,10 @@ export function AdminShell({
                   isActive && "bg-secondary text-secondary-foreground font-semibold border-l-3 border-primary shadow-xs",
                 )}
               >
-                <Link href={item.submenus[0]?.href ?? item.href} title={item.label}>
+                <Link href={item.submenus[0]?.href ?? item.href} title={itemLabel}>
                   <item.icon data-icon="inline-start" />
                   <span className={cn("truncate", !adminNavOpen && "sr-only")}>
-                    {item.label}
+                    {itemLabel}
                   </span>
                 </Link>
               </Button>
@@ -253,13 +255,13 @@ export function AdminShell({
           <div className="mb-3 flex items-center justify-between gap-3 text-sm">
             <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
               <span className={cn("size-2 rounded-full", syncStatus === "online" ? "bg-primary" : "bg-gold animate-pulse")} />
-              <span className="capitalize">{syncStatus}</span>
+              <span className="capitalize">{t(`status.${syncStatus}`, syncStatus)}</span>
             </span>
             <span className="truncate text-xs font-medium text-foreground">{username}</span>
           </div>
           <Button variant="outline" size="sm" className="w-full justify-center">
             <LogOutIcon data-icon="inline-start" />
-            Sign out
+            {t("user.signOut")}
           </Button>
         </form>
       </aside>
@@ -363,7 +365,7 @@ export function AdminShell({
           <nav className="hidden min-w-0 flex-1 items-center gap-2 overflow-visible whitespace-nowrap lg:flex">
             {activeMenu ? (
               <>
-                <span className="shrink-0 font-semibold">{activeMenu.label}</span>
+                <span className="shrink-0 font-semibold">{t(`nav.${activeMenu.key}`, activeMenu.label)}</span>
                 <span className="text-muted-foreground">/</span>
               </>
             ) : null}
@@ -449,12 +451,12 @@ export function AdminShell({
           <form action={logout} className="hidden shrink-0 items-center gap-3 md:flex">
             <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-secondary/60 px-2.5 py-1 text-xs font-medium text-foreground">
               <span className={cn("size-2 rounded-full", syncStatus === "online" ? "bg-primary" : "bg-gold animate-pulse")} />
-              <span className="capitalize">{syncStatus}</span>
+              <span className="capitalize">{t(`status.${syncStatus}`, syncStatus)}</span>
             </span>
             <span className="text-xs font-medium text-foreground">{username}</span>
-            <Button variant="outline" size="sm" aria-label="Sign out">
+            <Button variant="outline" size="sm" aria-label={t("user.signOut")}>
               <LogOutIcon data-icon="inline-start" />
-              Sign out
+              {t("user.signOut")}
             </Button>
           </form>
         </header>

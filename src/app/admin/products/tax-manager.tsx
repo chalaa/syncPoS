@@ -21,6 +21,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
+import { useTranslation } from "@/lib/i18n/use-translation";
 import type { TaxRecord } from "@/server/catalog/types";
 
 type TaxMutation = (formData: FormData) => void | Promise<void>;
@@ -53,6 +54,7 @@ function TaxForm({
   record?: TaxRecord;
   returnPath: string;
 }) {
+  const { t } = useTranslation();
   return (
     <form action={action} className="flex flex-col gap-4">
       <DialogHeader>
@@ -142,10 +144,10 @@ function TaxForm({
       <DialogFooter>
         <DialogClose asChild>
           <Button type="button" variant="outline">
-            Cancel
+            {t("action.cancel")}
           </Button>
         </DialogClose>
-        <Button>{record ? "Save changes" : "Create"}</Button>
+        <Button>{record ? t("action.save") : t("action.create")}</Button>
       </DialogFooter>
     </form>
   );
@@ -197,6 +199,7 @@ export function TaxManager({
   softDeleteAction: TaxMutation;
   restoreAction: TaxMutation;
 }) {
+  const { t } = useTranslation();
   return (
     <PageShell>
       <PageHeader
@@ -230,13 +233,13 @@ export function TaxManager({
           <table className="w-full min-w-[880px] text-left text-sm">
             <thead className="border-b border-border bg-muted/50 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               <tr>
-                <th className="px-4 py-3">Code</th>
+                <th className="px-4 py-3">{t("field.code")}</th>
                 <th className="px-4 py-3">Tax</th>
                 <th className="px-4 py-3">Scope</th>
-                <th className="px-4 py-3 text-right">Rate</th>
+                <th className="px-4 py-3 text-right">{t("field.rate")}</th>
                 <th className="px-4 py-3">Included</th>
-                <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3 text-right">Actions</th>
+                <th className="px-4 py-3">{t("field.status")}</th>
+                <th className="px-4 py-3 text-right">{t("action.actions")}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
