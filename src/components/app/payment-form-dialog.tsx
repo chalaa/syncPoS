@@ -16,6 +16,7 @@ import {
   ReceiptText,
   Trash2Icon,
   Wallet,
+  X,
 } from "lucide-react";
 import Link from "next/link";
 import { Fragment, useCallback, useId, useMemo, useRef, useState, useTransition } from "react";
@@ -435,12 +436,12 @@ function PaymentLinesStep({
       )}
 
       {/* Actions */}
-      <div className="flex items-center justify-end gap-2.5 border-t border-border pt-4">
+      <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-2.5 border-t border-border pt-4">
         <Button
           type="button"
           onClick={onContinue}
           disabled={noAccounts}
-          className="gap-2 bg-gradient-to-r from-[#0B5D4B] to-[#073B35] font-semibold text-white shadow-md shadow-[#0B5D4B]/20 hover:brightness-110 active:scale-[0.99] transition-all"
+          className="w-full sm:w-auto gap-2 bg-gradient-to-r from-[#0B5D4B] to-[#073B35] font-semibold text-white shadow-md shadow-[#0B5D4B]/20 hover:brightness-110 active:scale-[0.99] transition-all justify-center"
         >
           Review &amp; Post
           <ArrowRight className="size-4 text-emerald-200" />
@@ -588,13 +589,13 @@ function ReviewStep({
       )}
 
       {/* Actions */}
-      <div className="flex items-center justify-between gap-2.5 border-t border-border pt-4">
+      <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-between gap-2.5 border-t border-border pt-4">
         <Button
           type="button"
           variant="outline"
           onClick={onBack}
           disabled={isPending}
-          className="gap-2 text-muted-foreground hover:text-foreground"
+          className="w-full sm:w-auto gap-2 text-muted-foreground hover:text-foreground justify-center"
         >
           <ArrowLeft className="size-4" />
           Back
@@ -603,7 +604,7 @@ function ReviewStep({
         <Button
           type="submit"
           disabled={isPending}
-          className="gap-2 bg-gradient-to-r from-[#0B5D4B] to-[#073B35] font-semibold text-white shadow-md shadow-[#0B5D4B]/20 hover:brightness-110 active:scale-[0.99] transition-all"
+          className="w-full sm:w-auto gap-2 bg-gradient-to-r from-[#0B5D4B] to-[#073B35] font-semibold text-white shadow-md shadow-[#0B5D4B]/20 hover:brightness-110 active:scale-[0.99] transition-all justify-center"
         >
           {isPending ? (
             <>
@@ -803,7 +804,7 @@ export function PaymentFormDialog({
         <div className="h-1.5 w-full bg-gradient-to-r from-[#0B5D4B] via-[#073B35] to-[#D9A441] shrink-0" />
 
         {/* Header */}
-        <DialogHeader className="shrink-0 border-b border-border/70 bg-background/95 px-6 py-4 backdrop-blur-md">
+        <DialogHeader className="shrink-0 border-b border-border/70 bg-background/95 px-4 sm:px-6 py-4 backdrop-blur-md flex flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#0B5D4B] to-[#073B35] text-white shadow-md shadow-[#0B5D4B]/25 ring-1 ring-white/20">
               <Landmark className="size-5 text-emerald-200" />
@@ -817,6 +818,14 @@ export function PaymentFormDialog({
               </DialogDescription>
             </div>
           </div>
+          <button
+            type="button"
+            onClick={() => setOpen(false)}
+            className="rounded-lg p-1.5 sm:p-2 bg-red-500 text-white hover:bg-red-600 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/50 shadow-2xs"
+            aria-label="Close"
+          >
+            <X className="size-4 sm:size-4.5" />
+          </button>
         </DialogHeader>
 
         {/* Step indicator */}

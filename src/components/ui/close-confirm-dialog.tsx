@@ -43,18 +43,28 @@ export function CloseConfirmDialog({
         <div className="p-6 flex flex-col gap-5">
           {/* Icon + title */}
           <DialogHeader className="p-0 space-y-3">
-            <div className="flex items-center gap-3">
-              <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-700/40">
-                <AlertTriangle className="size-5 text-amber-600 dark:text-amber-400" />
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-700/40">
+                  <AlertTriangle className="size-5 text-amber-600 dark:text-amber-400" />
+                </div>
+                <div className="min-w-0">
+                  <DialogTitle className="text-base font-bold text-foreground leading-tight">
+                    Unsaved Changes
+                  </DialogTitle>
+                  <DialogDescription className="text-xs text-muted-foreground mt-0.5">
+                    You have unsaved work. What would you like to do?
+                  </DialogDescription>
+                </div>
               </div>
-              <div className="min-w-0">
-                <DialogTitle className="text-base font-bold text-foreground leading-tight">
-                  Unsaved Changes
-                </DialogTitle>
-                <DialogDescription className="text-xs text-muted-foreground mt-0.5">
-                  You have unsaved work. What would you like to do?
-                </DialogDescription>
-              </div>
+              <button
+                type="button"
+                onClick={() => onOpenChange(false)}
+                className="rounded-lg p-1.5 bg-red-500 text-white hover:bg-red-600 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/50 shadow-2xs shrink-0"
+                aria-label="Close dialog"
+              >
+                <X className="size-4" />
+              </button>
             </div>
           </DialogHeader>
 

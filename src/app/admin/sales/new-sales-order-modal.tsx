@@ -166,10 +166,10 @@ export function NewSalesOrderModal({
             <button
               type="button"
               onClick={handleCloseRequest}
-              className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus:outline-none focus:ring-2 focus:ring-[#0B5D4B]/30"
+              className="rounded-lg p-1.5 sm:p-2 bg-red-500 text-white hover:bg-red-600 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/50 shadow-2xs"
               aria-label="Close"
             >
-              <X className="size-5" />
+              <X className="size-4 sm:size-4.5" />
             </button>
           </DialogHeader>
 

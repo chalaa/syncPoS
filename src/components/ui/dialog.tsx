@@ -59,8 +59,8 @@ function DialogContent({
       >
         {children}
         {showCloseButton ? (
-          <DialogPrimitive.Close className="absolute right-4 top-4 rounded-md opacity-70 transition-opacity hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-            <XIcon />
+          <DialogPrimitive.Close className="absolute right-4 top-4 rounded-lg p-1.5 sm:p-2 bg-red-500 text-white hover:bg-red-600 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/50 shadow-2xs z-10">
+            <XIcon className="size-4 sm:size-4.5" />
             <span className="sr-only">Close</span>
           </DialogPrimitive.Close>
         ) : null}
@@ -81,7 +81,7 @@ function DialogHeader({ className, ...props }: ComponentProps<"div">) {
 function DialogFooter({ className, ...props }: ComponentProps<"div">) {
   return (
     <div
-      className={cn("flex flex-col-reverse gap-2 sm:flex-row sm:justify-end", className)}
+      className={cn("flex flex-col-reverse gap-2.5 sm:flex-row sm:justify-end items-stretch sm:items-center", className)}
       {...props}
     />
   );

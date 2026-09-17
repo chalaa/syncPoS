@@ -145,10 +145,10 @@ export function OperationDetailModal({
             <button
               type="button"
               onClick={onClose}
-              className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus:outline-none focus:ring-2 focus:ring-[#0B5D4B]/30"
+              className="rounded-lg p-1.5 sm:p-2 bg-red-500 text-white hover:bg-red-600 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/50 shadow-2xs"
               aria-label="Close"
             >
-              <X className="size-5" />
+              <X className="size-4 sm:size-4.5" />
             </button>
           </div>
         </DialogHeader>
@@ -282,26 +282,26 @@ export function OperationDetailModal({
 
         {/* Modal Footer with Actions */}
         {operation && (
-          <div className="shrink-0 border-t border-border/70 bg-background/95 px-6 py-3.5 flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
+          <div className="shrink-0 border-t border-border/70 bg-background/95 px-4 sm:px-6 py-3 sm:py-3.5 flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-between gap-2.5 sm:gap-3">
+            <div className="flex flex-wrap items-center gap-2">
               {operation.status === "draft" && (
                 <>
-                  <form action={postInventoryOperation}>
+                  <form action={postInventoryOperation} className="flex-1 sm:flex-none">
                     <input type="hidden" name="movementId" value={operation.id} />
                     {returnPath && <input type="hidden" name="returnPath" value={returnPath} />}
                     <Button
                       type="submit"
                       size="sm"
-                      className="bg-gradient-to-r from-[#0B5D4B] to-[#073B35] font-semibold text-white shadow-sm shadow-[#0B5D4B]/20 hover:brightness-110"
+                      className="w-full sm:w-auto bg-gradient-to-r from-[#0B5D4B] to-[#073B35] font-semibold text-white shadow-sm shadow-[#0B5D4B]/20 hover:brightness-110 justify-center"
                     >
                       <CheckCircle2 className="size-3.5 mr-1" />
                       Post Operation
                     </Button>
                   </form>
-                  <form action={cancelInventoryOperation}>
+                  <form action={cancelInventoryOperation} className="flex-1 sm:flex-none">
                     <input type="hidden" name="movementId" value={operation.id} />
                     {returnPath && <input type="hidden" name="returnPath" value={returnPath} />}
-                    <Button type="submit" size="sm" variant="danger">
+                    <Button type="submit" size="sm" variant="danger" className="w-full sm:w-auto justify-center">
                       Cancel Operation
                     </Button>
                   </form>
@@ -309,7 +309,7 @@ export function OperationDetailModal({
               )}
             </div>
 
-            <Button onClick={onClose} variant="outline" size="sm" className="font-semibold">
+            <Button onClick={onClose} variant="outline" size="sm" className="font-semibold w-full sm:w-auto">
               Close
             </Button>
           </div>

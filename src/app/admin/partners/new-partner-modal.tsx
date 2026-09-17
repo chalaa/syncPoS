@@ -80,15 +80,14 @@ export function NewPartnerModal({
               </p>
             </div>
           </div>
-          <Button
+          <DialogClose
             type="button"
-            variant="ghost"
-            size="icon"
+            className="rounded-lg p-1.5 sm:p-2 bg-red-500 text-white hover:bg-red-600 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/50 shadow-2xs"
+            aria-label="Close dialog"
             onClick={() => setOpen(false)}
-            className="h-8 w-8 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted"
           >
-            <X className="h-4 w-4" />
-          </Button>
+            <X className="size-4 sm:size-4.5" />
+          </DialogClose>
         </DialogHeader>
 
         <form action={createPartner} className="flex flex-col p-4 sm:p-6 gap-4">
@@ -227,18 +226,18 @@ export function NewPartnerModal({
             <textarea name="notes" rows={3} className={textareaClass} />
           </label>
 
-          <div className="pt-2 border-t border-border/80 flex items-center justify-end gap-2.5">
+          <div className="pt-3 border-t border-border/80 flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-2.5">
             <Button
               type="button"
               variant="outline"
               onClick={() => setOpen(false)}
-              className="h-10 px-4 text-xs font-semibold"
+              className="h-10 w-full sm:w-auto px-4 text-xs font-semibold justify-center"
             >
               Cancel
             </Button>
             <Button
               type="submit"
-              className="h-10 px-5 gap-2 bg-gradient-to-r from-[#0B5D4B] to-[#073B35] font-semibold text-white shadow-md shadow-[#0B5D4B]/20 hover:brightness-110 active:scale-[0.99]"
+              className="h-10 w-full sm:w-auto px-5 gap-2 bg-gradient-to-r from-[#0B5D4B] to-[#073B35] font-semibold text-white shadow-md shadow-[#0B5D4B]/20 hover:brightness-110 active:scale-[0.99] justify-center"
             >
               <Plus className="size-4 text-emerald-200" />
               Create partner

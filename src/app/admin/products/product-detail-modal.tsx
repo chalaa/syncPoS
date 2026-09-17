@@ -1231,8 +1231,8 @@ export function ProductDetailModal({
         </div>
 
         {/* Modal Footer */}
-        <div className="shrink-0 border-t border-border/70 bg-background/95 px-6 py-3.5 backdrop-blur-md flex items-center justify-between">
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+        <div className="shrink-0 border-t border-border/70 bg-background/95 px-4 sm:px-6 py-3 sm:py-3.5 backdrop-blur-md flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-between gap-2.5 sm:gap-3">
+          <div className="flex items-center justify-between sm:justify-start gap-2 text-xs text-muted-foreground">
             {product ? (
               <>
                 <span className="font-mono text-[11px]">System ID: {product.id}</span>
@@ -1240,11 +1240,12 @@ export function ProductDetailModal({
             ) : null}
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 w-full sm:w-auto">
             <Button
               type="button"
               variant="outline"
               onClick={() => onOpenChange(false)}
+              className="flex-1 sm:flex-initial"
             >
               {t("product.close")}
             </Button>
@@ -1252,7 +1253,7 @@ export function ProductDetailModal({
               <ButtonLink
                 href={`/admin/products/${product.id}/edit`}
                 variant="default"
-                className="gap-1.5 bg-gradient-to-r from-[#0B5D4B] to-[#073B35] font-semibold text-white shadow-sm hover:brightness-110"
+                className="flex-1 sm:flex-initial gap-1.5 bg-gradient-to-r from-[#0B5D4B] to-[#073B35] font-semibold text-white shadow-sm hover:brightness-110 justify-center"
               >
                 <Pencil className="size-3.5" />
                 Edit Product
