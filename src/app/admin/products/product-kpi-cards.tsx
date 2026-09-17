@@ -2,6 +2,7 @@
 
 import { Package, Layers, ShieldCheck, Tag } from "lucide-react";
 import type { ProductListItem } from "./product-list-table";
+import { useTranslation } from "@/lib/i18n/use-translation";
 
 export function ProductKpiCards({
   products,
@@ -12,6 +13,7 @@ export function ProductKpiCards({
   categoriesCount: number;
   brandsCount: number;
 }) {
+  const { t } = useTranslation();
   const totalCount = products.length;
   const activeCount = products.filter((p) => p.isActive && !p.deletedAt).length;
   const trackedCount = products.filter((p) => p.trackingMode && p.trackingMode !== "none").length;
@@ -39,9 +41,9 @@ export function ProductKpiCards({
             <Package className="size-3.5" />
           </div>
           <div className="min-w-0">
-            <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Catalog</div>
+            <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{t("kpi.catalog", "Catalog")}</div>
             <div className="font-mono text-xs font-bold text-foreground">
-              {totalCount} <span className="text-[10px] font-normal text-emerald-600">({activeCount} active)</span>
+              {totalCount} <span className="text-[10px] font-normal text-emerald-600">({activeCount} {t("kpi.active", "active")})</span>
             </div>
           </div>
         </div>
@@ -52,9 +54,9 @@ export function ProductKpiCards({
             <Layers className="size-3.5" />
           </div>
           <div className="min-w-0">
-            <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Categories</div>
+            <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{t("kpi.categories", "Categories")}</div>
             <div className="font-mono text-xs font-bold text-foreground">
-              {categoriesCount} <span className="text-[10px] font-normal text-muted-foreground">({brandsCount} brands)</span>
+              {categoriesCount} <span className="text-[10px] font-normal text-muted-foreground">({brandsCount} {t("kpi.brands", "brands")})</span>
             </div>
           </div>
         </div>
@@ -65,7 +67,7 @@ export function ProductKpiCards({
             <ShieldCheck className="size-3.5" />
           </div>
           <div className="min-w-0">
-            <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Tracked</div>
+            <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{t("kpi.tracked", "Tracked")}</div>
             <div className="font-mono text-xs font-bold text-foreground">{trackedCount} SKUs</div>
           </div>
         </div>
@@ -76,7 +78,7 @@ export function ProductKpiCards({
             <Tag className="size-3.5" />
           </div>
           <div className="min-w-0">
-            <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Avg Price</div>
+            <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{t("kpi.avg", "Avg Price")}</div>
             <div className="font-mono text-xs font-bold text-foreground">{formattedAvgPrice}</div>
           </div>
         </div>
@@ -88,7 +90,7 @@ export function ProductKpiCards({
         <div className="relative flex flex-col justify-between overflow-hidden rounded-xl border border-emerald-500/20 bg-gradient-to-br from-emerald-500/5 via-background to-card p-4 shadow-xs transition-all hover:border-emerald-500/40 hover:shadow-md">
           <div className="flex items-center justify-between gap-2">
             <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Catalog Items
+              {t("kpi.catalogItems", "Catalog Items")}
             </span>
             <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-600 ring-1 ring-emerald-500/20 dark:text-emerald-400">
               <Package className="size-4" />
@@ -97,10 +99,10 @@ export function ProductKpiCards({
           <div className="mt-2">
             <p className="font-mono text-2xl font-extrabold tracking-tight text-foreground">
               {totalCount}{" "}
-              <span className="text-xs font-normal text-muted-foreground">Products</span>
+              <span className="text-xs font-normal text-muted-foreground">{t("kpi.products", "Products")}</span>
             </p>
             <p className="mt-0.5 text-xs text-muted-foreground truncate">
-              <span className="font-semibold text-emerald-600 dark:text-emerald-400">{activeCount} active</span> in catalog
+              <span className="font-semibold text-emerald-600 dark:text-emerald-400">{activeCount} {t("kpi.active", "active")}</span> {t("kpi.inCatalog", "in catalog")}
             </p>
           </div>
           <div className="pointer-events-none absolute -bottom-6 -right-6 size-20 rounded-full bg-emerald-500/5 blur-xl" />
@@ -110,7 +112,7 @@ export function ProductKpiCards({
         <div className="relative flex flex-col justify-between overflow-hidden rounded-xl border border-border/80 bg-card p-4 shadow-xs transition-all hover:border-blue-500/40 hover:shadow-md">
           <div className="flex items-center justify-between gap-2">
             <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Taxonomy & Brands
+              {t("kpi.taxonomyBrands", "Taxonomy & Brands")}
             </span>
             <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-blue-500/10 text-blue-600 ring-1 ring-blue-500/20 dark:text-blue-400">
               <Layers className="size-4" />
@@ -119,10 +121,10 @@ export function ProductKpiCards({
           <div className="mt-2">
             <p className="font-mono text-2xl font-extrabold tracking-tight text-foreground">
               {categoriesCount}{" "}
-              <span className="text-xs font-normal text-muted-foreground">Categories</span>
+              <span className="text-xs font-normal text-muted-foreground">{t("kpi.categories", "Categories")}</span>
             </p>
             <p className="mt-0.5 text-xs text-muted-foreground truncate">
-              Across <span className="font-semibold text-foreground">{brandsCount} distinct brands</span>
+              {t("kpi.across", "Across")} <span className="font-semibold text-foreground">{brandsCount} {t("kpi.distinctBrands", "distinct brands")}</span>
             </p>
           </div>
         </div>
@@ -131,7 +133,7 @@ export function ProductKpiCards({
         <div className="relative flex flex-col justify-between overflow-hidden rounded-xl border border-border/80 bg-card p-4 shadow-xs transition-all hover:border-emerald-500/40 hover:shadow-md">
           <div className="flex items-center justify-between gap-2">
             <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Tracked SKUs
+              {t("kpi.trackedSkus", "Tracked SKUs")}
             </span>
             <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-600 ring-1 ring-emerald-500/20 dark:text-emerald-400">
               <ShieldCheck className="size-4" />
@@ -140,10 +142,10 @@ export function ProductKpiCards({
           <div className="mt-2">
             <p className="font-mono text-2xl font-extrabold tracking-tight text-foreground">
               {trackedCount}{" "}
-              <span className="text-xs font-normal text-muted-foreground">Serial / Lot</span>
+              <span className="text-xs font-normal text-muted-foreground">{t("kpi.serialLot", "Serial / Lot")}</span>
             </p>
             <p className="mt-0.5 text-xs text-muted-foreground truncate">
-              Strict tracking enabled
+              {t("kpi.strictTracking", "Strict tracking enabled")}
             </p>
           </div>
         </div>
@@ -152,7 +154,7 @@ export function ProductKpiCards({
         <div className="relative flex flex-col justify-between overflow-hidden rounded-xl border border-border/80 bg-card p-4 shadow-xs transition-all hover:border-amber-500/40 hover:shadow-md">
           <div className="flex items-center justify-between gap-2">
             <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Avg Catalog Price
+              {t("kpi.avgPrice", "Avg Catalog Price")}
             </span>
             <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-amber-500/10 text-amber-600 ring-1 ring-amber-500/20 dark:text-amber-400">
               <Tag className="size-4" />
@@ -163,7 +165,7 @@ export function ProductKpiCards({
               {formattedAvgPrice}
             </p>
             <p className="mt-0.5 text-xs text-muted-foreground truncate">
-              Average list price
+              {t("kpi.avgListPrice", "Average list price")}
             </p>
           </div>
         </div>

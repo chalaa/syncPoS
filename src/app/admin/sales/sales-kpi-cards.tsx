@@ -2,12 +2,14 @@
 
 import { DollarSign, FileText, Send, CheckCircle } from "lucide-react";
 import type { SalesOrderListRow } from "@/server/sales/types";
+import { useTranslation } from "@/lib/i18n/use-translation";
 
 export function SalesKpiCards({
   orders,
 }: {
   orders: SalesOrderListRow[];
 }) {
+  const { t } = useTranslation();
   const totalOrdersCount = orders.length;
   const activeOrders = orders.filter((o) => o.status !== "cancelled");
   const pendingDeliveries = activeOrders.filter(
@@ -39,7 +41,7 @@ export function SalesKpiCards({
             <DollarSign className="size-3.5" />
           </div>
           <div className="min-w-0">
-            <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Volume</div>
+            <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{t("kpi.volume", "Volume")}</div>
             <div className="font-mono text-xs font-bold text-foreground">{formattedVolume}</div>
           </div>
         </div>
@@ -50,9 +52,9 @@ export function SalesKpiCards({
             <FileText className="size-3.5" />
           </div>
           <div className="min-w-0">
-            <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Orders</div>
+            <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{t("kpi.orders", "Orders")}</div>
             <div className="font-mono text-xs font-bold text-foreground">
-              {totalOrdersCount} <span className="text-[10px] font-normal text-blue-600">({orders.filter((o) => o.status === "draft" || o.status === "sent").length} draft)</span>
+              {totalOrdersCount} <span className="text-[10px] font-normal text-blue-600">({orders.filter((o) => o.status === "draft" || o.status === "sent").length} {t("kpi.draft", "draft")})</span>
             </div>
           </div>
         </div>
@@ -63,8 +65,8 @@ export function SalesKpiCards({
             <Send className="size-3.5" />
           </div>
           <div className="min-w-0">
-            <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Pending Dispatch</div>
-            <div className="font-mono text-xs font-bold text-foreground">{pendingDeliveries} Fulfillments</div>
+            <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{t("kpi.pendingDispatch", "Pending Dispatch")}</div>
+            <div className="font-mono text-xs font-bold text-foreground">{pendingDeliveries} {t("kpi.fulfillments", "Fulfillments")}</div>
           </div>
         </div>
 
@@ -74,8 +76,8 @@ export function SalesKpiCards({
             <CheckCircle className="size-3.5" />
           </div>
           <div className="min-w-0">
-            <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Settled</div>
-            <div className="font-mono text-xs font-bold text-foreground">{settledCount} Paid Orders</div>
+            <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{t("kpi.settled", "Settled")}</div>
+            <div className="font-mono text-xs font-bold text-foreground">{settledCount} {t("kpi.paidOrders", "Paid Orders")}</div>
           </div>
         </div>
       </div>
@@ -86,7 +88,7 @@ export function SalesKpiCards({
         <div className="relative flex flex-col justify-between overflow-hidden rounded-xl border border-emerald-500/20 bg-gradient-to-br from-emerald-500/5 via-background to-card p-4 shadow-xs transition-all hover:border-emerald-500/40 hover:shadow-md">
           <div className="flex items-center justify-between gap-2">
             <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Total Sales Volume
+              {t("kpi.totalSalesVolume", "Total Sales Volume")}
             </span>
             <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-600 ring-1 ring-emerald-500/20 dark:text-emerald-400">
               <DollarSign className="size-4" />
@@ -97,7 +99,7 @@ export function SalesKpiCards({
               {formattedVolume}
             </p>
             <p className="mt-0.5 text-xs text-muted-foreground truncate">
-              Across {activeOrders.length} active customer orders
+              {t("kpi.across", "Across")} {activeOrders.length} {t("kpi.activeCustomerOrders", "active customer orders")}
             </p>
           </div>
           <div className="pointer-events-none absolute -bottom-6 -right-6 size-20 rounded-full bg-emerald-500/5 blur-xl" />
@@ -107,7 +109,7 @@ export function SalesKpiCards({
         <div className="relative flex flex-col justify-between overflow-hidden rounded-xl border border-border/80 bg-card p-4 shadow-xs transition-all hover:border-blue-500/40 hover:shadow-md">
           <div className="flex items-center justify-between gap-2">
             <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Orders & Quotes
+              {t("kpi.ordersAndQuotes", "Orders & Quotes")}
             </span>
             <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-blue-500/10 text-blue-600 ring-1 ring-blue-500/20 dark:text-blue-400">
               <FileText className="size-4" />
@@ -116,11 +118,11 @@ export function SalesKpiCards({
           <div className="mt-2">
             <p className="font-mono text-2xl font-extrabold tracking-tight text-foreground">
               {totalOrdersCount}{" "}
-              <span className="text-xs font-normal text-muted-foreground">Orders</span>
+              <span className="text-xs font-normal text-muted-foreground">{t("kpi.orders", "Orders")}</span>
             </p>
             <p className="mt-0.5 text-xs text-muted-foreground truncate">
               <span className="font-semibold text-blue-600 dark:text-blue-400">
-                {orders.filter((o) => o.status === "draft" || o.status === "sent").length} draft/quotes
+                {orders.filter((o) => o.status === "draft" || o.status === "sent").length} {t("kpi.draftQuotes", "draft/quotes")}
               </span>
             </p>
           </div>
@@ -130,7 +132,7 @@ export function SalesKpiCards({
         <div className="relative flex flex-col justify-between overflow-hidden rounded-xl border border-border/80 bg-card p-4 shadow-xs transition-all hover:border-amber-500/40 hover:shadow-md">
           <div className="flex items-center justify-between gap-2">
             <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Pending Deliveries
+              {t("kpi.pendingDeliveries", "Pending Deliveries")}
             </span>
             <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-amber-500/10 text-amber-600 ring-1 ring-amber-500/20 dark:text-amber-400">
               <Send className="size-4" />
@@ -139,10 +141,10 @@ export function SalesKpiCards({
           <div className="mt-2">
             <p className="font-mono text-2xl font-extrabold tracking-tight text-foreground">
               {pendingDeliveries}{" "}
-              <span className="text-xs font-normal text-muted-foreground">Fulfillments</span>
+              <span className="text-xs font-normal text-muted-foreground">{t("kpi.fulfillments", "Fulfillments")}</span>
             </p>
             <p className="mt-0.5 text-xs text-muted-foreground truncate">
-              Awaiting customer dispatch
+              {t("kpi.awaitingCustomerDispatch", "Awaiting customer dispatch")}
             </p>
           </div>
         </div>
@@ -151,7 +153,7 @@ export function SalesKpiCards({
         <div className="relative flex flex-col justify-between overflow-hidden rounded-xl border border-border/80 bg-card p-4 shadow-xs transition-all hover:border-emerald-500/40 hover:shadow-md">
           <div className="flex items-center justify-between gap-2">
             <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Settled Invoices
+              {t("kpi.settledInvoices", "Settled Invoices")}
             </span>
             <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-600 ring-1 ring-emerald-500/20 dark:text-emerald-400">
               <CheckCircle className="size-4" />
@@ -160,10 +162,10 @@ export function SalesKpiCards({
           <div className="mt-2">
             <p className="font-mono text-2xl font-extrabold tracking-tight text-foreground">
               {settledCount}{" "}
-              <span className="text-xs font-normal text-muted-foreground">Paid Orders</span>
+              <span className="text-xs font-normal text-muted-foreground">{t("kpi.paidOrders", "Paid Orders")}</span>
             </p>
             <p className="mt-0.5 text-xs text-muted-foreground truncate">
-              Customer billing completed
+              {t("kpi.customerBillingCompleted", "Customer billing completed")}
             </p>
           </div>
         </div>

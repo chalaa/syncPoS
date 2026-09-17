@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 
 import { cn } from "@/lib/utils";
 import type { InventorySummaryMetrics } from "@/server/inventory/stock-types";
+import { useTranslation } from "@/lib/i18n/use-translation";
 
 export function InventoryKpiCards({
   metrics,
@@ -13,6 +14,7 @@ export function InventoryKpiCards({
   metrics: InventorySummaryMetrics;
   activeStatus?: string;
 }) {
+  const { t } = useTranslation();
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -41,7 +43,7 @@ export function InventoryKpiCards({
             <DollarSign className="size-3.5" />
           </div>
           <div className="min-w-0">
-            <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Valuation</div>
+            <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{t("kpi.valuation", "Valuation")}</div>
             <div className="font-mono text-xs font-bold text-foreground">{formattedValuation}</div>
           </div>
         </div>
@@ -52,7 +54,7 @@ export function InventoryKpiCards({
             <PackageCheck className="size-3.5" />
           </div>
           <div className="min-w-0">
-            <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">In Stock</div>
+            <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{t("kpi.inStock", "In Stock")}</div>
             <div className="font-mono text-xs font-bold text-foreground">{metrics.totalSkusOnHand} SKUs</div>
           </div>
         </div>
@@ -73,11 +75,11 @@ export function InventoryKpiCards({
             <AlertTriangle className="size-3.5" />
           </div>
           <div className="min-w-0">
-            <div className="text-[10px] font-semibold uppercase tracking-wider text-amber-700 dark:text-amber-400">Alerts</div>
+            <div className="text-[10px] font-semibold uppercase tracking-wider text-amber-700 dark:text-amber-400">{t("kpi.alerts", "Alerts")}</div>
             <div className="flex items-center gap-1 font-mono text-xs font-bold">
-              <span className="text-amber-600">{metrics.lowStockCount} Low</span>
+              <span className="text-amber-600">{metrics.lowStockCount} {t("kpi.low", "Low")}</span>
               <span className="text-muted-foreground/40">•</span>
-              <span className="text-destructive">{metrics.outOfStockCount} Out</span>
+              <span className="text-destructive">{metrics.outOfStockCount} {t("kpi.out", "Out")}</span>
             </div>
           </div>
         </div>
@@ -88,9 +90,9 @@ export function InventoryKpiCards({
             <Lock className="size-3.5" />
           </div>
           <div className="min-w-0">
-            <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Reserved</div>
+            <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{t("kpi.reserved", "Reserved")}</div>
             <div className="font-mono text-xs font-bold text-foreground">
-              {Number(metrics.totalReservedQuantity).toLocaleString("en-US", { maximumFractionDigits: 2 })} Units
+              {Number(metrics.totalReservedQuantity).toLocaleString("en-US", { maximumFractionDigits: 2 })} {t("kpi.units", "Units")}
             </div>
           </div>
         </div>
@@ -102,7 +104,7 @@ export function InventoryKpiCards({
         <div className="relative flex flex-col justify-between overflow-hidden rounded-xl border border-emerald-500/20 bg-gradient-to-br from-emerald-500/5 via-background to-card p-4 shadow-xs transition-all hover:border-emerald-500/40 hover:shadow-md">
           <div className="flex items-center justify-between gap-2">
             <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Total Valuation
+              {t("kpi.totalValuation", "Total Valuation")}
             </span>
             <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-600 ring-1 ring-emerald-500/20 dark:text-emerald-400">
               <DollarSign className="size-4" />
@@ -114,7 +116,7 @@ export function InventoryKpiCards({
             </p>
             <p className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground truncate">
               <Boxes className="size-3 text-emerald-600 dark:text-emerald-400 shrink-0" />
-              Asset value of stock
+              {t("kpi.assetValueOfStock", "Asset value of stock")}
             </p>
           </div>
           <div className="pointer-events-none absolute -bottom-6 -right-6 size-20 rounded-full bg-emerald-500/5 blur-xl" />
@@ -124,7 +126,7 @@ export function InventoryKpiCards({
         <div className="relative flex flex-col justify-between overflow-hidden rounded-xl border border-border/80 bg-card p-4 shadow-xs transition-all hover:border-primary/40 hover:shadow-md">
           <div className="flex items-center justify-between gap-2">
             <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Active SKUs In Stock
+              {t("kpi.activeSkusInStock", "Active SKUs In Stock")}
             </span>
             <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-blue-500/10 text-blue-600 ring-1 ring-blue-500/20 dark:text-blue-400">
               <PackageCheck className="size-4" />
@@ -133,11 +135,11 @@ export function InventoryKpiCards({
           <div className="mt-2">
             <p className="font-mono text-2xl font-extrabold tracking-tight text-foreground">
               {metrics.totalSkusOnHand}{" "}
-              <span className="text-xs font-normal text-muted-foreground">Products</span>
+              <span className="text-xs font-normal text-muted-foreground">{t("kpi.products", "Products")}</span>
             </p>
             <p className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground truncate">
               <CheckCircle2 className="size-3 text-blue-600 dark:text-blue-400 shrink-0" />
-              Positive stock count
+              {t("kpi.positiveStockCount", "Positive stock count")}
             </p>
           </div>
         </div>
@@ -157,7 +159,7 @@ export function InventoryKpiCards({
         >
           <div className="flex items-center justify-between gap-2">
             <span className="text-xs font-semibold uppercase tracking-wider text-amber-700 dark:text-amber-400">
-              Stock Alerts
+              {t("kpi.stockAlerts", "Stock Alerts")}
             </span>
             <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-amber-500/10 text-amber-600 ring-1 ring-amber-500/20 transition-transform group-hover:scale-110 dark:text-amber-400">
               <AlertTriangle className="size-4" />
@@ -168,15 +170,15 @@ export function InventoryKpiCards({
               <p className="font-mono text-2xl font-extrabold tracking-tight text-amber-600 dark:text-amber-400">
                 {metrics.lowStockCount}
               </p>
-              <span className="text-xs font-medium text-muted-foreground">Low</span>
+              <span className="text-xs font-medium text-muted-foreground">{t("kpi.low", "Low")}</span>
               <span className="text-muted-foreground/50">•</span>
               <p className="font-mono text-lg font-bold text-destructive">
                 {metrics.outOfStockCount}
               </p>
-              <span className="text-xs font-medium text-muted-foreground">Out</span>
+              <span className="text-xs font-medium text-muted-foreground">{t("kpi.out", "Out")}</span>
             </div>
             <p className="mt-0.5 text-xs text-amber-800/80 truncate group-hover:underline dark:text-amber-400/80">
-              Filter low stock items &rarr;
+              {t("kpi.filterLowStock", "Filter low stock items →")}
             </p>
           </div>
         </div>
@@ -185,7 +187,7 @@ export function InventoryKpiCards({
         <div className="relative flex flex-col justify-between overflow-hidden rounded-xl border border-border/80 bg-card p-4 shadow-xs transition-all hover:border-indigo-500/40 hover:shadow-md">
           <div className="flex items-center justify-between gap-2">
             <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Reserved Stock
+              {t("kpi.reservedStock", "Reserved Stock")}
             </span>
             <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-indigo-500/10 text-indigo-600 ring-1 ring-indigo-500/20 dark:text-indigo-400">
               <Lock className="size-4" />
@@ -194,10 +196,10 @@ export function InventoryKpiCards({
           <div className="mt-2">
             <p className="font-mono text-2xl font-extrabold tracking-tight text-foreground">
               {Number(metrics.totalReservedQuantity).toLocaleString("en-US", { maximumFractionDigits: 2 })}{" "}
-              <span className="text-xs font-normal text-muted-foreground">Units</span>
+              <span className="text-xs font-normal text-muted-foreground">{t("kpi.units", "Units")}</span>
             </p>
             <p className="mt-0.5 text-xs text-muted-foreground truncate">
-              Allocated for pending orders
+              {t("kpi.allocatedPendingOrders", "Allocated for pending orders")}
             </p>
           </div>
         </div>
