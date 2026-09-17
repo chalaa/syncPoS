@@ -149,6 +149,20 @@ export const translations = {
     "kpi.paidOrders": "Paid Orders",
     "kpi.customerBillingCompleted": "Customer billing completed",
 
+    // Detail Stat Cards Direct & KPI Translations
+    "Receipts": "Receipts",
+    "Landed Costs": "Landed Costs",
+    "Payments": "Payments",
+    "Returns": "Returns",
+    "Purchase Order": "Purchase Order",
+    "Deliveries": "Deliveries",
+    "Invoice": "Invoice",
+    "Invoices": "Invoices",
+    "Vendor Bill": "Vendor Bill",
+    "Vendor Bills": "Vendor Bills",
+    "Expense": "Expense",
+    "Sales Order": "Sales Order",
+
     // Actions & Common Controls
     "action.save": "Save",
     "action.cancel": "Cancel",
@@ -389,6 +403,20 @@ export const translations = {
     "kpi.awaitingCustomerDispatch": "ለደንበኛ መላክ በመጠባበቅ ላይ",
     "kpi.paidOrders": "የተከፈሉ ትዕዛዞች",
     "kpi.customerBillingCompleted": "የደንበኛ ክፍያ ተጠናቋል",
+
+    // Detail Stat Cards Direct & KPI Translations
+    "Receipts": "መረከቢያዎች",
+    "Landed Costs": "የጭነት ወጪዎች",
+    "Payments": "ክፍያዎች",
+    "Returns": "መመለሻዎች",
+    "Purchase Order": "የግዥ ትዕዛዝ",
+    "Deliveries": "ርክክቦች",
+    "Invoice": "የሽያጭ ደረሰኝ",
+    "Invoices": "የሽያጭ ደረሰኞች",
+    "Vendor Bill": "የአቅራቢ ደረሰኝ",
+    "Vendor Bills": "የአቅራቢ ደረሰኞች",
+    "Expense": "ወጪ",
+    "Sales Order": "የሽያጭ ትዕዛዝ",
 
     // Actions & Common Controls
     "action.save": "አስቀምጥ",

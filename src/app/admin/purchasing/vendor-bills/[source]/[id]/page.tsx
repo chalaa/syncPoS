@@ -8,6 +8,7 @@ import { Alert } from "@/components/ui/alert";
 import { StatusBadge } from "@/components/ui/badge";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
+import { DetailStatCard } from "@/components/ui/detail-stat-card";
 import { requirePermission } from "@/server/auth/session";
 import { getActivePaymentAccounts } from "@/server/payments/payments";
 import {
@@ -92,37 +93,25 @@ export default async function VendorBillDetailPage({ params, searchParams }: Ven
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap gap-2.5">
           {bill.purchaseOrderId ? (
-            <Link
+            <DetailStatCard
               href={`/admin/purchasing/${bill.purchaseOrderId}`}
-              className="group flex flex-col rounded-lg border border-border bg-card px-4 py-2 text-sm shadow-xs transition-all hover:border-primary/50 hover:bg-secondary/40"
-            >
-              <span className="text-lg font-bold tracking-tight text-foreground transition-colors group-hover:text-primary">
-                {bill.orderNo}
-              </span>
-              <span className="text-xs font-medium text-muted-foreground">Purchase Order</span>
-            </Link>
+              count={bill.orderNo}
+              label="Purchase Order"
+            />
           ) : null}
           {bill.goodsReceiptId ? (
-            <Link
+            <DetailStatCard
               href={`/admin/purchasing/receipts/${bill.goodsReceiptId}`}
-              className="group flex flex-col rounded-lg border border-border bg-card px-4 py-2 text-sm shadow-xs transition-all hover:border-primary/50 hover:bg-secondary/40"
-            >
-              <span className="text-lg font-bold tracking-tight text-foreground transition-colors group-hover:text-primary">
-                {bill.receiptNo}
-              </span>
-              <span className="text-xs font-medium text-muted-foreground">Receipt</span>
-            </Link>
+              count={bill.receiptNo}
+              label="Receipts"
+            />
           ) : null}
           {bill.source === "vendor_bill" ? (
-            <Link
+            <DetailStatCard
               href={`/admin/purchasing?view=payments&vendorBillId=${bill.id}`}
-              className="group flex flex-col rounded-lg border border-border bg-card px-4 py-2 text-sm shadow-xs transition-all hover:border-primary/50 hover:bg-secondary/40"
-            >
-              <span className="text-lg font-bold tracking-tight text-foreground transition-colors group-hover:text-primary">
-                {bill.paymentCount}
-              </span>
-              <span className="text-xs font-medium text-muted-foreground">Payments</span>
-            </Link>
+              count={bill.paymentCount}
+              label="Payments"
+            />
           ) : null}
         </div>
         <div className="flex flex-wrap items-center gap-2.5">

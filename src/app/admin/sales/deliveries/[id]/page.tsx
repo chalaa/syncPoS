@@ -15,6 +15,7 @@ import { StatusBadge } from "@/components/ui/badge";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { Notebook } from "@/components/ui/notebook";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
+import { DetailStatCard } from "@/components/ui/detail-stat-card";
 import { requirePermission } from "@/server/auth/session";
 import { getDefaultCompany } from "@/server/catalog/products";
 import { getStockOutApprovalState } from "@/server/inventory/stock-approvals";
@@ -93,15 +94,11 @@ export default async function DeliveryDetailPage({ params, searchParams }: Deliv
 
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap gap-2.5">
-          <Link
+          <DetailStatCard
             href={`/admin/sales/${delivery.salesOrderId}`}
-            className="group flex flex-col rounded-lg border border-border bg-card px-4 py-2 text-sm shadow-xs transition-all hover:border-primary/50 hover:bg-secondary/40"
-          >
-            <span className="text-lg font-bold tracking-tight text-foreground transition-colors group-hover:text-primary">
-              {delivery.orderNo}
-            </span>
-            <span className="text-xs font-medium text-muted-foreground">Sales Order</span>
-          </Link>
+            count={delivery.orderNo}
+            label="Sales Order"
+          />
           {delivery.stockMovementId ? (
             <Link
               href={`/admin/inventory/operations/${delivery.stockMovementId}`}

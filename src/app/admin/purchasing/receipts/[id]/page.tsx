@@ -5,6 +5,7 @@ import { Alert } from "@/components/ui/alert";
 import { StatusBadge } from "@/components/ui/badge";
 import { ButtonLink } from "@/components/ui/button";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
+import { DetailStatCard } from "@/components/ui/detail-stat-card";
 import { requirePermission } from "@/server/auth/session";
 import {
   displayPurchaseMoney,
@@ -49,24 +50,16 @@ export default async function ReceiptDetailPage({ params, searchParams }: Receip
 
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap gap-2.5">
-          <Link
+          <DetailStatCard
             href={`/admin/purchasing/${receipt.purchaseOrderId}`}
-            className="group flex flex-col rounded-lg border border-border bg-card px-4 py-2 text-sm shadow-xs transition-all hover:border-primary/50 hover:bg-secondary/40"
-          >
-            <span className="text-lg font-bold tracking-tight text-foreground transition-colors group-hover:text-primary">
-              {receipt.orderNo}
-            </span>
-            <span className="text-xs font-medium text-muted-foreground">Purchase Order</span>
-          </Link>
-          <Link
+            count={receipt.orderNo}
+            label="Purchase Order"
+          />
+          <DetailStatCard
             href={`/admin/purchasing?view=landed-costs&purchaseOrderId=${receipt.purchaseOrderId}`}
-            className="group flex flex-col rounded-lg border border-border bg-card px-4 py-2 text-sm shadow-xs transition-all hover:border-primary/50 hover:bg-secondary/40"
-          >
-            <span className="text-lg font-bold tracking-tight text-foreground transition-colors group-hover:text-primary">
-              {receipt.landedCostCount}
-            </span>
-            <span className="text-xs font-medium text-muted-foreground">Landed Costs</span>
-          </Link>
+            count={receipt.landedCostCount}
+            label="Landed Costs"
+          />
         </div>
         <StatusBadge status={receipt.status} size="lg" />
       </div>

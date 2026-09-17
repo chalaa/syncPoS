@@ -7,6 +7,7 @@ import { Alert } from "@/components/ui/alert";
 import { StatusBadge } from "@/components/ui/badge";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
+import { DetailStatCard } from "@/components/ui/detail-stat-card";
 import { requirePermission, getUserPermissionCodes } from "@/server/auth/session";
 import { displayExpenseMoney, getExpenseDetail } from "@/server/expenses/expenses";
 import { getActivePaymentAccounts, getPaymentList } from "@/server/payments/payments";
@@ -84,15 +85,11 @@ export default async function ExpenseDetailPage({ params, searchParams }: Expens
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap gap-2.5">
           {payments.length > 0 ? (
-            <Link
+            <DetailStatCard
               href={`/admin/operations/expenses/${expense.id}#payments`}
-              className="group flex flex-col rounded-lg border border-border bg-card px-4 py-2 text-sm shadow-xs transition-all hover:border-primary/50 hover:bg-secondary/40"
-            >
-              <span className="text-lg font-bold tracking-tight text-foreground transition-colors group-hover:text-primary">
-                {payments.length}
-              </span>
-              <span className="text-xs font-medium text-muted-foreground">Payments</span>
-            </Link>
+              count={payments.length}
+              label="Payments"
+            />
           ) : null}
         </div>
         <div className="flex flex-wrap items-center gap-2.5">

@@ -8,6 +8,7 @@ import { StatusBadge } from "@/components/ui/badge";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { Notebook } from "@/components/ui/notebook";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
+import { DetailStatCard } from "@/components/ui/detail-stat-card";
 import { requirePermission } from "@/server/auth/session";
 import { getActivePaymentAccounts } from "@/server/payments/payments";
 import { displaySalesMoney, getCustomerInvoiceDetail } from "@/server/sales/sales";
@@ -76,36 +77,24 @@ export default async function CustomerInvoicePage({ params, searchParams }: Cust
 
       <div className="mb-6 flex flex-wrap gap-2.5">
         {invoice.salesOrderId ? (
-          <Link
+          <DetailStatCard
             href={`/admin/sales/${invoice.salesOrderId}`}
-            className="group flex flex-col rounded-lg border border-border bg-card px-4 py-2 text-sm shadow-xs transition-all hover:border-primary/50 hover:bg-secondary/40"
-          >
-            <span className="text-lg font-bold tracking-tight text-foreground transition-colors group-hover:text-primary">
-              {invoice.orderNo}
-            </span>
-            <span className="text-xs font-medium text-muted-foreground">Sales Order</span>
-          </Link>
+            count={invoice.orderNo}
+            label="Sales Order"
+          />
         ) : null}
         {invoice.deliveryId ? (
-          <Link
+          <DetailStatCard
             href={`/admin/sales/deliveries/${invoice.deliveryId}`}
-            className="group flex flex-col rounded-lg border border-border bg-card px-4 py-2 text-sm shadow-xs transition-all hover:border-primary/50 hover:bg-secondary/40"
-          >
-            <span className="text-lg font-bold tracking-tight text-foreground transition-colors group-hover:text-primary">
-              {invoice.deliveryNo}
-            </span>
-            <span className="text-xs font-medium text-muted-foreground">Delivery</span>
-          </Link>
+            count={invoice.deliveryNo}
+            label="Deliveries"
+          />
         ) : null}
-        <Link
+        <DetailStatCard
           href={`/admin/sales?view=payments&customerInvoiceId=${invoice.id}`}
-          className="group flex flex-col rounded-lg border border-border bg-card px-4 py-2 text-sm shadow-xs transition-all hover:border-primary/50 hover:bg-secondary/40"
-        >
-          <span className="text-lg font-bold tracking-tight text-foreground transition-colors group-hover:text-primary">
-            {invoice.paymentCount}
-          </span>
-          <span className="text-xs font-medium text-muted-foreground">Payments</span>
-        </Link>
+          count={invoice.paymentCount}
+          label="Payments"
+        />
       </div>
 
       <section className="overflow-hidden rounded-lg border border-border bg-card p-6 shadow-xs">
