@@ -3,7 +3,7 @@
 import { ChevronDownIcon, LogOutIcon, MenuIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { useEffect, useState, type MouseEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type MouseEvent, type ReactNode } from "react";
 
 import { logout } from "@/app/login/actions";
 import { filterAdminMenuItems } from "@/components/app/admin-navigation";
@@ -112,11 +112,36 @@ export function AdminShell({
     };
   }, []);
 
+  const mobileDetailsRef = useRef<HTMLDetailsElement>(null);
+
   useEffect(() => {
+    function handleClickOutside(event: Event) {
+      if (
+        mobileDetailsRef.current &&
+        mobileDetailsRef.current.open &&
+        !mobileDetailsRef.current.contains(event.target as Node)
+      ) {
+        mobileDetailsRef.current.open = false;
+      }
+    }
+
+    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("touchstart", handleClickOutside);
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("touchstart", handleClickOutside);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (mobileDetailsRef.current) {
+      mobileDetailsRef.current.open = false;
+    }
     if (window.matchMedia("(max-width: 767px)").matches) {
       setAdminNavOpen(false);
     }
-  }, [pathname, setAdminNavOpen]);
+  }, [pathname, currentHref, setAdminNavOpen]);
 
   useEffect(() => {
     if (!isHydrated) return;
@@ -251,7 +276,7 @@ export function AdminShell({
           </Button>
 
           <div className="relative min-w-0 flex-1 lg:hidden">
-            <details className="group">
+            <details ref={mobileDetailsRef} className="group">
               <summary className="flex h-9 min-w-0 cursor-pointer list-none items-center justify-between gap-2 rounded-md border border-input bg-card px-3 text-sm font-semibold [&::-webkit-details-marker]:hidden">
                 <span className="truncate">
                   {activeMenu?.label}
