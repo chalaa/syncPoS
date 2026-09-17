@@ -165,24 +165,27 @@ export function ProductDetailModal({
   const qtyOnHand = Number(product?.quantityOnHand ?? 0);
   const totalValuationMinor = Math.round(qtyOnHand * (product?.standardCostMinor ?? 0));
 
-  const tabs: { id: TabKey; label: string; icon: typeof FileText; count?: number }[] = [
-    { id: "overview", label: "Overview", icon: FileText },
-    { id: "pricing", label: "Pricing & Margin", icon: Coins },
+  const tabs: { id: TabKey; label: string; shortLabel: string; icon: typeof FileText; count?: number }[] = [
+    { id: "overview", label: "Overview", shortLabel: "Overview", icon: FileText },
+    { id: "pricing", label: "Pricing & Margin", shortLabel: "Pricing", icon: Coins },
     {
       id: "inventory",
       label: "Inventory Locations",
+      shortLabel: "Locations",
       icon: Warehouse,
       count: product?.stockRows?.length,
     },
     {
       id: "tracking",
       label: "Lots / Serials",
+      shortLabel: "Tracking",
       icon: QrCode,
       count: product?.trackingRows?.length,
     },
     {
       id: "moves",
       label: "Stock Movements",
+      shortLabel: "Movements",
       icon: History,
       count: product?.movementCount,
     },
@@ -457,7 +460,7 @@ export function ProductDetailModal({
               </div>
 
               {/* Segmented Pill Navigation Bar */}
-              <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar rounded-xl border border-border/80 bg-muted/50 p-1">
+              <div className="flex w-full items-center gap-1 sm:gap-1.5 overflow-x-auto no-scrollbar rounded-xl border border-border/80 bg-muted/50 p-1 touch-pan-x snap-x snap-mandatory max-w-full">
                 {tabs.map((tab) => {
                   const Icon = tab.icon;
                   const isActive = activeTab === tab.id;
@@ -467,7 +470,7 @@ export function ProductDetailModal({
                       type="button"
                       onClick={() => setActiveTab(tab.id)}
                       className={cn(
-                        "flex shrink-0 flex-1 min-w-[80px] sm:min-w-0 items-center justify-center gap-1.5 sm:gap-2 rounded-lg px-2.5 sm:px-3 py-2 text-xs font-semibold transition-all outline-none whitespace-nowrap",
+                        "flex shrink-0 sm:flex-1 items-center justify-center gap-1.5 sm:gap-2 rounded-lg px-2.5 sm:px-3 py-2 text-xs font-semibold transition-all outline-none whitespace-nowrap snap-start cursor-pointer",
                         isActive
                           ? "bg-card text-[#0B5D4B] shadow-xs ring-1 ring-black/5 font-bold"
                           : "text-muted-foreground hover:bg-card/60 hover:text-foreground",
@@ -476,11 +479,12 @@ export function ProductDetailModal({
                       <Icon
                         className={cn("size-3.5 shrink-0", isActive ? "text-[#0B5D4B]" : "text-muted-foreground")}
                       />
-                      <span>{tab.label}</span>
+                      <span className="hidden sm:inline">{tab.label}</span>
+                      <span className="sm:hidden">{tab.shortLabel}</span>
                       {tab.count !== undefined && tab.count > 0 ? (
                         <span
                           className={cn(
-                            "rounded-full px-1.5 py-0.2 text-[10px] font-mono",
+                            "rounded-full px-1.5 py-0.5 text-[10px] font-mono leading-none",
                             isActive
                               ? "bg-[#0B5D4B]/10 text-[#0B5D4B] font-bold"
                               : "bg-background/80 text-muted-foreground",

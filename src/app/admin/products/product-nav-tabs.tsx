@@ -20,7 +20,7 @@ export function ProductNavTabs({ currentHref }: { currentHref?: string }) {
   const activeHref = currentHref ?? pathname;
 
   return (
-    <nav className="mb-6 flex items-center gap-1 overflow-x-auto border-b border-border pb-px">
+    <nav className="mb-6 flex items-center gap-1 overflow-x-auto no-scrollbar touch-pan-x border-b border-border pb-px">
       {productTabs.map((tab) => {
         const isActive = activeHref === tab.href;
 
