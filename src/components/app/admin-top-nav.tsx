@@ -9,6 +9,8 @@ import { logout } from "@/app/login/actions";
 import { filterAdminMenuItems } from "@/components/app/admin-navigation";
 import type { AdminSubMenuItem } from "@/components/app/types";
 import { Button } from "@/components/ui/button";
+import { LanguageSwitcher } from "@/components/ui/language-switcher";
+import { useTranslation } from "@/lib/i18n/use-translation";
 import { cn } from "@/lib/utils";
 import type { ShopOption } from "@/server/locations/shop-options";
 import { useAppStore } from "@/stores/app-store";
@@ -435,12 +437,13 @@ export function AdminShell({
             })}
           </nav>
 
-          <div className="shrink-0">
+          <div className="shrink-0 flex items-center gap-2">
             <ShopSelector
               locations={shopLocations}
               selectedLocationId={selectedLocationId}
               onChange={setSelectedLocationId}
             />
+            <LanguageSwitcher />
           </div>
 
           <form action={logout} className="hidden shrink-0 items-center gap-3 md:flex">
@@ -471,6 +474,8 @@ function ShopSelector({
   selectedLocationId: string | null;
   onChange: (locationId: string | null) => void;
 }) {
+  const { t } = useTranslation();
+
   if (locations.length === 0) {
     return null;
   }
@@ -491,9 +496,9 @@ function ShopSelector({
 
   return (
     <label className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-      <span className="hidden xl:inline">Shop</span>
+      <span className="hidden xl:inline">{t("shop.label")}</span>
       <select
-        aria-label="Default sales shop"
+        aria-label={t("shop.defaultSelect")}
         value={selectedLocationId ?? locations[0]?.id ?? ""}
         onChange={(event) => handleSelect(event.target.value)}
         className="h-9 w-28 rounded-md border border-input bg-background px-2 text-xs text-foreground sm:w-40 lg:w-48"

@@ -47,6 +47,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
+import { useTranslation } from "@/lib/i18n/use-translation";
 import type { ProductDetail } from "@/server/catalog/types";
 import { useAppStore } from "@/stores/app-store";
 
@@ -227,28 +228,29 @@ export function ProductDetailModal({
   const qtyOnHand = shopStock.onHand;
   const totalValuationMinor = Math.round(qtyOnHand * (product?.standardCostMinor ?? 0));
   const unitDisplay = product?.unitName || product?.unitCode || "";
+  const { t } = useTranslation();
 
   const tabs: { id: TabKey; label: string; shortLabel: string; icon: typeof FileText; count?: number }[] = [
-    { id: "overview", label: "Overview", shortLabel: "Overview", icon: FileText },
-    { id: "pricing", label: "Pricing & Margin", shortLabel: "Pricing", icon: Coins },
+    { id: "overview", label: t("product.overview"), shortLabel: t("product.overview"), icon: FileText },
+    { id: "pricing", label: t("product.pricing"), shortLabel: t("product.price"), icon: Coins },
     {
       id: "inventory",
-      label: "Inventory Locations",
-      shortLabel: "Locations",
+      label: t("product.locations"),
+      shortLabel: t("product.onHand"),
       icon: Warehouse,
       count: product?.stockRows?.length,
     },
     {
       id: "tracking",
-      label: "Lots / Serials",
-      shortLabel: "Tracking",
+      label: t("product.tracking"),
+      shortLabel: t("product.tracking"),
       icon: QrCode,
       count: product?.trackingRows?.length,
     },
     {
       id: "moves",
-      label: "Stock Movements",
-      shortLabel: "Movements",
+      label: t("product.movements"),
+      shortLabel: t("product.movements"),
       icon: History,
       count: product?.movementCount,
     },
@@ -275,7 +277,7 @@ export function ProductDetailModal({
               <div className="min-w-0 space-y-1.5">
                 <div className="flex flex-wrap items-center gap-2">
                   <DialogTitle className="text-lg font-bold tracking-tight text-foreground sm:text-2xl truncate">
-                    {isLoading && !product ? "Loading Product..." : product?.name ?? "Product Details"}
+                    {isLoading && !product ? t("product.loading") : product?.name ?? "Product Details"}
                   </DialogTitle>
                   {product ? (
                     <span
@@ -292,7 +294,7 @@ export function ProductDetailModal({
                           product.isActive ? "bg-emerald-500 animate-pulse" : "bg-muted-foreground",
                         )}
                       />
-                      {product.isActive ? "Active in Catalog" : "Inactive"}
+                      {product.isActive ? t("product.activeInCatalog") : t("product.inactive")}
                     </span>
                   ) : null}
                 </div>
@@ -359,7 +361,7 @@ export function ProductDetailModal({
                   className="px-2 sm:px-3 gap-1.5 font-medium border-border/80 hover:border-[#0B5D4B]/40 hover:text-[#0B5D4B]"
                 >
                   <Pencil className="size-3.5" />
-                  <span className="hidden sm:inline">Edit Product</span>
+                  <span className="hidden sm:inline">{t("product.editProduct")}</span>
                 </ButtonLink>
               ) : null}
 
@@ -402,7 +404,7 @@ export function ProductDetailModal({
                 >
                   <div className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground truncate">
                     <Coins className="size-3 text-emerald-600 shrink-0" />
-                    <span className="truncate">Price</span>
+                    <span className="truncate">{t("product.price")}</span>
                   </div>
                   <div className="mt-1 font-mono text-xs font-bold text-foreground truncate">
                     {formatMoneyMinor(product.listPriceMinor, product.currencyCode)}
@@ -422,7 +424,7 @@ export function ProductDetailModal({
                 >
                   <div className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground truncate">
                     <Receipt className="size-3 text-amber-600 shrink-0" />
-                    <span className="truncate">Cost</span>
+                    <span className="truncate">{t("product.cost")}</span>
                   </div>
                   <div className="mt-1 font-mono text-xs font-bold text-foreground truncate">
                     {formatMoneyMinor(product.standardCostMinor, product.currencyCode)}
@@ -441,8 +443,8 @@ export function ProductDetailModal({
                   )}
                 >
                   <div className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-[#0B5D4B] truncate">
-                    <Sparkles className="size-3 text-[#D9A441] shrink-0" />
-                    <span className="truncate">Margin</span>
+                    <Percent className="size-3 text-[#0B5D4B] shrink-0" />
+                    <span className="truncate">{t("product.margin")}</span>
                   </div>
                   <div className="mt-1 font-mono text-xs font-bold text-[#0B5D4B] truncate">
                     {marginPercent.toFixed(1)}%
@@ -462,7 +464,7 @@ export function ProductDetailModal({
                 >
                   <div className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground truncate">
                     <Package className="size-3 text-[#0B5D4B] shrink-0" />
-                    <span className="truncate">On Hand</span>
+                    <span className="truncate">{t("product.onHand")}</span>
                   </div>
                   <div className="mt-1 font-mono text-xs font-bold text-foreground truncate">
                     {displayQuantity(shopStock.onHand)}{unitDisplay ? ` ${unitDisplay}` : ""}
@@ -482,7 +484,7 @@ export function ProductDetailModal({
                 >
                   <div className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground truncate">
                     <TrendingUp className="size-3 text-blue-600 shrink-0" />
-                    <span className="truncate">Incoming</span>
+                    <span className="truncate">{t("product.incoming")}</span>
                   </div>
                   <div className="mt-1 font-mono text-xs font-bold text-foreground truncate">
                     {displayQuantity(product.incomingQuantity)}{unitDisplay ? ` ${unitDisplay}` : ""}
@@ -493,7 +495,7 @@ export function ProductDetailModal({
                 <div className="flex flex-col justify-between rounded-lg border border-border bg-secondary/30 p-2 text-left shadow-2xs min-w-0">
                   <div className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground truncate">
                     <Building2 className="size-3 text-muted-foreground shrink-0" />
-                    <span className="truncate">Valuation</span>
+                    <span className="truncate">{t("product.valuation")}</span>
                   </div>
                   <div className="mt-1 font-mono text-xs font-bold text-foreground truncate">
                     {formatMoneyMinor(totalValuationMinor, product.currencyCode)}
@@ -516,7 +518,7 @@ export function ProductDetailModal({
                 >
                   <div className="flex items-center justify-between">
                     <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                      Selling Price
+                      {t("product.sellingPrice")}
                     </span>
                     <Coins className="size-4 text-emerald-600 opacity-80 group-hover:scale-110 transition-transform" />
                   </div>
@@ -543,7 +545,7 @@ export function ProductDetailModal({
                 >
                   <div className="flex items-center justify-between">
                     <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                      Std Cost
+                      {t("product.stdCost")}
                     </span>
                     <Receipt className="size-4 text-amber-600 opacity-80 group-hover:scale-110 transition-transform" />
                   </div>
@@ -570,7 +572,7 @@ export function ProductDetailModal({
                 >
                   <div className="flex items-center justify-between">
                     <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                      On Hand
+                      {t("product.onHand")}
                     </span>
                     <Package className="size-4 text-[#0B5D4B] opacity-80 group-hover:scale-110 transition-transform shrink-0" />
                   </div>
@@ -579,7 +581,7 @@ export function ProductDetailModal({
                       {displayQuantity(shopStock.onHand)}{unitDisplay ? ` ${unitDisplay}` : ""}
                     </div>
                     <span className="text-[10px] text-muted-foreground truncate block">
-                      {displayQuantity(shopStock.available)}{unitDisplay ? ` ${unitDisplay}` : ""} available company-wide
+                      {displayQuantity(shopStock.available)}{unitDisplay ? ` ${unitDisplay}` : ""} {t("product.companyWideAvailable")}
                     </span>
                   </div>
                 </button>
@@ -597,7 +599,7 @@ export function ProductDetailModal({
                 >
                   <div className="flex items-center justify-between">
                     <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                      Incoming
+                      {t("product.incoming")}
                     </span>
                     <TrendingUp className="size-4 text-blue-600 opacity-80 group-hover:scale-110 transition-transform" />
                   </div>
@@ -606,7 +608,7 @@ export function ProductDetailModal({
                       {displayQuantity(product.incomingQuantity)}{unitDisplay ? ` ${unitDisplay}` : ""}
                     </div>
                     <span className="text-[10px] text-muted-foreground">
-                      On active purchase orders
+                      {t("product.onActivePo")}
                     </span>
                   </div>
                 </button>
@@ -615,7 +617,7 @@ export function ProductDetailModal({
                 <div className="flex flex-col justify-between rounded-xl border border-border bg-secondary/30 p-3.5 text-left">
                   <div className="flex items-center justify-between">
                     <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                      Inventory Value
+                      {t("product.inventoryValue")}
                     </span>
                     <Building2 className="size-4 text-muted-foreground/70" />
                   </div>
@@ -959,7 +961,7 @@ export function ProductDetailModal({
                     <div className="flex flex-col justify-between rounded-lg border border-border bg-card p-2 text-left shadow-2xs min-w-0">
                       <div className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground truncate">
                         <Package className="size-3 text-[#0B5D4B] shrink-0" />
-                        <span className="truncate">On Hand</span>
+                        <span className="truncate">{t("product.onHand")}</span>
                       </div>
                       <div className="mt-1 font-mono text-xs font-bold text-foreground truncate">
                         {displayQuantity(shopStock.onHand)}{unitDisplay ? ` ${unitDisplay}` : ""}
@@ -970,7 +972,7 @@ export function ProductDetailModal({
                     <div className="flex flex-col justify-between rounded-lg border border-border bg-card p-2 text-left shadow-2xs min-w-0">
                       <div className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground truncate">
                         <Activity className="size-3 text-amber-600 shrink-0" />
-                        <span className="truncate">Reserved</span>
+                        <span className="truncate">{t("product.reserved")}</span>
                       </div>
                       <div className="mt-1 font-mono text-xs font-bold text-foreground truncate">
                         {displayQuantity(shopStock.reserved)}{unitDisplay ? ` ${unitDisplay}` : ""}
@@ -981,7 +983,7 @@ export function ProductDetailModal({
                     <div className="flex flex-col justify-between rounded-lg border border-[#0B5D4B]/30 bg-[#0B5D4B]/5 p-2 text-left shadow-2xs min-w-0">
                       <div className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-[#0B5D4B] truncate">
                         <Check className="size-3 text-[#0B5D4B]" />
-                        <span className="truncate">Available</span>
+                        <span className="truncate">{t("product.available")}</span>
                       </div>
                       <div className="mt-1 font-mono text-xs font-bold text-[#0B5D4B] truncate">
                         {displayQuantity(shopStock.available)}{unitDisplay ? ` ${unitDisplay}` : ""}
@@ -992,19 +994,19 @@ export function ProductDetailModal({
                   {/* Desktop/Tablet View (hidden on mobile) */}
                   <div className="hidden sm:grid sm:grid-cols-3 sm:gap-3">
                     <MetricCard
-                      title="On Hand"
+                      title={t("product.onHand")}
                       value={unitDisplay ? `${displayQuantity(shopStock.onHand)} ${unitDisplay}` : displayQuantity(shopStock.onHand)}
-                      subtitle="Physically in storage"
+                      subtitle={t("product.physicallyInStorage")}
                     />
                     <MetricCard
-                      title="Reserved for Orders"
+                      title={t("product.reservedOrders")}
                       value={unitDisplay ? `${displayQuantity(shopStock.reserved)} ${unitDisplay}` : displayQuantity(shopStock.reserved)}
-                      subtitle="Pending delivery / POS"
+                      subtitle={t("product.pendingDelivery")}
                     />
                     <MetricCard
-                      title="Available to Sell"
+                      title={t("product.availableToSell")}
                       value={unitDisplay ? `${displayQuantity(shopStock.available)} ${unitDisplay}` : displayQuantity(shopStock.available)}
-                      subtitle="Company-wide available stock"
+                      subtitle={t("product.companyWideAvailable")}
                       highlight
                     />
                   </div>
@@ -1012,18 +1014,18 @@ export function ProductDetailModal({
                   {/* Stock by Location Table */}
                   <div className="overflow-hidden rounded-xl border border-border bg-card shadow-2xs">
                     <div className="border-b border-border bg-muted/20 px-4 py-3 text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                      Warehouse & Retail Location Balances
+                      {t("product.warehouseBalances")}
                     </div>
                     <div className="overflow-x-auto">
                       <table className="w-full min-w-[720px] text-left text-sm">
                         <thead className="bg-muted/40 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                           <tr className="border-b border-border">
-                            <th className="px-4 py-2.5">Location</th>
-                            <th className="px-4 py-2.5">Tracking Key</th>
-                            <th className="px-4 py-2.5 text-right">On Hand</th>
-                            <th className="px-4 py-2.5 text-right">Reserved</th>
-                            <th className="px-4 py-2.5 text-right">Available</th>
-                            <th className="px-4 py-2.5 text-right">Average Cost</th>
+                            <th className="px-4 py-2.5">{t("product.location")}</th>
+                            <th className="px-4 py-2.5">{t("product.trackingKey")}</th>
+                            <th className="px-4 py-2.5 text-right">{t("product.onHand")}</th>
+                            <th className="px-4 py-2.5 text-right">{t("product.reserved")}</th>
+                            <th className="px-4 py-2.5 text-right">{t("product.available")}</th>
+                            <th className="px-4 py-2.5 text-right">{t("product.avgCost")}</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-border/60">
@@ -1244,7 +1246,7 @@ export function ProductDetailModal({
               variant="outline"
               onClick={() => onOpenChange(false)}
             >
-              Close
+              {t("product.close")}
             </Button>
             {product ? (
               <ButtonLink

@@ -3,12 +3,13 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
-import type { AppState, SyncStatus } from "@/stores/types";
+import type { AppState, Language, SyncStatus } from "@/stores/types";
 
 const initialState = {
   adminNavOpen: true,
   selectedLocationId: null,
   syncStatus: "online" as SyncStatus,
+  language: "en" as Language,
 };
 
 export const useAppStore = create<AppState>()(
@@ -30,6 +31,7 @@ export const useAppStore = create<AppState>()(
         set({ selectedLocationId: locationId });
       },
       setSyncStatus: (status) => set({ syncStatus: status }),
+      setLanguage: (lang) => set({ language: lang }),
       resetAppState: () => set(initialState),
     }),
     {
@@ -37,6 +39,7 @@ export const useAppStore = create<AppState>()(
       partialize: (state) => ({
         adminNavOpen: state.adminNavOpen,
         selectedLocationId: state.selectedLocationId,
+        language: state.language,
       }),
     },
   ),
