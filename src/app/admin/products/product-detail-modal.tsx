@@ -48,6 +48,7 @@ import {
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import type { ProductDetail } from "@/server/catalog/types";
+import { useAppStore } from "@/stores/app-store";
 
 export type ProductDetailModalProps = {
   productId: string | null;
@@ -162,7 +163,90 @@ export function ProductDetailModal({
   const standardCost = (product?.standardCostMinor ?? 0) / 100;
   const unitProfit = listPrice - standardCost;
   const marginPercent = listPrice > 0 ? (unitProfit / listPrice) * 100 : 0;
-  const qtyOnHand = Number(product?.quantityOnHand ?? 0);
+
+  const globalSelectedLocationId = useAppStore((state) => state.selectedLocationId);
+
+  const shopOptions = useMemo(() => {
+    if (!product?.stockRows || product.stockRows.length === 0) return [];
+    const map = new Map<string, { code: string; name: string }>();
+    product.stockRows.forEach((row) => {
+      if (row.locationCode && !map.has(row.locationCode)) {
+        map.set(row.locationCode, {
+          code: row.locationCode,
+          name: row.locationName || row.locationCode,
+        });
+      }
+    });
+    return Array.from(map.values());
+  }, [product]);
+
+  const [selectedShopCode, setSelectedShopCode] = useState<string>("all");
+
+  useEffect(() => {
+    if (shopOptions.length === 0) {
+      setSelectedShopCode("all");
+      return;
+    }
+    if (globalSelectedLocationId) {
+      const matched = shopOptions.find(
+        (s) =>
+          s.code.toLowerCase() === globalSelectedLocationId.toLowerCase() ||
+          s.name.toLowerCase() === globalSelectedLocationId.toLowerCase(),
+      );
+      if (matched) {
+        setSelectedShopCode(matched.code);
+        return;
+      }
+    }
+    if (shopOptions.length === 1 && shopOptions[0]) {
+      setSelectedShopCode(shopOptions[0].code);
+    }
+  }, [globalSelectedLocationId, shopOptions]);
+
+  const shopStock = useMemo(() => {
+    if (!product) {
+      return {
+        onHand: 0,
+        reserved: 0,
+        available: 0,
+        label: "All Locations",
+      };
+    }
+
+    if (selectedShopCode === "all" || !product.stockRows || product.stockRows.length === 0) {
+      return {
+        onHand: Number(product.quantityOnHand ?? 0),
+        reserved: Number(product.quantityReserved ?? 0),
+        available: Number(product.quantityAvailable ?? 0),
+        label: shopOptions.length === 1 && shopOptions[0] ? shopOptions[0].name : "All Locations",
+      };
+    }
+
+    const matchingRows = product.stockRows.filter((row) => row.locationCode === selectedShopCode);
+
+    if (matchingRows.length === 0) {
+      return {
+        onHand: 0,
+        reserved: 0,
+        available: 0,
+        label: selectedShopCode,
+      };
+    }
+
+    const shopName = matchingRows[0]?.locationName || selectedShopCode;
+    const onHand = matchingRows.reduce((acc, row) => acc + Number(row.quantityOnHand || 0), 0);
+    const reserved = matchingRows.reduce((acc, row) => acc + Number(row.quantityReserved || 0), 0);
+    const available = matchingRows.reduce((acc, row) => acc + Number(row.quantityAvailable || 0), 0);
+
+    return {
+      onHand,
+      reserved,
+      available,
+      label: shopName,
+    };
+  }, [product, selectedShopCode, shopOptions]);
+
+  const qtyOnHand = shopStock.onHand;
   const totalValuationMinor = Math.round(qtyOnHand * (product?.standardCostMinor ?? 0));
 
   const tabs: { id: TabKey; label: string; shortLabel: string; icon: typeof FileText; count?: number }[] = [
@@ -277,6 +361,29 @@ export function ProductDetailModal({
                       <span className="inline-flex items-center gap-1 rounded-md bg-secondary/80 px-2 py-0.5 text-[11px] font-medium text-secondary-foreground">
                         <Globe className="size-3 text-muted-foreground" />
                         {product.country}
+                      </span>
+                    )}
+
+                    {shopOptions.length > 0 && (
+                      <span className="inline-flex items-center gap-1.5 rounded-md border border-[#0B5D4B]/30 bg-[#0B5D4B]/10 px-2 py-0.5 text-[11px] font-semibold text-[#0B5D4B]">
+                        <Building2 className="size-3 text-[#0B5D4B]" />
+                        <span>Shop:</span>
+                        <select
+                          value={selectedShopCode}
+                          onChange={(e) => setSelectedShopCode(e.target.value)}
+                          className="bg-transparent font-bold text-[#0B5D4B] focus:outline-none cursor-pointer"
+                        >
+                          {shopOptions.length > 1 ? (
+                            <option value="all" className="bg-background text-foreground">
+                              All Locations
+                            </option>
+                          ) : null}
+                          {shopOptions.map((shop) => (
+                            <option key={shop.code} value={shop.code} className="bg-background text-foreground">
+                              {shop.name}
+                            </option>
+                          ))}
+                        </select>
                       </span>
                     )}
                   </div>
@@ -399,10 +506,10 @@ export function ProductDetailModal({
                 >
                   <div className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground truncate">
                     <Package className="size-3 text-[#0B5D4B] shrink-0" />
-                    <span className="truncate">On Hand</span>
+                    <span className="truncate">{selectedShopCode === "all" ? "On Hand" : shopStock.label}</span>
                   </div>
                   <div className="mt-1 font-mono text-xs font-bold text-foreground truncate">
-                    {displayQuantity(product.quantityOnHand)} {product.unitCode}
+                    {displayQuantity(shopStock.onHand)} {product.unitCode}
                   </div>
                 </button>
 
@@ -506,20 +613,20 @@ export function ProductDetailModal({
                   )}
                 >
                   <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                      On Hand
+                    <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground truncate max-w-[130px]" title={shopStock.label}>
+                      {selectedShopCode === "all" ? "On Hand" : `${shopStock.label} On Hand`}
                     </span>
-                    <Package className="size-4 text-[#0B5D4B] opacity-80 group-hover:scale-110 transition-transform" />
+                    <Package className="size-4 text-[#0B5D4B] opacity-80 group-hover:scale-110 transition-transform shrink-0" />
                   </div>
                   <div className="mt-2">
-                    <div className="text-lg font-bold tracking-tight text-foreground">
-                      {displayQuantity(product.quantityOnHand)}{" "}
+                    <div className="text-lg font-bold tracking-tight text-foreground font-mono">
+                      {displayQuantity(shopStock.onHand)}{" "}
                       <span className="text-xs font-normal text-muted-foreground">
                         {product.unitCode}
                       </span>
                     </div>
-                    <span className="text-[10px] text-muted-foreground">
-                      {displayQuantity(product.quantityAvailable)} available
+                    <span className="text-[10px] text-muted-foreground truncate block">
+                      {displayQuantity(shopStock.available)} available ({shopStock.label})
                     </span>
                   </div>
                 </button>
@@ -902,10 +1009,10 @@ export function ProductDetailModal({
                     <div className="flex flex-col justify-between rounded-lg border border-border bg-card p-2 text-left shadow-2xs min-w-0">
                       <div className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground truncate">
                         <Package className="size-3 text-[#0B5D4B] shrink-0" />
-                        <span className="truncate">Total On Hand</span>
+                        <span className="truncate">{selectedShopCode === "all" ? "Total On Hand" : shopStock.label}</span>
                       </div>
                       <div className="mt-1 font-mono text-xs font-bold text-foreground truncate">
-                        {displayQuantity(product.quantityOnHand)} {product.unitCode}
+                        {displayQuantity(shopStock.onHand)} {product.unitCode}
                       </div>
                     </div>
 
@@ -916,18 +1023,18 @@ export function ProductDetailModal({
                         <span className="truncate">Reserved</span>
                       </div>
                       <div className="mt-1 font-mono text-xs font-bold text-foreground truncate">
-                        {displayQuantity(product.quantityReserved)} {product.unitCode}
+                        {displayQuantity(shopStock.reserved)} {product.unitCode}
                       </div>
                     </div>
 
                     {/* Available to Sell */}
                     <div className="flex flex-col justify-between rounded-lg border border-[#0B5D4B]/30 bg-[#0B5D4B]/5 p-2 text-left shadow-2xs min-w-0">
                       <div className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-[#0B5D4B] truncate">
-                        <Check className="size-3 text-[#0B5D4B] shrink-0" />
+                        <Check className="size-3 text-[#0B5D4B]" />
                         <span className="truncate">Available</span>
                       </div>
                       <div className="mt-1 font-mono text-xs font-bold text-[#0B5D4B] truncate">
-                        {displayQuantity(product.quantityAvailable)} {product.unitCode}
+                        {displayQuantity(shopStock.available)} {product.unitCode}
                       </div>
                     </div>
                   </div>
@@ -935,19 +1042,19 @@ export function ProductDetailModal({
                   {/* Desktop/Tablet View (hidden on mobile) */}
                   <div className="hidden sm:grid sm:grid-cols-3 sm:gap-3">
                     <MetricCard
-                      title="Total On Hand"
-                      value={`${displayQuantity(product.quantityOnHand)} ${product.unitCode}`}
-                      subtitle="Physically in storage"
+                      title={selectedShopCode === "all" ? "Total On Hand" : `${shopStock.label} On Hand`}
+                      value={`${displayQuantity(shopStock.onHand)} ${product.unitCode}`}
+                      subtitle={`Physically in storage (${shopStock.label})`}
                     />
                     <MetricCard
                       title="Reserved for Orders"
-                      value={`${displayQuantity(product.quantityReserved)} ${product.unitCode}`}
+                      value={`${displayQuantity(shopStock.reserved)} ${product.unitCode}`}
                       subtitle="Pending delivery / POS"
                     />
                     <MetricCard
                       title="Available to Sell"
-                      value={`${displayQuantity(product.quantityAvailable)} ${product.unitCode}`}
-                      subtitle="Net uncommitted stock"
+                      value={`${displayQuantity(shopStock.available)} ${product.unitCode}`}
+                      subtitle={`Net uncommitted stock (${shopStock.label})`}
                       highlight
                     />
                   </div>
