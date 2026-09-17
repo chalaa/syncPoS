@@ -166,74 +166,45 @@ export function ProductDetailModal({
 
   const globalSelectedLocationId = useAppStore((state) => state.selectedLocationId);
 
-  const shopOptions = useMemo(() => {
-    if (!product?.stockRows || product.stockRows.length === 0) return [];
-    const map = new Map<string, { code: string; name: string }>();
-    product.stockRows.forEach((row) => {
-      if (row.locationCode && !map.has(row.locationCode)) {
-        map.set(row.locationCode, {
-          code: row.locationCode,
-          name: row.locationName || row.locationCode,
-        });
-      }
-    });
-    return Array.from(map.values());
-  }, [product]);
-
-  const [selectedShopCode, setSelectedShopCode] = useState<string>("all");
-
-  useEffect(() => {
-    if (shopOptions.length === 0) {
-      setSelectedShopCode("all");
-      return;
-    }
-    if (globalSelectedLocationId) {
-      const matched = shopOptions.find(
-        (s) =>
-          s.code.toLowerCase() === globalSelectedLocationId.toLowerCase() ||
-          s.name.toLowerCase() === globalSelectedLocationId.toLowerCase(),
-      );
-      if (matched) {
-        setSelectedShopCode(matched.code);
-        return;
-      }
-    }
-    if (shopOptions.length === 1 && shopOptions[0]) {
-      setSelectedShopCode(shopOptions[0].code);
-    }
-  }, [globalSelectedLocationId, shopOptions]);
-
   const shopStock = useMemo(() => {
     if (!product) {
       return {
         onHand: 0,
         reserved: 0,
         available: 0,
-        label: "All Locations",
+        label: "Total On Hand",
+        isFiltered: false,
       };
     }
 
-    if (selectedShopCode === "all" || !product.stockRows || product.stockRows.length === 0) {
+    if (!globalSelectedLocationId || !product.stockRows || product.stockRows.length === 0) {
       return {
         onHand: Number(product.quantityOnHand ?? 0),
         reserved: Number(product.quantityReserved ?? 0),
         available: Number(product.quantityAvailable ?? 0),
-        label: shopOptions.length === 1 && shopOptions[0] ? shopOptions[0].name : "All Locations",
+        label: "Total On Hand",
+        isFiltered: false,
       };
     }
 
-    const matchingRows = product.stockRows.filter((row) => row.locationCode === selectedShopCode);
+    const matchingRows = product.stockRows.filter(
+      (row) =>
+        row.locationCode?.toLowerCase() === globalSelectedLocationId.toLowerCase() ||
+        row.locationName?.toLowerCase() === globalSelectedLocationId.toLowerCase() ||
+        row.stockBalanceId === globalSelectedLocationId,
+    );
 
     if (matchingRows.length === 0) {
       return {
-        onHand: 0,
-        reserved: 0,
-        available: 0,
-        label: selectedShopCode,
+        onHand: Number(product.quantityOnHand ?? 0),
+        reserved: Number(product.quantityReserved ?? 0),
+        available: Number(product.quantityAvailable ?? 0),
+        label: "Total On Hand",
+        isFiltered: false,
       };
     }
 
-    const shopName = matchingRows[0]?.locationName || selectedShopCode;
+    const shopName = matchingRows[0]?.locationName || matchingRows[0]?.locationCode || "Selected Shop";
     const onHand = matchingRows.reduce((acc, row) => acc + Number(row.quantityOnHand || 0), 0);
     const reserved = matchingRows.reduce((acc, row) => acc + Number(row.quantityReserved || 0), 0);
     const available = matchingRows.reduce((acc, row) => acc + Number(row.quantityAvailable || 0), 0);
@@ -243,8 +214,9 @@ export function ProductDetailModal({
       reserved,
       available,
       label: shopName,
+      isFiltered: true,
     };
-  }, [product, selectedShopCode, shopOptions]);
+  }, [product, globalSelectedLocationId]);
 
   const qtyOnHand = shopStock.onHand;
   const totalValuationMinor = Math.round(qtyOnHand * (product?.standardCostMinor ?? 0));
@@ -361,29 +333,6 @@ export function ProductDetailModal({
                       <span className="inline-flex items-center gap-1 rounded-md bg-secondary/80 px-2 py-0.5 text-[11px] font-medium text-secondary-foreground">
                         <Globe className="size-3 text-muted-foreground" />
                         {product.country}
-                      </span>
-                    )}
-
-                    {shopOptions.length > 0 && (
-                      <span className="inline-flex items-center gap-1.5 rounded-md border border-[#0B5D4B]/30 bg-[#0B5D4B]/10 px-2 py-0.5 text-[11px] font-semibold text-[#0B5D4B]">
-                        <Building2 className="size-3 text-[#0B5D4B]" />
-                        <span>Shop:</span>
-                        <select
-                          value={selectedShopCode}
-                          onChange={(e) => setSelectedShopCode(e.target.value)}
-                          className="bg-transparent font-bold text-[#0B5D4B] focus:outline-none cursor-pointer"
-                        >
-                          {shopOptions.length > 1 ? (
-                            <option value="all" className="bg-background text-foreground">
-                              All Locations
-                            </option>
-                          ) : null}
-                          {shopOptions.map((shop) => (
-                            <option key={shop.code} value={shop.code} className="bg-background text-foreground">
-                              {shop.name}
-                            </option>
-                          ))}
-                        </select>
                       </span>
                     )}
                   </div>
@@ -506,7 +455,7 @@ export function ProductDetailModal({
                 >
                   <div className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground truncate">
                     <Package className="size-3 text-[#0B5D4B] shrink-0" />
-                    <span className="truncate">{selectedShopCode === "all" ? "On Hand" : shopStock.label}</span>
+                    <span className="truncate">{shopStock.isFiltered ? shopStock.label : "On Hand"}</span>
                   </div>
                   <div className="mt-1 font-mono text-xs font-bold text-foreground truncate">
                     {displayQuantity(shopStock.onHand)} {product.unitCode}
@@ -614,7 +563,7 @@ export function ProductDetailModal({
                 >
                   <div className="flex items-center justify-between">
                     <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground truncate max-w-[130px]" title={shopStock.label}>
-                      {selectedShopCode === "all" ? "On Hand" : `${shopStock.label} On Hand`}
+                      {shopStock.isFiltered ? `${shopStock.label} On Hand` : "On Hand"}
                     </span>
                     <Package className="size-4 text-[#0B5D4B] opacity-80 group-hover:scale-110 transition-transform shrink-0" />
                   </div>
@@ -626,7 +575,7 @@ export function ProductDetailModal({
                       </span>
                     </div>
                     <span className="text-[10px] text-muted-foreground truncate block">
-                      {displayQuantity(shopStock.available)} available ({shopStock.label})
+                      {displayQuantity(shopStock.available)} available {shopStock.isFiltered ? `(${shopStock.label})` : ""}
                     </span>
                   </div>
                 </button>
@@ -1009,7 +958,7 @@ export function ProductDetailModal({
                     <div className="flex flex-col justify-between rounded-lg border border-border bg-card p-2 text-left shadow-2xs min-w-0">
                       <div className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground truncate">
                         <Package className="size-3 text-[#0B5D4B] shrink-0" />
-                        <span className="truncate">{selectedShopCode === "all" ? "Total On Hand" : shopStock.label}</span>
+                        <span className="truncate">{shopStock.isFiltered ? shopStock.label : "Total On Hand"}</span>
                       </div>
                       <div className="mt-1 font-mono text-xs font-bold text-foreground truncate">
                         {displayQuantity(shopStock.onHand)} {product.unitCode}
@@ -1042,7 +991,7 @@ export function ProductDetailModal({
                   {/* Desktop/Tablet View (hidden on mobile) */}
                   <div className="hidden sm:grid sm:grid-cols-3 sm:gap-3">
                     <MetricCard
-                      title={selectedShopCode === "all" ? "Total On Hand" : `${shopStock.label} On Hand`}
+                      title={shopStock.isFiltered ? `${shopStock.label} On Hand` : "Total On Hand"}
                       value={`${displayQuantity(shopStock.onHand)} ${product.unitCode}`}
                       subtitle={`Physically in storage (${shopStock.label})`}
                     />
