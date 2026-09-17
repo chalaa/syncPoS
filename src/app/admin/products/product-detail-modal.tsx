@@ -166,6 +166,10 @@ export function ProductDetailModal({
 
   const globalSelectedLocationId = useAppStore((state) => state.selectedLocationId);
 
+  const companyAvailable = Number(product?.quantityAvailable ?? 0);
+  const companyOnHand = Number(product?.quantityOnHand ?? 0);
+  const companyReserved = Number(product?.quantityReserved ?? 0);
+
   const shopStock = useMemo(() => {
     if (!product) {
       return {
@@ -179,9 +183,9 @@ export function ProductDetailModal({
 
     if (!globalSelectedLocationId) {
       return {
-        onHand: Number(product.quantityOnHand ?? 0),
-        reserved: Number(product.quantityReserved ?? 0),
-        available: Number(product.quantityAvailable ?? 0),
+        onHand: companyOnHand,
+        reserved: companyReserved,
+        available: companyAvailable,
         label: "Total On Hand",
         isFiltered: false,
       };
@@ -201,25 +205,24 @@ export function ProductDetailModal({
       return {
         onHand: 0,
         reserved: 0,
-        available: 0,
+        available: companyAvailable,
         label: "Selected Shop",
         isFiltered: true,
       };
     }
 
     const shopName = matchingRows[0]?.locationName || matchingRows[0]?.locationCode || "Selected Shop";
-    const onHand = matchingRows.reduce((acc, row) => acc + Number(row.quantityOnHand || 0), 0);
-    const reserved = matchingRows.reduce((acc, row) => acc + Number(row.quantityReserved || 0), 0);
-    const available = matchingRows.reduce((acc, row) => acc + Number(row.quantityAvailable || 0), 0);
+    const locationOnHand = matchingRows.reduce((acc, row) => acc + Number(row.quantityOnHand || 0), 0);
+    const locationReserved = matchingRows.reduce((acc, row) => acc + Number(row.quantityReserved || 0), 0);
 
     return {
-      onHand,
-      reserved,
-      available,
+      onHand: locationOnHand,
+      reserved: locationReserved,
+      available: companyAvailable,
       label: shopName,
       isFiltered: true,
     };
-  }, [product, globalSelectedLocationId]);
+  }, [product, globalSelectedLocationId, companyOnHand, companyReserved, companyAvailable]);
 
   const qtyOnHand = shopStock.onHand;
   const totalValuationMinor = Math.round(qtyOnHand * (product?.standardCostMinor ?? 0));
@@ -578,7 +581,7 @@ export function ProductDetailModal({
                       </span>
                     </div>
                     <span className="text-[10px] text-muted-foreground truncate block">
-                      {displayQuantity(shopStock.available)} available {shopStock.isFiltered ? `(${shopStock.label})` : ""}
+                      {displayQuantity(shopStock.available)} available company-wide
                     </span>
                   </div>
                 </button>
@@ -1006,7 +1009,7 @@ export function ProductDetailModal({
                     <MetricCard
                       title="Available to Sell"
                       value={`${displayQuantity(shopStock.available)} ${product.unitCode}`}
-                      subtitle={`Net uncommitted stock (${shopStock.label})`}
+                      subtitle="Company-wide available stock"
                       highlight
                     />
                   </div>
