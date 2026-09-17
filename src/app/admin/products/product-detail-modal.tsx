@@ -461,7 +461,7 @@ export function ProductDetailModal({
                 >
                   <div className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground truncate">
                     <Package className="size-3 text-[#0B5D4B] shrink-0" />
-                    <span className="truncate">{shopStock.isFiltered ? shopStock.label : "On Hand"}</span>
+                    <span className="truncate">On Hand</span>
                   </div>
                   <div className="mt-1 font-mono text-xs font-bold text-foreground truncate">
                     {displayQuantity(shopStock.onHand)} {product.unitCode}
@@ -568,8 +568,8 @@ export function ProductDetailModal({
                   )}
                 >
                   <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground truncate max-w-[130px]" title={shopStock.label}>
-                      {shopStock.isFiltered ? `${shopStock.label} On Hand` : "On Hand"}
+                    <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                      On Hand
                     </span>
                     <Package className="size-4 text-[#0B5D4B] opacity-80 group-hover:scale-110 transition-transform shrink-0" />
                   </div>
@@ -964,7 +964,7 @@ export function ProductDetailModal({
                     <div className="flex flex-col justify-between rounded-lg border border-border bg-card p-2 text-left shadow-2xs min-w-0">
                       <div className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground truncate">
                         <Package className="size-3 text-[#0B5D4B] shrink-0" />
-                        <span className="truncate">{shopStock.isFiltered ? shopStock.label : "Total On Hand"}</span>
+                        <span className="truncate">On Hand</span>
                       </div>
                       <div className="mt-1 font-mono text-xs font-bold text-foreground truncate">
                         {displayQuantity(shopStock.onHand)} {product.unitCode}
@@ -997,9 +997,9 @@ export function ProductDetailModal({
                   {/* Desktop/Tablet View (hidden on mobile) */}
                   <div className="hidden sm:grid sm:grid-cols-3 sm:gap-3">
                     <MetricCard
-                      title={shopStock.isFiltered ? `${shopStock.label} On Hand` : "Total On Hand"}
+                      title="On Hand"
                       value={`${displayQuantity(shopStock.onHand)} ${product.unitCode}`}
-                      subtitle={`Physically in storage (${shopStock.label})`}
+                      subtitle="Physically in storage"
                     />
                     <MetricCard
                       title="Reserved for Orders"
