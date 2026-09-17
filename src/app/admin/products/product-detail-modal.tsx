@@ -226,6 +226,7 @@ export function ProductDetailModal({
 
   const qtyOnHand = shopStock.onHand;
   const totalValuationMinor = Math.round(qtyOnHand * (product?.standardCostMinor ?? 0));
+  const unitDisplay = product?.unitName || product?.unitCode || "";
 
   const tabs: { id: TabKey; label: string; shortLabel: string; icon: typeof FileText; count?: number }[] = [
     { id: "overview", label: "Overview", shortLabel: "Overview", icon: FileText },
@@ -464,7 +465,7 @@ export function ProductDetailModal({
                     <span className="truncate">On Hand</span>
                   </div>
                   <div className="mt-1 font-mono text-xs font-bold text-foreground truncate">
-                    {displayQuantity(shopStock.onHand)}
+                    {displayQuantity(shopStock.onHand)}{unitDisplay ? ` ${unitDisplay}` : ""}
                   </div>
                 </button>
 
@@ -484,7 +485,7 @@ export function ProductDetailModal({
                     <span className="truncate">Incoming</span>
                   </div>
                   <div className="mt-1 font-mono text-xs font-bold text-foreground truncate">
-                    {displayQuantity(product.incomingQuantity)}
+                    {displayQuantity(product.incomingQuantity)}{unitDisplay ? ` ${unitDisplay}` : ""}
                   </div>
                 </button>
 
@@ -575,10 +576,10 @@ export function ProductDetailModal({
                   </div>
                   <div className="mt-2">
                     <div className="text-lg font-bold tracking-tight text-foreground font-mono">
-                      {displayQuantity(shopStock.onHand)}
+                      {displayQuantity(shopStock.onHand)}{unitDisplay ? ` ${unitDisplay}` : ""}
                     </div>
                     <span className="text-[10px] text-muted-foreground truncate block">
-                      {displayQuantity(shopStock.available)} available company-wide
+                      {displayQuantity(shopStock.available)}{unitDisplay ? ` ${unitDisplay}` : ""} available company-wide
                     </span>
                   </div>
                 </button>
@@ -602,7 +603,7 @@ export function ProductDetailModal({
                   </div>
                   <div className="mt-2">
                     <div className="text-lg font-bold tracking-tight text-foreground font-mono">
-                      {displayQuantity(product.incomingQuantity)}
+                      {displayQuantity(product.incomingQuantity)}{unitDisplay ? ` ${unitDisplay}` : ""}
                     </div>
                     <span className="text-[10px] text-muted-foreground">
                       On active purchase orders
@@ -961,7 +962,7 @@ export function ProductDetailModal({
                         <span className="truncate">On Hand</span>
                       </div>
                       <div className="mt-1 font-mono text-xs font-bold text-foreground truncate">
-                        {displayQuantity(shopStock.onHand)}
+                        {displayQuantity(shopStock.onHand)}{unitDisplay ? ` ${unitDisplay}` : ""}
                       </div>
                     </div>
 
@@ -972,7 +973,7 @@ export function ProductDetailModal({
                         <span className="truncate">Reserved</span>
                       </div>
                       <div className="mt-1 font-mono text-xs font-bold text-foreground truncate">
-                        {displayQuantity(shopStock.reserved)}
+                        {displayQuantity(shopStock.reserved)}{unitDisplay ? ` ${unitDisplay}` : ""}
                       </div>
                     </div>
 
@@ -983,7 +984,7 @@ export function ProductDetailModal({
                         <span className="truncate">Available</span>
                       </div>
                       <div className="mt-1 font-mono text-xs font-bold text-[#0B5D4B] truncate">
-                        {displayQuantity(shopStock.available)}
+                        {displayQuantity(shopStock.available)}{unitDisplay ? ` ${unitDisplay}` : ""}
                       </div>
                     </div>
                   </div>
@@ -992,17 +993,17 @@ export function ProductDetailModal({
                   <div className="hidden sm:grid sm:grid-cols-3 sm:gap-3">
                     <MetricCard
                       title="On Hand"
-                      value={displayQuantity(shopStock.onHand)}
+                      value={unitDisplay ? `${displayQuantity(shopStock.onHand)} ${unitDisplay}` : displayQuantity(shopStock.onHand)}
                       subtitle="Physically in storage"
                     />
                     <MetricCard
                       title="Reserved for Orders"
-                      value={displayQuantity(shopStock.reserved)}
+                      value={unitDisplay ? `${displayQuantity(shopStock.reserved)} ${unitDisplay}` : displayQuantity(shopStock.reserved)}
                       subtitle="Pending delivery / POS"
                     />
                     <MetricCard
                       title="Available to Sell"
-                      value={displayQuantity(shopStock.available)}
+                      value={unitDisplay ? `${displayQuantity(shopStock.available)} ${unitDisplay}` : displayQuantity(shopStock.available)}
                       subtitle="Company-wide available stock"
                       highlight
                     />
