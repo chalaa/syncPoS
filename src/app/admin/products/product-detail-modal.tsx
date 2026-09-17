@@ -268,8 +268,8 @@ export function ProductDetailModal({
           <div className="flex items-start justify-between gap-2.5 sm:gap-4">
             {/* Left: Product Icon & Titles */}
             <div className="flex items-start gap-3 sm:gap-3.5 min-w-0">
-              <div className="flex size-10 sm:size-12 shrink-0 items-center justify-center rounded-xl sm:rounded-2xl bg-gradient-to-br from-[#0B5D4B] to-[#073B35] text-white shadow-md shadow-[#0B5D4B]/25 ring-1 ring-white/10">
-                <Boxes className="size-5 sm:size-6 text-emerald-200" />
+              <div className="hidden sm:flex size-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-[#0B5D4B] to-[#073B35] text-white shadow-md shadow-[#0B5D4B]/25 ring-1 ring-white/10">
+                <Boxes className="size-6 text-emerald-200" />
               </div>
 
               <div className="min-w-0 space-y-1.5">
