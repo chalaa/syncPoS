@@ -12,6 +12,7 @@ import {
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { DeleteConfirmationDialog } from "@/components/ui/delete-confirmation-dialog";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
 import { requirePermission } from "@/server/auth/session";
 import { getDefaultCompany } from "@/server/catalog/products";
@@ -221,14 +222,13 @@ export default async function OwnersPage({ searchParams }: OwnersPageProps) {
                             </Button>
                           </form>
                         ) : (
-                          <form action={softDeleteOwner}>
-                            <input type="hidden" name="ownerId" value={owner.id} />
-                            <input type="hidden" name="returnPath" value={returnPath} />
-                            <Button type="submit" variant="destructive" size="sm" className="h-8 text-xs">
-                              <Trash2 className="size-3.5" data-icon="inline-start" />
-                              Delete
-                            </Button>
-                          </form>
+                          <DeleteConfirmationDialog
+                            action={softDeleteOwner}
+                            hiddenInputs={{ ownerId: owner.id, returnPath }}
+                            itemName={owner.name}
+                            size="sm"
+                            className="h-8 text-xs"
+                          />
                         )}
                       </td>
                     </tr>

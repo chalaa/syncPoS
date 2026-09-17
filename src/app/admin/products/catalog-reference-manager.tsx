@@ -9,6 +9,7 @@ import { ProductNavTabs } from "@/app/admin/products/product-nav-tabs";
 import { Alert } from "@/components/ui/alert";
 import { StatusBadge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { DeleteConfirmationDialog } from "@/components/ui/delete-confirmation-dialog";
 import { CountrySelectField } from "@/components/ui/country-select-field";
 import { TableSearchInput } from "@/components/ui/table-search-input";
 import {
@@ -364,14 +365,11 @@ export function CatalogReferenceManager({
                               Edit
                             </Button>
                           </ReferenceDialog>
-                          <form action={softDeleteAction}>
-                            <input type="hidden" name="id" value={record.id} />
-                            <input type="hidden" name="returnPath" value={returnPath} />
-                            <Button variant="destructive" size="sm" className="h-7 text-xs">
-                              <Trash2Icon className="size-3.5" data-icon="inline-start" />
-                              Delete
-                            </Button>
-                          </form>
+                          <DeleteConfirmationDialog
+                            action={softDeleteAction}
+                            hiddenInputs={{ id: record.id, returnPath }}
+                            itemName={record.name}
+                          />
                         </>
                       ) : (
                         <form action={restoreAction}>

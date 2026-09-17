@@ -15,6 +15,7 @@ import {
 import { Alert } from "@/components/ui/alert";
 import { Badge, StatusBadge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { DeleteConfirmationDialog } from "@/components/ui/delete-confirmation-dialog";
 import {
   Dialog,
   DialogClose,
@@ -393,14 +394,16 @@ export function IamManager({
                               <span className="sr-only">Edit role</span>
                             </Button>
                           </RoleDialog>
-                          <form action={softDeleteRole}>
-                            <input type="hidden" name="id" value={role.id} />
-                            <input type="hidden" name="returnPath" value={returnPath} />
+                          <DeleteConfirmationDialog
+                            action={softDeleteRole}
+                            hiddenInputs={{ id: role.id, returnPath }}
+                            itemName={role.name}
+                          >
                             <Button variant="danger" size="icon" disabled={!role.isDeletable}>
                               <Trash2Icon />
                               <span className="sr-only">Delete role</span>
                             </Button>
-                          </form>
+                          </DeleteConfirmationDialog>
                         </>
                       ) : (
                         <span className="text-xs text-muted-foreground">View only</span>

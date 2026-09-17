@@ -15,6 +15,7 @@ import {
 import { Alert } from "@/components/ui/alert";
 import { StatusBadge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { DeleteConfirmationDialog } from "@/components/ui/delete-confirmation-dialog";
 import {
   Dialog,
   DialogClose,
@@ -337,14 +338,11 @@ export function LocationManager({
                               Edit
                             </Button>
                           </LocationDialog>
-                          <form action={softDeleteStockLocation}>
-                            <input type="hidden" name="id" value={record.id} />
-                            <input type="hidden" name="returnPath" value={returnPath} />
-                            <Button variant="destructive" size="sm" className="h-7 text-xs">
-                              <Trash2Icon className="size-3.5" data-icon="inline-start" />
-                              Delete
-                            </Button>
-                          </form>
+                          <DeleteConfirmationDialog
+                            action={softDeleteStockLocation}
+                            hiddenInputs={{ id: record.id, returnPath }}
+                            itemName={record.name}
+                          />
                         </>
                       ) : (
                         <form action={restoreStockLocation}>

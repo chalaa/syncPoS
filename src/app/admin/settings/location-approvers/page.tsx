@@ -1,5 +1,6 @@
 import { removeLocationApprover, assignLocationApprover } from "@/app/admin/settings/location-approvers/actions";
 import { Button } from "@/components/ui/button";
+import { DeleteConfirmationDialog } from "@/components/ui/delete-confirmation-dialog";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
 import { requirePermission } from "@/server/auth/session";
 import { getDefaultCompany } from "@/server/catalog/products";
@@ -95,10 +96,13 @@ export default async function LocationApproversPage({ searchParams }: LocationAp
                     </td>
                     <td className="px-4 py-3">{approver.isActive ? "Active" : "Inactive"}</td>
                     <td className="px-4 py-3 text-right">
-                      <form action={removeLocationApprover}>
-                        <input type="hidden" name="approverId" value={approver.id} />
-                        <Button type="submit" variant="destructive" size="sm">Remove</Button>
-                      </form>
+                      <DeleteConfirmationDialog
+                        title="Remove Location Approver"
+                        description={`Are you sure you want to remove ${approver.username} from location ${approver.locationName}?`}
+                        action={removeLocationApprover}
+                        hiddenInputs={{ approverId: approver.id }}
+                        triggerLabel="Remove"
+                      />
                     </td>
                   </tr>
                 ))

@@ -12,6 +12,7 @@ import {
 } from "@/app/admin/operations/expenses/actions";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { DeleteConfirmationDialog } from "@/components/ui/delete-confirmation-dialog";
 import { TableSearchInput } from "@/components/ui/table-search-input";
 import {
   Dialog,
@@ -190,14 +191,11 @@ export function ExpenseCategoryManager({
                               Edit
                             </Button>
                           </CategoryDialog>
-                          <form action={softDeleteExpenseCategory}>
-                            <input type="hidden" name="id" value={record.id} />
-                            <input type="hidden" name="returnPath" value={returnPath} />
-                            <Button variant="danger" size="sm">
-                              <Trash2Icon data-icon="inline-start" />
-                              Delete
-                            </Button>
-                          </form>
+                          <DeleteConfirmationDialog
+                            action={softDeleteExpenseCategory}
+                            hiddenInputs={{ id: record.id, returnPath }}
+                            itemName={record.name}
+                          />
                         </>
                       )}
                     </div>

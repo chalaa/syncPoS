@@ -5,6 +5,7 @@ import { ExternalLink, Layers, Package, ShieldCheck, Tag, Trash2, RotateCcw } fr
 
 import { minorToDisplay } from "@/lib/catalog-utils";
 import { Button, ButtonLink } from "@/components/ui/button";
+import { DeleteConfirmationDialog } from "@/components/ui/delete-confirmation-dialog";
 import { ProductDetailModal } from "./product-detail-modal";
 import { restoreProduct, softDeleteProduct } from "./actions";
 import type { ProductDetail } from "@/server/catalog/types";
@@ -198,8 +199,11 @@ export function ProductListTable({
                         >
                           Edit
                         </ButtonLink>
-                        <form action={softDeleteProduct}>
-                          <input type="hidden" name="id" value={product.id} />
+                        <DeleteConfirmationDialog
+                          action={softDeleteProduct}
+                          hiddenInputs={{ id: product.id }}
+                          itemName={product.name}
+                        >
                           <Button
                             variant="ghost"
                             size="sm"
@@ -208,7 +212,7 @@ export function ProductListTable({
                           >
                             <Trash2 className="size-3.5" />
                           </Button>
-                        </form>
+                        </DeleteConfirmationDialog>
                       </>
                     ) : (
                       <form action={restoreProduct}>

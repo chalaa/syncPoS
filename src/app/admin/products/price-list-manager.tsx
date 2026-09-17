@@ -8,6 +8,7 @@ import { ProductNavTabs } from "@/app/admin/products/product-nav-tabs";
 import { Alert } from "@/components/ui/alert";
 import { StatusBadge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { DeleteConfirmationDialog } from "@/components/ui/delete-confirmation-dialog";
 import {
   Dialog,
   DialogClose,
@@ -289,13 +290,11 @@ export function PriceListManager({
                           Edit
                         </Button>
                       </PriceListDialog>
-                      <form action={softDeletePriceList}>
-                        <input type="hidden" name="id" value={row.id} />
-                        <Button variant="destructive" size="sm" className="h-7 text-xs">
-                          <Trash2Icon className="size-3.5" data-icon="inline-start" />
-                          Delete
-                        </Button>
-                      </form>
+                      <DeleteConfirmationDialog
+                        action={softDeletePriceList}
+                        hiddenInputs={{ id: row.id, returnPath }}
+                        itemName={row.name}
+                      />
                     </div>
                   </td>
                 </tr>

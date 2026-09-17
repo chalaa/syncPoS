@@ -7,6 +7,7 @@ import type { ReactNode } from "react";
 import { Alert } from "@/components/ui/alert";
 import { StatusBadge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { DeleteConfirmationDialog } from "@/components/ui/delete-confirmation-dialog";
 import { TableSearchInput } from "@/components/ui/table-search-input";
 import {
   Dialog,
@@ -449,14 +450,11 @@ function MethodTable({
                           Edit
                         </Button>
                       </MethodDialog>
-                      <form action={deleteAction}>
-                        <input type="hidden" name="id" value={record.id} />
-                        <input type="hidden" name="returnPath" value={returnPath} />
-                        <Button variant="destructive" size="sm" className="h-7 text-xs">
-                          <Trash2Icon className="size-3.5" data-icon="inline-start" />
-                          Delete
-                        </Button>
-                      </form>
+                      <DeleteConfirmationDialog
+                        action={deleteAction}
+                        hiddenInputs={{ id: record.id, returnPath }}
+                        itemName={record.name}
+                      />
                     </>
                   ) : (
                     <form action={restoreAction}>
@@ -555,14 +553,11 @@ function AccountTable({
                           Edit
                         </Button>
                       </AccountDialog>
-                      <form action={deleteAction}>
-                        <input type="hidden" name="id" value={record.id} />
-                        <input type="hidden" name="returnPath" value={returnPath} />
-                        <Button variant="destructive" size="sm" className="h-7 text-xs">
-                          <Trash2Icon className="size-3.5" data-icon="inline-start" />
-                          Delete
-                        </Button>
-                      </form>
+                      <DeleteConfirmationDialog
+                        action={deleteAction}
+                        hiddenInputs={{ id: record.id, returnPath }}
+                        itemName={record.name}
+                      />
                     </>
                   ) : (
                     <form action={restoreAction}>

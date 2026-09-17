@@ -5,6 +5,7 @@ import { NewPartnerModal } from "@/app/admin/partners/new-partner-modal";
 import { Alert } from "@/components/ui/alert";
 import { Badge, StatusBadge } from "@/components/ui/badge";
 import { Button, ButtonLink } from "@/components/ui/button";
+import { DeleteConfirmationDialog } from "@/components/ui/delete-confirmation-dialog";
 import { TableFilterSelect } from "@/components/ui/table-filter-select";
 import { TableSearchInput } from "@/components/ui/table-search-input";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
@@ -202,12 +203,11 @@ export default async function PartnersPage({ searchParams }: PartnersPageProps) 
                             >
                               Edit
                             </ButtonLink>
-                            <form action={softDeletePartner}>
-                              <input type="hidden" name="id" value={partner.id} />
-                              <Button variant="danger" size="sm">
-                                Delete
-                              </Button>
-                            </form>
+                            <DeleteConfirmationDialog
+                              action={softDeletePartner}
+                              hiddenInputs={{ id: partner.id }}
+                              itemName={partner.displayName}
+                            />
                           </>
                         ) : (
                           <form action={restorePartner}>
