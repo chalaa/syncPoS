@@ -1308,9 +1308,19 @@ export function NewProductModal({
                   </p>
                 </div>
               </div>
-              <Badge variant="outline" className="border-amber-400 bg-amber-50 text-amber-900 font-bold px-2.5 py-1">
-                {step === 3 ? "Confirmation Required" : "Catalog Review"}
-              </Badge>
+              <div className="flex items-center gap-2.5">
+                <Badge variant="outline" className="border-amber-400 bg-amber-50 text-amber-900 font-bold px-2.5 py-1">
+                  {step === 3 ? "Confirmation Required" : "Catalog Review"}
+                </Badge>
+                <button
+                  type="button"
+                  onClick={() => setShowDuplicateWarning(false)}
+                  className="rounded-lg p-1.5 sm:p-2 bg-red-500 text-white hover:bg-red-600 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/50 shadow-2xs"
+                  aria-label="Close modal"
+                >
+                  <X className="size-4.5" />
+                </button>
+              </div>
             </div>
 
             {/* Warning Body */}
