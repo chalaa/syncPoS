@@ -62,6 +62,7 @@ export type ProductFormRecord = {
 
 export type ProductDetailStockRow = {
   stockBalanceId: string;
+  locationId?: string;
   locationCode: string;
   locationName: string;
   serialNo: string | null;

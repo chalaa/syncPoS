@@ -177,7 +177,7 @@ export function ProductDetailModal({
       };
     }
 
-    if (!globalSelectedLocationId || !product.stockRows || product.stockRows.length === 0) {
+    if (!globalSelectedLocationId) {
       return {
         onHand: Number(product.quantityOnHand ?? 0),
         reserved: Number(product.quantityReserved ?? 0),
@@ -187,20 +187,23 @@ export function ProductDetailModal({
       };
     }
 
-    const matchingRows = product.stockRows.filter(
+    const targetId = globalSelectedLocationId.toLowerCase();
+
+    const matchingRows = (product.stockRows ?? []).filter(
       (row) =>
-        row.locationCode?.toLowerCase() === globalSelectedLocationId.toLowerCase() ||
-        row.locationName?.toLowerCase() === globalSelectedLocationId.toLowerCase() ||
-        row.stockBalanceId === globalSelectedLocationId,
+        (row.locationId && row.locationId.toLowerCase() === targetId) ||
+        row.locationCode?.toLowerCase() === targetId ||
+        row.locationName?.toLowerCase() === targetId ||
+        row.stockBalanceId.toLowerCase() === targetId,
     );
 
     if (matchingRows.length === 0) {
       return {
-        onHand: Number(product.quantityOnHand ?? 0),
-        reserved: Number(product.quantityReserved ?? 0),
-        available: Number(product.quantityAvailable ?? 0),
-        label: "Total On Hand",
-        isFiltered: false,
+        onHand: 0,
+        reserved: 0,
+        available: 0,
+        label: "Selected Shop",
+        isFiltered: true,
       };
     }
 

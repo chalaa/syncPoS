@@ -479,6 +479,7 @@ export async function getProductDetail(id: string): Promise<ProductDetail | null
     db
       .select({
         stockBalanceId: stockBalances.id,
+        locationId: locations.id,
         locationCode: locations.code,
         locationName: locations.name,
         serialNo: productSerials.serialNo,
