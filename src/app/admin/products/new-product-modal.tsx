@@ -634,10 +634,10 @@ export function NewProductModal({
 
             <DialogClose
               type="button"
-              className="rounded-full p-2 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="rounded-lg p-1.5 sm:p-2 bg-red-500 text-white hover:bg-red-600 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/50 shadow-2xs"
               aria-label="Close dialog"
             >
-              <X className="size-5" />
+              <X className="size-4.5" />
             </DialogClose>
           </DialogHeader>
 
