@@ -1294,22 +1294,27 @@ export function NewProductModal({
             <div className="h-1.5 w-full bg-gradient-to-r from-amber-500 via-orange-500 to-red-500 shrink-0" />
 
             {/* Warning Header */}
-            <div className="shrink-0 border-b border-border/70 bg-background/95 px-6 py-4 backdrop-blur-md flex items-center justify-between gap-4">
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-800 border border-amber-300">
+            <div className="shrink-0 border-b border-border/70 bg-background/95 px-4 sm:px-6 py-3 sm:py-4 backdrop-blur-md flex items-start sm:items-center justify-between gap-3">
+              <div className="flex items-start sm:items-center gap-3 min-w-0">
+                <div className="hidden sm:flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-800 border border-amber-300">
                   <AlertTriangle className="h-5 w-5" />
                 </div>
-                <div>
-                  <h3 className="text-base font-bold text-foreground">
+                <div className="min-w-0 space-y-1 sm:space-y-0">
+                  <h3 className="text-sm sm:text-base font-bold text-foreground leading-snug">
                     Duplicate Product Warning
                   </h3>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-xs text-muted-foreground leading-tight">
                     {duplicateMatches.length} matching product{duplicateMatches.length > 1 ? "s" : ""} already found in your catalog
                   </p>
+                  <div className="pt-1 sm:hidden">
+                    <Badge variant="outline" className="border-amber-400 bg-amber-50 text-amber-900 font-bold px-2.5 py-0.5 text-[11px]">
+                      {step === 3 ? "Confirmation Required" : "Catalog Review"}
+                    </Badge>
+                  </div>
                 </div>
               </div>
-              <div className="flex items-center gap-2.5">
-                <Badge variant="outline" className="border-amber-400 bg-amber-50 text-amber-900 font-bold px-2.5 py-1">
+              <div className="flex items-center gap-2.5 shrink-0">
+                <Badge variant="outline" className="hidden sm:inline-flex border-amber-400 bg-amber-50 text-amber-900 font-bold px-2.5 py-1">
                   {step === 3 ? "Confirmation Required" : "Catalog Review"}
                 </Badge>
                 <button
@@ -1318,7 +1323,7 @@ export function NewProductModal({
                   className="rounded-lg p-1.5 sm:p-2 bg-red-500 text-white hover:bg-red-600 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/50 shadow-2xs"
                   aria-label="Close modal"
                 >
-                  <X className="size-4.5" />
+                  <X className="size-4 sm:size-4.5" />
                 </button>
               </div>
             </div>
