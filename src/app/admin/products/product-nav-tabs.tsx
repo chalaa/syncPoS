@@ -2,22 +2,23 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-
+import { useTranslation } from "@/lib/i18n/use-translation";
 import { cn } from "@/lib/utils";
 
 const productTabs = [
-  { label: "Products Catalog", href: "/admin/products" },
-  { label: "Categories", href: "/admin/products/categories" },
-  { label: "Brands", href: "/admin/products/brands" },
-  { label: "Units", href: "/admin/products/units" },
-  { label: "Taxes", href: "/admin/products/taxes" },
-  { label: "Price Lists", href: "/admin/products/price-lists" },
-  { label: "Lots / Serials", href: "/admin/products/tracking" },
+  { key: "Products Catalog", label: "Products Catalog", href: "/admin/products" },
+  { key: "Categories", label: "Categories", href: "/admin/products/categories" },
+  { key: "Brands", label: "Brands", href: "/admin/products/brands" },
+  { key: "Units", label: "Units", href: "/admin/products/units" },
+  { key: "Taxes", label: "Taxes", href: "/admin/products/taxes" },
+  { key: "Price Lists", label: "Price Lists", href: "/admin/products/price-lists" },
+  { key: "Lots / Serials", label: "Lots / Serials", href: "/admin/products/tracking" },
 ];
 
 export function ProductNavTabs({ currentHref }: { currentHref?: string }) {
   const pathname = usePathname();
   const activeHref = currentHref ?? pathname;
+  const { t } = useTranslation();
 
   return (
     <nav className="mb-6 flex items-center gap-1 overflow-x-auto no-scrollbar touch-pan-x border-b border-border pb-px">
@@ -38,7 +39,7 @@ export function ProductNavTabs({ currentHref }: { currentHref?: string }) {
             {isActive ? (
               <span className="size-1.5 rounded-full bg-gold inline-block" />
             ) : null}
-            {tab.label}
+            {t(tab.key, tab.label)}
           </Link>
         );
       })}
