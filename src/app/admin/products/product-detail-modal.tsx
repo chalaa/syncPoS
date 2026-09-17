@@ -464,7 +464,7 @@ export function ProductDetailModal({
                     <span className="truncate">On Hand</span>
                   </div>
                   <div className="mt-1 font-mono text-xs font-bold text-foreground truncate">
-                    {displayQuantity(shopStock.onHand)} {product.unitCode}
+                    {displayQuantity(shopStock.onHand)}
                   </div>
                 </button>
 
@@ -484,7 +484,7 @@ export function ProductDetailModal({
                     <span className="truncate">Incoming</span>
                   </div>
                   <div className="mt-1 font-mono text-xs font-bold text-foreground truncate">
-                    {displayQuantity(product.incomingQuantity)} {product.unitCode}
+                    {displayQuantity(product.incomingQuantity)}
                   </div>
                 </button>
 
@@ -575,10 +575,7 @@ export function ProductDetailModal({
                   </div>
                   <div className="mt-2">
                     <div className="text-lg font-bold tracking-tight text-foreground font-mono">
-                      {displayQuantity(shopStock.onHand)}{" "}
-                      <span className="text-xs font-normal text-muted-foreground">
-                        {product.unitCode}
-                      </span>
+                      {displayQuantity(shopStock.onHand)}
                     </div>
                     <span className="text-[10px] text-muted-foreground truncate block">
                       {displayQuantity(shopStock.available)} available company-wide
@@ -604,11 +601,8 @@ export function ProductDetailModal({
                     <TrendingUp className="size-4 text-blue-600 opacity-80 group-hover:scale-110 transition-transform" />
                   </div>
                   <div className="mt-2">
-                    <div className="text-lg font-bold tracking-tight text-foreground">
-                      {displayQuantity(product.incomingQuantity)}{" "}
-                      <span className="text-xs font-normal text-muted-foreground">
-                        {product.unitCode}
-                      </span>
+                    <div className="text-lg font-bold tracking-tight text-foreground font-mono">
+                      {displayQuantity(product.incomingQuantity)}
                     </div>
                     <span className="text-[10px] text-muted-foreground">
                       On active purchase orders
@@ -967,7 +961,7 @@ export function ProductDetailModal({
                         <span className="truncate">On Hand</span>
                       </div>
                       <div className="mt-1 font-mono text-xs font-bold text-foreground truncate">
-                        {displayQuantity(shopStock.onHand)} {product.unitCode}
+                        {displayQuantity(shopStock.onHand)}
                       </div>
                     </div>
 
@@ -978,7 +972,7 @@ export function ProductDetailModal({
                         <span className="truncate">Reserved</span>
                       </div>
                       <div className="mt-1 font-mono text-xs font-bold text-foreground truncate">
-                        {displayQuantity(shopStock.reserved)} {product.unitCode}
+                        {displayQuantity(shopStock.reserved)}
                       </div>
                     </div>
 
@@ -989,7 +983,7 @@ export function ProductDetailModal({
                         <span className="truncate">Available</span>
                       </div>
                       <div className="mt-1 font-mono text-xs font-bold text-[#0B5D4B] truncate">
-                        {displayQuantity(shopStock.available)} {product.unitCode}
+                        {displayQuantity(shopStock.available)}
                       </div>
                     </div>
                   </div>
@@ -998,17 +992,17 @@ export function ProductDetailModal({
                   <div className="hidden sm:grid sm:grid-cols-3 sm:gap-3">
                     <MetricCard
                       title="On Hand"
-                      value={`${displayQuantity(shopStock.onHand)} ${product.unitCode}`}
+                      value={displayQuantity(shopStock.onHand)}
                       subtitle="Physically in storage"
                     />
                     <MetricCard
                       title="Reserved for Orders"
-                      value={`${displayQuantity(shopStock.reserved)} ${product.unitCode}`}
+                      value={displayQuantity(shopStock.reserved)}
                       subtitle="Pending delivery / POS"
                     />
                     <MetricCard
                       title="Available to Sell"
-                      value={`${displayQuantity(shopStock.available)} ${product.unitCode}`}
+                      value={displayQuantity(shopStock.available)}
                       subtitle="Company-wide available stock"
                       highlight
                     />
