@@ -19,7 +19,7 @@ import {
 import { canonicalPermissionCodesFor, userHasPermission } from "@/server/iam/permissions";
 
 const sessionCookieName = "syncpos_session";
-const sessionDurationMs = 1000 * 60 * 60 * 8;
+const sessionDurationMs = 1000 * 60 * 60 * 24 * 7; // 7 days (1 week)
 const maxActiveSessionsPerUser = 5;
 
 function hashToken(token: string) {
