@@ -1309,7 +1309,7 @@ export function NewProductModal({
                 </div>
               </div>
               <Badge variant="outline" className="border-amber-400 bg-amber-50 text-amber-900 font-bold px-2.5 py-1">
-                Confirmation Required
+                {step === 3 ? "Confirmation Required" : "Catalog Review"}
               </Badge>
             </div>
 
@@ -1427,33 +1427,34 @@ export function NewProductModal({
                 variant="outline"
                 onClick={() => {
                   setShowDuplicateWarning(false);
-                  setStep(1);
                 }}
                 disabled={isPending}
                 className="h-10 gap-2 px-4 font-medium"
               >
                 <ArrowLeft className="size-4" />
-                Cancel & Edit Details
+                Close & Edit Details
               </Button>
 
-              <Button
-                type="button"
-                onClick={() => handleFinalSubmit(true)}
-                disabled={isPending}
-                className="h-10 gap-2 bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white font-semibold shadow-md shadow-amber-600/20 transition-all"
-              >
-                {isPending ? (
-                  <>
-                    <LoaderCircleIcon className="size-4 animate-spin" />
-                    <span>Registering Product...</span>
-                  </>
-                ) : (
-                  <>
-                    <CheckCircle2 className="size-4 text-amber-100" />
-                    <span>Create Product Anyway</span>
-                  </>
-                )}
-              </Button>
+              {step === 3 ? (
+                <Button
+                  type="button"
+                  onClick={() => handleFinalSubmit(true)}
+                  disabled={isPending}
+                  className="h-10 gap-2 bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white font-semibold shadow-md shadow-amber-600/20 transition-all"
+                >
+                  {isPending ? (
+                    <>
+                      <LoaderCircleIcon className="size-4 animate-spin" />
+                      <span>Registering Product...</span>
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 className="size-4 text-amber-100" />
+                      <span>Create Product Anyway</span>
+                    </>
+                  )}
+                </Button>
+              ) : null}
             </div>
           </div>
         )}
