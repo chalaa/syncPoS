@@ -324,27 +324,25 @@ export function ProductDetailModal({
             </div>
           ) : (
             <div className="space-y-4 sm:space-y-5 p-4 sm:p-6">
-              {/* Mobile View: Compact Commercial Micro-Bar (sm:hidden) */}
-              <div className="-mx-4 flex gap-2 overflow-x-auto px-4 py-1 no-scrollbar touch-pan-x snap-x snap-mandatory sm:hidden">
+              {/* Mobile View: Compact 3-Column Grid (No Horizontal Scroll) */}
+              <div className="grid grid-cols-3 gap-1.5 sm:hidden">
                 {/* 1. Selling Price */}
                 <button
                   type="button"
                   onClick={() => setActiveTab("pricing")}
                   className={cn(
-                    "flex shrink-0 snap-start items-center gap-2 rounded-lg border px-2.5 py-1.5 text-left shadow-2xs",
+                    "flex flex-col justify-between rounded-lg border p-2 text-left shadow-2xs transition-colors min-w-0",
                     activeTab === "pricing"
                       ? "border-[#0B5D4B] bg-[#0B5D4B]/5"
                       : "border-border bg-card",
                   )}
                 >
-                  <div className="flex size-6 shrink-0 items-center justify-center rounded-md bg-emerald-500/10 text-emerald-600">
-                    <Coins className="size-3.5" />
+                  <div className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground truncate">
+                    <Coins className="size-3 text-emerald-600 shrink-0" />
+                    <span className="truncate">Price</span>
                   </div>
-                  <div className="min-w-0">
-                    <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Price</div>
-                    <div className="font-mono text-xs font-bold text-foreground">
-                      {formatMoneyMinor(product.listPriceMinor, product.currencyCode)}
-                    </div>
+                  <div className="mt-1 font-mono text-xs font-bold text-foreground truncate">
+                    {formatMoneyMinor(product.listPriceMinor, product.currencyCode)}
                   </div>
                 </button>
 
@@ -353,77 +351,89 @@ export function ProductDetailModal({
                   type="button"
                   onClick={() => setActiveTab("pricing")}
                   className={cn(
-                    "flex shrink-0 snap-start items-center gap-2 rounded-lg border px-2.5 py-1.5 text-left shadow-2xs",
+                    "flex flex-col justify-between rounded-lg border p-2 text-left shadow-2xs transition-colors min-w-0",
                     activeTab === "pricing"
                       ? "border-[#0B5D4B] bg-[#0B5D4B]/5"
                       : "border-border bg-card",
                   )}
                 >
-                  <div className="flex size-6 shrink-0 items-center justify-center rounded-md bg-amber-500/10 text-amber-600">
-                    <Receipt className="size-3.5" />
+                  <div className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground truncate">
+                    <Receipt className="size-3 text-amber-600 shrink-0" />
+                    <span className="truncate">Cost</span>
                   </div>
-                  <div className="min-w-0">
-                    <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Cost</div>
-                    <div className="font-mono text-xs font-bold text-foreground">
-                      {formatMoneyMinor(product.standardCostMinor, product.currencyCode)}
-                    </div>
+                  <div className="mt-1 font-mono text-xs font-bold text-foreground truncate">
+                    {formatMoneyMinor(product.standardCostMinor, product.currencyCode)}
                   </div>
                 </button>
 
-                {/* 3. On Hand Stock */}
+                {/* 3. Gross Margin */}
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("pricing")}
+                  className={cn(
+                    "flex flex-col justify-between rounded-lg border p-2 text-left shadow-2xs transition-colors min-w-0",
+                    activeTab === "pricing"
+                      ? "border-[#0B5D4B] bg-[#0B5D4B]/10"
+                      : "border border-[#0B5D4B]/20 bg-[#0B5D4B]/5",
+                  )}
+                >
+                  <div className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-[#0B5D4B] truncate">
+                    <Sparkles className="size-3 text-[#D9A441] shrink-0" />
+                    <span className="truncate">Margin</span>
+                  </div>
+                  <div className="mt-1 font-mono text-xs font-bold text-[#0B5D4B] truncate">
+                    {marginPercent.toFixed(1)}%
+                  </div>
+                </button>
+
+                {/* 4. On Hand Stock */}
                 <button
                   type="button"
                   onClick={() => setActiveTab("inventory")}
                   className={cn(
-                    "flex shrink-0 snap-start items-center gap-2 rounded-lg border px-2.5 py-1.5 text-left shadow-2xs",
+                    "flex flex-col justify-between rounded-lg border p-2 text-left shadow-2xs transition-colors min-w-0",
                     activeTab === "inventory"
                       ? "border-[#0B5D4B] bg-[#0B5D4B]/5"
                       : "border-border bg-card",
                   )}
                 >
-                  <div className="flex size-6 shrink-0 items-center justify-center rounded-md bg-emerald-500/10 text-[#0B5D4B]">
-                    <Package className="size-3.5" />
+                  <div className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground truncate">
+                    <Package className="size-3 text-[#0B5D4B] shrink-0" />
+                    <span className="truncate">On Hand</span>
                   </div>
-                  <div className="min-w-0">
-                    <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">On Hand</div>
-                    <div className="font-mono text-xs font-bold text-foreground">
-                      {displayQuantity(product.quantityOnHand)} {product.unitCode}
-                    </div>
+                  <div className="mt-1 font-mono text-xs font-bold text-foreground truncate">
+                    {displayQuantity(product.quantityOnHand)} {product.unitCode}
                   </div>
                 </button>
 
-                {/* 4. Incoming Stock */}
+                {/* 5. Incoming Stock */}
                 <button
                   type="button"
                   onClick={() => setActiveTab("inventory")}
                   className={cn(
-                    "flex shrink-0 snap-start items-center gap-2 rounded-lg border px-2.5 py-1.5 text-left shadow-2xs",
+                    "flex flex-col justify-between rounded-lg border p-2 text-left shadow-2xs transition-colors min-w-0",
                     activeTab === "inventory"
                       ? "border-[#0B5D4B] bg-[#0B5D4B]/5"
                       : "border-border bg-card",
                   )}
                 >
-                  <div className="flex size-6 shrink-0 items-center justify-center rounded-md bg-blue-500/10 text-blue-600">
-                    <TrendingUp className="size-3.5" />
+                  <div className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground truncate">
+                    <TrendingUp className="size-3 text-blue-600 shrink-0" />
+                    <span className="truncate">Incoming</span>
                   </div>
-                  <div className="min-w-0">
-                    <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Incoming</div>
-                    <div className="font-mono text-xs font-bold text-foreground">
-                      {displayQuantity(product.incomingQuantity)} {product.unitCode}
-                    </div>
+                  <div className="mt-1 font-mono text-xs font-bold text-foreground truncate">
+                    {displayQuantity(product.incomingQuantity)} {product.unitCode}
                   </div>
                 </button>
 
-                {/* 5. Inventory Valuation */}
-                <div className="flex shrink-0 snap-start items-center gap-2 rounded-lg border border-border bg-secondary/30 px-2.5 py-1.5 text-left shadow-2xs">
-                  <div className="flex size-6 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
-                    <Building2 className="size-3.5" />
+                {/* 6. Inventory Valuation */}
+                <div className="flex flex-col justify-between rounded-lg border border-border bg-secondary/30 p-2 text-left shadow-2xs min-w-0">
+                  <div className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground truncate">
+                    <Building2 className="size-3 text-muted-foreground shrink-0" />
+                    <span className="truncate">Valuation</span>
                   </div>
-                  <div className="min-w-0">
-                    <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Valuation</div>
-                    <div className="font-mono text-xs font-bold text-foreground">
-                      {formatMoneyMinor(totalValuationMinor, product.currencyCode)}
-                    </div>
+                  <div className="mt-1 font-mono text-xs font-bold text-foreground truncate">
+                    {formatMoneyMinor(totalValuationMinor, product.currencyCode)}
                   </div>
                 </div>
               </div>
@@ -563,8 +573,8 @@ export function ProductDetailModal({
                 </div>
               </div>
 
-              {/* Segmented Pill Navigation Bar */}
-              <div className="flex w-full items-center gap-1 sm:gap-1.5 overflow-x-auto no-scrollbar rounded-xl border border-border/80 bg-muted/50 p-1 touch-pan-x snap-x snap-mandatory max-w-full">
+              {/* Segmented Navigation Tab Bar */}
+              <div className="grid grid-cols-5 gap-1 rounded-xl border border-border/80 bg-muted/50 p-1 w-full">
                 {tabs.map((tab) => {
                   const Icon = tab.icon;
                   const isActive = activeTab === tab.id;
@@ -574,21 +584,35 @@ export function ProductDetailModal({
                       type="button"
                       onClick={() => setActiveTab(tab.id)}
                       className={cn(
-                        "flex shrink-0 sm:flex-1 items-center justify-center gap-1.5 sm:gap-2 rounded-lg px-2.5 sm:px-3 py-2 text-xs font-semibold transition-all outline-none whitespace-nowrap snap-start cursor-pointer",
+                        "flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-2 rounded-lg px-1 sm:px-3 py-1.5 text-[10px] sm:text-xs font-semibold transition-all outline-none cursor-pointer min-w-0",
                         isActive
                           ? "bg-card text-[#0B5D4B] shadow-xs ring-1 ring-black/5 font-bold"
                           : "text-muted-foreground hover:bg-card/60 hover:text-foreground",
                       )}
                     >
-                      <Icon
-                        className={cn("size-3.5 shrink-0", isActive ? "text-[#0B5D4B]" : "text-muted-foreground")}
-                      />
-                      <span className="hidden sm:inline">{tab.label}</span>
-                      <span className="sm:hidden">{tab.shortLabel}</span>
+                      <div className="relative flex items-center justify-center">
+                        <Icon
+                          className={cn("size-3.5 shrink-0", isActive ? "text-[#0B5D4B]" : "text-muted-foreground")}
+                        />
+                        {tab.count !== undefined && tab.count > 0 ? (
+                          <span
+                            className={cn(
+                              "sm:hidden absolute -top-1.5 -right-2 rounded-full px-1 py-0.2 text-[9px] font-mono leading-none",
+                              isActive
+                                ? "bg-[#0B5D4B] text-white font-bold"
+                                : "bg-muted-foreground/30 text-foreground",
+                            )}
+                          >
+                            {tab.count}
+                          </span>
+                        ) : null}
+                      </div>
+                      <span className="hidden sm:inline truncate">{tab.label}</span>
+                      <span className="sm:hidden truncate text-[10px] leading-tight">{tab.shortLabel}</span>
                       {tab.count !== undefined && tab.count > 0 ? (
                         <span
                           className={cn(
-                            "rounded-full px-1.5 py-0.5 text-[10px] font-mono leading-none",
+                            "hidden sm:inline-block rounded-full px-1.5 py-0.5 text-[10px] font-mono leading-none",
                             isActive
                               ? "bg-[#0B5D4B]/10 text-[#0B5D4B] font-bold"
                               : "bg-background/80 text-muted-foreground",
@@ -706,44 +730,38 @@ export function ProductDetailModal({
               {/* Tab Panel 2: Pricing & Commercial Margin */}
               {activeTab === "pricing" && (
                 <div className="space-y-4 sm:space-y-5 animate-in fade-in-50 duration-150">
-                  {/* Mobile View: Compact Pricing Micro-Bar (sm:hidden) */}
-                  <div className="-mx-4 flex gap-2 overflow-x-auto px-4 py-1 no-scrollbar touch-pan-x snap-x snap-mandatory sm:hidden">
+                  {/* Mobile View: Compact 3-Column Grid (No Horizontal Scroll) */}
+                  <div className="grid grid-cols-3 gap-1.5 sm:hidden">
                     {/* Sales Price */}
-                    <div className="flex shrink-0 snap-start items-center gap-2 rounded-lg border border-emerald-500/20 bg-card px-2.5 py-1.5 shadow-2xs">
-                      <div className="flex size-6 shrink-0 items-center justify-center rounded-md bg-emerald-500/10 text-emerald-600">
-                        <Tag className="size-3.5" />
+                    <div className="flex flex-col justify-between rounded-lg border border-emerald-500/20 bg-card p-2 text-left shadow-2xs min-w-0">
+                      <div className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground truncate">
+                        <Tag className="size-3 text-emerald-600 shrink-0" />
+                        <span className="truncate">List Price</span>
                       </div>
-                      <div className="min-w-0">
-                        <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">List Price</div>
-                        <div className="font-mono text-xs font-bold text-foreground">
-                          {formatMoneyMinor(product.listPriceMinor, product.currencyCode)}
-                        </div>
+                      <div className="mt-1 font-mono text-xs font-bold text-foreground truncate">
+                        {formatMoneyMinor(product.listPriceMinor, product.currencyCode)}
                       </div>
                     </div>
 
                     {/* Purchase Cost */}
-                    <div className="flex shrink-0 snap-start items-center gap-2 rounded-lg border border-border bg-card px-2.5 py-1.5 shadow-2xs">
-                      <div className="flex size-6 shrink-0 items-center justify-center rounded-md bg-amber-500/10 text-amber-600">
-                        <Receipt className="size-3.5" />
+                    <div className="flex flex-col justify-between rounded-lg border border-border bg-card p-2 text-left shadow-2xs min-w-0">
+                      <div className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground truncate">
+                        <Receipt className="size-3 text-amber-600 shrink-0" />
+                        <span className="truncate">Std Cost</span>
                       </div>
-                      <div className="min-w-0">
-                        <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Std Cost</div>
-                        <div className="font-mono text-xs font-bold text-foreground">
-                          {formatMoneyMinor(product.standardCostMinor, product.currencyCode)}
-                        </div>
+                      <div className="mt-1 font-mono text-xs font-bold text-foreground truncate">
+                        {formatMoneyMinor(product.standardCostMinor, product.currencyCode)}
                       </div>
                     </div>
 
                     {/* Gross Margin */}
-                    <div className="flex shrink-0 snap-start items-center gap-2 rounded-lg border border-[#0B5D4B]/30 bg-[#0B5D4B]/5 px-2.5 py-1.5 shadow-2xs">
-                      <div className="flex size-6 shrink-0 items-center justify-center rounded-md bg-[#0B5D4B]/10 text-[#0B5D4B]">
-                        <Sparkles className="size-3.5" />
+                    <div className="flex flex-col justify-between rounded-lg border border-[#0B5D4B]/30 bg-[#0B5D4B]/5 p-2 text-left shadow-2xs min-w-0">
+                      <div className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-[#0B5D4B] truncate">
+                        <Sparkles className="size-3 text-[#D9A441] shrink-0" />
+                        <span className="truncate">Margin</span>
                       </div>
-                      <div className="min-w-0">
-                        <div className="text-[10px] font-semibold uppercase tracking-wider text-[#0B5D4B]">Gross Margin</div>
-                        <div className="font-mono text-xs font-bold text-foreground">
-                          {marginPercent.toFixed(1)}% ({product.currencyCode} {unitProfit.toFixed(2)})
-                        </div>
+                      <div className="mt-1 font-mono text-xs font-bold text-[#0B5D4B] truncate">
+                        {marginPercent.toFixed(1)}%
                       </div>
                     </div>
                   </div>
@@ -878,44 +896,38 @@ export function ProductDetailModal({
               {/* Tab Panel 3: Inventory by Location */}
               {activeTab === "inventory" && (
                 <div className="space-y-4 animate-in fade-in-50 duration-150">
-                  {/* Mobile View: Compact Inventory Micro-Bar (sm:hidden) */}
-                  <div className="-mx-4 flex gap-2 overflow-x-auto px-4 py-1 no-scrollbar touch-pan-x snap-x snap-mandatory sm:hidden">
+                  {/* Mobile View: Compact 3-Column Grid (No Horizontal Scroll) */}
+                  <div className="grid grid-cols-3 gap-1.5 sm:hidden">
                     {/* On Hand */}
-                    <div className="flex shrink-0 snap-start items-center gap-2 rounded-lg border border-border bg-card px-2.5 py-1.5 shadow-2xs">
-                      <div className="flex size-6 shrink-0 items-center justify-center rounded-md bg-emerald-500/10 text-[#0B5D4B]">
-                        <Package className="size-3.5" />
+                    <div className="flex flex-col justify-between rounded-lg border border-border bg-card p-2 text-left shadow-2xs min-w-0">
+                      <div className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground truncate">
+                        <Package className="size-3 text-[#0B5D4B] shrink-0" />
+                        <span className="truncate">Total On Hand</span>
                       </div>
-                      <div className="min-w-0">
-                        <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Total On Hand</div>
-                        <div className="font-mono text-xs font-bold text-foreground">
-                          {displayQuantity(product.quantityOnHand)} {product.unitCode}
-                        </div>
+                      <div className="mt-1 font-mono text-xs font-bold text-foreground truncate">
+                        {displayQuantity(product.quantityOnHand)} {product.unitCode}
                       </div>
                     </div>
 
                     {/* Reserved */}
-                    <div className="flex shrink-0 snap-start items-center gap-2 rounded-lg border border-border bg-card px-2.5 py-1.5 shadow-2xs">
-                      <div className="flex size-6 shrink-0 items-center justify-center rounded-md bg-amber-500/10 text-amber-600">
-                        <Activity className="size-3.5" />
+                    <div className="flex flex-col justify-between rounded-lg border border-border bg-card p-2 text-left shadow-2xs min-w-0">
+                      <div className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground truncate">
+                        <Activity className="size-3 text-amber-600 shrink-0" />
+                        <span className="truncate">Reserved</span>
                       </div>
-                      <div className="min-w-0">
-                        <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Reserved</div>
-                        <div className="font-mono text-xs font-bold text-foreground">
-                          {displayQuantity(product.quantityReserved)} {product.unitCode}
-                        </div>
+                      <div className="mt-1 font-mono text-xs font-bold text-foreground truncate">
+                        {displayQuantity(product.quantityReserved)} {product.unitCode}
                       </div>
                     </div>
 
                     {/* Available to Sell */}
-                    <div className="flex shrink-0 snap-start items-center gap-2 rounded-lg border border-[#0B5D4B]/30 bg-[#0B5D4B]/5 px-2.5 py-1.5 shadow-2xs">
-                      <div className="flex size-6 shrink-0 items-center justify-center rounded-md bg-[#0B5D4B]/10 text-[#0B5D4B]">
-                        <Check className="size-3.5" />
+                    <div className="flex flex-col justify-between rounded-lg border border-[#0B5D4B]/30 bg-[#0B5D4B]/5 p-2 text-left shadow-2xs min-w-0">
+                      <div className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-[#0B5D4B] truncate">
+                        <Check className="size-3 text-[#0B5D4B] shrink-0" />
+                        <span className="truncate">Available</span>
                       </div>
-                      <div className="min-w-0">
-                        <div className="text-[10px] font-semibold uppercase tracking-wider text-[#0B5D4B]">Available</div>
-                        <div className="font-mono text-xs font-bold text-[#0B5D4B]">
-                          {displayQuantity(product.quantityAvailable)} {product.unitCode}
-                        </div>
+                      <div className="mt-1 font-mono text-xs font-bold text-[#0B5D4B] truncate">
+                        {displayQuantity(product.quantityAvailable)} {product.unitCode}
                       </div>
                     </div>
                   </div>
