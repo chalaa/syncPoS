@@ -172,9 +172,70 @@ export default async function PartnerDetailPage({ params }: PartnerDetailPagePro
 
       <PartnerSmartButtons partner={partner} />
 
-      {/* Financial KPI Summary Cards */}
-      <section className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="rounded-xl border border-border border-l-4 border-l-amber-500 bg-card p-4.5 shadow-xs transition-all hover:shadow-sm">
+      {/* Mobile View: Compact Financial Micro-Metric Bar (sm:hidden) */}
+      <div className="-mx-4 mb-4 flex gap-2 overflow-x-auto px-4 py-1 no-scrollbar touch-pan-x snap-x snap-mandatory sm:hidden">
+        {/* Customer Unpaid */}
+        <div className="flex shrink-0 snap-start items-center gap-2 rounded-lg border border-amber-500/30 bg-card px-2.5 py-1.5 shadow-2xs">
+          <div className="flex size-6 shrink-0 items-center justify-center rounded-md bg-amber-500/10 text-amber-600">
+            <DollarSign className="size-3.5" />
+          </div>
+          <div className="min-w-0">
+            <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Unpaid Receivables</div>
+            <div className="font-mono text-xs font-bold text-foreground">
+              {money(partner.financial.receivableResidualMinor, partner.currencyCode)}
+            </div>
+          </div>
+        </div>
+
+        {/* Available Credit */}
+        <div className="flex shrink-0 snap-start items-center gap-2 rounded-lg border border-emerald-500/30 bg-card px-2.5 py-1.5 shadow-2xs">
+          <div className="flex size-6 shrink-0 items-center justify-center rounded-md bg-emerald-500/10 text-emerald-600">
+            <CreditCard className="size-3.5" />
+          </div>
+          <div className="min-w-0">
+            <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Credit Line</div>
+            <div className="font-mono text-xs font-bold text-foreground">
+              {money(partner.financial.remainingCreditMinor, partner.currencyCode)}
+            </div>
+          </div>
+        </div>
+
+        {/* Supplier Unpaid */}
+        <div className="flex shrink-0 snap-start items-center gap-2 rounded-lg border border-rose-500/30 bg-card px-2.5 py-1.5 shadow-2xs">
+          <div className="flex size-6 shrink-0 items-center justify-center rounded-md bg-rose-500/10 text-rose-600">
+            <Banknote className="size-3.5" />
+          </div>
+          <div className="min-w-0">
+            <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Unpaid Payables</div>
+            <div className="font-mono text-xs font-bold text-foreground">
+              {money(partner.financial.payableResidualMinor, partner.currencyCode)}
+            </div>
+          </div>
+        </div>
+
+        {/* Net Exposure */}
+        <div className="flex shrink-0 snap-start items-center gap-2 rounded-lg border border-border bg-card px-2.5 py-1.5 shadow-2xs">
+          <div className="flex size-6 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+            <Briefcase className="size-3.5" />
+          </div>
+          <div className="min-w-0">
+            <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Net Position</div>
+            <div
+              className={`font-mono text-xs font-bold ${
+                partner.financial.netBalanceMinor >= 0
+                  ? "text-emerald-700 dark:text-emerald-400"
+                  : "text-rose-600 dark:text-rose-400"
+              }`}
+            >
+              {money(partner.financial.netBalanceMinor, partner.currencyCode)}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Desktop/Tablet Financial KPI Summary Cards (hidden on mobile) */}
+      <section className="hidden mb-6 sm:grid sm:grid-cols-2 lg:grid-cols-4 sm:gap-4">
+        <div className="rounded-xl border border-border border-l-4 border-l-amber-500 bg-card p-4 shadow-xs transition-all hover:shadow-sm">
           <div className="flex items-center justify-between text-muted-foreground">
             <span className="text-xs font-semibold uppercase tracking-wider">
               Customer Unpaid
@@ -187,7 +248,7 @@ export default async function PartnerDetailPage({ params }: PartnerDetailPagePro
           <p className="mt-1 text-xs text-muted-foreground">Outstanding receivables</p>
         </div>
 
-        <div className="rounded-xl border border-border border-l-4 border-l-emerald-600 bg-card p-4.5 shadow-xs transition-all hover:shadow-sm">
+        <div className="rounded-xl border border-border border-l-4 border-l-emerald-600 bg-card p-4 shadow-xs transition-all hover:shadow-sm">
           <div className="flex items-center justify-between text-muted-foreground">
             <span className="text-xs font-semibold uppercase tracking-wider">
               Available Credit
@@ -200,7 +261,7 @@ export default async function PartnerDetailPage({ params }: PartnerDetailPagePro
           <p className="mt-1 text-xs text-muted-foreground">Remaining credit line</p>
         </div>
 
-        <div className="rounded-xl border border-border border-l-4 border-l-rose-500 bg-card p-4.5 shadow-xs transition-all hover:shadow-sm">
+        <div className="rounded-xl border border-border border-l-4 border-l-rose-500 bg-card p-4 shadow-xs transition-all hover:shadow-sm">
           <div className="flex items-center justify-between text-muted-foreground">
             <span className="text-xs font-semibold uppercase tracking-wider">
               Supplier Unpaid
@@ -214,7 +275,7 @@ export default async function PartnerDetailPage({ params }: PartnerDetailPagePro
         </div>
 
         <div
-          className={`rounded-xl border border-border border-l-4 bg-card p-4.5 shadow-xs transition-all hover:shadow-sm ${
+          className={`rounded-xl border border-border border-l-4 bg-card p-4 shadow-xs transition-all hover:shadow-sm ${
             partner.financial.netBalanceMinor >= 0
               ? "border-l-emerald-600"
               : "border-l-rose-500"

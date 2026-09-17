@@ -46,8 +46,36 @@ export default async function AdminDashboardPage() {
         </div>
       </div>
 
-      {/* KPI Metrics Grid */}
-      <section className="-mx-4 mb-6 flex gap-2.5 overflow-x-auto px-4 pb-2 pt-0.5 no-scrollbar snap-x snap-mandatory sm:mx-0 sm:grid sm:grid-cols-2 sm:px-0 sm:pb-0 lg:grid-cols-3">
+      {/* Mobile View: Compact Micro-Metric Bar (sm:hidden) */}
+      <div className="-mx-4 mb-4 flex gap-2 overflow-x-auto px-4 py-1 no-scrollbar touch-pan-x snap-x snap-mandatory sm:hidden">
+        {report.metrics.map((metric) => {
+          const toneDot =
+            metric.tone === "success"
+              ? "bg-primary"
+              : metric.tone === "warning"
+                ? "bg-gold"
+                : metric.tone === "danger"
+                  ? "bg-destructive"
+                  : "bg-muted-foreground";
+
+          return (
+            <Link
+              key={metric.label}
+              href={metric.href}
+              className="flex shrink-0 snap-start items-center gap-2 rounded-lg border border-border bg-card px-2.5 py-1.5 shadow-2xs active:bg-secondary/50"
+            >
+              <span className={`size-2 shrink-0 rounded-full ${toneDot}`} />
+              <div className="min-w-0">
+                <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{metric.label}</div>
+                <div className="font-mono text-xs font-bold text-foreground">{metric.value}</div>
+              </div>
+            </Link>
+          );
+        })}
+      </div>
+
+      {/* Desktop/Tablet KPI Metrics Grid (hidden on mobile) */}
+      <section className="hidden mb-6 sm:grid sm:grid-cols-2 lg:grid-cols-3 sm:gap-3">
         {report.metrics.map((metric) => {
           const toneBorder =
             metric.tone === "success"
@@ -71,18 +99,18 @@ export default async function AdminDashboardPage() {
             <Link
               key={metric.label}
               href={metric.href}
-              className={`group relative flex w-[72vw] min-w-[200px] max-w-[260px] shrink-0 snap-start flex-col justify-between rounded-xl border border-border ${toneBorder} border-t-3 bg-card p-3.5 shadow-xs transition-all duration-150 hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md sm:w-auto sm:min-w-0 sm:max-w-none sm:p-5`}
+              className={`group relative flex flex-col justify-between rounded-xl border border-border ${toneBorder} border-t-3 bg-card p-4 shadow-xs transition-all duration-150 hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md`}
             >
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-1.5 truncate">
                   <span className={`size-2 shrink-0 rounded-full ${toneDot}`} />
-                  <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground truncate sm:text-xs">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground truncate">
                     {metric.label}
                   </p>
                 </div>
                 <ArrowUpRight className="size-4 shrink-0 text-muted-foreground opacity-0 transition-all duration-150 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:text-primary group-hover:opacity-100" />
               </div>
-              <p className="mt-2 text-xl font-bold tracking-tight text-foreground transition-colors group-hover:text-primary sm:text-2xl">
+              <p className="mt-2 text-2xl font-bold tracking-tight text-foreground transition-colors group-hover:text-primary">
                 {metric.value}
               </p>
             </Link>

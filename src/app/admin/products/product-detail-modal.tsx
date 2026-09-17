@@ -324,14 +324,118 @@ export function ProductDetailModal({
             </div>
           ) : (
             <div className="space-y-4 sm:space-y-5 p-4 sm:p-6">
-              {/* Executive Commercial & Stock Highlights Strip */}
-              <div className="grid grid-cols-2 gap-2.5 sm:gap-3 sm:grid-cols-3 lg:grid-cols-5">
+              {/* Mobile View: Compact Commercial Micro-Bar (sm:hidden) */}
+              <div className="-mx-4 flex gap-2 overflow-x-auto px-4 py-1 no-scrollbar touch-pan-x snap-x snap-mandatory sm:hidden">
+                {/* 1. Selling Price */}
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("pricing")}
+                  className={cn(
+                    "flex shrink-0 snap-start items-center gap-2 rounded-lg border px-2.5 py-1.5 text-left shadow-2xs",
+                    activeTab === "pricing"
+                      ? "border-[#0B5D4B] bg-[#0B5D4B]/5"
+                      : "border-border bg-card",
+                  )}
+                >
+                  <div className="flex size-6 shrink-0 items-center justify-center rounded-md bg-emerald-500/10 text-emerald-600">
+                    <Coins className="size-3.5" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Price</div>
+                    <div className="font-mono text-xs font-bold text-foreground">
+                      {formatMoneyMinor(product.listPriceMinor, product.currencyCode)}
+                    </div>
+                  </div>
+                </button>
+
+                {/* 2. Standard Cost */}
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("pricing")}
+                  className={cn(
+                    "flex shrink-0 snap-start items-center gap-2 rounded-lg border px-2.5 py-1.5 text-left shadow-2xs",
+                    activeTab === "pricing"
+                      ? "border-[#0B5D4B] bg-[#0B5D4B]/5"
+                      : "border-border bg-card",
+                  )}
+                >
+                  <div className="flex size-6 shrink-0 items-center justify-center rounded-md bg-amber-500/10 text-amber-600">
+                    <Receipt className="size-3.5" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Cost</div>
+                    <div className="font-mono text-xs font-bold text-foreground">
+                      {formatMoneyMinor(product.standardCostMinor, product.currencyCode)}
+                    </div>
+                  </div>
+                </button>
+
+                {/* 3. On Hand Stock */}
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("inventory")}
+                  className={cn(
+                    "flex shrink-0 snap-start items-center gap-2 rounded-lg border px-2.5 py-1.5 text-left shadow-2xs",
+                    activeTab === "inventory"
+                      ? "border-[#0B5D4B] bg-[#0B5D4B]/5"
+                      : "border-border bg-card",
+                  )}
+                >
+                  <div className="flex size-6 shrink-0 items-center justify-center rounded-md bg-emerald-500/10 text-[#0B5D4B]">
+                    <Package className="size-3.5" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">On Hand</div>
+                    <div className="font-mono text-xs font-bold text-foreground">
+                      {displayQuantity(product.quantityOnHand)} {product.unitCode}
+                    </div>
+                  </div>
+                </button>
+
+                {/* 4. Incoming Stock */}
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("inventory")}
+                  className={cn(
+                    "flex shrink-0 snap-start items-center gap-2 rounded-lg border px-2.5 py-1.5 text-left shadow-2xs",
+                    activeTab === "inventory"
+                      ? "border-[#0B5D4B] bg-[#0B5D4B]/5"
+                      : "border-border bg-card",
+                  )}
+                >
+                  <div className="flex size-6 shrink-0 items-center justify-center rounded-md bg-blue-500/10 text-blue-600">
+                    <TrendingUp className="size-3.5" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Incoming</div>
+                    <div className="font-mono text-xs font-bold text-foreground">
+                      {displayQuantity(product.incomingQuantity)} {product.unitCode}
+                    </div>
+                  </div>
+                </button>
+
+                {/* 5. Inventory Valuation */}
+                <div className="flex shrink-0 snap-start items-center gap-2 rounded-lg border border-border bg-secondary/30 px-2.5 py-1.5 text-left shadow-2xs">
+                  <div className="flex size-6 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
+                    <Building2 className="size-3.5" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Valuation</div>
+                    <div className="font-mono text-xs font-bold text-foreground">
+                      {formatMoneyMinor(totalValuationMinor, product.currencyCode)}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Desktop/Tablet View: Executive Commercial & Stock Highlights Strip (hidden on mobile) */}
+              <div className="hidden sm:grid sm:grid-cols-3 lg:grid-cols-5 sm:gap-3">
                 {/* 1. Selling Price Card */}
                 <button
                   type="button"
                   onClick={() => setActiveTab("pricing")}
                   className={cn(
-                    "group flex flex-col justify-between rounded-xl border p-3 sm:p-3.5 text-left transition-all",
+                    "group flex flex-col justify-between rounded-xl border p-3.5 text-left transition-all",
                     activeTab === "pricing"
                       ? "border-[#0B5D4B] bg-[#0B5D4B]/5 shadow-xs"
                       : "border-border bg-card hover:border-[#0B5D4B]/40 hover:bg-secondary/30",
@@ -358,7 +462,7 @@ export function ProductDetailModal({
                   type="button"
                   onClick={() => setActiveTab("pricing")}
                   className={cn(
-                    "group flex flex-col justify-between rounded-xl border p-3 sm:p-3.5 text-left transition-all",
+                    "group flex flex-col justify-between rounded-xl border p-3.5 text-left transition-all",
                     activeTab === "pricing"
                       ? "border-[#0B5D4B] bg-[#0B5D4B]/5 shadow-xs"
                       : "border-border bg-card hover:border-[#0B5D4B]/40 hover:bg-secondary/30",
@@ -385,7 +489,7 @@ export function ProductDetailModal({
                   type="button"
                   onClick={() => setActiveTab("inventory")}
                   className={cn(
-                    "group flex flex-col justify-between rounded-xl border p-3 sm:p-3.5 text-left transition-all",
+                    "group flex flex-col justify-between rounded-xl border p-3.5 text-left transition-all",
                     activeTab === "inventory"
                       ? "border-[#0B5D4B] bg-[#0B5D4B]/5 shadow-xs"
                       : "border-border bg-card hover:border-[#0B5D4B]/40 hover:bg-secondary/30",
@@ -415,7 +519,7 @@ export function ProductDetailModal({
                   type="button"
                   onClick={() => setActiveTab("inventory")}
                   className={cn(
-                    "group flex flex-col justify-between rounded-xl border p-3 sm:p-3.5 text-left transition-all",
+                    "group flex flex-col justify-between rounded-xl border p-3.5 text-left transition-all",
                     activeTab === "inventory"
                       ? "border-[#0B5D4B] bg-[#0B5D4B]/5 shadow-xs"
                       : "border-border bg-card hover:border-[#0B5D4B]/40 hover:bg-secondary/30",
@@ -441,7 +545,7 @@ export function ProductDetailModal({
                 </button>
 
                 {/* 5. Inventory Valuation */}
-                <div className="col-span-2 sm:col-span-1 flex flex-col justify-between rounded-xl border border-border bg-secondary/30 p-3 sm:p-3.5 text-left">
+                <div className="flex flex-col justify-between rounded-xl border border-border bg-secondary/30 p-3.5 text-left">
                   <div className="flex items-center justify-between">
                     <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                       Inventory Value
