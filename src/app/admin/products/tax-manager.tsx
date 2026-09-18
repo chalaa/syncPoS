@@ -58,8 +58,8 @@ function TaxForm({
   return (
     <form action={action} className="flex flex-col gap-4">
       <DialogHeader>
-        <DialogTitle>{title}</DialogTitle>
-        <DialogDescription>Configure the tax used by purchase and sales document lines.</DialogDescription>
+        <DialogTitle>{t(title)}</DialogTitle>
+        <DialogDescription>{t("tax.modalDescription")}</DialogDescription>
       </DialogHeader>
 
       <input type="hidden" name="returnPath" value={returnPath} />
@@ -67,31 +67,31 @@ function TaxForm({
 
       {record ? <input type="hidden" name="code" value={record.code} /> : null}
       <label className="flex flex-col gap-1 text-sm font-medium">
-        Name
+        {t("field.name")}
         <input name="name" required defaultValue={record?.name} className={inputClass} />
       </label>
 
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="flex flex-col gap-1 text-sm font-medium">
-          Scope
+          {t("field.scope")}
           <select name="scope" defaultValue={record?.scope ?? "purchase"} className={inputClass}>
-            <option value="purchase">Purchase</option>
-            <option value="sale">Sale</option>
-            <option value="both">Both</option>
+            <option value="purchase">{t("tax.scope.purchase")}</option>
+            <option value="sale">{t("tax.scope.sale")}</option>
+            <option value="both">{t("tax.scope.both")}</option>
           </select>
         </label>
         <label className="flex flex-col gap-1 text-sm font-medium">
-          Computation
+          {t("field.computation")}
           <select name="computation" defaultValue={record?.computation ?? "percent"} className={inputClass}>
-            <option value="percent">Percentage</option>
-            <option value="fixed">Fixed amount</option>
+            <option value="percent">{t("tax.computation.percent")}</option>
+            <option value="fixed">{t("tax.computation.fixed")}</option>
           </select>
         </label>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="flex flex-col gap-1 text-sm font-medium">
-          Rate %
+          {t("field.rate")}
           <input
             name="rate"
             type="number"
@@ -103,7 +103,7 @@ function TaxForm({
           />
         </label>
         <label className="flex flex-col gap-1 text-sm font-medium">
-          Fixed amount
+          {t("field.fixedAmount")}
           <input
             name="amount"
             type="number"
@@ -116,7 +116,7 @@ function TaxForm({
       </div>
 
       <label className="flex flex-col gap-1 text-sm font-medium">
-        Description
+        {t("field.description")}
         <textarea name="description" defaultValue={record?.description ?? ""} className={textareaClass} />
       </label>
 
@@ -128,7 +128,7 @@ function TaxForm({
             defaultChecked={record?.priceIncluded ?? false}
             className="size-4 rounded border-input"
           />
-          Price included
+          {t("field.priceIncluded")}
         </label>
         <label className="flex items-center gap-2 text-sm font-medium">
           <input
@@ -137,7 +137,7 @@ function TaxForm({
             defaultChecked={record?.isActive ?? true}
             className="size-4 rounded border-input"
           />
-          Active
+          {t("field.active")}
         </label>
       </div>
 
@@ -203,13 +203,13 @@ export function TaxManager({
   return (
     <PageShell>
       <PageHeader
-        eyebrow="Catalog Management"
-        title="Taxes & Levies"
+        eyebrow={t("header.eyebrow.Catalog Management")}
+        title={t("header.title.Taxes & Levies")}
         actions={
           <TaxDialog label="New tax" action={createAction} returnPath={returnPath}>
             <Button size="sm">
               <PlusIcon className="size-4" data-icon="inline-start" />
-              New tax
+              {t("action.newTax")}
             </Button>
           </TaxDialog>
         }
@@ -224,7 +224,7 @@ export function TaxManager({
         <div className="border-b border-border p-4">
           <TableSearchInput
             defaultValue={query}
-            placeholder="Search code or name..."
+            placeholder={t("action.searchCodeOrName")}
             className="sm:max-w-md"
           />
         </div>
@@ -234,10 +234,10 @@ export function TaxManager({
             <thead className="border-b border-border bg-muted/50 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               <tr>
                 <th className="px-4 py-3">{t("field.code")}</th>
-                <th className="px-4 py-3">Tax</th>
-                <th className="px-4 py-3">Scope</th>
+                <th className="px-4 py-3">{t("field.tax")}</th>
+                <th className="px-4 py-3">{t("field.scope")}</th>
                 <th className="px-4 py-3 text-right">{t("field.rate")}</th>
-                <th className="px-4 py-3">Included</th>
+                <th className="px-4 py-3">{t("field.included")}</th>
                 <th className="px-4 py-3">{t("field.status")}</th>
                 <th className="px-4 py-3 text-right">{t("action.actions")}</th>
               </tr>
@@ -253,13 +253,13 @@ export function TaxManager({
                   </td>
                   <td className="px-4 py-3">
                     <div className="font-medium text-foreground">{record.name}</div>
-                    <div className="text-xs text-muted-foreground">{record.description || "No description"}</div>
+                    <div className="text-xs text-muted-foreground">{record.description || t("common.noDescription")}</div>
                   </td>
-                  <td className="px-4 py-3 capitalize text-foreground">{record.scope}</td>
+                  <td className="px-4 py-3 capitalize text-foreground">{t(`tax.scope.${record.scope}` as any) || record.scope}</td>
                   <td className="px-4 py-3 text-right font-mono text-xs font-bold text-foreground">
                     {formatTax(record)}
                   </td>
-                  <td className="px-4 py-3 text-foreground">{record.priceIncluded ? "Yes" : "No"}</td>
+                  <td className="px-4 py-3 text-foreground">{record.priceIncluded ? t("common.yes") : t("common.no")}</td>
                   <td className="px-4 py-3">
                     <StatusBadge status={record.isActive ? "active" : "inactive"} />
                   </td>
@@ -275,7 +275,7 @@ export function TaxManager({
                           >
                             <Button variant="outline" size="sm" className="h-7 text-xs">
                               <EditIcon className="size-3.5" data-icon="inline-start" />
-                              Edit
+                              {t("action.edit")}
                             </Button>
                           </TaxDialog>
                           <DeleteConfirmationDialog
@@ -290,7 +290,7 @@ export function TaxManager({
                           <input type="hidden" name="returnPath" value={returnPath} />
                           <Button variant="outline" size="sm" className="h-7 text-xs">
                             <RotateCcwIcon className="size-3.5" data-icon="inline-start" />
-                            Restore
+                            {t("action.restore")}
                           </Button>
                         </form>
                       )}
@@ -301,7 +301,7 @@ export function TaxManager({
               {records.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="px-4 py-12 text-center text-muted-foreground">
-                    No taxes found.
+                    {t("tax.emptyTitle")}
                   </td>
                 </tr>
               ) : null}
@@ -312,3 +312,4 @@ export function TaxManager({
     </PageShell>
   );
 }
+

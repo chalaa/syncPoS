@@ -37,6 +37,7 @@ function SpecificationTags({
 }: {
   fields: ProductSpecificationField[];
 }) {
+  const { t } = useTranslation();
   const [tags, setTags] = useState(() => fields.map((field) => field.label).filter(Boolean));
   const [draft, setDraft] = useState("");
 
@@ -82,7 +83,7 @@ function SpecificationTags({
           </span>
         ))}
         {tags.length === 0 ? (
-          <span className="px-1 text-xs text-muted-foreground">No specifications added</span>
+          <span className="px-1 text-xs text-muted-foreground">{t("catalog.noSpecifications")}</span>
         ) : null}
       </div>
       <div className="flex gap-2">
@@ -100,7 +101,7 @@ function SpecificationTags({
         />
         <Button type="button" variant="outline" size="sm" onClick={() => addTag()} disabled={!draft.trim()}>
           <PlusIcon data-icon="inline-start" />
-          Add
+          {t("action.add")}
         </Button>
       </div>
     </div>
@@ -130,8 +131,8 @@ function ReferenceForm({
   return (
     <form action={action} className="space-y-4">
       <DialogHeader>
-        <DialogTitle>{title}</DialogTitle>
-        <DialogDescription>{description}</DialogDescription>
+        <DialogTitle>{t(title)}</DialogTitle>
+        <DialogDescription>{t("modal.reference.description")}</DialogDescription>
       </DialogHeader>
 
       <input type="hidden" name="returnPath" value={returnPath} />
@@ -140,7 +141,7 @@ function ReferenceForm({
       {record ? <input type="hidden" name="code" value={record.code} /> : null}
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="flex flex-col gap-1 text-sm font-medium">
-          Name
+          {t("field.name")}
           <input
             name="name"
             required
@@ -149,13 +150,13 @@ function ReferenceForm({
           />
         </label>
         {showCountry ? (
-          <CountrySelectField name="country" label="Country" defaultValue={record?.country ?? ""} />
+          <CountrySelectField name="country" label={t("field.country")} defaultValue={record?.country ?? ""} />
         ) : null}
       </div>
 
       {showPrecision ? (
         <label className="flex flex-col gap-1 text-sm font-medium">
-          Precision
+          {t("field.precision")}
           <input
             name="precision"
             type="number"
@@ -168,7 +169,7 @@ function ReferenceForm({
       ) : showSpecifications ? (
         <div className="grid gap-3">
           <label className="flex flex-col gap-1 text-sm font-medium">
-            Description
+            {t("field.description")}
             <textarea
               name="description"
               defaultValue={record?.description ?? ""}
@@ -179,7 +180,7 @@ function ReferenceForm({
         </div>
       ) : (
         <label className="flex flex-col gap-1 text-sm font-medium">
-          Description
+          {t("field.description")}
           <textarea
             name="description"
             defaultValue={record?.description ?? ""}
@@ -195,7 +196,7 @@ function ReferenceForm({
           defaultChecked={record?.isActive ?? true}
           className="size-4 rounded border-input"
         />
-        Active
+        {t("field.active")}
       </label>
 
       <DialogFooter>
@@ -273,8 +274,8 @@ export function CatalogReferenceManager({
   return (
     <PageShell>
       <PageHeader
-        eyebrow={eyebrow}
-        title={title}
+        eyebrow={t(eyebrow)}
+        title={t(title)}
         actions={
           <ReferenceDialog
             label={createLabel}
@@ -286,7 +287,7 @@ export function CatalogReferenceManager({
           >
             <Button>
               <PlusIcon data-icon="inline-start" />
-              {createLabel}
+              {t(createLabel)}
             </Button>
           </ReferenceDialog>
         }
@@ -301,13 +302,13 @@ export function CatalogReferenceManager({
         <div className="border-b border-border p-4">
           <TableSearchInput
             defaultValue={query}
-            placeholder="Search code or name..."
+            placeholder={t("action.searchCodeOrName")}
             className="sm:max-w-md"
           />
         </div>
 
         <div className="border-b border-border bg-muted/20 px-4 py-2.5">
-          <p className="text-xs text-muted-foreground">{description}</p>
+          <p className="text-xs text-muted-foreground">{t(description)}</p>
         </div>
 
         <div className="overflow-x-auto">
@@ -316,8 +317,8 @@ export function CatalogReferenceManager({
               <tr>
                 <th className="px-4 py-3">{t("field.code")}</th>
                 <th className="px-4 py-3">{t("field.name")}</th>
-                {showPrecision ? <th className="px-4 py-3">Precision</th> : null}
-                {showCountry ? <th className="px-4 py-3">Country</th> : null}
+                {showPrecision ? <th className="px-4 py-3">{t("field.precision")}</th> : null}
+                {showCountry ? <th className="px-4 py-3">{t("field.country")}</th> : null}
                 <th className="px-4 py-3">{t("field.status")}</th>
                 <th className="px-4 py-3 text-right">{t("action.actions")}</th>
               </tr>
@@ -335,7 +336,7 @@ export function CatalogReferenceManager({
                     <div className="font-medium text-foreground">{record.name}</div>
                     {!showPrecision ? (
                       <div className="text-xs text-muted-foreground">
-                        {record.description || "No description"}
+                        {record.description || t("common.noDescription")}
                       </div>
                     ) : null}
                   </td>
@@ -365,7 +366,7 @@ export function CatalogReferenceManager({
                           >
                             <Button variant="outline" size="sm" className="h-7 text-xs">
                               <EditIcon className="size-3.5" data-icon="inline-start" />
-                              Edit
+                              {t("action.edit")}
                             </Button>
                           </ReferenceDialog>
                           <DeleteConfirmationDialog
@@ -380,7 +381,7 @@ export function CatalogReferenceManager({
                           <input type="hidden" name="returnPath" value={returnPath} />
                           <Button variant="outline" size="sm" className="h-7 text-xs">
                             <RotateCcwIcon className="size-3.5" data-icon="inline-start" />
-                            Restore
+                            {t("action.restore")}
                           </Button>
                         </form>
                       )}
@@ -394,7 +395,7 @@ export function CatalogReferenceManager({
                     colSpan={4 + (showPrecision ? 1 : 0) + (showCountry ? 1 : 0)}
                     className="px-4 py-12 text-center text-muted-foreground"
                   >
-                    No records found.
+                    {t("common.noRecords")}
                   </td>
                 </tr>
               ) : null}

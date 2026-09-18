@@ -4,6 +4,7 @@ import { SearchIcon, X } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 
+import { useTranslation } from "@/lib/i18n/use-translation";
 import { cn } from "@/lib/utils";
 
 type TableSearchInputProps = {
@@ -23,6 +24,7 @@ export function TableSearchInput({
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [, startTransition] = useTransition();
+  const { t } = useTranslation();
 
   const [value, setValue] = useState(defaultValue);
   const isInitialMount = useRef(true);
@@ -57,6 +59,8 @@ export function TableSearchInput({
     return () => clearTimeout(timer);
   }, [value, pathname, router, searchParams, paramName]);
 
+  const displayPlaceholder = t("action.searchProducts", t(placeholder, placeholder));
+
   return (
     <div className={cn("relative min-w-0 flex-1", className)}>
       <SearchIcon className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground pointer-events-none" />
@@ -64,7 +68,7 @@ export function TableSearchInput({
         type="text"
         value={value}
         onChange={(e) => setValue(e.target.value)}
-        placeholder={placeholder}
+        placeholder={displayPlaceholder}
         className="h-10 w-full rounded-xl border border-input bg-background pl-9 pr-8 text-sm font-normal text-foreground transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
       />
       {value ? (

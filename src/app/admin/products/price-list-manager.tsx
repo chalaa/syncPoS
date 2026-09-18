@@ -24,6 +24,7 @@ import { ProductSelect, type ProductSelectOption } from "@/app/admin/products/pr
 import { RelatedModelSelect } from "@/components/ui/related-model-select";
 import { minorToDisplay } from "@/lib/catalog-utils";
 import { cn } from "@/lib/utils";
+import { useTranslation } from "@/lib/i18n/use-translation";
 import type { PriceListFormOptions, ProductPriceListItemRow, ProductPriceListRow } from "@/server/catalog/types";
 
 type PriceListMutation = (formData: FormData) => Promise<void>;
@@ -75,6 +76,7 @@ function PriceListForm({
   options: PriceListFormOptions;
   returnPath: string;
 }) {
+  const { t } = useTranslation();
   const [lines, setLines] = useState<PriceListLineDraft[]>(() => record?.items.length ? record.items.map(lineFromItem) : [newLine()]);
   const [productOptions, setProductOptions] = useState<ProductSelectOption[]>(options.products);
 
@@ -89,8 +91,8 @@ function PriceListForm({
   return (
     <form action={action} className="grid gap-4">
       <DialogHeader>
-        <DialogTitle>{title}</DialogTitle>
-      <DialogDescription>Set product prices by owner and quantity break.</DialogDescription>
+        <DialogTitle>{t(title)}</DialogTitle>
+      <DialogDescription>{t("pricelist.modalDescription")}</DialogDescription>
       </DialogHeader>
 
       <input type="hidden" name="returnPath" value={returnPath} />
@@ -98,12 +100,12 @@ function PriceListForm({
 
       <div className="grid gap-4 md:grid-cols-2">
         <label className="grid gap-1 text-sm font-medium">
-          Name
+          {t("field.name")}
           <input name="name" required defaultValue={record?.name} className={inputClass} />
         </label>
         <RelatedModelSelect
           name="ownerId"
-          label="Owner"
+          label={t("pricelist.owner")}
           options={options.owners}
           defaultValue={record?.ownerId ?? options.owners[0]?.id ?? ""}
           required={options.owners.length > 0}
@@ -114,26 +116,26 @@ function PriceListForm({
 
       <label className="flex items-center gap-2 text-sm font-medium">
         <input name="isActive" type="checkbox" defaultChecked={record?.isActive ?? true} className="size-4 rounded border-input" />
-        Active
+        {t("field.active")}
       </label>
 
       <section className="grid gap-3">
         <div className="flex items-center justify-between gap-3">
-          <h3 className="text-sm font-semibold">Price Items</h3>
+          <h3 className="text-sm font-semibold">{t("pricelist.priceItems")}</h3>
           <Button type="button" variant="outline" size="sm" onClick={() => setLines((current) => [...current, newLine()])}>
             <PlusIcon data-icon="inline-start" />
-            Add item
+            {t("pricelist.addItem")}
           </Button>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[720px] text-left text-sm">
             <thead className="text-xs uppercase text-muted-foreground">
               <tr className="border-b border-border">
-                <th className="px-2 py-2">Product</th>
-                <th className="w-28 px-2 py-2 text-right">Min Qty</th>
-                <th className="w-32 px-2 py-2 text-right">Unit Price</th>
-                <th className="w-32 px-2 py-2 text-right">Discount</th>
-                <th className="w-24 px-2 py-2">Active</th>
+                <th className="px-2 py-2">{t("nav.products")}</th>
+                <th className="w-28 px-2 py-2 text-right">{t("pricelist.minQty")}</th>
+                <th className="w-32 px-2 py-2 text-right">{t("pricelist.unitPrice")}</th>
+                <th className="w-32 px-2 py-2 text-right">{t("pricelist.discount")}</th>
+                <th className="w-24 px-2 py-2">{t("field.active")}</th>
                 <th className="w-12 px-2 py-2"></th>
               </tr>
             </thead>
@@ -166,8 +168,8 @@ function PriceListForm({
                   </td>
                   <td className="px-2 py-2">
                     <select name="itemIsActive" value={line.isActive ? "true" : "false"} className={tableInputClass} onChange={(event) => updateLine(line.key, { isActive: event.target.value === "true" })}>
-                      <option value="true">Yes</option>
-                      <option value="false">No</option>
+                      <option value="true">{t("common.yes")}</option>
+                      <option value="false">{t("common.no")}</option>
                     </select>
                   </td>
                   <td className="px-2 py-2 text-right">
@@ -185,9 +187,9 @@ function PriceListForm({
 
       <DialogFooter>
         <DialogClose asChild>
-          <Button type="button" variant="outline">Cancel</Button>
+          <Button type="button" variant="outline">{t("action.cancel")}</Button>
         </DialogClose>
-        <Button>{record ? "Save changes" : "Create price list"}</Button>
+        <Button>{record ? t("pricelist.saveChanges") : t("pricelist.createPriceList")}</Button>
       </DialogFooter>
     </form>
   );
@@ -229,18 +231,19 @@ export function PriceListManager({
   notice?: string;
   error?: string;
 }) {
+  const { t } = useTranslation();
   const returnPath = "/admin/products/price-lists";
 
   return (
     <PageShell>
       <PageHeader
-        eyebrow="Catalog Management"
-        title="Price Lists & Tiered Pricing"
+        eyebrow={t("header.eyebrow.Catalog Management")}
+        title={t("Price Lists & Tiered Pricing")}
         actions={
           <PriceListDialog label="New price list" action={createPriceList} options={options} returnPath={returnPath}>
             <Button size="sm">
               <PlusIcon className="size-4" data-icon="inline-start" />
-              New price list
+              {t("action.newPriceList")}
             </Button>
           </PriceListDialog>
         }
@@ -256,12 +259,12 @@ export function PriceListManager({
           <table className="w-full min-w-[980px] text-left text-sm">
             <thead className="border-b border-border bg-muted/50 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               <tr>
-                <th className="px-4 py-3">Price List</th>
-                <th className="px-4 py-3">Owner</th>
-                <th className="px-4 py-3">Currency</th>
-                <th className="px-4 py-3 text-right">Items</th>
-                <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3 text-right">Actions</th>
+                <th className="px-4 py-3">{t("header.title.Price Lists")}</th>
+                <th className="px-4 py-3">{t("pricelist.owner")}</th>
+                <th className="px-4 py-3">{t("pricelist.currency")}</th>
+                <th className="px-4 py-3 text-right">{t("pricelist.items")}</th>
+                <th className="px-4 py-3">{t("field.status")}</th>
+                <th className="px-4 py-3 text-right">{t("action.actions")}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
@@ -273,7 +276,7 @@ export function PriceListManager({
                   <td className="px-4 py-3">
                     <div className="font-medium text-foreground">{row.name}</div>
                     <div className="text-xs text-muted-foreground">
-                      {row.items.slice(0, 2).map((item) => `${item.sku} ${minorToDisplay(item.unitPriceMinor)}`).join(", ") || "No items configured"}
+                      {row.items.slice(0, 2).map((item) => `${item.sku} ${minorToDisplay(item.unitPriceMinor)}`).join(", ") || t("pricelist.noItems")}
                     </div>
                   </td>
                   <td className="px-4 py-3 text-foreground">{row.ownerName ?? "—"}</td>
@@ -287,7 +290,7 @@ export function PriceListManager({
                       <PriceListDialog label={`Edit ${row.name}`} action={updatePriceList} record={row} options={options} returnPath={returnPath}>
                         <Button type="button" variant="outline" size="sm" className="h-7 text-xs">
                           <EditIcon className="size-3.5" data-icon="inline-start" />
-                          Edit
+                          {t("action.edit")}
                         </Button>
                       </PriceListDialog>
                       <DeleteConfirmationDialog
@@ -302,7 +305,7 @@ export function PriceListManager({
               {rows.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-4 py-12 text-center text-muted-foreground">
-                    No price lists found.
+                    {t("pricelist.emptyTitle")}
                   </td>
                 </tr>
               ) : null}
@@ -313,3 +316,4 @@ export function PriceListManager({
     </PageShell>
   );
 }
+

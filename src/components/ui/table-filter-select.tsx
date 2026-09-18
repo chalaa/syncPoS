@@ -3,6 +3,8 @@
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useTransition } from "react";
 
+import { useTranslation } from "@/lib/i18n/use-translation";
+
 export type FilterOption = {
   value: string;
   label: string;
@@ -29,8 +31,12 @@ export function TableFilterSelect({
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [, startTransition] = useTransition();
+  const { t } = useTranslation();
 
   const currentValue = searchParams.get(paramName) ?? defaultValue;
+
+  const displayLabel = label ? t(`field.${label.toLowerCase()}`, t(label, label)) : undefined;
+  const displayAllLabel = t(`action.all${paramName.charAt(0).toUpperCase() + paramName.slice(1)}s`, t(allLabel, allLabel));
 
   function handleChange(newValue: string) {
     const params = new URLSearchParams(searchParams.toString());
@@ -47,16 +53,16 @@ export function TableFilterSelect({
 
   return (
     <label className={`flex items-center gap-2 text-xs font-medium text-muted-foreground ${className}`}>
-      {label ? <span className="shrink-0">{label}:</span> : null}
+      {displayLabel ? <span className="shrink-0">{displayLabel}:</span> : null}
       <select
         value={currentValue}
         onChange={(e) => handleChange(e.target.value)}
         className="h-9 rounded-md border border-input bg-background px-2.5 text-xs text-foreground outline-none focus-visible:ring-1 focus-visible:ring-ring"
       >
-        <option value="">{allLabel}</option>
+        <option value="">{displayAllLabel}</option>
         {options.map((opt) => (
           <option key={opt.value} value={opt.value}>
-            {opt.label}
+            {t(opt.label, opt.label)}
           </option>
         ))}
       </select>

@@ -37,6 +37,8 @@ import {
   extractSpecificationValue,
 } from "./product-autofill";
 
+import { useTranslation } from "@/lib/i18n/use-translation";
+
 export function ProductForm({
   mode,
   product,
@@ -48,9 +50,10 @@ export function ProductForm({
   notice,
   error,
 }: ProductFormProps) {
+  const { t } = useTranslation();
   const action = mode === "create" ? createProduct : updateProduct;
-  const title = mode === "create" ? "New Product" : product?.name ?? "Edit Product";
-  const submitLabel = mode === "create" ? "Create product" : "Save changes";
+  const title = mode === "create" ? t("action.newProduct") : product?.name ?? t("product.editProduct");
+  const submitLabel = mode === "create" ? t("action.create") : t("action.save");
   const [saleTaxIds, setSaleTaxIds] = useState(product?.saleTaxIds ?? []);
   const [purchaseTaxIds, setPurchaseTaxIds] = useState(product?.purchaseTaxIds ?? []);
   const [productName, setProductName] = useState(product?.name ?? initialProductName ?? "");
@@ -169,16 +172,16 @@ export function ProductForm({
   return (
     <PageShell maxWidth="max-w-6xl">
       <PageHeader
-        eyebrow="Product"
+        eyebrow={t("nav.products")}
         title={title}
         actions={
           <div className="flex flex-wrap gap-2">
             <ButtonLink href="/admin/products" variant="outline">
-              Back
+              {t("action.back")}
             </ButtonLink>
             {product ? (
               <ButtonLink href={`/admin/products/${product.id}`} variant="outline">
-                Open
+                {t("action.view")}
               </ButtonLink>
             ) : null}
           </div>
@@ -188,7 +191,7 @@ export function ProductForm({
       {notice ? <Alert kind="success">{notice}</Alert> : null}
       {error ? <Alert kind="error">{error}</Alert> : null}
       {units.length === 0 ? (
-        <Alert kind="warning">Create at least one unit of measure before creating a product.</Alert>
+        <Alert kind="warning">{t("product.createUnitWarning")}</Alert>
       ) : null}
 
       <form action={action} className="grid gap-5 rounded-lg border border-border bg-card p-5">
@@ -198,7 +201,7 @@ export function ProductForm({
 
         <div className="grid gap-4 md:grid-cols-2">
           <label className="grid gap-1 text-sm font-medium">
-            Product Name
+            {t("field.productName")}
             <input
               name="name"
               value={productName}
@@ -210,7 +213,7 @@ export function ProductForm({
           </label>
           {standardName ? (
             <div className="grid gap-1 rounded-md border border-border bg-muted/60 px-3 py-2 text-sm">
-              <span className="text-xs font-semibold uppercase text-muted-foreground">Standard Name</span>
+              <span className="text-xs font-semibold uppercase text-muted-foreground">{t("product.standardCatalogName")}</span>
               <span className="min-h-6 break-words text-base font-semibold text-foreground">{standardName}</span>
             </div>
           ) : null}
@@ -230,7 +233,7 @@ export function ProductForm({
                   <div className="grid gap-4 md:grid-cols-2">
                     <RelatedModelSelect
                       name="categoryId"
-                      label="Category"
+                      label={t("field.category")}
                       options={categories}
                       value={categoryId}
                       onValueChange={(nextCategoryId) => {
@@ -242,7 +245,7 @@ export function ProductForm({
                     />
                     <RelatedModelSelect
                       name="brandId"
-                      label="Brand"
+                      label={t("field.brand")}
                       options={brands}
                       value={brandId}
                       onValueChange={changeBrand}
@@ -267,7 +270,7 @@ export function ProductForm({
                     </label>
                     <RelatedModelSelect
                       name="unitId"
-                      label="Unit"
+                      label={t("field.unit")}
                       options={units}
                       defaultValue={product?.unitId ?? units[0]?.id ?? ""}
                       required
@@ -278,7 +281,7 @@ export function ProductForm({
 
                   <CountrySelectField
                     name="country"
-                    label="Country"
+                    label={t("field.country")}
                     value={country}
                     onValueChange={(nextCountry) => {
                       setCountry(nextCountry);
@@ -287,7 +290,7 @@ export function ProductForm({
                   />
 
                   <label className="grid gap-1 text-sm font-medium">
-                    Description
+                    {t("field.description")}
                     <textarea name="description" defaultValue={product?.description ?? ""} className={textareaClass} />
                   </label>
                 </div>
@@ -295,11 +298,11 @@ export function ProductForm({
             },
             {
               value: "inventory",
-              label: "Inventory",
+              label: t("nav.inventory"),
               content: (
                 <div className="grid gap-4 md:grid-cols-2">
                   <label className="grid gap-1 text-sm font-medium">
-                    Tracking Mode
+                    {t("field.tracking")}
                     <select
                       name="trackingMode"
                       defaultValue={product?.trackingMode ?? "none"}
@@ -317,11 +320,11 @@ export function ProductForm({
             },
             {
               value: "sales",
-              label: "Sales",
+              label: t("nav.sales"),
               content: (
                 <div className="grid gap-4">
                   <label className="grid gap-1 text-sm font-medium">
-                    Sales Unit Price
+                    {t("product.sellingPrice")}
                     <input
                       name="listPrice"
                       type="number"
@@ -348,11 +351,11 @@ export function ProductForm({
             },
             {
               value: "purchase",
-              label: "Purchase",
+              label: t("nav.purchasing"),
               content: (
                 <div className="grid gap-4">
                   <label className="grid gap-1 text-sm font-medium">
-                    Purchase Unit Cost
+                    {t("product.stdCost")}
                     <input
                       name="standardCost"
                       type="number"
@@ -417,7 +420,7 @@ export function ProductForm({
 
         <div className="flex flex-wrap justify-end gap-3 border-t border-border pt-4">
           <ButtonLink href="/admin/products" variant="outline">
-            Cancel
+            {t("action.cancel")}
           </ButtonLink>
           <Button disabled={units.length === 0}>{submitLabel}</Button>
         </div>

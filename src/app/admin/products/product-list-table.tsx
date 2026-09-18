@@ -98,7 +98,7 @@ export function ProductListTable({
           <thead>
             <tr className="border-b border-border bg-muted/40 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
               <th className="px-4 py-3">{t("field.sku")}</th>
-              <th className="px-4 py-3">Product Info</th>
+              <th className="px-4 py-3">{t("field.info")}</th>
               <th className="px-4 py-3">{t("product.category")}</th>
               <th className="px-4 py-3">{t("field.tracking")}</th>
               <th className="px-4 py-3">{t("field.unit")}</th>
@@ -125,11 +125,11 @@ export function ProductListTable({
                   </div>
                   {product.standardName && product.standardName !== product.name ? (
                     <div className="text-xs text-muted-foreground line-clamp-1">
-                      Alt: {product.standardName}
+                      {t("product.altName")}: {product.standardName}
                     </div>
                   ) : null}
                   {product.country ? (
-                    <div className="text-[11px] text-muted-foreground">Origin: {product.country}</div>
+                    <div className="text-[11px] text-muted-foreground">{t("product.origin")}: {product.country}</div>
                   ) : null}
                 </td>
                 <td className="px-4 py-3.5 align-middle">
@@ -147,7 +147,7 @@ export function ProductListTable({
                       </span>
                     ) : null}
                     {!product.categoryName && !product.brandName ? (
-                      <span className="text-xs text-muted-foreground">Unassigned</span>
+                      <span className="text-xs text-muted-foreground">{t("product.unassigned")}</span>
                     ) : null}
                   </div>
                 </td>
@@ -155,16 +155,16 @@ export function ProductListTable({
                   {product.trackingMode === "serial" ? (
                     <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-400 border border-emerald-500/20">
                       <span className="size-1.5 rounded-full bg-emerald-500" />
-                      Serial
+                      {t("product.trackingSerial")}
                     </span>
                   ) : product.trackingMode === "lot" ? (
                     <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-500/10 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wider text-blue-700 dark:text-blue-400 border border-blue-500/20">
                       <span className="size-1.5 rounded-full bg-blue-500" />
-                      Lot
+                      {t("product.trackingLot")}
                     </span>
                   ) : (
                     <span className="inline-flex items-center rounded-full bg-muted px-2.5 py-0.5 text-[11px] font-medium text-muted-foreground border border-border/60">
-                      Standard
+                      {t("product.trackingStandard")}
                     </span>
                   )}
                 </td>
@@ -191,7 +191,7 @@ export function ProductListTable({
                           className="h-8 gap-1 px-2 text-xs font-medium hover:bg-primary/10 hover:text-primary"
                         >
                           <ExternalLink className="size-3.5" />
-                          View
+                          {t("action.view")}
                         </Button>
                         <ButtonLink
                           href={`/admin/products/${product.id}/edit`}
@@ -199,7 +199,7 @@ export function ProductListTable({
                           size="sm"
                           className="h-8 px-2.5 text-xs"
                         >
-                          Edit
+                          {t("action.edit")}
                         </ButtonLink>
                         <DeleteConfirmationDialog
                           action={softDeleteProduct}
@@ -210,7 +210,7 @@ export function ProductListTable({
                             variant="ghost"
                             size="sm"
                             className="h-8 px-2 text-destructive hover:bg-destructive/10 hover:text-destructive"
-                            title="Delete product"
+                            title={t("action.delete")}
                           >
                             <Trash2 className="size-3.5" />
                           </Button>
@@ -221,7 +221,7 @@ export function ProductListTable({
                         <input type="hidden" name="id" value={product.id} />
                         <Button variant="outline" size="sm" className="h-8 gap-1 px-2.5 text-xs">
                           <RotateCcw className="size-3.5" />
-                          Restore
+                          {t("action.restore")}
                         </Button>
                       </form>
                     )}
@@ -236,9 +236,9 @@ export function ProductListTable({
                     <div className="flex size-12 items-center justify-center rounded-2xl bg-muted/60 text-muted-foreground ring-1 ring-border">
                       <Package className="size-6" />
                     </div>
-                    <p className="mt-3 font-semibold text-foreground">No Products Found</p>
+                    <p className="mt-3 font-semibold text-foreground">{t("product.emptyTitle")}</p>
                     <p className="mt-1 text-xs text-muted-foreground">
-                      No product records match your current search query or filter options.
+                      {t("product.emptyDescription")}
                     </p>
                   </div>
                 </td>
