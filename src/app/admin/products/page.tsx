@@ -1,8 +1,4 @@
-import Link from "next/link";
-import { Download, Upload } from "lucide-react";
-
 import { Alert } from "@/components/ui/alert";
-import { Button, ButtonLink } from "@/components/ui/button";
 import { TableFilterSelect } from "@/components/ui/table-filter-select";
 import { TableSearchInput } from "@/components/ui/table-search-input";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
@@ -10,7 +6,7 @@ import { getCatalogFormOptions, getProductDetail, getProductList } from "@/serve
 import { requirePermission, getUserPermissionCodes } from "@/server/auth/session";
 import { PERMISSIONS, userHasPermission } from "@/server/iam/permissions";
 
-import { NewProductModal } from "./new-product-modal";
+import { ProductPageHeaderActions } from "./product-page-header-actions";
 import { ProductKpiCards } from "./product-kpi-cards";
 import { ProductListTable } from "./product-list-table";
 
@@ -63,26 +59,15 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
         title="Products & Pricing"
         description="Manage unified product definitions, tracking modes, tax assignments, and catalog prices."
         actions={
-          canManageProducts ? (
-            <div className="flex flex-wrap items-center gap-2">
-              <ButtonLink href="/admin/products/import" variant="outline" className="gap-1.5 font-medium">
-                <Upload className="size-3.5 text-muted-foreground" />
-                Import
-              </ButtonLink>
-              <ButtonLink href="/admin/products/export" variant="outline" className="gap-1.5 font-medium">
-                <Download className="size-3.5 text-muted-foreground" />
-                Export
-              </ButtonLink>
-              <NewProductModal
-                categories={formOptions.categories}
-                brands={formOptions.brands}
-                units={formOptions.units}
-                taxes={formOptions.taxes}
-                initialOpen={params.new === "1" || params.new === "true"}
-                initialProductName={params.name}
-              />
-            </div>
-          ) : null
+          <ProductPageHeaderActions
+            categories={formOptions.categories}
+            brands={formOptions.brands}
+            units={formOptions.units}
+            taxes={formOptions.taxes}
+            initialOpen={params.new === "1" || params.new === "true"}
+            initialProductName={params.name}
+            canManageProducts={canManageProducts}
+          />
         }
       />
 

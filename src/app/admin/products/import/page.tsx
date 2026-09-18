@@ -1,5 +1,5 @@
 import { CategoryImporter, ProductImporter } from "@/app/admin/products/import/product-importer";
-import { ButtonLink } from "@/components/ui/button";
+import { BackToProductsButton } from "@/app/admin/products/back-to-products-button";
 import { Notebook } from "@/components/ui/notebook";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
 import { requirePermission } from "@/server/auth/session";
@@ -24,9 +24,7 @@ export default async function ProductImportPage({ searchParams }: ProductImportP
         title="Product Import"
         actions={
           <div className="flex flex-wrap gap-2">
-            <ButtonLink href="/admin/products" variant="outline">
-              Back to products
-            </ButtonLink>
+            <BackToProductsButton />
           </div>
         }
       />

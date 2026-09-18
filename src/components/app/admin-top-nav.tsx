@@ -49,10 +49,11 @@ function getActiveSubmenuLabel(
   items: AdminSubMenuItem[],
   currentHref: string,
   pathname: string,
+  t: (key: string, fallback?: string) => string,
 ) {
   for (const item of items) {
     if (currentHref === item.href) {
-      return item.label;
+      return t(item.label, item.label);
     }
 
     const activeChild = item.children?.find((child) => {
@@ -66,11 +67,11 @@ function getActiveSubmenuLabel(
     });
 
     if (activeChild) {
-      return `${item.label} / ${activeChild.label}`;
+      return `${t(item.label, item.label)} / ${t(activeChild.label, activeChild.label)}`;
     }
   }
 
-  return items[0]?.label ?? "Menu";
+  return items[0] ? t(items[0].label, items[0].label) : t("nav.menu", "Menu");
 }
 
 export function AdminShell({
@@ -98,10 +99,11 @@ export function AdminShell({
   const activeMenu = getActiveMenu(pathname, adminMenuItems);
   const queryString = searchParams.toString();
   const currentHref = queryString ? `${pathname}?${queryString}` : pathname;
-  const activeSubmenuLabel = activeMenu
-    ? getActiveSubmenuLabel(activeMenu.submenus, currentHref, pathname)
-    : "Menu";
   const { t } = useTranslation();
+  const activeMenuLabel = activeMenu ? t(`nav.${activeMenu.key}`, activeMenu.label) : t("nav.menu", "Menu");
+  const activeSubmenuLabel = activeMenu
+    ? getActiveSubmenuLabel(activeMenu.submenus, currentHref, pathname, t)
+    : t("nav.menu", "Menu");
 
   const [isHydrated, setIsHydrated] = useState(false);
 
@@ -283,7 +285,7 @@ export function AdminShell({
             <details ref={mobileDetailsRef} className="group">
               <summary className="flex h-9 min-w-0 cursor-pointer list-none items-center justify-between gap-2 rounded-md border border-input bg-card px-3 text-sm font-semibold [&::-webkit-details-marker]:hidden">
                 <span className="truncate">
-                  {activeMenu?.label}
+                  {activeMenuLabel}
                   <span className="mx-2 text-muted-foreground">/</span>
                   <span className="font-medium text-muted-foreground">{activeSubmenuLabel}</span>
                 </span>
@@ -292,6 +294,7 @@ export function AdminShell({
               <div className="absolute left-0 right-0 top-full z-50 mt-2 max-h-[70vh] overflow-y-auto rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-md">
                 {activeMenu?.submenus.map((item) => {
                   const isActive = isSubmenuActive(item, currentHref, pathname);
+                  const translatedLabel = t(item.label, item.label);
 
                   return (
                     <div key={item.href}>
@@ -306,7 +309,7 @@ export function AdminShell({
                             setMobileOpenSubmenuHref((current) => (current === item.href ? null : item.href))
                           }
                         >
-                          <span>{item.label}</span>
+                          <span>{translatedLabel}</span>
                           <ChevronDownIcon
                             className={cn(
                               "size-4 transition-transform",
@@ -323,7 +326,7 @@ export function AdminShell({
                             isActive && "bg-primary/10 font-semibold text-primary",
                           )}
                         >
-                          {item.label}
+                          {translatedLabel}
                         </Link>
                       )}
                       {item.children?.length ? (
@@ -349,7 +352,7 @@ export function AdminShell({
                                   isChildActive && "bg-primary/10 font-semibold text-primary",
                                 )}
                               >
-                                {child.label}
+                                {t(child.label, child.label)}
                               </Link>
                             );
                           })}
@@ -371,6 +374,7 @@ export function AdminShell({
             ) : null}
             {activeMenu?.submenus.map((item) => {
               const isActive = isSubmenuActive(item, currentHref, pathname);
+              const translatedLabel = t(item.label, item.label);
 
               if (item.children?.length) {
                 return (
@@ -387,7 +391,7 @@ export function AdminShell({
                         setOpenSubmenuHref((current) => (current === item.href ? null : item.href))
                       }
                     >
-                      {item.label}
+                      {translatedLabel}
                       <ChevronDownIcon data-icon="inline-end" />
                     </Button>
                     <div
@@ -416,7 +420,7 @@ export function AdminShell({
                               )}
                               role="menuitem"
                             >
-                              {child.label}
+                              {t(child.label, child.label)}
                             </Link>
                           );
                         })}
@@ -433,7 +437,7 @@ export function AdminShell({
                   variant={isActive ? "secondary" : "ghost"}
                   size="sm"
                 >
-                  <Link href={item.href}>{item.label}</Link>
+                  <Link href={item.href}>{translatedLabel}</Link>
                 </Button>
               );
             })}

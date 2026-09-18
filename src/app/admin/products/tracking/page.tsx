@@ -1,8 +1,8 @@
 import Link from "next/link";
 
+import { BackToProductsButton } from "@/app/admin/products/back-to-products-button";
 import { ProductNavTabs } from "@/app/admin/products/product-nav-tabs";
 import { StatusBadge } from "@/components/ui/badge";
-import { ButtonLink } from "@/components/ui/button";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
 import { requirePermission } from "@/server/auth/session";
 import { getProductTrackingRows, minorToDisplay } from "@/server/catalog/products";
@@ -22,7 +22,7 @@ export default async function ProductTrackingPage() {
         eyebrow="Catalog Management"
         title="Lots & Serial Tracking"
         description="Trace serialized machinery and batch-tracked components across locations."
-        actions={<ButtonLink href="/admin/products" variant="outline">Back to Products</ButtonLink>}
+        actions={<BackToProductsButton />}
       />
 
       <ProductNavTabs currentHref="/admin/products/tracking" />

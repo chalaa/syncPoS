@@ -12,6 +12,7 @@ import {
 } from "@/app/admin/products/import/actions";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { useTranslation } from "@/lib/i18n/use-translation";
 import type { CategoryImportPreviewState, ProductImportPreviewState } from "@/server/catalog/types";
 
 const productImportInitialState: ProductImportPreviewState = {
@@ -65,6 +66,7 @@ function moneyMinor(value: number) {
 }
 
 export function ProductImporter() {
+  const { t } = useTranslation();
   const [previewState, validateAction, isValidating] = useActionState(
     validateProductImport,
     productImportInitialState,
@@ -113,7 +115,7 @@ export function ProductImporter() {
           <Button asChild variant="outline">
             <Link href="/admin/products/import/template">
               <DownloadIcon data-icon="inline-start" />
-              Template
+              {t("action.template")}
             </Link>
           </Button>
         </div>
@@ -127,7 +129,7 @@ export function ProductImporter() {
           />
           <Button disabled={isValidating}>
             <UploadIcon data-icon="inline-start" />
-            {isValidating ? "Validating..." : "Validate preview"}
+            {isValidating ? t("action.validating") : t("action.validatePreview")}
           </Button>
         </form>
       </section>
@@ -147,13 +149,13 @@ export function ProductImporter() {
                 <Button asChild variant="outline">
                   <a href={errorReportHref(previewRows)} download="product-import-error-report.csv">
                     <DownloadIcon data-icon="inline-start" />
-                    Error report
+                    {t("action.errorReport")}
                   </a>
                 </Button>
               ) : null}
               <Button disabled={!canImport || isImporting}>
                 <CheckCircleIcon data-icon="inline-start" />
-                {isImporting ? "Importing..." : "Import products"}
+                {isImporting ? t("action.importing") : t("action.importProducts")}
               </Button>
             </div>
           </form>
@@ -224,6 +226,7 @@ export function ProductImporter() {
 }
 
 export function CategoryImporter() {
+  const { t } = useTranslation();
   const [previewState, validateAction, isValidating] = useActionState(
     validateCategoryImport,
     categoryImportInitialState,
@@ -272,7 +275,7 @@ export function CategoryImporter() {
           <Button asChild variant="outline">
             <Link href="/admin/products/import/category-template">
               <DownloadIcon data-icon="inline-start" />
-              Category template
+              {t("action.categoryTemplate")}
             </Link>
           </Button>
         </div>
@@ -286,7 +289,7 @@ export function CategoryImporter() {
           />
           <Button disabled={isValidating}>
             <UploadIcon data-icon="inline-start" />
-            {isValidating ? "Validating..." : "Validate preview"}
+            {isValidating ? t("action.validating") : t("action.validatePreview")}
           </Button>
         </form>
       </section>
@@ -306,13 +309,13 @@ export function CategoryImporter() {
                 <Button asChild variant="outline">
                   <a href={categoryErrorReportHref(previewRows)} download="category-import-error-report.csv">
                     <DownloadIcon data-icon="inline-start" />
-                    Error report
+                    {t("action.errorReport")}
                   </a>
                 </Button>
               ) : null}
               <Button disabled={!canImport || isImporting}>
                 <CheckCircleIcon data-icon="inline-start" />
-                {isImporting ? "Importing..." : "Import categories"}
+                {isImporting ? t("action.importing") : t("action.importCategories")}
               </Button>
             </div>
           </form>

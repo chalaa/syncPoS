@@ -15,6 +15,8 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 
+import { useTranslation } from "@/lib/i18n/use-translation";
+
 type DeleteConfirmationDialogProps = {
   title?: string;
   description?: string;
@@ -29,17 +31,21 @@ type DeleteConfirmationDialogProps = {
 };
 
 export function DeleteConfirmationDialog({
-  title = "Confirm Deletion",
+  title,
   description,
   itemName,
   action,
   hiddenInputs = {},
   children,
-  triggerLabel = "Delete",
+  triggerLabel,
   variant = "destructive",
   size = "sm",
   className = "h-7 text-xs",
 }: DeleteConfirmationDialogProps) {
+  const { t } = useTranslation();
+
+  const dialogTitle = title ?? t("action.confirmDeletion", "Confirm Deletion");
+  const buttonTriggerLabel = triggerLabel ?? t("action.delete", "Delete");
   const displayDescription =
     description ??
     (itemName
@@ -52,7 +58,7 @@ export function DeleteConfirmationDialog({
         {children ?? (
           <Button variant={variant} size={size} className={className}>
             <Trash2Icon className="size-3.5" data-icon="inline-start" />
-            {triggerLabel}
+            {buttonTriggerLabel}
           </Button>
         )}
       </DialogTrigger>
@@ -61,7 +67,7 @@ export function DeleteConfirmationDialog({
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-destructive">
               <AlertTriangleIcon className="size-5 shrink-0" />
-              {title}
+              {dialogTitle}
             </DialogTitle>
             <DialogDescription className="text-muted-foreground pt-1">
               {displayDescription}
@@ -75,12 +81,12 @@ export function DeleteConfirmationDialog({
           <DialogFooter className="gap-2 sm:gap-0">
             <DialogClose asChild>
               <Button type="button" variant="outline">
-                Cancel
+                {t("action.cancel", "Cancel")}
               </Button>
             </DialogClose>
             <Button type="submit" variant="destructive">
               <Trash2Icon className="size-4" data-icon="inline-start" />
-              Confirm Delete
+              {t("action.confirmDelete", "Confirm Delete")}
             </Button>
           </DialogFooter>
         </form>

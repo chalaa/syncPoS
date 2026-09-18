@@ -945,7 +945,7 @@ export function ProductDetailModal({
                       size="sm"
                       className="gap-1 shrink-0"
                     >
-                      <span>Manage Price Lists</span>
+                      <span>{t("product.managePriceLists", "Manage Price Lists")}</span>
                       <ArrowRight className="size-3" />
                     </ButtonLink>
                   </div>
@@ -1256,7 +1256,7 @@ export function ProductDetailModal({
                 className="flex-1 sm:flex-initial gap-1.5 bg-gradient-to-r from-[#0B5D4B] to-[#073B35] font-semibold text-white shadow-sm hover:brightness-110 justify-center"
               >
                 <Pencil className="size-3.5" />
-                Edit Product
+                {t("product.editProduct", "Edit Product")}
               </ButtonLink>
             ) : null}
           </div>

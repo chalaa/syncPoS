@@ -597,7 +597,7 @@ export function NewProductModal({
         <DialogTrigger asChild>
           <Button className="gap-2 bg-gradient-to-r from-[#0B5D4B] to-[#073B35] font-semibold text-white shadow-md shadow-[#0B5D4B]/20 transition-all hover:brightness-110 active:scale-[0.99]">
             <PackagePlus className="size-4 text-emerald-200" />
-            Add Product
+            {t("action.newProduct")}
           </Button>
         </DialogTrigger>
       ) : null}
@@ -804,7 +804,7 @@ export function NewProductModal({
                         onClick={() => setShowDuplicateWarning(true)}
                         className="shrink-0 rounded-md bg-amber-200/90 hover:bg-amber-300 px-2.5 py-1 font-bold text-amber-950 text-[11px] transition-colors border border-amber-300"
                       >
-                        Review Existing
+                        {t("action.reviewExisting")}
                       </button>
                     </div>
                   )}
@@ -1098,7 +1098,7 @@ export function NewProductModal({
                           title="Scan product title and auto-fill specifications"
                         >
                           <Sparkles className="size-3 text-[#D9A441]" />
-                          <span>Auto-fill from Title</span>
+                          <span>{t("action.autofillFromTitle")}</span>
                         </Button>
                         <Badge variant="primary" size="sm" className="text-[10px]">
                           {specificationFields.length} attributes
@@ -1273,7 +1273,7 @@ export function NewProductModal({
                   {isPending || isCheckingDuplicates ? (
                     <>
                       <LoaderCircleIcon className="size-4 animate-spin" />
-                      <span>{isCheckingDuplicates ? "Checking Duplicates..." : "Registering..."}</span>
+                      <span>{isCheckingDuplicates ? t("action.checkingDuplicates") : t("action.registering")}</span>
                     </>
                   ) : (
                     <>
@@ -1523,6 +1523,7 @@ function QuickAddCategoryDialog({
   initialName: string;
   onCreated: (category: CategorySelectOption) => void;
 }) {
+  const { t } = useTranslation();
   const [name, setName] = useState(initialName);
   const [description, setDescription] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -1604,7 +1605,7 @@ function QuickAddCategoryDialog({
               disabled={isSubmitting}
               className="h-9 text-xs"
             >
-              Cancel
+              {t("action.cancel")}
             </Button>
             <Button
               type="submit"
@@ -1614,10 +1615,10 @@ function QuickAddCategoryDialog({
               {isSubmitting ? (
                 <>
                   <LoaderCircleIcon className="mr-1.5 size-3.5 animate-spin" />
-                  Creating...
+                  {t("action.creating")}
                 </>
               ) : (
-                "Save Category"
+                t("action.saveCategory")
               )}
             </Button>
           </DialogFooter>
@@ -1638,6 +1639,7 @@ function QuickAddBrandDialog({
   initialName: string;
   onCreated: (brand: SelectOption & { country?: string | null }) => void;
 }) {
+  const { t } = useTranslation();
   const [name, setName] = useState(initialName);
   const [country, setCountry] = useState("");
   const [description, setDescription] = useState("");
@@ -1731,7 +1733,7 @@ function QuickAddBrandDialog({
               disabled={isSubmitting}
               className="h-9 text-xs"
             >
-              Cancel
+              {t("action.cancel")}
             </Button>
             <Button
               type="submit"
@@ -1741,10 +1743,10 @@ function QuickAddBrandDialog({
               {isSubmitting ? (
                 <>
                   <LoaderCircleIcon className="mr-1.5 size-3.5 animate-spin" />
-                  Creating...
+                  {t("action.creating")}
                 </>
               ) : (
-                "Save Brand"
+                t("action.saveBrand")
               )}
             </Button>
           </DialogFooter>
@@ -1765,6 +1767,7 @@ function QuickAddUnitDialog({
   initialName: string;
   onCreated: (unit: SelectOption) => void;
 }) {
+  const { t } = useTranslation();
   const [name, setName] = useState(initialName);
   const [precision, setPrecision] = useState("0");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -1852,7 +1855,7 @@ function QuickAddUnitDialog({
               disabled={isSubmitting}
               className="h-9 text-xs"
             >
-              Cancel
+              {t("action.cancel")}
             </Button>
             <Button
               type="submit"
@@ -1862,10 +1865,10 @@ function QuickAddUnitDialog({
               {isSubmitting ? (
                 <>
                   <LoaderCircleIcon className="mr-1.5 size-3.5 animate-spin" />
-                  Creating...
+                  {t("action.creating")}
                 </>
               ) : (
-                "Save Unit"
+                t("action.saveUnit")
               )}
             </Button>
           </DialogFooter>
