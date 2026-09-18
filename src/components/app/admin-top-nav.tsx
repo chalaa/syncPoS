@@ -220,7 +220,7 @@ export function AdminShell({
             )}
           >
             <span className="size-2.5 rounded-full bg-gold inline-block shrink-0 shadow-xs" />
-            <span>syncPoS</span>
+            <span>Mesud Machinery</span>
           </Link>
         </div>
 

@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "syncPoS",
+  title: "Mesud Machinery",
   description: "Machinery retail POS and management system",
 };
 

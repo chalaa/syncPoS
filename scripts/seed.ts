@@ -120,8 +120,8 @@ async function main() {
         .values({
           id: ids.company,
           code: "SYNC",
-          legalName: "syncPoS Demo Company",
-          tradeName: "syncPoS",
+          legalName: "Mesud Machinery",
+          tradeName: "Mesud Machinery",
           baseCurrencyCode: "ETB",
           timezone: "Africa/Addis_Ababa",
           fiscalYearStartMonth: 1,
@@ -131,8 +131,8 @@ async function main() {
           target: companies.id,
           set: {
             code: "SYNC",
-            legalName: "syncPoS Demo Company",
-            tradeName: "syncPoS",
+            legalName: "Mesud Machinery",
+            tradeName: "Mesud Machinery",
             baseCurrencyCode: "ETB",
             timezone: "Africa/Addis_Ababa",
             fiscalYearStartMonth: 1,

@@ -78,7 +78,7 @@ export default function Home() {
           <p className="text-sm font-bold uppercase tracking-wider text-accent-dark">Built For Machinery Retail</p>
           <h2 className="mt-2 text-3xl font-bold tracking-tight text-foreground">One system for the counter, warehouse, purchasing desk, and manager.</h2>
           <p className="mt-4 text-base leading-7 text-muted-foreground">
-            syncPoS is shaped around machinery shops where serialized machines, spare parts, supplier documents, and location-based stock need to agree before sales begin.
+            Mesud Machinery is shaped around machinery shops where serialized machines, spare parts, supplier documents, and location-based stock need to agree before sales begin.
           </p>
         </div>
 
@@ -175,7 +175,7 @@ function Hero() {
 
       <div className="relative z-10 mx-auto flex min-h-[88svh] max-w-7xl flex-col px-6">
         <header className="flex items-center justify-between py-6 text-white">
-          <Link href="/" className="text-xl font-semibold">syncPoS</Link>
+          <Link href="/" className="text-xl font-semibold">Mesud Machinery</Link>
           <nav className="flex items-center gap-3 text-sm">
             <Link href="/login" className="hidden font-medium text-white/85 hover:text-white sm:inline">Sign in</Link>
             <Link
@@ -190,7 +190,7 @@ function Hero() {
         <div className="flex max-w-3xl flex-1 flex-col justify-center pb-12 pt-8 text-white">
           <p className="text-sm font-bold uppercase tracking-wider text-gold">Machinery Retail Management</p>
           <h1 className="mt-4 text-5xl font-bold leading-tight md:text-6xl tracking-tight">
-            syncPoS
+            Mesud Machinery
           </h1>
           <p className="mt-5 max-w-2xl text-xl leading-8 text-white/90">
             A practical management system for machinery sales, spare parts inventory, purchasing, payments, expenses, and future offline POS sync.

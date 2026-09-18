@@ -124,7 +124,7 @@ function catalogItem(code: string, description: string, legacyCodes: string[] = 
 }
 
 export const PERMISSION_CATALOG = [
-  catalogItem(PERMISSIONS.OWNER.ALL, "Full access to all syncPoS sectors and settings"),
+  catalogItem(PERMISSIONS.OWNER.ALL, "Full access to all Mesud Machinery sectors and settings"),
   catalogItem(PERMISSIONS.COMPANY.MANAGE, "Manage company settings, fiscal year, and configuration", ["company.manage"]),
   catalogItem(PERMISSIONS.COMPANY.OWNERS_MANAGE, "Manage company legal owners"),
   catalogItem(PERMISSIONS.COMPANY.AUDIT_VIEW, "View system audit logs and compliance history"),
@@ -203,7 +203,7 @@ export const SYSTEM_ROLES = [
   {
     code: "owner",
     name: "Owner",
-    description: "Full unrestricted access to every syncPoS sector and setting.",
+    description: "Full unrestricted access to every Mesud Machinery sector and setting.",
     permissionCodes: [PERMISSIONS.OWNER.ALL],
     isEditable: false,
     isDeletable: false,

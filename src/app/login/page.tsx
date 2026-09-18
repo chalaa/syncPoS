@@ -52,7 +52,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
           <div className="mb-6 text-center">
             <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
               <span className="size-2 rounded-full bg-gold" />
-              syncPoS Enterprise
+              Mesud Machinery Enterprise
             </div>
             <h1 className="mt-3 text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
               Sign in to Operations
@@ -126,7 +126,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
 
         {/* System copyright */}
         <p className="mt-6 text-center text-xs text-muted-foreground">
-          syncPoS © 2026 · Ethiopian Retail & Logistics Gateway
+          Mesud Machinery © 2026 · Ethiopian Retail & Logistics Gateway
         </p>
       </div>
     </main>
