@@ -8,7 +8,9 @@ import { StatusBadge } from "@/components/ui/badge";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { TableFilterSelect } from "@/components/ui/table-filter-select";
 import { TableSearchInput } from "@/components/ui/table-search-input";
+import { TablePagination } from "@/components/ui/table-pagination";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
+import { paginateRows } from "@/lib/pagination";
 import { requirePermission, getUserPermissionCodes } from "@/server/auth/session";
 import { displayExpenseMoney, getExpenseFormOptions, getExpenseList } from "@/server/expenses/expenses";
 import type { ExpenseListRow } from "@/server/expenses/types";
@@ -24,6 +26,8 @@ type ExpensesPageProps = {
     error?: string;
     category?: string;
     paymentStatus?: string;
+    page?: string;
+    pageSize?: string;
   }>;
 };
 
@@ -62,6 +66,7 @@ export default async function ExpensesPage({ searchParams }: ExpensesPageProps) 
     { value: "unpaid", label: "Unpaid" },
     { value: "paid", label: "Paid" },
   ];
+  const expensePage = paginateRows(expenses, params);
 
   return (
     <PageShell>
@@ -117,7 +122,8 @@ export default async function ExpensesPage({ searchParams }: ExpensesPageProps) 
           </div>
         </div>
 
-        <ExpenseTable rows={expenses} showCancelled={showCancelled} />
+        <ExpenseTable rows={expensePage.rows} showCancelled={showCancelled} />
+        <TablePagination pagination={expensePage.pagination} />
       </section>
     </PageShell>
   );

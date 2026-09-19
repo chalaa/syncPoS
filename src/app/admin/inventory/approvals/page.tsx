@@ -3,6 +3,8 @@ import Link from "next/link";
 import { approveStockOutRequest, rejectStockOutRequest } from "@/app/admin/inventory/approvals/actions";
 import { Button } from "@/components/ui/button";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
+import { TablePagination } from "@/components/ui/table-pagination";
+import { paginateRows } from "@/lib/pagination";
 import { requirePermission } from "@/server/auth/session";
 import { getDefaultCompany } from "@/server/catalog/products";
 import { getStockOutApprovalRows } from "@/server/inventory/stock-approvals";
@@ -14,6 +16,8 @@ type InventoryApprovalsPageProps = {
     status?: string;
     notice?: string;
     error?: string;
+    page?: string;
+    pageSize?: string;
   }>;
 };
 
@@ -36,6 +40,7 @@ export default async function InventoryApprovalsPage({ searchParams }: Inventory
   const status = params.status ?? "pending";
   const company = await getDefaultCompany();
   const rows = await getStockOutApprovalRows(company.id, status);
+  const approvalPage = paginateRows(rows, params);
 
   return (
     <PageShell>
@@ -78,14 +83,14 @@ export default async function InventoryApprovalsPage({ searchParams }: Inventory
               </tr>
             </thead>
             <tbody>
-              {rows.length === 0 ? (
+              {approvalPage.rows.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
                     No stock-out approval requests found.
                   </td>
                 </tr>
               ) : (
-                rows.map((row) => {
+                approvalPage.rows.map((row) => {
                   const href = sourceHref(row);
 
                   return (
@@ -134,6 +139,7 @@ export default async function InventoryApprovalsPage({ searchParams }: Inventory
               )}
             </tbody>
           </table>
+          <TablePagination pagination={approvalPage.pagination} />
         </div>
       </div>
     </PageShell>

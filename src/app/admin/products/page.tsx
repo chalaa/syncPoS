@@ -1,7 +1,9 @@
 import { Alert } from "@/components/ui/alert";
 import { TableFilterSelect } from "@/components/ui/table-filter-select";
 import { TableSearchInput } from "@/components/ui/table-search-input";
+import { TablePagination } from "@/components/ui/table-pagination";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
+import { paginateRows } from "@/lib/pagination";
 import { getCatalogFormOptions, getProductDetail, getProductList } from "@/server/catalog/products";
 import { requirePermission, getUserPermissionCodes } from "@/server/auth/session";
 import { PERMISSIONS, userHasPermission } from "@/server/iam/permissions";
@@ -24,6 +26,8 @@ type ProductsPageProps = {
     category?: string;
     brand?: string;
     status?: string;
+    page?: string;
+    pageSize?: string;
   }>;
 };
 
@@ -51,6 +55,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
     { value: "active", label: "Active" },
     { value: "inactive", label: "Inactive" },
   ];
+  const productPage = paginateRows(products, params);
 
   return (
     <PageShell>
@@ -111,11 +116,12 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
         </div>
 
         <ProductListTable
-          products={products}
+          products={productPage.rows}
           showDeleted={showDeleted}
           initialProductId={params.productId}
           initialProductDetail={initialProductDetail}
         />
+        <TablePagination pagination={productPage.pagination} />
       </section>
     </PageShell>
   );

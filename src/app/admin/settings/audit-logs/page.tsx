@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
 import { TableSearchInput } from "@/components/ui/table-search-input";
+import { TablePagination } from "@/components/ui/table-pagination";
 import { requirePermission } from "@/server/auth/session";
 import { getAuditLogList } from "@/server/audit/audit-logs";
 
@@ -15,6 +16,7 @@ type AuditLogsPageProps = {
     action?: string;
     entityType?: string;
     page?: string;
+    pageSize?: string;
   }>;
 };
 
@@ -31,29 +33,19 @@ function severityClass(severity: string) {
   return "border-border bg-muted/40 text-muted-foreground";
 }
 
-function buildPageHref(params: Awaited<AuditLogsPageProps["searchParams"]>, page: number) {
-  const query = new URLSearchParams();
-
-  if (params.q) query.set("q", params.q);
-  if (params.severity) query.set("severity", params.severity);
-  if (params.action) query.set("action", params.action);
-  if (params.entityType) query.set("entityType", params.entityType);
-  query.set("page", String(page));
-
-  return `/admin/settings/audit-logs?${query.toString()}`;
-}
-
 export default async function AuditLogsPage({ searchParams }: AuditLogsPageProps) {
   await requirePermission("company:settings:manage");
 
   const params = await searchParams;
   const page = Number.parseInt(params.page ?? "1", 10);
+  const pageSize = Number.parseInt(params.pageSize ?? "50", 10);
   const result = await getAuditLogList({
     query: params.q,
     severity: params.severity,
     action: params.action,
     entityType: params.entityType,
     page: Number.isFinite(page) ? page : 1,
+    pageSize: Number.isFinite(pageSize) ? pageSize : 50,
   });
 
   return (
@@ -119,19 +111,16 @@ export default async function AuditLogsPage({ searchParams }: AuditLogsPageProps
         </table>
       </section>
 
-      <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm">
-        <p className="text-muted-foreground">
-          Showing page {result.page} of {result.pageCount}, {result.total} logs total.
-        </p>
-        <div className="flex gap-2">
-          <Button asChild variant="outline" size="sm">
-            <Link href={buildPageHref(params, Math.max(result.page - 1, 1))}>Previous</Link>
-          </Button>
-          <Button asChild variant="outline" size="sm">
-            <Link href={buildPageHref(params, Math.min(result.page + 1, result.pageCount))}>Next</Link>
-          </Button>
-        </div>
-      </div>
+      <TablePagination
+        pagination={{
+          page: result.page,
+          pageSize: result.pageSize,
+          totalRows: result.total,
+          totalPages: result.pageCount,
+          from: result.total === 0 ? 0 : (result.page - 1) * result.pageSize + 1,
+          to: Math.min(result.page * result.pageSize, result.total),
+        }}
+      />
     </PageShell>
   );
 }

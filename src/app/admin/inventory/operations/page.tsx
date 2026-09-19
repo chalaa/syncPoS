@@ -9,6 +9,8 @@ import { OperationsTableClient } from "@/app/admin/inventory/operations/operatio
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
+import { TablePagination } from "@/components/ui/table-pagination";
+import { paginateRows } from "@/lib/pagination";
 import { requirePermission } from "@/server/auth/session";
 import {
   getInventoryAdjustmentFormOptions,
@@ -25,6 +27,8 @@ type InventoryOperationsPageProps = {
     notice?: string;
     error?: string;
     selectedId?: string;
+    page?: string;
+    pageSize?: string;
   }>;
 };
 
@@ -39,6 +43,7 @@ export default async function InventoryOperationsPage({ searchParams }: Inventor
     getInventoryOperationList({ view, query }),
     getInventoryAdjustmentFormOptions(),
   ]);
+  const operationPage = paginateRows(rows, params);
 
   const currentReturnPath = `/admin/inventory/operations${view !== "all" ? `?view=${view}` : ""}`;
 
@@ -102,12 +107,13 @@ export default async function InventoryOperationsPage({ searchParams }: Inventor
       {params.error ? <Alert kind="error">{params.error}</Alert> : null}
 
       <OperationsTableClient
-        rows={rows}
+        rows={operationPage.rows}
         view={view}
         query={query}
         formOptions={formOptions}
         initialSelectedId={params.selectedId}
       />
+      <TablePagination pagination={operationPage.pagination} />
     </PageShell>
   );
 }

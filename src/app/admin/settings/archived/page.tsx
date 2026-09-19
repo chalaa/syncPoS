@@ -18,6 +18,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
 import { TableSearchInput } from "@/components/ui/table-search-input";
+import { TablePagination } from "@/components/ui/table-pagination";
+import { paginateRows } from "@/lib/pagination";
 import {
   getArchivedSummary,
   type ArchivedItem,
@@ -33,6 +35,8 @@ type ArchivedPageProps = {
     group?: string;
     notice?: string;
     error?: string;
+    page?: string;
+    pageSize?: string;
   }>;
 };
 
@@ -74,6 +78,7 @@ export default async function ArchivedPage({ searchParams }: ArchivedPageProps) 
   const returnPath = `/admin/settings/archived${group !== "all" ? `?group=${group}` : ""}${query ? `${group !== "all" ? "&" : "?"}q=${encodeURIComponent(query)}` : ""}`;
 
   const { items, counts } = await getArchivedSummary({ query, group });
+  const archivedPage = paginateRows(items, params);
 
   const tabs: { key: TypeGroup; label: string; count: number }[] = [
     { key: "all", label: "All Items", count: counts.all },
@@ -167,7 +172,7 @@ export default async function ArchivedPage({ searchParams }: ArchivedPageProps) 
                     </td>
                   </tr>
                 ) : (
-                  items.map((item) => {
+                  archivedPage.rows.map((item) => {
                     const badge = getEntityBadgeProps(item.entityType);
                     const BadgeIcon = badge.icon;
 
@@ -232,6 +237,7 @@ export default async function ArchivedPage({ searchParams }: ArchivedPageProps) 
               </tbody>
             </table>
           </div>
+          <TablePagination pagination={archivedPage.pagination} />
         </div>
       </div>
     </PageShell>

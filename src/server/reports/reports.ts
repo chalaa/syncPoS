@@ -2,7 +2,8 @@ import "server-only";
 
 import { sql } from "drizzle-orm";
 
-import { getDefaultCompany, minorToDisplay } from "@/server/catalog/products";
+import { displayReportMoney } from "@/lib/report-formatters";
+import { getDefaultCompany } from "@/server/catalog/products";
 import { db } from "@/server/db/client";
 import type {
   DashboardPaymentAccount,
@@ -18,10 +19,6 @@ import type {
   SalesReportRow,
   StockReportRow,
 } from "@/server/reports/types";
-
-export function displayReportMoney(value: number, currencyCode: string) {
-  return `${currencyCode} ${minorToDisplay(value)}`;
-}
 
 export function normalizeReportFilters(params: {
   dateFrom?: string;

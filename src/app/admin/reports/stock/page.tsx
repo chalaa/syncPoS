@@ -3,14 +3,17 @@ import Link from "next/link";
 import { EmptyRows, ReportFilters, ReportNavTabs, SummaryCard } from "@/app/admin/reports/report-ui";
 import { Badge } from "@/components/ui/badge";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
+import { TablePagination } from "@/components/ui/table-pagination";
+import { paginateRows } from "@/lib/pagination";
 import { requirePermission } from "@/server/auth/session";
 import { displayQuantity } from "@/server/inventory/stock";
-import { displayReportMoney, getStockReport, normalizeReportFilters } from "@/server/reports/reports";
+import { displayReportMoney } from "@/lib/report-formatters";
+import { getStockReport, normalizeReportFilters } from "@/server/reports/reports";
 
 export const dynamic = "force-dynamic";
 
 type StockReportPageProps = {
-  searchParams: Promise<{ q?: string }>;
+  searchParams: Promise<{ q?: string; page?: string; pageSize?: string }>;
 };
 
 export default async function StockReportPage({ searchParams }: StockReportPageProps) {
@@ -21,6 +24,7 @@ export default async function StockReportPage({ searchParams }: StockReportPageP
   const rows = await getStockReport(filters);
   const currencyCode = rows[0]?.currencyCode ?? "ETB";
   const stockValueMinor = rows.reduce((total, row) => total + row.stockValueMinor, 0);
+  const reportPage = paginateRows(rows, params);
 
   return (
     <PageShell>
@@ -62,7 +66,7 @@ export default async function StockReportPage({ searchParams }: StockReportPageP
             </tr>
           </thead>
           <tbody>
-            {rows.map((row) => (
+            {reportPage.rows.map((row) => (
               <tr key={`${row.locationId}-${row.productId}-${row.productSerialId ?? row.productLotId ?? "bulk"}`} className="border-t border-border transition-colors hover:bg-secondary/30">
                 <td className="px-4 py-3">
                   <Link href={`/admin/products/${row.productId}`} className="font-semibold text-primary underline-offset-4 hover:underline">
@@ -87,10 +91,11 @@ export default async function StockReportPage({ searchParams }: StockReportPageP
                 <td className="px-4 py-3 text-right font-semibold text-foreground">{displayReportMoney(row.stockValueMinor, row.currencyCode)}</td>
               </tr>
             ))}
-            {rows.length === 0 ? <EmptyRows colSpan={9} /> : null}
+            {reportPage.rows.length === 0 ? <EmptyRows colSpan={9} /> : null}
           </tbody>
         </table>
       </section>
+      <TablePagination pagination={reportPage.pagination} />
     </PageShell>
   );
 }

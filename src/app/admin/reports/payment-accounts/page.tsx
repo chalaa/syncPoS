@@ -3,13 +3,16 @@ import Link from "next/link";
 import { EmptyRows, ReportFilters, ReportNavTabs, SummaryCard } from "@/app/admin/reports/report-ui";
 import { StatusBadge } from "@/components/ui/badge";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
+import { TablePagination } from "@/components/ui/table-pagination";
+import { paginateRows } from "@/lib/pagination";
 import { requirePermission } from "@/server/auth/session";
-import { displayReportMoney, getPaymentAccountStatement, normalizeReportFilters } from "@/server/reports/reports";
+import { displayReportMoney } from "@/lib/report-formatters";
+import { getPaymentAccountStatement, normalizeReportFilters } from "@/server/reports/reports";
 
 export const dynamic = "force-dynamic";
 
 type PaymentAccountReportPageProps = {
-  searchParams: Promise<{ q?: string; dateFrom?: string; dateTo?: string; paymentType?: string; paymentAccountId?: string }>;
+  searchParams: Promise<{ q?: string; dateFrom?: string; dateTo?: string; paymentType?: string; paymentAccountId?: string; page?: string; pageSize?: string }>;
 };
 
 export default async function PaymentAccountReportPage({ searchParams }: PaymentAccountReportPageProps) {
@@ -22,6 +25,7 @@ export default async function PaymentAccountReportPage({ searchParams }: Payment
   const inboundMinor = rows.filter((row) => row.paymentType === "inbound").reduce((total, row) => total + row.amountMinor, 0);
   const outboundMinor = rows.filter((row) => row.paymentType === "outbound").reduce((total, row) => total + row.amountMinor, 0);
   const netMinor = inboundMinor - outboundMinor;
+  const reportPage = paginateRows(rows, params);
 
   return (
     <PageShell>
@@ -70,7 +74,7 @@ export default async function PaymentAccountReportPage({ searchParams }: Payment
             </tr>
           </thead>
           <tbody>
-            {rows.map((row) => (
+            {reportPage.rows.map((row) => (
               <tr key={row.id} className="border-t border-border transition-colors hover:bg-secondary/30">
                 <td className="px-4 py-3">
                   <Link
@@ -104,10 +108,11 @@ export default async function PaymentAccountReportPage({ searchParams }: Payment
                 <td className="px-4 py-3 text-right font-medium">{displayReportMoney(row.signedAmountMinor, row.currencyCode)}</td>
               </tr>
             ))}
-            {rows.length === 0 ? <EmptyRows colSpan={10} /> : null}
+            {reportPage.rows.length === 0 ? <EmptyRows colSpan={10} /> : null}
           </tbody>
         </table>
       </section>
+      <TablePagination pagination={reportPage.pagination} />
     </PageShell>
   );
 }

@@ -1,11 +1,13 @@
 import Link from "next/link";
 import { TableFilterSelect } from "@/components/ui/table-filter-select";
 import { TableSearchInput } from "@/components/ui/table-search-input";
+import { TablePagination } from "@/components/ui/table-pagination";
 import { Alert } from "@/components/ui/alert";
 import { Badge, StatusBadge } from "@/components/ui/badge";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
 import { cn } from "@/lib/utils";
+import { paginateRows, type PaginationMeta } from "@/lib/pagination";
 import { requirePermission, getUserPermissionCodes } from "@/server/auth/session";
 import { PERMISSIONS, userHasPermission } from "@/server/iam/permissions";
 import { getPaymentList } from "@/server/payments/payments";
@@ -31,6 +33,8 @@ type SalesPageProps = {
     q?: string;
     status?: string;
     paymentTerm?: string;
+    page?: string;
+    pageSize?: string;
   }>;
 };
 
@@ -59,10 +63,11 @@ export default async function SalesPage({ searchParams }: SalesPageProps) {
 
   if (view === "deliveries") {
     const deliveries = await getDeliveryList({ salesOrderId: params.salesOrderId });
+    const page = paginateRows(deliveries, params);
 
     return (
-      <SalesLayout currentView={view} title="Deliveries" orders={allOrders} notice={params.notice} error={params.error}>
-        <DeliveryList deliveries={deliveries} />
+      <SalesLayout currentView={view} title="Deliveries" orders={allOrders} notice={params.notice} error={params.error} pagination={page.pagination}>
+        <DeliveryList deliveries={page.rows} />
       </SalesLayout>
     );
   }
@@ -73,10 +78,11 @@ export default async function SalesPage({ searchParams }: SalesPageProps) {
       customerInvoiceId: params.customerInvoiceId,
       customerId: params.partnerId,
     });
+    const page = paginateRows(invoices, params);
 
     return (
-      <SalesLayout currentView={view} title="Customer Invoices" orders={allOrders} notice={params.notice} error={params.error}>
-        <CustomerInvoiceList invoices={invoices} />
+      <SalesLayout currentView={view} title="Customer Invoices" orders={allOrders} notice={params.notice} error={params.error} pagination={page.pagination}>
+        <CustomerInvoiceList invoices={page.rows} />
       </SalesLayout>
     );
   }
@@ -87,16 +93,18 @@ export default async function SalesPage({ searchParams }: SalesPageProps) {
       salesOrderId: params.salesOrderId,
       customerInvoiceId: params.customerInvoiceId,
     });
+    const page = paginateRows(payments, params);
 
     return (
-      <SalesLayout currentView={view} title="Customer Payments" orders={allOrders} notice={params.notice} error={params.error}>
-        <CustomerPaymentList payments={payments} />
+      <SalesLayout currentView={view} title="Customer Payments" orders={allOrders} notice={params.notice} error={params.error} pagination={page.pagination}>
+        <CustomerPaymentList payments={page.rows} />
       </SalesLayout>
     );
   }
 
   if (view === "returns") {
     const returns = await getCustomerReturnList(params.salesOrderId);
+    const page = paginateRows(returns, params);
 
     return (
       <SalesLayout
@@ -105,14 +113,16 @@ export default async function SalesPage({ searchParams }: SalesPageProps) {
         orders={allOrders}
         notice={params.notice}
         error={params.error}
+        pagination={page.pagination}
         actions={canManageReturns ? <ButtonLink href="/admin/sales/returns/new">New Return</ButtonLink> : undefined}
       >
-        <CustomerReturnList returns={returns} />
+        <CustomerReturnList returns={page.rows} />
       </SalesLayout>
     );
   }
 
   const formOptions = await getSalesFormOptions();
+  const orderPage = paginateRows(allOrders, params);
 
   return (
     <SalesLayout
@@ -121,6 +131,7 @@ export default async function SalesPage({ searchParams }: SalesPageProps) {
       orders={allOrders}
       notice={params.notice}
       error={params.error}
+      pagination={orderPage.pagination}
       actions={
         canCreate ? (
           <NewSalesOrderModal
@@ -139,7 +150,7 @@ export default async function SalesPage({ searchParams }: SalesPageProps) {
         ) : undefined
       }
     >
-      <SalesOrderList orders={allOrders} />
+      <SalesOrderList orders={orderPage.rows} />
     </SalesLayout>
   );
 }
@@ -159,6 +170,7 @@ function SalesLayout({
   notice,
   error,
   actions,
+  pagination,
   children,
 }: {
   title: string;
@@ -167,6 +179,7 @@ function SalesLayout({
   notice?: string;
   error?: string;
   actions?: React.ReactNode;
+  pagination: PaginationMeta;
   children: React.ReactNode;
 }) {
   return (
@@ -184,6 +197,7 @@ function SalesLayout({
       {error ? <Alert kind="error">{error}</Alert> : null}
 
       {children}
+      <TablePagination pagination={pagination} />
     </PageShell>
   );
 }

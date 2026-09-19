@@ -12,7 +12,8 @@ import {
 import { Badge, StatusBadge } from "@/components/ui/badge";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
 import { requirePermission } from "@/server/auth/session";
-import { displayReportMoney, getDashboardReport } from "@/server/reports/reports";
+import { displayReportMoney } from "@/lib/report-formatters";
+import { getDashboardReport } from "@/server/reports/reports";
 import { PERMISSIONS } from "@/server/iam/permissions";
 
 export const dynamic = "force-dynamic";
@@ -317,4 +318,3 @@ export default async function AdminDashboardPage() {
     </PageShell>
   );
 }
-

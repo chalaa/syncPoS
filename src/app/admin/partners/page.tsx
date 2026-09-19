@@ -8,7 +8,9 @@ import { Button, ButtonLink } from "@/components/ui/button";
 import { DeleteConfirmationDialog } from "@/components/ui/delete-confirmation-dialog";
 import { TableFilterSelect } from "@/components/ui/table-filter-select";
 import { TableSearchInput } from "@/components/ui/table-search-input";
+import { TablePagination } from "@/components/ui/table-pagination";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
+import { paginateRows } from "@/lib/pagination";
 import {
   getPartnerFormOptions,
   getPartnerList,
@@ -30,6 +32,8 @@ type PartnersPageProps = {
     error?: string;
     status?: string;
     paymentTerm?: string;
+    page?: string;
+    pageSize?: string;
   }>;
 };
 
@@ -65,6 +69,7 @@ export default async function PartnersPage({ searchParams }: PartnersPageProps) 
     value: pt.id,
     label: `${pt.code} (${pt.name})`,
   }));
+  const partnerPage = paginateRows(partners, params);
 
   return (
     <PageShell>
@@ -148,7 +153,7 @@ export default async function PartnersPage({ searchParams }: PartnersPageProps) 
                 </tr>
               </thead>
               <tbody>
-                {partners.map((partner) => (
+                {partnerPage.rows.map((partner) => (
                   <tr key={partner.id} className="border-t border-border transition-colors hover:bg-secondary/30">
                     <td className="px-4 py-3 font-mono text-xs font-semibold text-foreground">{partner.code}</td>
                     <td className="px-4 py-3">
@@ -221,7 +226,7 @@ export default async function PartnersPage({ searchParams }: PartnersPageProps) 
                     </td>
                   </tr>
                 ))}
-                {partners.length === 0 ? (
+                {partnerPage.rows.length === 0 ? (
                   <tr>
                     <td colSpan={7} className="px-4 py-12 text-center text-muted-foreground">
                       <p className="font-medium text-foreground">No partners found</p>
@@ -232,6 +237,7 @@ export default async function PartnersPage({ searchParams }: PartnersPageProps) 
               </tbody>
             </table>
           </div>
+          <TablePagination pagination={partnerPage.pagination} />
         </section>
       </div>
     </PageShell>

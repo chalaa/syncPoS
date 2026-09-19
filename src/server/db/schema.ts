@@ -180,6 +180,12 @@ export const salesOrderStatus = pgEnum("sales_order_status", [
   "cancelled",
 ]);
 export const salesPaymentTerm = pgEnum("sales_payment_term", ["cash", "credit"]);
+export const salesLineApprovalStatus = pgEnum("sales_line_approval_status", [
+  "pending",
+  "approved",
+  "rejected",
+  "cancelled",
+]);
 export const deliveryStatus = pgEnum("delivery_status", ["draft", "posted", "cancelled"]);
 export const customerInvoiceStatus = pgEnum("customer_invoice_status", [
   "draft",
@@ -2306,6 +2312,53 @@ export const salesOrderLineTaxes = pgTable(
     primaryKey({ columns: [table.salesOrderLineId, table.taxId] }),
     check("sales_order_line_taxes_amount_chk", sql`${table.taxAmountMinor} >= 0`),
     index("sales_order_line_taxes_tax_idx").on(table.taxId),
+  ],
+);
+
+export const salesLineApprovals = pgTable(
+  "sales_line_approvals",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    companyId: uuid("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    salesOrderId: uuid("sales_order_id")
+      .notNull()
+      .references(() => salesOrders.id, { onDelete: "cascade", onUpdate: "cascade" }),
+    salesOrderLineId: uuid("sales_order_line_id").references(() => salesOrderLines.id, {
+      onDelete: "set null",
+      onUpdate: "cascade",
+    }),
+    lineNo: smallint("line_no").notNull(),
+    productId: uuid("product_id")
+      .notNull()
+      .references(() => products.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    sourceLocationId: uuid("source_location_id")
+      .notNull()
+      .references(() => locations.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    requestedBy: uuid("requested_by").references(() => users.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
+    decidedBy: uuid("decided_by").references(() => users.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
+    status: salesLineApprovalStatus("status").notNull().default("pending"),
+    requestedAt: timestamp("requested_at", { withTimezone: true }).notNull().defaultNow(),
+    decidedAt: timestamp("decided_at", { withTimezone: true }),
+    notes: text("notes"),
+    metadata: jsonb("metadata").notNull().default({}),
+    ...timestamps,
+  },
+  (table) => [
+    index("sales_line_approvals_order_idx").on(table.companyId, table.salesOrderId),
+    index("sales_line_approvals_line_idx").on(table.salesOrderLineId),
+    index("sales_line_approvals_location_status_idx").on(
+      table.companyId,
+      table.sourceLocationId,
+      table.status,
+    ),
   ],
 );
 

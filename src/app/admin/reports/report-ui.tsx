@@ -19,7 +19,7 @@ import { type ReactNode, useTransition } from "react";
 
 import { Button } from "@/components/ui/button";
 import { TableSearchInput } from "@/components/ui/table-search-input";
-import { displayReportMoney } from "@/server/reports/reports";
+import { displayReportMoney } from "@/lib/report-formatters";
 import type { ReportSummary } from "@/server/reports/types";
 
 const REPORT_TABS = [

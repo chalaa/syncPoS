@@ -4,6 +4,8 @@ import { BackToProductsButton } from "@/app/admin/products/back-to-products-butt
 import { ProductNavTabs } from "@/app/admin/products/product-nav-tabs";
 import { StatusBadge } from "@/components/ui/badge";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
+import { TablePagination } from "@/components/ui/table-pagination";
+import { paginateRows } from "@/lib/pagination";
 import { requirePermission } from "@/server/auth/session";
 import { getProductTrackingRows, minorToDisplay } from "@/server/catalog/products";
 import type { ProductTrackingListRow } from "@/server/catalog/types";
@@ -11,10 +13,16 @@ import { displayQuantity } from "@/server/inventory/stock";
 
 export const dynamic = "force-dynamic";
 
-export default async function ProductTrackingPage() {
+type ProductTrackingPageProps = {
+  searchParams: Promise<{ page?: string; pageSize?: string }>;
+};
+
+export default async function ProductTrackingPage({ searchParams }: ProductTrackingPageProps) {
   await requirePermission("product.view");
 
+  const params = await searchParams;
   const rows = await getProductTrackingRows();
+  const trackingPage = paginateRows(rows, params);
 
   return (
     <PageShell>
@@ -28,7 +36,8 @@ export default async function ProductTrackingPage() {
       <ProductNavTabs currentHref="/admin/products/tracking" />
 
       <section className="rounded-xl border border-border bg-card shadow-xs">
-        <TrackingTable rows={rows} />
+        <TrackingTable rows={trackingPage.rows} />
+        <TablePagination pagination={trackingPage.pagination} />
       </section>
     </PageShell>
   );

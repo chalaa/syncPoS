@@ -45,6 +45,11 @@ import { approveStockOutApprovals, requireStockOutApproval } from "@/server/inve
 import { paymentLinesTotal, replacePaymentLines, resolvePaymentLines } from "@/server/payments/payment-lines";
 import { getCustomerInvoicePaymentSummary, getSalesOrderPaymentSummary } from "@/server/payments/payments";
 import { getPaymentVerificationWarnings } from "@/server/payments/verify-et";
+import {
+  decideSalesLineApproval,
+  getBlockingSalesLineApprovals,
+  replaceSalesLineApprovals,
+} from "@/server/sales/line-approvals";
 
 const salesOrderHeaderSchema = z.object({
   salesOrderId: z.string().uuid().optional(),
@@ -81,6 +86,12 @@ const salesOrderLineSchema = z.object({
 const confirmSalesOrderSchema = z.object({
   salesOrderId: z.string().uuid(),
   returnPath: z.string().trim().startsWith("/admin/sales").optional(),
+});
+
+const salesLineApprovalDecisionSchema = z.object({
+  salesOrderId: z.string().uuid(),
+  approvalId: z.string().uuid(),
+  notes: z.string().trim().max(500).optional(),
 });
 
 const createDeliverySchema = z.object({
@@ -1222,7 +1233,8 @@ async function executeSalesOrderConfirmationTx(
     })
     .from(salesOrders)
     .where(and(eq(salesOrders.id, orderId), eq(salesOrders.companyId, company.id), isNull(salesOrders.deletedAt)))
-    .limit(1);
+    .limit(1)
+    .for("update");
 
   if (!order) {
     throw new Error("Sales order does not exist.");
@@ -1257,6 +1269,14 @@ async function executeSalesOrderConfirmationTx(
 
   if (!order.sourceLocationId) {
     throw new Error("Select a source location before confirming the quotation.");
+  }
+
+  const blockingApprovals = await getBlockingSalesLineApprovals(tx, company.id, order.id);
+  if (blockingApprovals.length > 0) {
+    const lineLabels = blockingApprovals
+      .map((approval) => `line ${approval.lineNo} (${approval.productName})`)
+      .join(", ");
+    throw new Error(`Approval is required before confirmation for ${lineLabels}.`);
   }
 
   const [creditSummary] = await tx.execute<{
@@ -1583,7 +1603,12 @@ export async function createSalesOrder(formData: FormData) {
             currencyCode: prepared.currencyCode,
           })),
         )
-        .returning({ id: salesOrderLines.id, lineNo: salesOrderLines.lineNo });
+        .returning({
+          id: salesOrderLines.id,
+          lineNo: salesOrderLines.lineNo,
+          productId: salesOrderLines.productId,
+          sourceLocationId: salesOrderLines.sourceLocationId,
+        });
 
       const lineTaxes = prepared.preparedLines.flatMap((line) => {
         const insertedLine = insertedLines.find((record) => record.lineNo === line.lineNo);
@@ -1601,6 +1626,13 @@ export async function createSalesOrder(formData: FormData) {
         await tx.insert(salesOrderLineTaxes).values(lineTaxes);
       }
 
+      const approvalResult = await replaceSalesLineApprovals(tx, {
+        companyId: company.id,
+        salesOrderId: order.id,
+        requestedBy: user.id,
+        lines: insertedLines,
+      });
+
       await tx.insert(auditLogs).values({
         companyId: company.id,
         actorUserId: user.id,
@@ -1612,13 +1644,17 @@ export async function createSalesOrder(formData: FormData) {
       });
 
       if (intent === "confirm") {
-        const confirmResult = await executeSalesOrderConfirmationTx(tx, {
-          company,
-          user,
-          orderId: order.id,
-        });
-        if (confirmResult?.notice) {
-          noticeMessage = confirmResult.notice;
+        if (approvalResult.pending > 0) {
+          noticeMessage = `Quotation saved and ${approvalResult.pending} line approval${approvalResult.pending === 1 ? "" : "s"} requested`;
+        } else {
+          const confirmResult = await executeSalesOrderConfirmationTx(tx, {
+            company,
+            user,
+            orderId: order.id,
+          });
+          if (confirmResult?.notice) {
+            noticeMessage = confirmResult.notice;
+          }
         }
       }
     });
@@ -1751,7 +1787,12 @@ export async function updateSalesOrder(formData: FormData) {
             currencyCode: prepared.currencyCode,
           })),
         )
-        .returning({ id: salesOrderLines.id, lineNo: salesOrderLines.lineNo });
+        .returning({
+          id: salesOrderLines.id,
+          lineNo: salesOrderLines.lineNo,
+          productId: salesOrderLines.productId,
+          sourceLocationId: salesOrderLines.sourceLocationId,
+        });
 
       const lineTaxes = prepared.preparedLines.flatMap((line) => {
         const insertedLine = insertedLines.find((record) => record.lineNo === line.lineNo);
@@ -1769,6 +1810,13 @@ export async function updateSalesOrder(formData: FormData) {
         await tx.insert(salesOrderLineTaxes).values(lineTaxes);
       }
 
+      const approvalResult = await replaceSalesLineApprovals(tx, {
+        companyId: company.id,
+        salesOrderId: existingOrder.id,
+        requestedBy: user.id,
+        lines: insertedLines,
+      });
+
       await tx.insert(auditLogs).values({
         companyId: company.id,
         actorUserId: user.id,
@@ -1780,13 +1828,17 @@ export async function updateSalesOrder(formData: FormData) {
       });
 
       if (intent === "confirm") {
-        const confirmResult = await executeSalesOrderConfirmationTx(tx, {
-          company,
-          user,
-          orderId: existingOrder.id,
-        });
-        if (confirmResult?.notice) {
-          noticeMessage = confirmResult.notice;
+        if (approvalResult.pending > 0) {
+          noticeMessage = `Quotation updated and ${approvalResult.pending} line approval${approvalResult.pending === 1 ? "" : "s"} requested`;
+        } else {
+          const confirmResult = await executeSalesOrderConfirmationTx(tx, {
+            company,
+            user,
+            orderId: existingOrder.id,
+          });
+          if (confirmResult?.notice) {
+            noticeMessage = confirmResult.notice;
+          }
         }
       }
     });
@@ -1837,6 +1889,55 @@ export async function confirmSalesOrder(formData: FormData) {
   revalidatePath(`/admin/sales/${parsed.data.salesOrderId}`);
   revalidatePath("/admin/inventory");
   redirect(`${parsed.data.returnPath ?? `/admin/sales/${parsed.data.salesOrderId}`}?notice=${encodeURIComponent(noticeMessage)}`);
+}
+
+async function decideSalesOrderLineApproval(
+  formData: FormData,
+  decision: "approved" | "rejected",
+) {
+  const user = await requirePermission("sales:orders:create");
+  const parsed = salesLineApprovalDecisionSchema.safeParse({
+    salesOrderId: formValue(formData, "salesOrderId"),
+    approvalId: formValue(formData, "approvalId"),
+    notes: formValue(formData, "notes") || undefined,
+  });
+
+  if (!parsed.success) {
+    redirectWithError("/admin/sales", "A valid line approval is required.");
+  }
+
+  const company = await getDefaultCompany();
+
+  try {
+    await decideSalesLineApproval({
+      companyId: company.id,
+      userId: user.id,
+      approvalId: parsed.data.approvalId,
+      decision,
+      notes: parsed.data.notes,
+    });
+  } catch (error) {
+    redirectWithError(
+      `/admin/sales/${parsed.data.salesOrderId}`,
+      error instanceof Error ? error.message : "Could not record the approval decision.",
+    );
+  }
+
+  revalidatePath("/admin/sales");
+  revalidatePath(`/admin/sales/${parsed.data.salesOrderId}`);
+  redirect(
+    `/admin/sales/${parsed.data.salesOrderId}?notice=${encodeURIComponent(
+      decision === "approved" ? "Sales line approved" : "Sales line rejected",
+    )}`,
+  );
+}
+
+export async function approveSalesOrderLine(formData: FormData) {
+  return decideSalesOrderLineApproval(formData, "approved");
+}
+
+export async function rejectSalesOrderLine(formData: FormData) {
+  return decideSalesOrderLineApproval(formData, "rejected");
 }
 
 export async function createDeliveryFromSalesOrder(formData: FormData) {

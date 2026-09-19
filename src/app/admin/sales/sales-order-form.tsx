@@ -215,6 +215,7 @@ type SalesOrderFormProps = {
   defaultDate?: string;
   isModal?: boolean;
   onCancel?: () => void;
+  confirmationBlockedReason?: string;
 };
 
 export const SalesOrderForm = forwardRef<SalesOrderFormHandle, SalesOrderFormProps>(
@@ -235,6 +236,7 @@ export const SalesOrderForm = forwardRef<SalesOrderFormHandle, SalesOrderFormPro
     defaultDate = "",
     isModal = false,
     onCancel,
+    confirmationBlockedReason,
   }, ref) {
   const [isPending, startTransition] = useTransition();
   const [step, setStep] = useState<1 | 2>(1);
@@ -1729,7 +1731,8 @@ export const SalesOrderForm = forwardRef<SalesOrderFormHandle, SalesOrderFormPro
               <Button
                 type="button"
                 onClick={() => submitWithIntent("confirm")}
-                disabled={isPending}
+                disabled={isPending || Boolean(confirmationBlockedReason)}
+                title={confirmationBlockedReason}
                 className={cn(
                   "gap-2 font-bold text-white shadow-lg shadow-[#0B5D4B]/25 transition-all hover:brightness-110 active:scale-[0.99] px-7 py-2 text-xs",
                   "bg-gradient-to-r from-[#0B5D4B] via-[#073B35] to-[#0B5D4B]"
@@ -1743,7 +1746,7 @@ export const SalesOrderForm = forwardRef<SalesOrderFormHandle, SalesOrderFormPro
                 ) : (
                   <>
                     <CheckCircle2 className="size-4 text-emerald-200" />
-                    <span>Confirm Sales Order</span>
+                    <span>{confirmationBlockedReason ? "Awaiting Approval" : "Confirm Sales Order"}</span>
                   </>
                 )}
               </Button>

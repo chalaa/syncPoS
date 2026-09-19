@@ -5,6 +5,8 @@ import { Alert } from "@/components/ui/alert";
 import { StatusBadge } from "@/components/ui/badge";
 import { ButtonLink } from "@/components/ui/button";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
+import { TablePagination } from "@/components/ui/table-pagination";
+import { paginateRows } from "@/lib/pagination";
 import { requirePermission } from "@/server/auth/session";
 import { getTransferList } from "@/server/transfers/transfers";
 import type { TransferListRow } from "@/server/transfers/types";
@@ -12,7 +14,7 @@ import type { TransferListRow } from "@/server/transfers/types";
 export const dynamic = "force-dynamic";
 
 type TransfersPageProps = {
-  searchParams: Promise<{ notice?: string; error?: string }>;
+  searchParams: Promise<{ notice?: string; error?: string; page?: string; pageSize?: string }>;
 };
 
 function label(value: string) {
@@ -23,6 +25,7 @@ export default async function TransfersPage({ searchParams }: TransfersPageProps
   await requirePermission("inventory.view");
 
   const [query, transfers] = await Promise.all([searchParams, getTransferList()]);
+  const transferPage = paginateRows(transfers, query);
 
   return (
     <PageShell>
@@ -54,7 +57,8 @@ export default async function TransfersPage({ searchParams }: TransfersPageProps
       {query.notice ? <Alert kind="success">{query.notice}</Alert> : null}
       {query.error ? <Alert kind="error">{query.error}</Alert> : null}
 
-      <TransferList transfers={transfers} />
+      <TransferList transfers={transferPage.rows} />
+      <TablePagination pagination={transferPage.pagination} />
     </PageShell>
   );
 }

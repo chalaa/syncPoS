@@ -3,13 +3,16 @@ import Link from "next/link";
 import { EmptyRows, ReportFilters, ReportNavTabs, ReportSummaryCards } from "@/app/admin/reports/report-ui";
 import { StatusBadge } from "@/components/ui/badge";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
+import { TablePagination } from "@/components/ui/table-pagination";
+import { paginateRows } from "@/lib/pagination";
 import { requirePermission } from "@/server/auth/session";
-import { displayReportMoney, getPayablesReport, normalizeReportFilters, summarizeMoney } from "@/server/reports/reports";
+import { displayReportMoney } from "@/lib/report-formatters";
+import { getPayablesReport, normalizeReportFilters, summarizeMoney } from "@/server/reports/reports";
 
 export const dynamic = "force-dynamic";
 
 type PayablesReportPageProps = {
-  searchParams: Promise<{ q?: string; dateFrom?: string; dateTo?: string }>;
+  searchParams: Promise<{ q?: string; dateFrom?: string; dateTo?: string; page?: string; pageSize?: string }>;
 };
 
 export default async function PayablesReportPage({ searchParams }: PayablesReportPageProps) {
@@ -19,6 +22,7 @@ export default async function PayablesReportPage({ searchParams }: PayablesRepor
   const filters = normalizeReportFilters(params);
   const rows = await getPayablesReport(filters);
   const summary = summarizeMoney(rows);
+  const reportPage = paginateRows(rows, params);
 
   return (
     <PageShell>
@@ -45,7 +49,7 @@ export default async function PayablesReportPage({ searchParams }: PayablesRepor
             </tr>
           </thead>
           <tbody>
-            {rows.map((row) => (
+            {reportPage.rows.map((row) => (
               <tr key={row.id} className="border-t border-border transition-colors hover:bg-secondary/30">
                 <td className="px-4 py-3">
                   <Link href={`/admin/purchasing/vendor-bills/vendor_bill/${row.id}`} className="font-semibold text-primary underline-offset-4 hover:underline">
@@ -64,10 +68,11 @@ export default async function PayablesReportPage({ searchParams }: PayablesRepor
                 <td className="px-4 py-3 text-right font-medium text-amber-600 dark:text-amber-400">{displayReportMoney(row.residualAmountMinor, row.currencyCode)}</td>
               </tr>
             ))}
-            {rows.length === 0 ? <EmptyRows colSpan={8} /> : null}
+            {reportPage.rows.length === 0 ? <EmptyRows colSpan={8} /> : null}
           </tbody>
         </table>
       </section>
+      <TablePagination pagination={reportPage.pagination} />
     </PageShell>
   );
 }

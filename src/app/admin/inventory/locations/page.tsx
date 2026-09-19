@@ -1,5 +1,6 @@
 import { LocationManager } from "@/app/admin/inventory/locations/location-manager";
 import { requirePermission } from "@/server/auth/session";
+import { paginateRows } from "@/lib/pagination";
 import { getStockLocationList, getStockLocationUserOptions } from "@/server/inventory/locations";
 
 export const dynamic = "force-dynamic";
@@ -12,6 +13,8 @@ type LocationsPageProps = {
     error?: string;
     type?: string;
     status?: string;
+    page?: string;
+    pageSize?: string;
   }>;
 };
 
@@ -29,10 +32,12 @@ export default async function LocationsPage({ searchParams }: LocationsPageProps
     getStockLocationUserOptions(),
   ]);
   const returnPath = `/admin/inventory/locations${showDeleted ? "?show=deleted" : ""}`;
+  const locationPage = paginateRows(records, params);
 
   return (
     <LocationManager
-      records={records}
+      records={locationPage.rows}
+      pagination={locationPage.pagination}
       users={users}
       query={query}
       showDeleted={showDeleted}

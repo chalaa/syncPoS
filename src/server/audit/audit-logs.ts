@@ -4,6 +4,7 @@ import { sql } from "drizzle-orm";
 
 import { getDefaultCompany } from "@/server/catalog/products";
 import { db } from "@/server/db/client";
+import { PAGE_SIZES, type PageSize } from "@/lib/pagination";
 
 export type AuditSeverity = "info" | "warning" | "critical";
 
@@ -29,9 +30,8 @@ export type AuditLogFilters = {
   action?: string;
   entityType?: string;
   page?: number;
+  pageSize?: number;
 };
-
-const pageSize = 50;
 
 export function sanitizeAuditMetadata(value: unknown): unknown {
   if (Array.isArray(value)) {
@@ -73,6 +73,9 @@ export async function getAuditLogList(filters: AuditLogFilters) {
   const action = filters.action?.trim() ?? "";
   const entityType = filters.entityType?.trim() ?? "";
   const page = Math.max(filters.page ?? 1, 1);
+  const pageSize = PAGE_SIZES.includes(filters.pageSize as PageSize)
+    ? (filters.pageSize as PageSize)
+    : 50;
   const offset = (page - 1) * pageSize;
 
   const whereClause = sql`

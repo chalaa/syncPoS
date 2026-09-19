@@ -14,6 +14,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DeleteConfirmationDialog } from "@/components/ui/delete-confirmation-dialog";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
+import { TablePagination } from "@/components/ui/table-pagination";
+import { paginateRows } from "@/lib/pagination";
 import { requirePermission } from "@/server/auth/session";
 import { getDefaultCompany } from "@/server/catalog/products";
 import { db } from "@/server/db/client";
@@ -28,6 +30,8 @@ type OwnersPageProps = {
     show?: string;
     notice?: string;
     error?: string;
+    page?: string;
+    pageSize?: string;
   }>;
 };
 
@@ -54,6 +58,7 @@ export default async function OwnersPage({ searchParams }: OwnersPageProps) {
       .where(and(eq(locations.companyId, company.id), eq(locations.isActive, true), isNull(locations.deletedAt)))
       .orderBy(asc(locations.name)),
   ]);
+  const ownerPage = paginateRows(records, params);
 
   return (
     <PageShell maxWidth="max-w-5xl">
@@ -143,7 +148,7 @@ export default async function OwnersPage({ searchParams }: OwnersPageProps) {
                     </td>
                   </tr>
                 ) : (
-                  records.map((owner) => (
+                  ownerPage.rows.map((owner) => (
                     <tr
                       key={owner.id}
                       className="transition-colors hover:bg-[rgba(235,239,234,0.45)] dark:hover:bg-muted/30"
@@ -237,6 +242,7 @@ export default async function OwnersPage({ searchParams }: OwnersPageProps) {
               </tbody>
             </table>
           </div>
+          <TablePagination pagination={ownerPage.pagination} />
         </div>
       </div>
     </PageShell>

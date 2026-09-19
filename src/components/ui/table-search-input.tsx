@@ -31,7 +31,8 @@ export function TableSearchInput({
 
   useEffect(() => {
     const urlValue = searchParams.get(paramName) ?? "";
-    setValue(urlValue);
+    const timer = setTimeout(() => setValue(urlValue), 0);
+    return () => clearTimeout(timer);
   }, [searchParams, paramName]);
 
   useEffect(() => {
@@ -50,6 +51,7 @@ export function TableSearchInput({
       } else {
         params.delete(paramName);
       }
+      params.delete("page");
 
       startTransition(() => {
         router.replace(`${pathname}?${params.toString()}`, { scroll: false });

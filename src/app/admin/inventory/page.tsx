@@ -3,6 +3,8 @@ import { ArrowLeftRight, Sliders, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
+import { TablePagination } from "@/components/ui/table-pagination";
+import { paginateRows } from "@/lib/pagination";
 import { requirePermission, getUserPermissionCodes } from "@/server/auth/session";
 import { PERMISSIONS, userHasPermission } from "@/server/iam/permissions";
 import { StockByLocationTable, StockFilters } from "@/app/admin/inventory/stock-table";
@@ -26,6 +28,8 @@ type InventoryPageProps = {
     locationId?: string;
     status?: string;
     asOfDate?: string;
+    page?: string;
+    pageSize?: string;
   }>;
 };
 
@@ -53,6 +57,7 @@ export default async function InventoryPage({ searchParams }: InventoryPageProps
     getInventorySummaryMetrics(),
     getInventoryAdjustmentFormOptions(),
   ]);
+  const stockPage = paginateRows(rows, params);
 
   return (
     <PageShell>
@@ -136,7 +141,8 @@ export default async function InventoryPage({ searchParams }: InventoryPageProps
           asOfDate={asOfDate}
           locations={options.locations}
         />
-        <StockByLocationTable rows={rows} formOptions={formOptions} />
+        <StockByLocationTable rows={stockPage.rows} formOptions={formOptions} />
+        <TablePagination pagination={stockPage.pagination} />
       </section>
     </PageShell>
   );

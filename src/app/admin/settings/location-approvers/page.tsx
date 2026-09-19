@@ -2,6 +2,8 @@ import { removeLocationApprover, assignLocationApprover } from "@/app/admin/sett
 import { Button } from "@/components/ui/button";
 import { DeleteConfirmationDialog } from "@/components/ui/delete-confirmation-dialog";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
+import { TablePagination } from "@/components/ui/table-pagination";
+import { paginateRows } from "@/lib/pagination";
 import { requirePermission } from "@/server/auth/session";
 import { getDefaultCompany } from "@/server/catalog/products";
 import { getLocationApproverManagementData } from "@/server/inventory/location-approvers";
@@ -12,6 +14,8 @@ type LocationApproversPageProps = {
   searchParams: Promise<{
     notice?: string;
     error?: string;
+    page?: string;
+    pageSize?: string;
   }>;
 };
 
@@ -23,6 +27,7 @@ export default async function LocationApproversPage({ searchParams }: LocationAp
   const params = await searchParams;
   const company = await getDefaultCompany();
   const data = await getLocationApproverManagementData(company.id);
+  const approverPage = paginateRows(data.approvers, params);
 
   return (
     <PageShell maxWidth="max-w-5xl">
@@ -84,7 +89,7 @@ export default async function LocationApproversPage({ searchParams }: LocationAp
                   </td>
                 </tr>
               ) : (
-                data.approvers.map((approver) => (
+                approverPage.rows.map((approver) => (
                   <tr key={approver.id} className="border-b border-border/70 last:border-0">
                     <td className="px-4 py-3">
                       <div className="font-medium">{approver.locationName}</div>
@@ -109,6 +114,7 @@ export default async function LocationApproversPage({ searchParams }: LocationAp
               )}
             </tbody>
           </table>
+          <TablePagination pagination={approverPage.pagination} />
         </div>
       </div>
     </PageShell>

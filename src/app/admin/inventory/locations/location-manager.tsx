@@ -6,6 +6,8 @@ import type { ReactNode } from "react";
 
 import { TableFilterSelect } from "@/components/ui/table-filter-select";
 import { TableSearchInput } from "@/components/ui/table-search-input";
+import { TablePagination } from "@/components/ui/table-pagination";
+import type { PaginationMeta } from "@/lib/pagination";
 import {
   createStockLocation,
   restoreStockLocation,
@@ -39,6 +41,7 @@ type LocationMutation = (formData: FormData) => Promise<void>;
 
 type LocationManagerProps = {
   records: StockLocationRecord[];
+  pagination: PaginationMeta;
   users: StockLocationUserOption[];
   query: string;
   showDeleted: boolean;
@@ -213,6 +216,7 @@ function LocationDialog({
 
 export function LocationManager({
   records,
+  pagination,
   users,
   query,
   showDeleted,
@@ -371,6 +375,7 @@ export function LocationManager({
             </tbody>
           </table>
         </div>
+        <TablePagination pagination={pagination} />
       </section>
     </PageShell>
   );

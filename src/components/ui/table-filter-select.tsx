@@ -45,6 +45,7 @@ export function TableFilterSelect({
     } else {
       params.delete(paramName);
     }
+    params.delete("page");
 
     startTransition(() => {
       router.replace(`${pathname}?${params.toString()}`, { scroll: false });

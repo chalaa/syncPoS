@@ -3,11 +3,13 @@ import type { ReactNode } from "react";
 
 import { TableFilterSelect } from "@/components/ui/table-filter-select";
 import { TableSearchInput } from "@/components/ui/table-search-input";
+import { TablePagination } from "@/components/ui/table-pagination";
 import { Alert } from "@/components/ui/alert";
 import { Badge, StatusBadge } from "@/components/ui/badge";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
 import { cn } from "@/lib/utils";
+import { paginateRows, type PaginationMeta } from "@/lib/pagination";
 import { requirePermission, getUserPermissionCodes } from "@/server/auth/session";
 import { PERMISSIONS, userHasPermission } from "@/server/iam/permissions";
 import {
@@ -46,6 +48,8 @@ type PurchasingPageProps = {
     q?: string;
     status?: string;
     paymentTerm?: string;
+    page?: string;
+    pageSize?: string;
   }>;
 };
 
@@ -73,16 +77,18 @@ export default async function PurchasingPage({ searchParams }: PurchasingPagePro
 
   if (view === "receipts") {
     const receipts = await getPurchaseReceiptList(params.purchaseOrderId);
+    const page = paginateRows(receipts, params);
 
     return (
-      <PurchasingLayout currentView={view} title="Receipts" orders={allOrders} notice={params.notice} error={params.error}>
-        <ReceiptList receipts={receipts} />
+      <PurchasingLayout currentView={view} title="Receipts" orders={allOrders} notice={params.notice} error={params.error} pagination={page.pagination}>
+        <ReceiptList receipts={page.rows} />
       </PurchasingLayout>
     );
   }
 
   if (view === "landed-costs") {
     const landedCosts = await getPurchaseLandedCostList(params.purchaseOrderId);
+    const page = paginateRows(landedCosts, params);
 
     return (
       <PurchasingLayout
@@ -91,9 +97,10 @@ export default async function PurchasingPage({ searchParams }: PurchasingPagePro
         orders={allOrders}
         notice={params.notice}
         error={params.error}
+        pagination={page.pagination}
         actions={<ButtonLink href="/admin/purchasing/landed-costs/new">New Landed Cost</ButtonLink>}
       >
-        <LandedCostList landedCosts={landedCosts} />
+        <LandedCostList landedCosts={page.rows} />
       </PurchasingLayout>
     );
   }
@@ -104,16 +111,18 @@ export default async function PurchasingPage({ searchParams }: PurchasingPagePro
       purchaseOrderId: params.purchaseOrderId,
       vendorBillId: params.vendorBillId,
     });
+    const page = paginateRows(payments, params);
 
     return (
-      <PurchasingLayout currentView={view} title="Supplier Payments" orders={allOrders} notice={params.notice} error={params.error}>
-        <PaymentList payments={payments} />
+      <PurchasingLayout currentView={view} title="Supplier Payments" orders={allOrders} notice={params.notice} error={params.error} pagination={page.pagination}>
+        <PaymentList payments={page.rows} />
       </PurchasingLayout>
     );
   }
 
   if (view === "returns") {
     const returns = await getSupplierReturnList(params.purchaseOrderId);
+    const page = paginateRows(returns, params);
 
     return (
       <PurchasingLayout
@@ -122,14 +131,16 @@ export default async function PurchasingPage({ searchParams }: PurchasingPagePro
         orders={allOrders}
         notice={params.notice}
         error={params.error}
+        pagination={page.pagination}
         actions={canCreateOrders ? <ButtonLink href="/admin/purchasing/returns/new">New Supplier Return</ButtonLink> : null}
       >
-        <SupplierReturnList returns={returns} />
+        <SupplierReturnList returns={page.rows} />
       </PurchasingLayout>
     );
   }
 
   const formOptions = await getPurchaseFormOptions();
+  const orderPage = paginateRows(allOrders, params);
 
   return (
     <PurchasingLayout
@@ -138,6 +149,7 @@ export default async function PurchasingPage({ searchParams }: PurchasingPagePro
       orders={allOrders}
       notice={params.notice}
       error={params.error}
+      pagination={orderPage.pagination}
       actions={
         canCreateOrders ? (
           <NewPurchaseOrderModal
@@ -155,7 +167,7 @@ export default async function PurchasingPage({ searchParams }: PurchasingPagePro
         ) : null
       }
     >
-      <PurchaseOrderList orders={allOrders} />
+      <PurchaseOrderList orders={orderPage.rows} />
     </PurchasingLayout>
   );
 }
@@ -175,6 +187,7 @@ function PurchasingLayout({
   notice,
   error,
   actions,
+  pagination,
   children,
 }: {
   title: string;
@@ -183,6 +196,7 @@ function PurchasingLayout({
   notice?: string;
   error?: string;
   actions?: ReactNode;
+  pagination: PaginationMeta;
   children: ReactNode;
 }) {
   return (
@@ -200,6 +214,7 @@ function PurchasingLayout({
       {error ? <Alert kind="error">{error}</Alert> : null}
 
       {children}
+      <TablePagination pagination={pagination} />
     </PageShell>
   );
 }

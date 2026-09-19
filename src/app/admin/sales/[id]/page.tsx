@@ -1,10 +1,10 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import {
-  confirmSalesOrder,
+  approveSalesOrderLine,
   createDeliveryFromSalesOrder,
   registerCustomerPayment,
+  rejectSalesOrderLine,
   updateSalesOrder,
 } from "@/app/admin/sales/actions";
 import { CreateDeliveryLinesEditor } from "@/app/admin/sales/[id]/create-delivery-lines-editor";
@@ -26,6 +26,7 @@ import { PageHeader, PageShell } from "@/components/ui/page-shell";
 import { DetailStatCard } from "@/components/ui/detail-stat-card";
 import { requirePermission } from "@/server/auth/session";
 import { getActivePaymentAccounts } from "@/server/payments/payments";
+import { getSalesLineApprovalSummary } from "@/server/sales/line-approvals";
 import {
   displaySalesMoney,
   getSalesFormOptions,
@@ -92,7 +93,7 @@ function CreateDeliveryDialog({
 }
 
 export default async function SalesOrderDetailPage({ params, searchParams }: SalesOrderDetailPageProps) {
-  await requirePermission("sales:orders:create");
+  const user = await requirePermission("sales:orders:create");
 
   const [{ id }, query, options] = await Promise.all([
     params,
@@ -109,6 +110,17 @@ export default async function SalesOrderDetailPage({ params, searchParams }: Sal
   }
 
   const isQuotation = order.status === "quotation";
+  const lineApprovals = isQuotation
+    ? await getSalesLineApprovalSummary(options.company.id, order.id, user.id)
+    : [];
+  const pendingApprovalCount = lineApprovals.filter((approval) => approval.status === "pending").length;
+  const rejectedApprovalCount = lineApprovals.filter((approval) => approval.status === "rejected").length;
+  const approvedApprovalCount = lineApprovals.filter((approval) => approval.status === "approved").length;
+  const confirmationBlockedReason = rejectedApprovalCount > 0
+    ? `${rejectedApprovalCount} line approval${rejectedApprovalCount === 1 ? " was" : "s were"} rejected. Edit and save the quotation to request approval again.`
+    : pendingApprovalCount > 0
+      ? `${pendingApprovalCount} line approval${pendingApprovalCount === 1 ? " is" : "s are"} still pending.`
+      : undefined;
   const hasRemainingDeliveryQuantity = order.lines.some(
     (line) => Number(line.quantityOrdered) - Number(line.quantityDelivered) > 0,
   );
@@ -184,22 +196,99 @@ export default async function SalesOrderDetailPage({ params, searchParams }: Sal
       </div>
 
       {isQuotation ? (
-        <SalesOrderForm
-          action={updateSalesOrder}
-          customers={options.customers}
-          owners={options.owners}
-          products={options.products}
-          productCategories={options.productCategories}
-          productBrands={options.productBrands}
-          productUnits={options.productUnits}
-          locations={options.locations}
-          taxes={options.taxes}
-          availableStock={options.availableStock}
-          error={query.error}
-          order={order}
-          submitLabel="Save Quotation"
-          defaultDate={todayDate()}
-        />
+        <div className="grid gap-4">
+          {lineApprovals.length > 0 ? (
+            <section className="rounded-lg border border-border bg-card p-4">
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-sm font-semibold">Line approvals</h2>
+                  <p className="text-xs text-muted-foreground">
+                    {approvedApprovalCount} of {lineApprovals.length} required lines approved
+                  </p>
+                </div>
+                <StatusBadge
+                  status={rejectedApprovalCount > 0 ? "rejected" : pendingApprovalCount > 0 ? "pending" : "approved"}
+                  label={rejectedApprovalCount > 0 ? "Approval rejected" : pendingApprovalCount > 0 ? "Approval pending" : "Ready to confirm"}
+                />
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[720px] text-left text-sm">
+                  <thead className="border-b border-border text-xs uppercase text-muted-foreground">
+                    <tr>
+                      <th className="px-2 py-2">Line</th>
+                      <th className="px-2 py-2">Product</th>
+                      <th className="px-2 py-2">Location</th>
+                      <th className="px-2 py-2">Status</th>
+                      <th className="px-2 py-2">Decision</th>
+                      <th className="px-2 py-2 text-right">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {lineApprovals.map((approval) => (
+                      <tr key={approval.id} className="border-b border-border/70 last:border-0">
+                        <td className="px-2 py-3">{approval.lineNo}</td>
+                        <td className="px-2 py-3 font-medium">{approval.productName}</td>
+                        <td className="px-2 py-3">
+                          <div>{approval.locationName}</div>
+                          <div className="text-xs text-muted-foreground">{approval.locationCode}</div>
+                        </td>
+                        <td className="px-2 py-3">
+                          <StatusBadge status={approval.status} label={statusLabel(approval.status)} />
+                        </td>
+                        <td className="px-2 py-3 text-xs text-muted-foreground">
+                          {approval.decidedByName ?? "-"}
+                          {approval.notes ? <div className="mt-1">{approval.notes}</div> : null}
+                        </td>
+                        <td className="px-2 py-3">
+                          {approval.status === "pending" && approval.canApprove ? (
+                            <div className="flex justify-end gap-2">
+                              <form action={rejectSalesOrderLine}>
+                                <input type="hidden" name="salesOrderId" value={order.id} />
+                                <input type="hidden" name="approvalId" value={approval.id} />
+                                <Button type="submit" size="sm" variant="outline">Reject</Button>
+                              </form>
+                              <form action={approveSalesOrderLine}>
+                                <input type="hidden" name="salesOrderId" value={order.id} />
+                                <input type="hidden" name="approvalId" value={approval.id} />
+                                <Button type="submit" size="sm">Approve</Button>
+                              </form>
+                            </div>
+                          ) : (
+                            <div className="text-right text-xs text-muted-foreground">
+                              {approval.status === "pending" ? "Assigned approver required" : "-"}
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {confirmationBlockedReason ? (
+                <p className="mt-3 text-xs font-medium text-amber-700">{confirmationBlockedReason}</p>
+              ) : null}
+            </section>
+          ) : null}
+
+          <SalesOrderForm
+            action={updateSalesOrder}
+            customers={options.customers}
+            owners={options.owners}
+            products={options.products}
+            productCategories={options.productCategories}
+            productBrands={options.productBrands}
+            productUnits={options.productUnits}
+            locations={options.locations}
+            taxes={options.taxes}
+            availableStock={options.availableStock}
+            error={query.error}
+            order={order}
+            submitLabel="Save Quotation"
+            defaultDate={todayDate()}
+            confirmationBlockedReason={confirmationBlockedReason}
+          />
+        </div>
       ) : (
         <section className="rounded-lg border border-border bg-card p-5">
           <div className="mb-5 grid gap-4 md:grid-cols-4">

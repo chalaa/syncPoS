@@ -3,8 +3,11 @@ import Link from "next/link";
 import { EmptyRows, ReportFilters, ReportNavTabs, SummaryCard } from "@/app/admin/reports/report-ui";
 import { StatusBadge } from "@/components/ui/badge";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
+import { TablePagination } from "@/components/ui/table-pagination";
+import { paginateRows } from "@/lib/pagination";
 import { requirePermission } from "@/server/auth/session";
-import { displayReportMoney, getPaymentReport, normalizeReportFilters } from "@/server/reports/reports";
+import { displayReportMoney } from "@/lib/report-formatters";
+import { getPaymentReport, normalizeReportFilters } from "@/server/reports/reports";
 
 export const dynamic = "force-dynamic";
 
@@ -16,6 +19,8 @@ type PaymentReportPageProps = {
     status?: string;
     paymentType?: string;
     paymentAccountId?: string;
+    page?: string;
+    pageSize?: string;
   }>;
 };
 
@@ -43,6 +48,7 @@ export default async function PaymentReportPage({ searchParams }: PaymentReportP
     .filter((row) => row.paymentType === "outbound")
     .reduce((total, row) => total + Number(row.amountMinor), 0);
   const allocatedMinor = rows.reduce((total, row) => total + Number(row.allocatedAmountMinor), 0);
+  const reportPage = paginateRows(rows, params);
 
   return (
     <PageShell>
@@ -113,7 +119,7 @@ export default async function PaymentReportPage({ searchParams }: PaymentReportP
             </tr>
           </thead>
           <tbody>
-            {rows.map((row) => (
+            {reportPage.rows.map((row) => (
               <tr key={row.id} className="border-t border-border transition-colors hover:bg-secondary/30">
                 <td className="px-4 py-3">
                   <Link
@@ -152,10 +158,11 @@ export default async function PaymentReportPage({ searchParams }: PaymentReportP
                 <td className="px-4 py-3 text-right font-medium">{displayReportMoney(Number(row.signedAmountMinor), row.currencyCode)}</td>
               </tr>
             ))}
-            {rows.length === 0 ? <EmptyRows colSpan={12} /> : null}
+            {reportPage.rows.length === 0 ? <EmptyRows colSpan={12} /> : null}
           </tbody>
         </table>
       </section>
+      <TablePagination pagination={reportPage.pagination} />
     </PageShell>
   );
 }
