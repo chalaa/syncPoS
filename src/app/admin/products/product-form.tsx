@@ -227,7 +227,7 @@ export function ProductForm({
           items={[
             {
               value: "general",
-              label: "General Information",
+              label: t("field.generalInfo"),
               content: (
                 <div className="grid gap-4">
                   <div className="grid gap-4 md:grid-cols-2">
@@ -240,8 +240,8 @@ export function ProductForm({
                         setCategoryId(nextCategoryId);
                         setManualFields((current) => ({ ...current, category: true }));
                       }}
-                      placeholder="Select category"
-                      emptyLabel="No categories found."
+                      placeholder={t("field.selectCategory")}
+                      emptyLabel={t("field.noCategoriesFound")}
                     />
                     <RelatedModelSelect
                       name="brandId"
@@ -249,14 +249,14 @@ export function ProductForm({
                       options={brands}
                       value={brandId}
                       onValueChange={changeBrand}
-                      placeholder="Select brand"
-                      emptyLabel="No brands found."
+                      placeholder={t("field.selectBrand")}
+                      emptyLabel={t("field.noBrandsFound")}
                     />
                   </div>
 
                   <div className="grid gap-4 md:grid-cols-2">
                     <label className="grid gap-1 text-sm font-medium">
-                      Model
+                      {t("field.model")}
                       <input
                         name="model"
                         value={model}
@@ -274,8 +274,8 @@ export function ProductForm({
                       options={units}
                       defaultValue={product?.unitId ?? units[0]?.id ?? ""}
                       required
-                      placeholder="Select unit"
-                      emptyLabel="No units found."
+                      placeholder={t("field.selectUnit")}
+                      emptyLabel={t("field.noUnitsFound")}
                     />
                   </div>
 
@@ -336,13 +336,13 @@ export function ProductForm({
                   </label>
                   {saleTaxOptions.length > 0 ? (
                     <label className="grid gap-1 text-sm font-medium">
-                      Customer Taxes
+                      {t("field.customerTaxes")}
                       <ManyToManyTags
                         name="saleTaxIds"
                         options={saleTaxOptions}
                         value={saleTaxIds}
                         onChange={setSaleTaxIds}
-                        placeholder="Select sale tax"
+                        placeholder={t("field.selectSaleTax")}
                       />
                     </label>
                   ) : null}
@@ -367,13 +367,13 @@ export function ProductForm({
                   </label>
                   {purchaseTaxOptions.length > 0 ? (
                     <label className="grid gap-1 text-sm font-medium">
-                      Vendor Taxes
+                      {t("field.vendorTaxes")}
                       <ManyToManyTags
                         name="purchaseTaxIds"
                         options={purchaseTaxOptions}
                         value={purchaseTaxIds}
                         onChange={setPurchaseTaxIds}
-                        placeholder="Select purchase tax"
+                        placeholder={t("field.selectPurchaseTax")}
                       />
                     </label>
                   ) : null}
@@ -382,7 +382,7 @@ export function ProductForm({
             },
             {
               value: "specifications",
-              label: "Specifications",
+              label: t("product.techSpecs"),
               content: (
                 <div className="grid gap-4 md:grid-cols-2">
                   {specificationFields.map((field) => {
@@ -409,7 +409,7 @@ export function ProductForm({
                   })}
                   {specificationFields.length === 0 ? (
                     <p className="text-sm text-muted-foreground">
-                      Select a category with configured specifications to fill product details.
+                      {t("product.selectCategorySpecsHint")}
                     </p>
                   ) : null}
                 </div>

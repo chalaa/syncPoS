@@ -21,7 +21,7 @@ import {
   userRoles,
   users,
 } from "@/server/db/schema";
-import { PERMISSION_CATALOG, SYSTEM_ROLES } from "@/server/iam/permissions";
+import { PERMISSION_CATALOG, SYSTEM_ROLES, parsePermissionCode } from "@/server/iam/permissions";
 
 const databaseUrl = process.env.DATABASE_URL ?? "";
 
@@ -70,6 +70,7 @@ const permissionRows = PERMISSION_CATALOG.flatMap((item) => [
   ...item.legacyCodes.map((legacyCode) => ({
     ...item,
     code: legacyCode,
+    ...parsePermissionCode(legacyCode),
     description: `${item.description} (legacy alias)`,
   })),
 ]).map((item) => ({

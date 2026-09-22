@@ -87,46 +87,48 @@ export type NewProductModalProps = {
   }) => void;
 };
 
+import type { TranslationKey } from "@/lib/i18n/translations";
+
 const trackingModes: {
   id: TrackingModeOption;
-  title: string;
-  subtitle: string;
-  description: string;
-  badge: string;
+  titleKey: TranslationKey;
+  subtitleKey: TranslationKey;
+  descriptionKey: TranslationKey;
+  badgeKey: TranslationKey;
   icon: typeof Boxes;
 }[] = [
   {
     id: "none",
-    title: "Standard Bulk",
-    subtitle: "Quantity count",
-    description: "Tracked in units or pieces without unique serials.",
-    badge: "Bulk",
+    titleKey: "tracking.mode.none.title",
+    subtitleKey: "tracking.mode.none.subtitle",
+    descriptionKey: "tracking.mode.none.description",
+    badgeKey: "tracking.mode.none.badge",
     icon: Boxes,
   },
   {
     id: "serial",
-    title: "Serial Numbered",
-    subtitle: "Individual serial #",
-    description: "Unique serial per unit for warranty and tracking.",
-    badge: "Unique",
+    titleKey: "tracking.mode.serial.title",
+    subtitleKey: "tracking.mode.serial.subtitle",
+    descriptionKey: "tracking.mode.serial.description",
+    badgeKey: "tracking.mode.serial.badge",
     icon: Barcode,
   },
   {
     id: "lot",
-    title: "Batch / Lot",
-    subtitle: "Expiry & batch control",
-    description: "Batched groups with production and expiry dates.",
-    badge: "Batched",
+    titleKey: "tracking.mode.lot.title",
+    subtitleKey: "tracking.mode.lot.subtitle",
+    descriptionKey: "tracking.mode.lot.description",
+    badgeKey: "tracking.mode.lot.badge",
     icon: CalendarClock,
   },
 ];
 
 type StepId = 1 | 2 | 3;
 
-const steps: { id: StepId; title: string; subtitle: string; icon: typeof Tag }[] = [
-  { id: 1, title: "Identity", subtitle: "Name & category", icon: Tag },
-  { id: 2, title: "Pricing & Stock", subtitle: "Margin & tracking", icon: Coins },
-  { id: 3, title: "Specs & Taxes", subtitle: "Attributes & review", icon: SlidersHorizontal },
+const steps: { id: StepId; titleKey: TranslationKey; subtitleKey: TranslationKey; icon: typeof Tag }[] = [
+  { id: 1, titleKey: "modal.newProduct.step1Title", subtitleKey: "modal.newProduct.step1Subtitle", icon: Tag },
+  { id: 2, titleKey: "modal.newProduct.step2Title", subtitleKey: "modal.newProduct.step2Subtitle", icon: Coins },
+  { id: 3, titleKey: "modal.newProduct.step3Title", subtitleKey: "modal.newProduct.step3Subtitle", icon: SlidersHorizontal },
 ];
 
 export function NewProductModal({
@@ -461,7 +463,7 @@ export function NewProductModal({
 
   function goToStep(nextStep: StepId) {
     if (nextStep > 1 && !productName.trim()) {
-      setError("Please enter a product name before proceeding.");
+      setError(t("validation.productNameRequired"));
       return;
     }
     setError(null);
@@ -500,7 +502,7 @@ export function NewProductModal({
 
     if (!productName.trim()) {
       setStep(1);
-      setError("Product name is required.");
+      setError(t("validation.productNameRequiredShort"));
       return;
     }
 
@@ -562,7 +564,7 @@ export function NewProductModal({
           setShowDuplicateWarning(true);
           return;
         }
-        setError(result.error ?? "Could not create product.");
+        setError(result.error ?? t("validation.productCreateError"));
         return;
       }
 
@@ -623,13 +625,13 @@ export function NewProductModal({
                     {t("modal.newProduct.title")}
                   </DialogTitle>
                   <Badge variant="accent" size="sm" className="hidden sm:inline-flex text-[10px]">
-                    Step {step} of 3
+                    {t("modal.newProduct.stepOfCount").replace("{step}", String(step))}
                   </Badge>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  {step === 1 && "Catalog classification with instant heuristic auto-fill."}
-                  {step === 2 && "Unit pricing, real-time margin calculation, and tracking mode."}
-                  {step === 3 && "Technical specifications, tax rules, and catalog confirmation."}
+                  {step === 1 && t("modal.newProduct.step1Desc")}
+                  {step === 2 && t("modal.newProduct.step2Desc")}
+                  {step === 3 && t("modal.newProduct.step3Desc")}
                 </p>
               </div>
             </div>
@@ -637,7 +639,7 @@ export function NewProductModal({
             <DialogClose
               type="button"
               className="rounded-lg p-1.5 sm:p-2 bg-red-500 text-white hover:bg-red-600 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/50 shadow-2xs"
-              aria-label="Close dialog"
+              aria-label={t("product.close")}
             >
               <X className="size-4.5" />
             </DialogClose>
@@ -688,10 +690,10 @@ export function NewProductModal({
                               : "text-muted-foreground",
                         )}
                       >
-                        {s.title}
+                        {t(s.titleKey)}
                       </p>
                       <p className="text-[10px] text-muted-foreground truncate leading-tight">
-                        {s.subtitle}
+                        {t(s.subtitleKey)}
                       </p>
                     </div>
                   </button>
@@ -706,7 +708,7 @@ export function NewProductModal({
 
             {units.length === 0 ? (
               <Alert kind="warning">
-                Please create at least one unit of measure before adding products.
+                {t("product.createUnitWarning")}
               </Alert>
             ) : null}
 
@@ -749,12 +751,12 @@ export function NewProductModal({
                       htmlFor="step1-product-name"
                       className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-muted-foreground"
                     >
-                      <span>Product Title / Description</span>
+                      <span>{t("field.productTitleDesc")}</span>
                       <span className="text-destructive">*</span>
                     </label>
                     <span className="inline-flex items-center gap-1 text-[11px] font-medium text-[#0B5D4B]">
                       <Sparkles className="size-3 text-[#D9A441]" />
-                      Auto-Detection Active
+                      {t("product.autoDetectionActive")}
                     </span>
                   </div>
 
@@ -766,7 +768,7 @@ export function NewProductModal({
                       id="step1-product-name"
                       value={productName}
                       onChange={(event) => changeProductName(event.target.value)}
-                      placeholder="e.g. Bosch GSB 13 RE Impact Drill 600W Germany..."
+                      placeholder={t("field.productTitlePlaceholder")}
                       maxLength={200}
                       required
                       autoFocus
@@ -777,7 +779,7 @@ export function NewProductModal({
                         type="button"
                         onClick={() => changeProductName("")}
                         className="absolute right-3 rounded-md p-1 text-muted-foreground hover:bg-secondary hover:text-foreground"
-                        title="Clear title"
+                        title={t("action.clearTitle")}
                       >
                         <X className="size-4" />
                       </button>
@@ -792,10 +794,10 @@ export function NewProductModal({
                           <AlertTriangle className="size-3.5" />
                         </div>
                         <div className="truncate text-amber-950">
-                          <span className="font-bold text-amber-950">Possible duplicate in catalog:</span>{" "}
+                          <span className="font-bold text-amber-950">{t("product.possibleDuplicate")}</span>{" "}
                           <span className="font-mono font-bold text-amber-950">{liveDuplicate.sku}</span> — <span className="font-medium text-amber-900">{liveDuplicate.name}</span>{" "}
                           <span className="inline-block rounded-full bg-amber-200/90 px-2 py-0.5 text-[10px] font-bold text-amber-950 border border-amber-300">
-                            {liveDuplicate.similarityScore}% Match
+                            {liveDuplicate.similarityScore}% {t("product.match")}
                           </span>
                         </div>
                       </div>
@@ -815,37 +817,37 @@ export function NewProductModal({
                       <div className="flex flex-wrap items-center gap-1.5 text-xs">
                         <span className="inline-flex items-center gap-1 font-semibold text-[#0B5D4B] text-[11px] mr-1">
                           <Sparkles className="size-3 text-[#D9A441]" />
-                          Matched:
+                          {t("product.matched")}
                         </span>
                         {selectedBrand && (
                           <span className="inline-flex items-center gap-1 rounded bg-card px-2 py-0.5 text-xs font-semibold text-[#0B5D4B] border border-border/60">
-                            Brand: {selectedBrand.name} <Check className="size-3" />
+                            {t("field.brand")}: {selectedBrand.name} <Check className="size-3" />
                           </span>
                         )}
                         {selectedCategory && (
                           <span className="inline-flex items-center gap-1 rounded bg-card px-2 py-0.5 text-xs font-semibold text-foreground border border-border/60">
-                            Category: {selectedCategory.name} <Check className="size-3 text-[#0B5D4B]" />
+                            {t("field.category")}: {selectedCategory.name} <Check className="size-3 text-[#0B5D4B]" />
                           </span>
                         )}
                         {model && (
                           <span className="rounded bg-card px-2 py-0.5 text-xs font-mono text-foreground border border-border/60">
-                            Model: {model}
+                            {t("field.model")}: {model}
                           </span>
                         )}
                         {country && (
                           <span className="rounded bg-card px-2 py-0.5 text-xs text-foreground border border-border/60">
-                            Origin: {country}
+                            {t("product.origin")}: {country}
                           </span>
                         )}
                         {detectedSpecsList.length > 0 && (
                           <span className="inline-flex items-center gap-1 rounded bg-[#0B5D4B]/10 px-2 py-0.5 text-xs font-semibold text-[#0B5D4B] border border-[#0B5D4B]/30">
-                            {detectedSpecsList.length} Specs Detected <Sparkles className="size-3 text-[#D9A441]" />
+                            {detectedSpecsList.length} {t("product.specsDetected")} <Sparkles className="size-3 text-[#D9A441]" />
                           </span>
                         )}
                       </div>
                       {standardName && (
                         <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground pt-1 border-t border-border/50">
-                          <span className="font-semibold uppercase tracking-wider text-[10px]">Standard Display:</span>
+                          <span className="font-semibold uppercase tracking-wider text-[10px]">{t("product.standardDisplay")}</span>
                           <span className="font-bold text-[#0B5D4B] truncate">{standardName}</span>
                         </div>
                       )}
@@ -856,13 +858,13 @@ export function NewProductModal({
                 {/* Classification Grid */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-1">
                   <RelatedModelSelect
-                    label="Category"
+                    label={t("field.category")}
                     options={localCategories}
                     value={categoryId}
                     onValueChange={changeCategory}
-                    placeholder="Select category"
-                    emptyLabel="No categories found."
-                    createLabel="Add Category..."
+                    placeholder={t("field.selectCategory")}
+                    emptyLabel={t("field.noCategoriesFound")}
+                    createLabel={t("action.addCategoryQuick")}
                     onCreateAndEdit={(query) => {
                       setQuickCategoryName(query);
                       setIsAddCategoryOpen(true);
@@ -870,13 +872,13 @@ export function NewProductModal({
                   />
 
                   <RelatedModelSelect
-                    label="Brand / Manufacturer"
+                    label={t("field.brand")}
                     options={localBrands}
                     value={brandId}
                     onValueChange={changeBrand}
-                    placeholder="Select brand"
-                    emptyLabel="No brands found."
-                    createLabel="Add Brand..."
+                    placeholder={t("field.selectBrand")}
+                    emptyLabel={t("field.noBrandsFound")}
+                    createLabel={t("action.addBrandQuick")}
                     onCreateAndEdit={(query) => {
                       setQuickBrandName(query);
                       setIsAddBrandOpen(true);
@@ -885,28 +887,28 @@ export function NewProductModal({
 
                   <div className="grid grid-cols-2 gap-3">
                     <label className="grid gap-1 text-xs font-semibold text-foreground">
-                      <span className="text-muted-foreground uppercase tracking-wider text-[10px]">Model</span>
+                      <span className="text-muted-foreground uppercase tracking-wider text-[10px]">{t("field.model")}</span>
                       <input
                         value={model}
                         onChange={(event) => {
                           setModel(event.target.value);
                           setManualFields((current) => ({ ...current, model: true }));
                         }}
-                        placeholder="e.g. GSB 13 RE"
+                        placeholder={t("field.modelPlaceholder")}
                         maxLength={100}
                         className="h-10 rounded-lg border border-input bg-background px-3 text-sm font-medium text-foreground outline-none transition-colors focus:border-[#0B5D4B] focus:ring-1 focus:ring-[#0B5D4B]"
                       />
                     </label>
 
                     <RelatedModelSelect
-                      label="Unit of Measure"
+                      label={t("field.unit")}
                       options={localUnits}
                       value={unitId}
                       onValueChange={setUnitId}
                       required
-                      placeholder="Select unit"
-                      emptyLabel="No units found."
-                      createLabel="Add Unit..."
+                      placeholder={t("field.selectUnit")}
+                      emptyLabel={t("field.noUnitsFound")}
+                      createLabel={t("action.addUnitQuick")}
                       onCreateAndEdit={(query) => {
                         setQuickUnitName(query);
                         setIsAddUnitOpen(true);
@@ -916,7 +918,7 @@ export function NewProductModal({
 
                   <CountrySelectField
                     name="_unused_country"
-                    label="Country of Origin"
+                    label={t("field.countryOfOrigin")}
                     value={country}
                     onValueChange={(nextCountry) => {
                       setCountry(nextCountry);
@@ -934,7 +936,7 @@ export function NewProductModal({
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <label className="grid gap-1.5 text-xs font-semibold text-foreground">
                     <span className="text-muted-foreground uppercase tracking-wider text-[11px]">
-                      Sales Price (ETB)
+                      {t("product.salesPriceEtb")}
                     </span>
                     <div className="relative flex items-center">
                       <span className="pointer-events-none absolute left-3 text-xs font-bold text-muted-foreground">
@@ -954,7 +956,7 @@ export function NewProductModal({
 
                   <label className="grid gap-1.5 text-xs font-semibold text-foreground">
                     <span className="text-muted-foreground uppercase tracking-wider text-[11px]">
-                      Purchase Cost (ETB)
+                      {t("product.purchaseCostEtb")}
                     </span>
                     <div className="relative flex items-center">
                       <span className="pointer-events-none absolute left-3 text-xs font-bold text-muted-foreground">
@@ -977,22 +979,22 @@ export function NewProductModal({
                 <div className="rounded-xl border border-border/80 bg-gradient-to-r from-secondary/40 via-card to-secondary/30 p-4 space-y-2 shadow-2xs">
                   <div className="flex items-center justify-between text-xs">
                     <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                      Expected Profit per Unit
+                      {t("product.expectedProfitPerUnit")}
                     </span>
                     {priceNum > 0 ? (
                       profit >= 0 ? (
                         <span className="inline-flex items-center gap-1 font-bold text-emerald-700 dark:text-emerald-400">
                           <TrendingUp className="size-3.5 text-emerald-600" />
-                          {marginPercent >= 20 ? "Healthy Profit Margin" : "Low Margin"}
+                          {marginPercent >= 20 ? t("product.healthyMargin") : t("product.lowMargin")}
                         </span>
                       ) : (
                         <span className="inline-flex items-center gap-1 font-bold text-destructive">
                           <AlertTriangle className="size-3.5" />
-                          Selling below cost
+                          {t("product.sellingBelowCost")}
                         </span>
                       )
                     ) : (
-                      <span className="text-[11px] text-muted-foreground">Enter prices to calculate margin</span>
+                      <span className="text-[11px] text-muted-foreground">{t("product.enterPricesCalcMargin")}</span>
                     )}
                   </div>
 
@@ -1005,7 +1007,7 @@ export function NewProductModal({
                           maximumFractionDigits: 2,
                         })}
                       </span>
-                      <span className="text-xs font-semibold text-muted-foreground">ETB profit</span>
+                      <span className="text-xs font-semibold text-muted-foreground">{t("product.etbProfit")}</span>
                     </div>
 
                     <Badge
@@ -1021,7 +1023,7 @@ export function NewProductModal({
                       size="lg"
                       className="font-bold font-mono text-sm px-3"
                     >
-                      {priceNum > 0 ? `${marginPercent.toFixed(1)}% margin` : "0.0% margin"}
+                      {priceNum > 0 ? `${marginPercent.toFixed(1)}% ${t("product.marginLabel")}` : `0.0% ${t("product.marginLabel")}`}
                     </Badge>
                   </div>
                 </div>
@@ -1029,18 +1031,18 @@ export function NewProductModal({
                 {/* Tracking Mode 3 Interactive Cards */}
                 <div className="space-y-2 pt-1">
                   <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                    Inventory Tracking Mode
+                    {t("field.tracking")}
                   </label>
                   <div className="grid grid-cols-3 gap-3">
-                    {trackingModes.map((mode) => {
-                      const isSelected = trackingMode === mode.id;
-                      const ModeIcon = mode.icon;
+                    {trackingModes.map((modeOption) => {
+                      const isSelected = trackingMode === modeOption.id;
+                      const ModeIcon = modeOption.icon;
 
                       return (
                         <button
-                          key={mode.id}
+                          key={modeOption.id}
                           type="button"
-                          onClick={() => setTrackingMode(mode.id)}
+                          onClick={() => setTrackingMode(modeOption.id)}
                           className={cn(
                             "relative flex flex-col items-start p-3 rounded-xl border text-left transition-all",
                             isSelected
@@ -1063,9 +1065,9 @@ export function NewProductModal({
                               <CheckCircle2 className="size-4 text-[#0B5D4B]" />
                             ) : null}
                           </div>
-                          <span className="text-xs font-bold text-foreground">{mode.title}</span>
+                          <span className="text-xs font-bold text-foreground">{t(modeOption.titleKey)}</span>
                           <span className="text-[10px] text-muted-foreground leading-tight line-clamp-2 mt-0.5">
-                            {mode.description}
+                            {t(modeOption.descriptionKey)}
                           </span>
                         </button>
                       );
@@ -1085,7 +1087,7 @@ export function NewProductModal({
                       <div className="flex items-center gap-2">
                         <SlidersHorizontal className="size-4 text-[#0B5D4B]" />
                         <span className="text-xs font-bold text-foreground">
-                          Technical Specifications ({selectedCategory?.name})
+                          {t("product.techSpecs")}{selectedCategory ? ` (${selectedCategory.name})` : ""}
                         </span>
                       </div>
                       <div className="flex items-center gap-2">
@@ -1095,13 +1097,13 @@ export function NewProductModal({
                           size="sm"
                           onClick={handleReAutofillSpecifications}
                           className="h-7 text-[11px] gap-1 px-2.5 text-[#0B5D4B] border-[#0B5D4B]/30 hover:bg-[#0B5D4B]/10 hover:text-[#0B5D4B] transition-colors"
-                          title="Scan product title and auto-fill specifications"
+                          title={t("product.autofillTooltip")}
                         >
                           <Sparkles className="size-3 text-[#D9A441]" />
                           <span>{t("action.autofillFromTitle")}</span>
                         </Button>
                         <Badge variant="primary" size="sm" className="text-[10px]">
-                          {specificationFields.length} attributes
+                          {specificationFields.length} {t("product.attributes")}
                         </Badge>
                       </div>
                     </div>
@@ -1117,7 +1119,7 @@ export function NewProductModal({
                             <div className="flex items-center justify-between text-[11px]">
                               <span className="text-muted-foreground truncate">{field.label}</span>
                               {isAutoDetected && (
-                                <span className="text-[10px] text-[#0B5D4B] font-semibold">✨ Auto</span>
+                                <span className="text-[10px] text-[#0B5D4B] font-semibold">✨ {t("product.auto")}</span>
                               )}
                             </div>
                             <input
@@ -1144,7 +1146,7 @@ export function NewProductModal({
                   </div>
                 ) : (
                   <div className="rounded-lg border border-dashed border-border/80 p-3 text-center text-xs text-muted-foreground">
-                    No engineering specifications configured for {selectedCategory?.name || "this category"}.
+                    {t("catalog.noCategorySpecs")}
                   </div>
                 )}
 
@@ -1154,13 +1156,13 @@ export function NewProductModal({
                     {saleTaxOptions.length > 0 ? (
                       <label className="grid gap-1 text-xs font-semibold text-foreground">
                         <span className="text-muted-foreground uppercase tracking-wider text-[10px]">
-                          Customer Sales Taxes
+                          {t("product.customerSalesTaxes")}
                         </span>
                         <ManyToManyTags
                           options={saleTaxOptions}
                           value={saleTaxIds}
                           onChange={setSaleTaxIds}
-                          placeholder="Add sales tax (e.g. VAT 15%)"
+                          placeholder={t("product.customerSalesTaxesPlaceholder")}
                         />
                       </label>
                     ) : null}
@@ -1168,13 +1170,13 @@ export function NewProductModal({
                     {purchaseTaxOptions.length > 0 ? (
                       <label className="grid gap-1 text-xs font-semibold text-foreground">
                         <span className="text-muted-foreground uppercase tracking-wider text-[10px]">
-                          Vendor Purchase Taxes
+                          {t("product.vendorPurchaseTaxes")}
                         </span>
                         <ManyToManyTags
                           options={purchaseTaxOptions}
                           value={purchaseTaxIds}
                           onChange={setPurchaseTaxIds}
-                          placeholder="Add purchase tax (e.g. TOT 2%)"
+                          placeholder={t("product.vendorPurchaseTaxesPlaceholder")}
                         />
                       </label>
                     ) : null}
@@ -1185,34 +1187,34 @@ export function NewProductModal({
                 <div className="rounded-xl border border-[#0B5D4B]/30 bg-gradient-to-r from-[#0B5D4B]/5 to-transparent p-3 space-y-1.5 text-xs">
                   <div className="flex items-center justify-between">
                     <span className="font-bold text-[#0B5D4B] flex items-center gap-1.5">
-                      <FileCheck className="size-4" /> Ready to Register:
+                      <FileCheck className="size-4" /> {t("product.readyToRegister")}
                     </span>
                     <Badge variant="accent" size="sm">
-                      {trackingMode === "serial" ? "Serial Tracked" : trackingMode === "lot" ? "Lot Tracked" : "Bulk Stock"}
+                      {trackingMode === "serial" ? t("product.serialTracked") : trackingMode === "lot" ? t("product.lotTracked") : t("product.bulkStock")}
                     </Badge>
                   </div>
                   <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
                     <span>
-                      <strong className="text-foreground">Title:</strong> {productName || "Unnamed"}
+                      <strong className="text-foreground">{t("product.summaryTitle")}</strong> {productName || t("product.unnamed")}
                     </span>
                     {selectedCategory && (
                       <span>
-                        <strong className="text-foreground">Category:</strong> {selectedCategory.name}
+                        <strong className="text-foreground">{t("field.category")}:</strong> {selectedCategory.name}
                       </span>
                     )}
                     {selectedBrand && (
                       <span>
-                        <strong className="text-foreground">Brand:</strong> {selectedBrand.name}
+                        <strong className="text-foreground">{t("field.brand")}:</strong> {selectedBrand.name}
                       </span>
                     )}
                     <span>
-                      <strong className="text-foreground">Price:</strong> ETB {listPrice}
+                      <strong className="text-foreground">{t("product.price")}:</strong> ETB {listPrice}
                     </span>
                     <span>
-                      <strong className="text-foreground">Cost:</strong> ETB {standardCost}
+                      <strong className="text-foreground">{t("product.cost")}:</strong> ETB {standardCost}
                     </span>
                     <span>
-                      <strong className="text-foreground">Margin:</strong> {marginPercent.toFixed(1)}%
+                      <strong className="text-foreground">{t("product.margin")}:</strong> {marginPercent.toFixed(1)}%
                     </span>
                   </div>
                 </div>
@@ -1248,7 +1250,7 @@ export function NewProductModal({
 
             <div className="flex items-center gap-2">
               <span className="hidden sm:inline-block text-xs text-muted-foreground mr-2 font-medium">
-                Step {step} of 3
+                {t("modal.newProduct.stepOfCount").replace("{step}", String(step))}
               </span>
 
               {step < 3 ? (
@@ -1301,27 +1303,27 @@ export function NewProductModal({
                 </div>
                 <div className="min-w-0 space-y-1 sm:space-y-0">
                   <h3 className="text-sm sm:text-base font-bold text-foreground leading-snug">
-                    Duplicate Product Warning
+                    {t("product.duplicateWarningTitle")}
                   </h3>
                   <p className="text-xs text-muted-foreground leading-tight">
-                    {duplicateMatches.length} matching product{duplicateMatches.length > 1 ? "s" : ""} already found in your catalog
+                    {duplicateMatches.length} {t("product.duplicateWarningSubtitle")}
                   </p>
                   <div className="pt-1 sm:hidden">
                     <Badge variant="outline" className="border-amber-400 bg-amber-50 text-amber-900 font-bold px-2.5 py-0.5 text-[11px]">
-                      {step === 3 ? "Confirmation Required" : "Catalog Review"}
+                      {step === 3 ? t("product.confirmationRequired") : t("product.catalogReview")}
                     </Badge>
                   </div>
                 </div>
               </div>
               <div className="flex items-center gap-2.5 shrink-0">
                 <Badge variant="outline" className="hidden sm:inline-flex border-amber-400 bg-amber-50 text-amber-900 font-bold px-2.5 py-1">
-                  {step === 3 ? "Confirmation Required" : "Catalog Review"}
+                  {step === 3 ? t("product.confirmationRequired") : t("product.catalogReview")}
                 </Badge>
                 <button
                   type="button"
                   onClick={() => setShowDuplicateWarning(false)}
                   className="rounded-lg p-1.5 sm:p-2 bg-red-500 text-white hover:bg-red-600 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/50 shadow-2xs"
-                  aria-label="Close modal"
+                  aria-label={t("product.close")}
                 >
                   <X className="size-4 sm:size-4.5" />
                 </button>
@@ -1335,9 +1337,9 @@ export function NewProductModal({
                   <AlertTriangle className="size-4" />
                 </div>
                 <div className="space-y-1">
-                  <span className="font-bold text-sm text-amber-950">A very similar product is already in the database.</span>
+                  <span className="font-bold text-sm text-amber-950">{t("product.duplicateBoxTitle")}</span>
                   <p className="text-xs text-amber-900 leading-relaxed font-medium">
-                    Items are often added with different word orders, slight spelling differences, or abbreviations. Please inspect the existing catalog product below before creating a duplicate entry.
+                    {t("product.duplicateBoxDesc")}
                   </p>
                 </div>
               </div>
@@ -1345,27 +1347,27 @@ export function NewProductModal({
               {/* Product Candidate Being Added */}
               <div className="rounded-xl border border-border bg-secondary/30 p-3.5 space-y-1.5">
                 <div className="flex items-center justify-between text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
-                  <span>Product You Are Adding (New):</span>
+                  <span>{t("product.addingDraftTitle")}</span>
                   <Badge variant="outline" size="sm" className="font-semibold text-[10px]">
-                    Draft Entry
+                    {t("product.draftEntry")}
                   </Badge>
                 </div>
                 <div className="font-semibold text-sm text-foreground">
                   {productName}
                 </div>
                 <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground pt-1">
-                  {selectedCategory && <span>Category: <strong className="text-foreground">{selectedCategory.name}</strong></span>}
-                  {selectedBrand && <span>Brand: <strong className="text-foreground">{selectedBrand.name}</strong></span>}
-                  {model && <span>Model: <strong className="text-foreground font-mono">{model}</strong></span>}
+                  {selectedCategory && <span>{t("field.category")}: <strong className="text-foreground">{selectedCategory.name}</strong></span>}
+                  {selectedBrand && <span>{t("field.brand")}: <strong className="text-foreground">{selectedBrand.name}</strong></span>}
+                  {model && <span>{t("field.model")}: <strong className="text-foreground font-mono">{model}</strong></span>}
                 </div>
               </div>
 
               {/* Existing Catalog Matches */}
               <div className="space-y-2">
                 <div className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center justify-between">
-                  <span>Existing Product{duplicateMatches.length > 1 ? "s" : ""} Already In Catalog:</span>
+                  <span>{t("product.existingInCatalog")}</span>
                   <span className="text-[11px] font-bold text-amber-800">
-                    {duplicateMatches.length} Match{duplicateMatches.length > 1 ? "es" : ""} Detected
+                    {duplicateMatches.length} {t("product.matchesDetected")}
                   </span>
                 </div>
 
@@ -1387,7 +1389,7 @@ export function NewProductModal({
                           </div>
                           {dup.standardName && dup.standardName !== dup.name && (
                             <div className="text-[11px] text-muted-foreground">
-                              Standard: <span className="font-medium text-foreground">{dup.standardName}</span>
+                              {t("product.standard")} <span className="font-medium text-foreground">{dup.standardName}</span>
                             </div>
                           )}
                         </div>
@@ -1400,7 +1402,7 @@ export function NewProductModal({
                               : "bg-amber-100 text-amber-900 border-amber-300"
                           )}
                         >
-                          {dup.similarityScore}% Match
+                          {dup.similarityScore}% {t("product.match")}
                         </span>
                       </div>
 
@@ -1413,11 +1415,11 @@ export function NewProductModal({
                       {/* Details & Catalog Link */}
                       <div className="flex flex-wrap items-center justify-between text-xs text-muted-foreground pt-1.5 border-t border-border/50 gap-2">
                         <div className="flex flex-wrap gap-x-3 gap-y-1">
-                          {dup.brandName && <span>Brand: <strong className="text-foreground">{dup.brandName}</strong></span>}
-                          {dup.categoryName && <span>Category: <strong className="text-foreground">{dup.categoryName}</strong></span>}
-                          {dup.model && <span>Model: <strong className="text-foreground font-mono">{dup.model}</strong></span>}
-                          <span>Price: <strong className="text-foreground">ETB {dup.listPrice}</strong></span>
-                          <span>Cost: <strong className="text-foreground">ETB {dup.standardCost}</strong></span>
+                          {dup.brandName && <span>{t("field.brand")}: <strong className="text-foreground">{dup.brandName}</strong></span>}
+                          {dup.categoryName && <span>{t("field.category")}: <strong className="text-foreground">{dup.categoryName}</strong></span>}
+                          {dup.model && <span>{t("field.model")}: <strong className="text-foreground font-mono">{dup.model}</strong></span>}
+                          <span>{t("product.price")}: <strong className="text-foreground">ETB {dup.listPrice}</strong></span>
+                          <span>{t("product.cost")}: <strong className="text-foreground">ETB {dup.standardCost}</strong></span>
                         </div>
 
                         <a
@@ -1426,7 +1428,7 @@ export function NewProductModal({
                           rel="noreferrer"
                           className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#0B5D4B] dark:text-emerald-400 hover:underline"
                         >
-                          View in Catalog <ExternalLink className="size-3" />
+                          {t("product.viewInCatalog")} <ExternalLink className="size-3" />
                         </a>
                       </div>
                     </div>
@@ -1447,7 +1449,7 @@ export function NewProductModal({
                 className="h-10 w-full sm:w-auto gap-2 px-4 text-xs sm:text-sm font-medium justify-center"
               >
                 <ArrowLeft className="size-4" />
-                <span>Close & Edit Details</span>
+                <span>{t("action.closeAndEdit")}</span>
               </Button>
 
               {step === 3 ? (
@@ -1460,12 +1462,12 @@ export function NewProductModal({
                   {isPending ? (
                     <>
                       <LoaderCircleIcon className="size-4 animate-spin" />
-                      <span>Registering Product...</span>
+                      <span>{t("action.registeringProduct")}</span>
                     </>
                   ) : (
                     <>
                       <CheckCircle2 className="size-4 text-amber-100" />
-                      <span>Create Product Anyway</span>
+                      <span>{t("action.confirmAndRegisterAnyway")}</span>
                     </>
                   )}
                 </Button>
@@ -1540,7 +1542,7 @@ function QuickAddCategoryDialog({
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!name.trim()) {
-      setError("Category name is required.");
+      setError(t("validation.categoryNameRequired"));
       return;
     }
     setIsSubmitting(true);
@@ -1555,7 +1557,7 @@ function QuickAddCategoryDialog({
       });
       onOpenChange(false);
     } catch (err: any) {
-      setError(err?.message || "Failed to create category.");
+      setError(err?.message || t("validation.categoryCreateError"));
     } finally {
       setIsSubmitting(false);
     }
@@ -1565,9 +1567,9 @@ function QuickAddCategoryDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent overlayClassName="z-[70]" className="z-[75] sm:max-w-md">
         <DialogHeader>
-          <DialogTitle className="text-base font-semibold">Add New Category</DialogTitle>
+          <DialogTitle className="text-base font-semibold">{t("modal.quickCategory.title")}</DialogTitle>
           <DialogDescription className="text-xs">
-            Create a category directly without leaving product creation.
+            {t("modal.quickCategory.desc")}
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4 pt-2">
@@ -1577,22 +1579,22 @@ function QuickAddCategoryDialog({
             </div>
           )}
           <label className="grid gap-1.5 text-xs font-semibold">
-            <span>Category Name *</span>
+            <span>{t("field.categoryName")}</span>
             <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. Power Tools"
+              placeholder={t("field.categoryNamePlaceholder")}
               required
               className="h-10 rounded-lg border border-input bg-background px-3 text-sm font-medium outline-none focus:border-[#0B5D4B] focus:ring-1 focus:ring-[#0B5D4B]"
             />
           </label>
           <label className="grid gap-1.5 text-xs font-semibold">
-            <span>Description (Optional)</span>
+            <span>{t("field.descriptionOptional")}</span>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Brief category description..."
+              placeholder={t("field.descriptionPlaceholder")}
               rows={2}
               className="rounded-lg border border-input bg-background p-2.5 text-sm font-medium outline-none focus:border-[#0B5D4B] focus:ring-1 focus:ring-[#0B5D4B]"
             />
@@ -1658,7 +1660,7 @@ function QuickAddBrandDialog({
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!name.trim()) {
-      setError("Brand name is required.");
+      setError(t("validation.brandNameRequired"));
       return;
     }
     setIsSubmitting(true);
@@ -1677,7 +1679,7 @@ function QuickAddBrandDialog({
       });
       onOpenChange(false);
     } catch (err: any) {
-      setError(err?.message || "Failed to create brand.");
+      setError(err?.message || t("validation.brandCreateError"));
     } finally {
       setIsSubmitting(false);
     }
@@ -1687,9 +1689,9 @@ function QuickAddBrandDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent overlayClassName="z-[70]" className="z-[75] sm:max-w-md">
         <DialogHeader>
-          <DialogTitle className="text-base font-semibold">Add New Brand</DialogTitle>
+          <DialogTitle className="text-base font-semibold">{t("modal.quickBrand.title")}</DialogTitle>
           <DialogDescription className="text-xs">
-            Create a brand directly without leaving product creation.
+            {t("modal.quickBrand.desc")}
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4 pt-2">
@@ -1699,28 +1701,28 @@ function QuickAddBrandDialog({
             </div>
           )}
           <label className="grid gap-1.5 text-xs font-semibold">
-            <span>Brand Name *</span>
+            <span>{t("field.brandName")}</span>
             <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. Bosch"
+              placeholder={t("field.brandNamePlaceholder")}
               required
               className="h-10 rounded-lg border border-input bg-background px-3 text-sm font-medium outline-none focus:border-[#0B5D4B] focus:ring-1 focus:ring-[#0B5D4B]"
             />
           </label>
           <CountrySelectField
             name="_unused_quick_brand_country"
-            label="Country of Origin (Optional)"
+            label={t("field.countryOfOriginOptional")}
             value={country}
             onValueChange={setCountry}
           />
           <label className="grid gap-1.5 text-xs font-semibold">
-            <span>Description (Optional)</span>
+            <span>{t("field.descriptionOptional")}</span>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Brief brand description..."
+              placeholder={t("field.brandDescriptionPlaceholder")}
               rows={2}
               className="rounded-lg border border-input bg-background p-2.5 text-sm font-medium outline-none focus:border-[#0B5D4B] focus:ring-1 focus:ring-[#0B5D4B]"
             />
@@ -1784,7 +1786,7 @@ function QuickAddUnitDialog({
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!name.trim()) {
-      setError("Unit name is required.");
+      setError(t("validation.unitNameRequired"));
       return;
     }
     setIsSubmitting(true);
@@ -1801,7 +1803,7 @@ function QuickAddUnitDialog({
       });
       onOpenChange(false);
     } catch (err: any) {
-      setError(err?.message || "Failed to create unit.");
+      setError(err?.message || t("validation.unitCreateError"));
     } finally {
       setIsSubmitting(false);
     }
@@ -1811,9 +1813,9 @@ function QuickAddUnitDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent overlayClassName="z-[70]" className="z-[75] sm:max-w-md">
         <DialogHeader>
-          <DialogTitle className="text-base font-semibold">Add New Unit of Measure</DialogTitle>
+          <DialogTitle className="text-base font-semibold">{t("modal.quickUnit.title")}</DialogTitle>
           <DialogDescription className="text-xs">
-            Create a unit directly without leaving product creation.
+            {t("modal.quickUnit.desc")}
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4 pt-2">
@@ -1823,18 +1825,18 @@ function QuickAddUnitDialog({
             </div>
           )}
           <label className="grid gap-1.5 text-xs font-semibold">
-            <span>Unit Name *</span>
+            <span>{t("field.unitName")}</span>
             <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. Meter, Box, Set"
+              placeholder={t("field.unitNamePlaceholder")}
               required
               className="h-10 rounded-lg border border-input bg-background px-3 text-sm font-medium outline-none focus:border-[#0B5D4B] focus:ring-1 focus:ring-[#0B5D4B]"
             />
           </label>
           <label className="grid gap-1.5 text-xs font-semibold">
-            <span>Decimal Precision</span>
+            <span>{t("field.decimalPrecision")}</span>
             <input
               type="number"
               min="0"
@@ -1844,7 +1846,7 @@ function QuickAddUnitDialog({
               className="h-10 rounded-lg border border-input bg-background px-3 text-sm font-medium outline-none focus:border-[#0B5D4B] focus:ring-1 focus:ring-[#0B5D4B]"
             />
             <span className="text-[10px] text-muted-foreground font-normal">
-              0 for integer counts (e.g. pcs), 2 for decimal measurements (e.g. kg, meters)
+              {t("field.decimalPrecisionHint")}
             </span>
           </label>
           <DialogFooter className="pt-2">

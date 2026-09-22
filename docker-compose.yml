@@ -8,7 +8,7 @@ services:
       POSTGRES_USER: syncpos
       POSTGRES_PASSWORD: syncpos
     ports:
-      - "5433:5432"
+      - "5435:5432"
     volumes:
       - syncpos-postgres-data:/var/lib/postgresql/data
     healthcheck:

@@ -94,7 +94,7 @@ export type PermissionCatalogItem = {
   action: string;
 };
 
-function parsePermissionCode(code: string) {
+export function parsePermissionCode(code: string) {
   if (code.includes(":")) {
     const [application, feature, action] = code.split(":");
 
