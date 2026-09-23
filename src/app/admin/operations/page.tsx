@@ -1,6 +1,7 @@
 import { ClipboardCheck } from "lucide-react";
 
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
+import { T } from "@/components/ui/t";
 import { requirePermission } from "@/server/auth/session";
 
 export const dynamic = "force-dynamic";
@@ -22,14 +23,14 @@ export default async function OperationsPage() {
             <ClipboardCheck className="size-5" />
           </div>
           <h2 className="mt-4 text-base font-bold tracking-tight text-foreground">
-            Workflow Approvals
+            <T k="Workflow Approvals" />
           </h2>
           <p className="mt-2 text-sm leading-6 text-muted-foreground">
-            Operational approval queues and financial threshold controls for pending transactions.
+            <T k="Operational approval queues and financial threshold controls for pending transactions." />
           </p>
           <div className="mt-5">
             <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-secondary/60 px-2.5 py-1 text-xs font-semibold text-muted-foreground">
-              Ready for Queue Rules
+              <T k="Ready for Queue Rules" />
             </span>
           </div>
         </div>

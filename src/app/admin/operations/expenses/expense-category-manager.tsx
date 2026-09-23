@@ -60,20 +60,22 @@ function CategoryForm({
     <form action={action} className="flex flex-col gap-4">
       <DialogHeader>
         <DialogTitle>{title}</DialogTitle>
-        <DialogDescription>Define categories used to classify non-inventory business costs.</DialogDescription>
+        <DialogDescription>
+          {t("expenseCategory.modalDesc", "Define categories used to classify non-inventory business costs.")}
+        </DialogDescription>
       </DialogHeader>
 
       <input type="hidden" name="returnPath" value={returnPath} />
       {record ? <input type="hidden" name="id" value={record.id} /> : null}
 
       <label className="flex flex-col gap-1 text-sm font-medium">
-        Name
+        {t("field.name", "Name")}
         <input name="name" required defaultValue={record?.name} className={inputClass} />
       </label>
       {record ? <input type="hidden" name="code" value={record.code} /> : null}
 
       <label className="flex flex-col gap-1 text-sm font-medium">
-        Description
+        {t("field.description", "Description")}
         <textarea name="description" defaultValue={record?.description ?? ""} className={textareaClass} />
       </label>
 
@@ -84,7 +86,7 @@ function CategoryForm({
           defaultChecked={record?.isActive ?? true}
           className="size-4 rounded border-input"
         />
-        Active
+        {t("field.active", "Active")}
       </label>
 
       <DialogFooter>
@@ -137,10 +139,14 @@ export function ExpenseCategoryManager({
         eyebrow="Operations"
         title="Expense Categories"
         actions={
-          <CategoryDialog label="New expense category" action={createExpenseCategory} returnPath={returnPath}>
+          <CategoryDialog
+            label={t("action.newExpenseCategory", "New expense category")}
+            action={createExpenseCategory}
+            returnPath={returnPath}
+          >
             <Button>
               <PlusIcon data-icon="inline-start" />
-              New category
+              {t("New category")}
             </Button>
           </CategoryDialog>
         }
@@ -174,7 +180,7 @@ export function ExpenseCategoryManager({
                   <td className="px-4 py-3 font-medium">{record.code}</td>
                   <td className="px-4 py-3">{record.name}</td>
                   <td className="px-4 py-3 text-muted-foreground">{record.description ?? "-"}</td>
-                  <td className="px-4 py-3">{record.isActive ? "Active" : "Inactive"}</td>
+                  <td className="px-4 py-3">{record.isActive ? t("Active") : t("Inactive")}</td>
                   <td className="px-4 py-3">
                     <div className="flex justify-end gap-2">
                       {showDeleted ? (
@@ -183,15 +189,20 @@ export function ExpenseCategoryManager({
                           <input type="hidden" name="returnPath" value={returnPath} />
                           <Button variant="outline" size="sm">
                             <RotateCcwIcon data-icon="inline-start" />
-                            Restore
+                            {t("action.restore", "Restore")}
                           </Button>
                         </form>
                       ) : (
                         <>
-                          <CategoryDialog label={`Edit ${record.name}`} action={updateExpenseCategory} record={record} returnPath={returnPath}>
+                          <CategoryDialog
+                            label={`${t("action.edit", "Edit")} ${record.name}`}
+                            action={updateExpenseCategory}
+                            record={record}
+                            returnPath={returnPath}
+                          >
                             <Button variant="outline" size="sm">
                               <EditIcon data-icon="inline-start" />
-                              Edit
+                              {t("action.edit", "Edit")}
                             </Button>
                           </CategoryDialog>
                           <DeleteConfirmationDialog
@@ -208,7 +219,7 @@ export function ExpenseCategoryManager({
               {records.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">
-                    No expense categories found.
+                    {t("expenseCategory.emptyTitle", "No expense categories found.")}
                   </td>
                 </tr>
               ) : null}

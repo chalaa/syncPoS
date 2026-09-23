@@ -13,6 +13,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { useTranslation } from "@/lib/i18n/use-translation";
 import type { ExpenseFormOptions } from "@/server/expenses/types";
 
 export type NewExpenseModalProps = {
@@ -34,6 +35,7 @@ export function NewExpenseModal({
   open: controlledOpen,
   onOpenChange: controlledOnOpenChange,
 }: NewExpenseModalProps) {
+  const { t } = useTranslation();
   const [internalOpen, setInternalOpen] = useState(false);
   const isControlled = controlledOpen !== undefined;
   const open = isControlled ? controlledOpen : internalOpen;
@@ -58,7 +60,7 @@ export function NewExpenseModal({
         <DialogTrigger asChild>
           <Button className="gap-2 bg-gradient-to-r from-[#0B5D4B] to-[#073B35] font-semibold text-white shadow-md shadow-[#0B5D4B]/20 transition-all hover:brightness-110 active:scale-[0.99] cursor-pointer">
             <Plus className="size-4 text-emerald-200" />
-            New Expense
+            {t("action.newExpense", "New Expense")}
           </Button>
         </DialogTrigger>
       ) : null}
@@ -78,17 +80,17 @@ export function NewExpenseModal({
             </div>
             <div>
               <DialogTitle className="text-base font-bold text-foreground tracking-tight">
-                Record New Expense
+                {t("modal.newExpense.title", "Record New Expense")}
               </DialogTitle>
               <p className="text-xs text-muted-foreground mt-0.5">
-                Capture operating costs, team reimbursements, or administrative fees.
+                {t("modal.newExpense.desc", "Capture operating costs, team reimbursements, or administrative fees.")}
               </p>
             </div>
           </div>
           <DialogClose
             type="button"
             className="rounded-lg p-1.5 sm:p-2 bg-red-500 text-white hover:bg-red-600 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/50 shadow-2xs"
-            aria-label="Close dialog"
+            aria-label={t("action.closeDialog", "Close dialog")}
             onClick={() => setOpen(false)}
           >
             <X className="size-4 sm:size-4.5" />
@@ -103,10 +105,10 @@ export function NewExpenseModal({
             {/* Category Select */}
             <label className="flex flex-col gap-1.5 text-xs font-semibold text-foreground sm:col-span-2">
               <span className="flex items-center gap-1">
-                Category <span className="text-destructive">*</span>
+                {t("field.category")} <span className="text-destructive">*</span>
               </span>
               <select name="categoryId" required className={inputClass}>
-                <option value="">Select expense category...</option>
+                <option value="">{t("field.selectExpenseCategory", "Select expense category...")}</option>
                 {options.categories.map((category) => (
                   <option key={category.id} value={category.id}>
                     {category.code ? `${category.code} · ` : ""}{category.name}
@@ -118,7 +120,7 @@ export function NewExpenseModal({
             {/* Expense Date */}
             <label className="flex flex-col gap-1.5 text-xs font-semibold text-foreground">
               <span className="flex items-center gap-1">
-                Expense Date <span className="text-destructive">*</span>
+                {t("field.expenseDate", "Expense Date")} <span className="text-destructive">*</span>
               </span>
               <input
                 name="expenseDate"
@@ -132,7 +134,7 @@ export function NewExpenseModal({
             {/* Amount */}
             <label className="flex flex-col gap-1.5 text-xs font-semibold text-foreground">
               <span className="flex items-center gap-1">
-                Amount <span className="text-destructive">*</span>
+                {t("field.amount", "Amount")} <span className="text-destructive">*</span>
               </span>
               <div className="relative flex items-center">
                 <Banknote className="pointer-events-none absolute left-3 size-4 text-muted-foreground" />
@@ -150,9 +152,11 @@ export function NewExpenseModal({
 
             {/* Employee */}
             <label className="flex flex-col gap-1.5 text-xs font-semibold text-foreground sm:col-span-2">
-              <span>Employee / Requester</span>
+              <span>{t("field.employeeRequester", "Employee / Requester")}</span>
               <select name="employeeId" className={inputClass}>
-                <option value="">No specific employee (General Company Expense)</option>
+                <option value="">
+                  {t("field.noSpecificEmployee", "No specific employee (General Company Expense)")}
+                </option>
                 {options.employees.map((employee) => (
                   <option key={employee.id} value={employee.id}>
                     {employee.code ? `${employee.code} · ` : ""}{employee.name}
@@ -163,10 +167,10 @@ export function NewExpenseModal({
 
             {/* Description */}
             <label className="flex flex-col gap-1.5 text-xs font-semibold text-foreground sm:col-span-2">
-              <span>Notes & Description</span>
+              <span>{t("field.notesDescription", "Notes & Description")}</span>
               <textarea
                 name="description"
-                placeholder="Provide description, invoice/receipt ref, or justification..."
+                placeholder={t("field.expenseNotesPlaceholder", "Provide description, invoice/receipt ref, or justification...")}
                 className={textareaClass}
               />
             </label>
@@ -180,7 +184,7 @@ export function NewExpenseModal({
               onClick={() => setOpen(false)}
               className="h-10 w-full sm:w-auto px-4 text-xs font-semibold justify-center"
             >
-              Cancel
+              {t("action.cancel")}
             </Button>
             <Button
               type="submit"
@@ -188,7 +192,7 @@ export function NewExpenseModal({
               className="h-10 w-full sm:w-auto px-5 gap-2 bg-gradient-to-r from-[#0B5D4B] to-[#073B35] font-semibold text-white shadow-md shadow-[#0B5D4B]/20 hover:brightness-110 active:scale-[0.99] justify-center"
             >
               <Plus className="size-4 text-emerald-200" />
-              Create Expense
+              {t("action.createExpense", "Create Expense")}
             </Button>
           </div>
         </form>

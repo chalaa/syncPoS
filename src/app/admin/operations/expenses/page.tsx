@@ -10,6 +10,7 @@ import { TableFilterSelect } from "@/components/ui/table-filter-select";
 import { TableSearchInput } from "@/components/ui/table-search-input";
 import { TablePagination } from "@/components/ui/table-pagination";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
+import { T } from "@/components/ui/t";
 import { paginateRows } from "@/lib/pagination";
 import { requirePermission, getUserPermissionCodes } from "@/server/auth/session";
 import { displayExpenseMoney, getExpenseFormOptions, getExpenseList } from "@/server/expenses/expenses";
@@ -79,7 +80,7 @@ export default async function ExpensesPage({ searchParams }: ExpensesPageProps) 
             {canManageCategories ? (
               <ButtonLink href="/admin/operations/expenses/categories" variant="outline">
                 <FolderIcon data-icon="inline-start" />
-                Categories
+                <T k="header.title.Expense Categories" fallback="Categories" />
               </ButtonLink>
             ) : null}
             {canCreateExpense ? <NewExpenseModal options={options} /> : null}
@@ -113,10 +114,10 @@ export default async function ExpensesPage({ searchParams }: ExpensesPageProps) 
             />
             <div className="flex rounded-lg border border-border bg-muted/40 p-1 text-sm">
               <Button asChild variant={!showCancelled ? "secondary" : "ghost"} size="sm">
-                <Link href="/admin/operations/expenses">Normal</Link>
+                <Link href="/admin/operations/expenses"><T k="common.normal" fallback="Normal" /></Link>
               </Button>
               <Button asChild variant={showCancelled ? "secondary" : "ghost"} size="sm">
-                <Link href="/admin/operations/expenses?show=cancelled">Cancelled</Link>
+                <Link href="/admin/operations/expenses?show=cancelled"><T k="status.cancelled" fallback="Cancelled" /></Link>
               </Button>
             </div>
           </div>
@@ -135,15 +136,15 @@ function ExpenseTable({ rows, showCancelled }: { rows: ExpenseListRow[]; showCan
       <table className="w-full min-w-[1040px] text-left text-sm">
         <thead className="bg-secondary/40 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
           <tr className="border-b border-border">
-            <th className="px-4 py-3">Expense</th>
-            <th className="px-4 py-3">Date</th>
-            <th className="px-4 py-3">Category</th>
-            <th className="px-4 py-3">Employee / Vendor</th>
-            <th className="px-4 py-3">Location</th>
-            <th className="px-4 py-3">Payment</th>
-            <th className="px-4 py-3 text-right">Amount</th>
-            <th className="px-4 py-3 text-right">Residual</th>
-            <th className="px-4 py-3 text-right">Actions</th>
+            <th className="px-4 py-3"><T k="Expense" /></th>
+            <th className="px-4 py-3"><T k="field.date" fallback="Date" /></th>
+            <th className="px-4 py-3"><T k="field.category" /></th>
+            <th className="px-4 py-3"><T k="Employee / Vendor" /></th>
+            <th className="px-4 py-3"><T k="field.location" fallback="Location" /></th>
+            <th className="px-4 py-3"><T k="Payment" /></th>
+            <th className="px-4 py-3 text-right"><T k="field.amount" fallback="Amount" /></th>
+            <th className="px-4 py-3 text-right"><T k="Residual" /></th>
+            <th className="px-4 py-3 text-right"><T k="action.actions" /></th>
           </tr>
         </thead>
         <tbody>
@@ -176,13 +177,13 @@ function ExpenseTable({ rows, showCancelled }: { rows: ExpenseListRow[]; showCan
                 <div className="flex justify-end gap-2">
                   <ButtonLink href={`/admin/operations/expenses/${expense.id}`} size="sm" variant="outline">
                     <BanknoteIcon data-icon="inline-start" />
-                    Details
+                    <T k="action.details" fallback="Details" />
                   </ButtonLink>
                   {!showCancelled && expense.status !== "cancelled" && expense.paymentStatus !== "paid" ? (
                     <form action={cancelExpense}>
                       <input type="hidden" name="id" value={expense.id} />
                       <input type="hidden" name="returnPath" value="/admin/operations/expenses" />
-                      <Button variant="danger" size="sm">Cancel</Button>
+                      <Button variant="danger" size="sm"><T k="action.cancelExpense" fallback="Cancel" /></Button>
                     </form>
                   ) : null}
                 </div>
@@ -192,8 +193,8 @@ function ExpenseTable({ rows, showCancelled }: { rows: ExpenseListRow[]; showCan
           {rows.length === 0 ? (
             <tr>
               <td colSpan={9} className="px-4 py-12 text-center text-muted-foreground">
-                <p className="font-medium text-foreground">No expenses found</p>
-                <p className="mt-1 text-xs text-muted-foreground">Try adjusting your search keywords.</p>
+                <p className="font-medium text-foreground"><T k="No expenses found" /></p>
+                <p className="mt-1 text-xs text-muted-foreground"><T k="Try adjusting your search keywords." /></p>
               </td>
             </tr>
           ) : null}

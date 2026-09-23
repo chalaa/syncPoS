@@ -31,6 +31,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { useFormValidation, type FormValidationResult } from "@/hooks/use-form-validation";
+import { useTranslation } from "@/lib/i18n/use-translation";
 import { cn } from "@/lib/utils";
 import type { PaymentAccountOption, PaymentLineRow } from "@/server/payments/types";
 
@@ -40,9 +41,13 @@ import type { PaymentAccountOption, PaymentLineRow } from "@/server/payments/typ
 
 type PaymentFormAction = (formData: FormData) => Promise<void>;
 
+export type PaymentDescriptionVariant = "registerAndPost" | "register" | "updateDraft";
+
 export type PaymentFormDialogProps = {
   title: string;
   description: string;
+  descriptionVariant?: PaymentDescriptionVariant;
+  documentNo?: string;
   triggerLabel: string;
   submitLabel: string;
   action: PaymentFormAction;
@@ -110,6 +115,7 @@ function MethodIcon({ type, className }: { type?: string; className?: string }) 
 // ---------------------------------------------------------------------------
 
 function StepIndicator({ step }: { step: 1 | 2 }) {
+  const { t } = useTranslation();
   return (
     <div className="flex items-center gap-0 px-6 pt-5 pb-1">
       {/* Step 1 */}
@@ -130,7 +136,7 @@ function StepIndicator({ step }: { step: 1 | 2 }) {
             step === 1 ? "text-foreground" : "text-[#0B5D4B]",
           )}
         >
-          Payment Details
+          {t("payment.stepDetails", "Payment Details")}
         </span>
       </div>
 
@@ -155,7 +161,7 @@ function StepIndicator({ step }: { step: 1 | 2 }) {
             step === 2 ? "text-foreground" : "text-muted-foreground",
           )}
         >
-          Confirm &amp; Post
+          {t("payment.stepConfirm", "Confirm & Post")}
         </span>
       </div>
     </div>
@@ -201,6 +207,7 @@ function PaymentLinesStep({
   onRemoveLine: (index: number) => void;
   onContinue: () => void;
 }) {
+  const { t } = useTranslation();
   const noAccounts = matchingAccounts.length === 0;
 
   function fieldError(index: number, field: "paymentAccountId" | "amount" | "reference") {
@@ -217,17 +224,17 @@ function PaymentLinesStep({
           </div>
           <div className="min-w-0">
             <p className="font-bold text-sm text-amber-900 dark:text-amber-200">
-              No Active Payment Account for {currencyCode}
+              {t("payment.noActiveAccountFor", "No Active Payment Account for")} {currencyCode}
             </p>
             <p className="text-xs text-amber-800 dark:text-amber-300 leading-relaxed mt-0.5">
-              Configure a payment account under{" "}
+              {t("payment.configureAccountPrefix", "Configure a payment account under")}{" "}
               <Link
                 href="/admin/settings/payments?tab=accounts"
                 className="font-bold underline underline-offset-2 hover:text-amber-700 dark:hover:text-amber-200 transition-colors"
               >
-                Settings › Payments
+                {t("Settings › Payments")}
               </Link>{" "}
-              to record transactions.
+              {t("payment.configureAccountSuffix", "to record transactions.")}
             </p>
           </div>
         </div>
@@ -237,7 +244,7 @@ function PaymentLinesStep({
       <div className="flex items-center justify-between rounded-xl border border-border bg-muted/30 px-4 py-3">
         <div className="flex items-center gap-2.5 text-sm text-muted-foreground">
           <ReceiptText className="size-4 shrink-0" />
-          <span>Total due</span>
+          <span>{t("payment.totalDue", "Total due")}</span>
         </div>
         <span className="font-mono text-lg font-extrabold text-foreground">
           {minorToDisplay(amountMinor, currencyCode)}
@@ -264,7 +271,7 @@ function PaymentLinesStep({
                     <MethodIcon type={account ? matchingAccounts.find(a => a.id === account.id)?.paymentMethodName?.toLowerCase().replace(/\s+/g, "_") : undefined} className="size-3.5" />
                   </div>
                   <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                    Payment Line {index + 1}
+                    {t("payment.paymentLine", "Payment Line")} {index + 1}
                   </span>
                 </div>
                 {lines.length > 1 && (
@@ -272,7 +279,7 @@ function PaymentLinesStep({
                     type="button"
                     onClick={() => onRemoveLine(index)}
                     className="flex size-7 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
-                    aria-label="Remove line"
+                    aria-label={t("payment.removeLine", "Remove line")}
                   >
                     <Trash2Icon className="size-3.5" />
                   </button>
@@ -284,7 +291,7 @@ function PaymentLinesStep({
                 <div className="sm:col-span-2">
                   <label className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-foreground/80">
                     <Building2 className="size-3" />
-                    Payment Account
+                    {t("payment.paymentAccount", "Payment Account")}
                   </label>
                   <select
                     name="linePaymentAccountId"
@@ -297,7 +304,9 @@ function PaymentLinesStep({
                     )}
                   >
                     <option value="" disabled>
-                      {noAccounts ? "No account available" : "Select account…"}
+                      {noAccounts
+                        ? t("payment.noAccountAvailable", "No account available")
+                        : t("payment.selectAccount", "Select account…")}
                     </option>
                     {matchingAccounts.map((acc) => (
                       <option key={acc.id} value={acc.id}>
@@ -314,7 +323,7 @@ function PaymentLinesStep({
                 <div>
                   <label className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-foreground/80">
                     <Wallet className="size-3" />
-                    Amount ({currencyCode})
+                    {t("field.amount")} ({currencyCode})
                   </label>
                   <input
                     name="lineAmount"
@@ -338,7 +347,7 @@ function PaymentLinesStep({
                 <div>
                   <label className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-foreground/80">
                     <Hash className="size-3" />
-                    Reference
+                    {t("Reference", "Reference")}
                     {account && matchingAccounts.find(a => a.id === account.id)?.requiresReference && (
                       <span className="text-destructive ml-0.5">*</span>
                     )}
@@ -347,7 +356,7 @@ function PaymentLinesStep({
                     name="lineReference"
                     value={line.reference}
                     onChange={(e) => onUpdateLine(index, { reference: e.target.value })}
-                    placeholder="e.g. TXN-00123"
+                    placeholder={t("payment.referencePlaceholder", "e.g. TXN-00123")}
                     className={cn(
                       "h-10 w-full rounded-lg border bg-background px-3 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0B5D4B]/30 focus-visible:border-[#0B5D4B]",
                       fieldError(index, "reference") ? "border-destructive" : "border-input",
@@ -362,13 +371,14 @@ function PaymentLinesStep({
                 <div className="sm:col-span-2">
                   <label className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-foreground/80">
                     <MessageSquare className="size-3" />
-                    Note <span className="font-normal text-muted-foreground">(optional)</span>
+                    {t("Note", "Note")}{" "}
+                    <span className="font-normal text-muted-foreground">({t("optional", "optional")})</span>
                   </label>
                   <input
                     name="lineNote"
                     value={line.note}
                     onChange={(e) => onUpdateLine(index, { note: e.target.value })}
-                    placeholder="Internal note…"
+                    placeholder={t("payment.internalNotePlaceholder", "Internal note…")}
                     className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0B5D4B]/30 focus-visible:border-[#0B5D4B]"
                   />
                 </div>
@@ -385,7 +395,7 @@ function PaymentLinesStep({
         className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-border py-2.5 text-xs font-semibold text-muted-foreground transition-all hover:border-[#0B5D4B]/40 hover:text-[#0B5D4B] dark:hover:text-emerald-400"
       >
         <PlusIcon className="size-3.5" />
-        Add Payment Line
+        {t("payment.addPaymentLine", "Add Payment Line")}
       </button>
 
       {/* Totals bar */}
@@ -399,12 +409,12 @@ function PaymentLinesStep({
       >
         <div className="flex items-center gap-4">
           <div>
-            <span className="text-xs text-muted-foreground">Entered</span>
+            <span className="text-xs text-muted-foreground">{t("payment.entered", "Entered")}</span>
             <p className="font-mono font-bold text-foreground">{minorToDisplay(enteredAmountMinor, currencyCode)}</p>
           </div>
           <div className="h-8 w-px bg-border" />
           <div>
-            <span className="text-xs text-muted-foreground">Remaining</span>
+            <span className="text-xs text-muted-foreground">{t("payment.remaining", "Remaining")}</span>
             <p
               className={cn(
                 "font-mono font-bold",
@@ -418,7 +428,7 @@ function PaymentLinesStep({
         {remainingAmountMinor === 0 && (
           <div className="flex items-center gap-1.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
             <CheckCircle2 className="size-4" />
-            Fully allocated
+            {t("payment.fullyAllocated", "Fully allocated")}
           </div>
         )}
       </div>
@@ -443,7 +453,7 @@ function PaymentLinesStep({
           disabled={noAccounts}
           className="w-full sm:w-auto gap-2 bg-gradient-to-r from-[#0B5D4B] to-[#073B35] font-semibold text-white shadow-md shadow-[#0B5D4B]/20 hover:brightness-110 active:scale-[0.99] transition-all justify-center"
         >
-          Review &amp; Post
+          {t("payment.reviewAndPost", "Review & Post")}
           <ArrowRight className="size-4 text-emerald-200" />
         </Button>
       </div>
@@ -478,6 +488,7 @@ function ReviewStep({
   hiddenFieldValue: string;
   onBack: () => void;
 }) {
+  const { t } = useTranslation();
   const remainingMinor = Math.max(amountMinor - enteredAmountMinor, 0);
 
   return (
@@ -488,9 +499,9 @@ function ReviewStep({
           <BadgeCheck className="size-5" />
         </div>
         <div>
-          <p className="text-sm font-bold text-foreground">Confirm &amp; Post Payment</p>
+          <p className="text-sm font-bold text-foreground">{t("payment.confirmAndPostPayment", "Confirm & Post Payment")}</p>
           <p className="text-xs text-muted-foreground">
-            Please verify all details. Confirming will post the payment immediately.
+            {t("payment.confirmHint", "Please verify all details. Confirming will post the payment immediately.")}
           </p>
         </div>
       </div>
@@ -509,34 +520,34 @@ function ReviewStep({
                   <MethodIcon className="size-3.5" />
                 </div>
                 <span className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
-                  Line {index + 1}
+                  {t("payment.line", "Line")} {index + 1}
                 </span>
               </div>
 
               <div className="grid grid-cols-2 gap-x-4 gap-y-2.5 text-sm sm:grid-cols-3">
                 <div>
-                  <p className="text-[11px] font-medium uppercase text-muted-foreground">Method</p>
+                  <p className="text-[11px] font-medium uppercase text-muted-foreground">{t("payment.method", "Method")}</p>
                   <p className="mt-0.5 font-semibold text-foreground">{account?.paymentMethodName ?? "—"}</p>
                 </div>
                 <div>
-                  <p className="text-[11px] font-medium uppercase text-muted-foreground">Account</p>
+                  <p className="text-[11px] font-medium uppercase text-muted-foreground">{t("field.account", "Account")}</p>
                   <p className="mt-0.5 font-semibold text-foreground">{account ? `${account.code} · ${account.name}` : "—"}</p>
                 </div>
                 <div>
-                  <p className="text-[11px] font-medium uppercase text-muted-foreground">Amount</p>
+                  <p className="text-[11px] font-medium uppercase text-muted-foreground">{t("field.amount")}</p>
                   <p className="mt-0.5 font-mono font-extrabold text-foreground">
                     {minorToDisplay(inputValueToMinor(line.amount), currencyCode)}
                   </p>
                 </div>
                 {line.reference && (
                   <div>
-                    <p className="text-[11px] font-medium uppercase text-muted-foreground">Reference</p>
+                    <p className="text-[11px] font-medium uppercase text-muted-foreground">{t("Reference", "Reference")}</p>
                     <p className="mt-0.5 font-semibold text-foreground">{line.reference}</p>
                   </div>
                 )}
                 {line.note && (
                   <div className="col-span-2">
-                    <p className="text-[11px] font-medium uppercase text-muted-foreground">Note</p>
+                    <p className="text-[11px] font-medium uppercase text-muted-foreground">{t("Note", "Note")}</p>
                     <p className="mt-0.5 font-medium text-foreground">{line.note}</p>
                   </div>
                 )}
@@ -549,15 +560,15 @@ function ReviewStep({
       {/* Totals */}
       <div className="rounded-xl border border-border bg-muted/30 px-4 py-3.5">
         <div className="flex items-center justify-between text-sm">
-          <span className="text-muted-foreground">Amount due</span>
+          <span className="text-muted-foreground">{t("payment.amountDue", "Amount due")}</span>
           <span className="font-mono font-bold text-foreground">{minorToDisplay(amountMinor, currencyCode)}</span>
         </div>
         <div className="mt-2 flex items-center justify-between text-sm">
-          <span className="text-muted-foreground">Payment total</span>
+          <span className="text-muted-foreground">{t("payment.paymentTotal", "Payment total")}</span>
           <span className="font-mono font-bold text-foreground">{minorToDisplay(enteredAmountMinor, currencyCode)}</span>
         </div>
         <div className="mt-2 border-t border-border/60 pt-2 flex items-center justify-between text-sm">
-          <span className="font-medium text-muted-foreground">Remaining</span>
+          <span className="font-medium text-muted-foreground">{t("payment.remaining", "Remaining")}</span>
           <span
             className={cn(
               "font-mono font-extrabold",
@@ -598,7 +609,7 @@ function ReviewStep({
           className="w-full sm:w-auto gap-2 text-muted-foreground hover:text-foreground justify-center"
         >
           <ArrowLeft className="size-4" />
-          Back
+          {t("action.back")}
         </Button>
 
         <Button
@@ -609,12 +620,12 @@ function ReviewStep({
           {isPending ? (
             <>
               <Loader2 className="size-4 animate-spin text-emerald-200" />
-              Posting Payment…
+              {t("payment.postingPayment", "Posting Payment…")}
             </>
           ) : (
             <>
               <CheckCircle2 className="size-4 text-emerald-200" />
-              {submitLabel || "Post Payment"}
+              {t(submitLabel || "Post Payment", submitLabel || "Post Payment")}
             </>
           )}
         </Button>
@@ -627,9 +638,17 @@ function ReviewStep({
 // Main component
 // ---------------------------------------------------------------------------
 
+const PAYMENT_DESCRIPTION_TEMPLATES: Record<PaymentDescriptionVariant, string> = {
+  registerAndPost: "Register and post payment for",
+  register: "Register payment for",
+  updateDraft: "Update draft payment",
+};
+
 export function PaymentFormDialog({
   title,
   description,
+  descriptionVariant,
+  documentNo,
   triggerLabel,
   submitLabel,
   action,
@@ -646,7 +665,12 @@ export function PaymentFormDialog({
   triggerVariant,
   triggerClassName,
 }: PaymentFormDialogProps) {
+  const { t } = useTranslation();
   const idPrefix = useId();
+  const resolvedDescription =
+    descriptionVariant && documentNo
+      ? `${t(`payment.desc.${descriptionVariant}`, PAYMENT_DESCRIPTION_TEMPLATES[descriptionVariant])} ${documentNo}.`
+      : t(description, description);
   const nextLineId = useRef(2);
   const formRef = useRef<HTMLFormElement>(null);
   const [isPending, startTransition] = useTransition();
@@ -693,7 +717,7 @@ export function PaymentFormDialog({
       const formErrors: string[] = [];
 
       if (values.lines.length === 0) {
-        formErrors.push("Add at least one payment line.");
+        formErrors.push(t("payment.error.addOneLine", "Add at least one payment line."));
       }
 
       values.lines.forEach((line, index) => {
@@ -701,28 +725,28 @@ export function PaymentFormDialog({
         const amount = Number.parseFloat(line.amount);
 
         if (!line.paymentAccountId) {
-          fieldErrors[`lines.${index}.paymentAccountId`] = `Select a payment account on line ${index + 1}.`;
+          fieldErrors[`lines.${index}.paymentAccountId`] = `${t("payment.error.selectAccountOnLine", "Select a payment account on line")} ${index + 1}.`;
         } else if (!account) {
-          fieldErrors[`lines.${index}.paymentAccountId`] = `Select an active account on line ${index + 1}.`;
+          fieldErrors[`lines.${index}.paymentAccountId`] = `${t("payment.error.selectActiveAccountOnLine", "Select an active account on line")} ${index + 1}.`;
         }
 
         if (!Number.isFinite(amount) || amount <= 0) {
-          fieldErrors[`lines.${index}.amount`] = `Enter an amount > 0 on line ${index + 1}.`;
+          fieldErrors[`lines.${index}.amount`] = `${t("payment.error.enterAmountOnLine", "Enter an amount > 0 on line")} ${index + 1}.`;
         }
 
         if (account?.requiresReference && !line.reference.trim()) {
-          fieldErrors[`lines.${index}.reference`] = `Reference required on line ${index + 1}.`;
+          fieldErrors[`lines.${index}.reference`] = `${t("payment.error.referenceRequiredOnLine", "Reference required on line")} ${index + 1}.`;
         }
       });
 
       const totalMinor = values.lines.reduce((sum, l) => sum + inputValueToMinor(l.amount), 0);
       if (totalMinor > values.targetAmountMinor) {
-        formErrors.push("Payment lines cannot exceed the remaining amount.");
+        formErrors.push(t("payment.error.linesExceedRemaining", "Payment lines cannot exceed the remaining amount."));
       }
 
       return { formErrors, fieldErrors };
     },
-    [],
+    [t],
   );
 
   const validationValues = useMemo(
@@ -792,7 +816,7 @@ export function PaymentFormDialog({
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
         <Button variant={triggerVariant} className={triggerClassName} disabled={disabled}>
-          {triggerLabel}
+          {t(triggerLabel, triggerLabel)}
         </Button>
       </DialogTrigger>
 
@@ -811,10 +835,10 @@ export function PaymentFormDialog({
             </div>
             <div className="min-w-0">
               <DialogTitle className="text-base font-bold tracking-tight text-foreground">
-                {title}
+                {t(title, title)}
               </DialogTitle>
               <DialogDescription className="text-xs text-muted-foreground mt-0.5">
-                {description}
+                {resolvedDescription}
               </DialogDescription>
             </div>
           </div>
@@ -822,7 +846,7 @@ export function PaymentFormDialog({
             type="button"
             onClick={() => setOpen(false)}
             className="rounded-lg p-1.5 sm:p-2 bg-red-500 text-white hover:bg-red-600 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/50 shadow-2xs"
-            aria-label="Close"
+            aria-label={t("action.close", "Close")}
           >
             <X className="size-4 sm:size-4.5" />
           </button>
