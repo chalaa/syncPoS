@@ -10,6 +10,7 @@ import {
 import Link from "next/link";
 
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
+import { T } from "@/components/ui/t";
 import { requirePermission } from "@/server/auth/session";
 
 export const dynamic = "force-dynamic";
@@ -95,15 +96,15 @@ export default async function ReportsPage() {
                   <ArrowUpRightIcon className="size-4 text-muted-foreground transition-transform duration-200 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:text-primary" />
                 </div>
                 <h2 className="mt-3 text-sm font-bold tracking-tight text-foreground transition-colors group-hover:text-primary sm:mt-4 sm:text-base">
-                  {report.title}
+                  <T k={report.title} />
                 </h2>
                 <p className="mt-1 text-xs leading-relaxed text-muted-foreground line-clamp-2 sm:text-sm">
-                  {report.description}
+                  <T k={report.description} />
                 </p>
               </div>
 
               <div className="mt-4 flex items-center gap-1.5 text-xs font-semibold text-primary sm:mt-5">
-                <span>View Analytics</span>
+                <span><T k="report.viewAnalytics" fallback="View Analytics" /></span>
                 <span className="transition-transform duration-200 group-hover:translate-x-1">&rarr;</span>
               </div>
             </Link>

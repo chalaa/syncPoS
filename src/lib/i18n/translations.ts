@@ -922,6 +922,103 @@ export const translations = {
     "owner.emptyTitle": "No owners found.",
     "owner.linkedShops": "Linked Shops:",
 
+    // Reports Module (shared UI)
+    "report.tab.overview": "Overview",
+    "report.tab.sales": "Sales",
+    "report.tab.expenses": "Expenses",
+    "report.tab.payment-accounts": "Accounts",
+    "report.tab.payments": "Payments",
+    "report.tab.stock": "Stock",
+    "report.tab.receivables": "Receivables",
+    "report.tab.payables": "Payables",
+    "report.from": "From",
+    "report.to": "To",
+    "report.allTypes": "All Types",
+    "report.resetFilters": "Reset Filters",
+    "report.records": "Records",
+    "report.grossTotal": "Gross Total",
+    "report.settledPaid": "Settled / Paid",
+    "report.totalRecords": "Total Records",
+    "report.openBalanceResidual": "Open Balance / Residual",
+    "report.noRecordsFound": "No records found",
+    "report.emptyHint": "Try adjusting your search keywords, status, or date range.",
+
+    // Reports Overview Page
+    "header.eyebrow.Financial & Operational Intelligence": "Financial & Operational Intelligence",
+    "header.title.Reports & Analytics": "Reports & Analytics",
+    "header.desc.Monitor real-time ledger records, cash movements, sales velocities, and stock valuations.":
+      "Monitor real-time ledger records, cash movements, sales velocities, and stock valuations.",
+    "report.viewAnalytics": "View Analytics",
+    "Sales Report": "Sales Report",
+    "Invoices, sales totals, taxes, paid amounts, residuals, customers, and locations.":
+      "Invoices, sales totals, taxes, paid amounts, residuals, customers, and locations.",
+    "Expense Report": "Expense Report",
+    "Expenses by category, date, vendor, employee, location, paid amount, and residual.":
+      "Expenses by category, date, vendor, employee, location, paid amount, and residual.",
+    "Payment Account Statement": "Payment Account Statement",
+    "Inbound and outbound payment movement by cash, bank, card, or mobile-money account.":
+      "Inbound and outbound payment movement by cash, bank, card, or mobile-money account.",
+    "Payment Report": "Payment Report",
+    "All customer invoice, vendor bill, and expense payments with account, source, and status.":
+      "All customer invoice, vendor bill, and expense payments with account, source, and status.",
+    "Stock Report": "Stock Report",
+    "Current stock by product, location, serial, lot, available quantity, and stock value.":
+      "Current stock by product, location, serial, lot, available quantity, and stock value.",
+    "Open customer invoices and unpaid balances with aging and customer breakdowns.":
+      "Open customer invoices and unpaid balances with aging and customer breakdowns.",
+    "Open vendor bills and unpaid supplier balances with due date tracking.":
+      "Open vendor bills and unpaid supplier balances with due date tracking.",
+
+    // Individual Report Pages
+    "header.eyebrow.Financial Reports": "Financial Reports",
+    "header.eyebrow.Inventory Intelligence": "Inventory Intelligence",
+    "header.desc.Comprehensive analysis of customer invoices, taxes, settlements, and outstanding balances.":
+      "Comprehensive analysis of customer invoices, taxes, settlements, and outstanding balances.",
+    "header.desc.Monitor operational expenditures, supplier payouts, employee reimbursements, and categorized costs.":
+      "Monitor operational expenditures, supplier payouts, employee reimbursements, and categorized costs.",
+    "header.desc.Audit inflow and outflow ledger activity across corporate cash boxes, banks, and digital accounts.":
+      "Audit inflow and outflow ledger activity across corporate cash boxes, banks, and digital accounts.",
+    "header.title.Payments Ledger": "Payments Ledger",
+    "header.desc.Comprehensive audit of all inbound customer collections, outbound supplier disbursements, and allocations.":
+      "Comprehensive audit of all inbound customer collections, outbound supplier disbursements, and allocations.",
+    "header.title.Stock Valuation Report": "Stock Valuation Report",
+    "header.desc.Real-time stock on hand, inventory reservations, serialized tracking, and asset valuations.":
+      "Real-time stock on hand, inventory reservations, serialized tracking, and asset valuations.",
+    "header.title.Customer Receivables": "Customer Receivables",
+    "header.desc.Track pending customer invoices, payment due dates, and outstanding aging balances.":
+      "Track pending customer invoices, payment due dates, and outstanding aging balances.",
+    "header.title.Supplier Payables": "Supplier Payables",
+    "header.desc.Monitor outstanding vendor bills, payment deadlines, and supplier liability balances.":
+      "Monitor outstanding vendor bills, payment deadlines, and supplier liability balances.",
+    "report.customer": "Customer",
+    "report.untaxed": "Untaxed",
+    "report.tax": "Tax",
+    "report.total": "Total",
+    "report.vendorEmployee": "Vendor/Employee",
+    "report.accountBank": "Account / Bank",
+    "report.signed": "Signed",
+    "report.source": "Source",
+    "report.allocated": "Allocated",
+    "report.avgCost": "Avg Cost",
+    "report.value": "Value",
+    "report.invoiceDate": "Invoice Date",
+    "report.dueDate": "Due Date",
+    "report.bill": "Bill",
+    "report.billDate": "Bill Date",
+    "Transaction Lines": "Transaction Lines",
+    "Total Credits (Inbound)": "Total Credits (Inbound)",
+    "Total Debits (Outbound)": "Total Debits (Outbound)",
+    "Net Flow": "Net Flow",
+    "Total Payments": "Total Payments",
+    "Total Inbound": "Total Inbound",
+    "Total Outbound": "Total Outbound",
+    "Net Cash Position": "Net Cash Position",
+    "Allocated to Invoices/Bills": "Allocated to Invoices/Bills",
+    "Unallocated / Floating Advance": "Unallocated / Floating Advance",
+    "SKU / Batch Records": "SKU / Batch Records",
+    "Total Inventory Valuation": "Total Inventory Valuation",
+    "Tracked Units (Serial / Lot)": "Tracked Units (Serial / Lot)",
+
     "header.title.Partners & Accounts": "Partners & Accounts",
     "header.desc.Manage customer profiles, supplier accounts, credit allowances, and primary contacts.":
       "Manage customer profiles, supplier accounts, credit allowances, and primary contacts.",
@@ -1926,6 +2023,103 @@ export const translations = {
     "owner.detailsAndShops": "የባለቤት ዝርዝሮች እና የሱቅ ምደባዎች",
     "owner.emptyTitle": "ምንም ባለቤት አልተገኘም።",
     "owner.linkedShops": "የተገናኙ ሱቆች:",
+
+    // Reports Module (shared UI)
+    "report.tab.overview": "አጠቃላይ እይታ",
+    "report.tab.sales": "ሽያጭ",
+    "report.tab.expenses": "ወጪዎች",
+    "report.tab.payment-accounts": "መለያዎች",
+    "report.tab.payments": "ክፍያዎች",
+    "report.tab.stock": "ዕቃ",
+    "report.tab.receivables": "የሚሰበሰብ",
+    "report.tab.payables": "የሚከፈል",
+    "report.from": "ከ",
+    "report.to": "እስከ",
+    "report.allTypes": "ሁሉም አይነቶች",
+    "report.resetFilters": "ማጣሪያዎችን ዳግም አስጀምር",
+    "report.records": "መዝገቦች",
+    "report.grossTotal": "ጠቅላላ ድምር",
+    "report.settledPaid": "የተከፈለ",
+    "report.totalRecords": "ጠቅላላ መዝገቦች",
+    "report.openBalanceResidual": "ክፍት ሂሳብ / ቀሪ",
+    "report.noRecordsFound": "ምንም መዝገብ አልተገኘም",
+    "report.emptyHint": "የፍለጋ ቃላትዎን፣ ሁኔታን ወይም የቀን ክልልን ለማስተካከል ይሞክሩ።",
+
+    // Reports Overview Page
+    "header.eyebrow.Financial & Operational Intelligence": "የፋይናንስ እና የስራ መረጃ",
+    "header.title.Reports & Analytics": "ሪፖርቶች እና ትንታኔ",
+    "header.desc.Monitor real-time ledger records, cash movements, sales velocities, and stock valuations.":
+      "የቀጥታ የመዝገብ ሪከርዶችን፣ የገንዘብ እንቅስቃሴዎችን፣ የሽያጭ ፍጥነቶችን እና የዕቃ ግምገማዎችን ይከታተሉ።",
+    "report.viewAnalytics": "ትንታኔ ይመልከቱ",
+    "Sales Report": "የሽያጭ ሪፖርት",
+    "Invoices, sales totals, taxes, paid amounts, residuals, customers, and locations.":
+      "ደረሰኞች፣ የሽያጭ ድምሮች፣ ታክሶች፣ የተከፈሉ መጠኖች፣ ቀሪዎች፣ ደንበኞች እና ቦታዎች።",
+    "Expense Report": "የወጪ ሪፖርት",
+    "Expenses by category, date, vendor, employee, location, paid amount, and residual.":
+      "ወጪዎች በምድብ፣ ቀን፣ አቅራቢ፣ ሰራተኛ፣ ቦታ፣ የተከፈለ መጠን እና ቀሪ።",
+    "Payment Account Statement": "የክፍያ መለያ መግለጫ",
+    "Inbound and outbound payment movement by cash, bank, card, or mobile-money account.":
+      "የገቢ እና ወጪ ክፍያ እንቅስቃሴ በጥሬ ገንዘብ፣ ባንክ፣ ካርድ ወይም በሞባይል ገንዘብ መለያ።",
+    "Payment Report": "የክፍያ ሪፖርት",
+    "All customer invoice, vendor bill, and expense payments with account, source, and status.":
+      "ሁሉም የደንበኛ ደረሰኝ፣ የአቅራቢ ክፍያ እና የወጪ ክፍያዎች ከመለያ፣ ምንጭ እና ሁኔታ ጋር።",
+    "Stock Report": "የዕቃ ሪፖርት",
+    "Current stock by product, location, serial, lot, available quantity, and stock value.":
+      "የአሁኑ ዕቃ በምርት፣ ቦታ፣ ሲሪያል፣ ሎት፣ ያለ መጠን እና የዕቃ ዋጋ።",
+    "Open customer invoices and unpaid balances with aging and customer breakdowns.":
+      "ክፍት የደንበኛ ደረሰኞች እና ያልተከፈሉ ሂሳቦች ከዕድሜ እና ከደንበኛ ዝርዝር ጋር።",
+    "Open vendor bills and unpaid supplier balances with due date tracking.":
+      "ክፍት የአቅራቢ ክፍያዎች እና ያልተከፈሉ የአቅራቢ ሂሳቦች ከመክፈያ ቀን ክትትል ጋር።",
+
+    // Individual Report Pages
+    "header.eyebrow.Financial Reports": "የፋይናንስ ሪፖርቶች",
+    "header.eyebrow.Inventory Intelligence": "የዕቃ መረጃ",
+    "header.desc.Comprehensive analysis of customer invoices, taxes, settlements, and outstanding balances.":
+      "የደንበኛ ደረሰኞች፣ ታክሶች፣ ክፍያዎች እና ያልተከፈሉ ሂሳቦች ሁሉን አቀፍ ትንታኔ።",
+    "header.desc.Monitor operational expenditures, supplier payouts, employee reimbursements, and categorized costs.":
+      "የስራ ወጪዎችን፣ የአቅራቢ ክፍያዎችን፣ የሰራተኛ ተመላሽ ክፍያዎችን እና በምድብ የተከፋፈሉ ወጪዎችን ይከታተሉ።",
+    "header.desc.Audit inflow and outflow ledger activity across corporate cash boxes, banks, and digital accounts.":
+      "በኩባንያ የገንዘብ ሳጥኖች፣ ባንኮች እና ዲጂታል መለያዎች ላይ የገቢ እና ወጪ መዝገብ እንቅስቃሴን ይመርምሩ።",
+    "header.title.Payments Ledger": "የክፍያ መዝገብ",
+    "header.desc.Comprehensive audit of all inbound customer collections, outbound supplier disbursements, and allocations.":
+      "ሁሉንም የገቢ ደንበኛ ስብስቦች፣ የወጪ አቅራቢ ክፍያዎች እና ምደባዎች ሁሉን አቀፍ ምርመራ።",
+    "header.title.Stock Valuation Report": "የዕቃ ግምገማ ሪፖርት",
+    "header.desc.Real-time stock on hand, inventory reservations, serialized tracking, and asset valuations.":
+      "የቀጥታ ጊዜ ያለ ዕቃ፣ የዕቃ ማስያዣዎች፣ በሲሪያል ክትትል እና የንብረት ግምገማዎች።",
+    "header.title.Customer Receivables": "የደንበኛ ሚሰበሰብ ሂሳብ",
+    "header.desc.Track pending customer invoices, payment due dates, and outstanding aging balances.":
+      "የሚጠባበቁ የደንበኛ ደረሰኞችን፣ የክፍያ መክፈያ ቀናትን እና ያልተከፈሉ ያረጁ ሂሳቦችን ይከታተሉ።",
+    "header.title.Supplier Payables": "የአቅራቢ የሚከፈል ሂሳብ",
+    "header.desc.Monitor outstanding vendor bills, payment deadlines, and supplier liability balances.":
+      "ያልተከፈሉ የአቅራቢ ክፍያዎችን፣ የክፍያ የጊዜ ገደቦችን እና የአቅራቢ ዕዳ ሂሳቦችን ይከታተሉ።",
+    "report.customer": "ደንበኛ",
+    "report.untaxed": "ከታክስ ነፃ",
+    "report.tax": "ታክስ",
+    "report.total": "ጠቅላላ",
+    "report.vendorEmployee": "አቅራቢ/ሰራተኛ",
+    "report.accountBank": "መለያ / ባንክ",
+    "report.signed": "የተመዘገበ",
+    "report.source": "ምንጭ",
+    "report.allocated": "የተመደበ",
+    "report.avgCost": "አማካይ ወጪ",
+    "report.value": "ዋጋ",
+    "report.invoiceDate": "የደረሰኝ ቀን",
+    "report.dueDate": "የመክፈያ ቀን",
+    "report.bill": "ክፍያ",
+    "report.billDate": "የክፍያ ቀን",
+    "Transaction Lines": "የግብይት መስመሮች",
+    "Total Credits (Inbound)": "ጠቅላላ ገቢ (ክሬዲት)",
+    "Total Debits (Outbound)": "ጠቅላላ ወጪ (ዴቢት)",
+    "Net Flow": "ተጣራ ፍሰት",
+    "Total Payments": "ጠቅላላ ክፍያዎች",
+    "Total Inbound": "ጠቅላላ ገቢ",
+    "Total Outbound": "ጠቅላላ ወጪ",
+    "Net Cash Position": "ተጣራ የገንዘብ ሁኔታ",
+    "Allocated to Invoices/Bills": "ለደረሰኞች/ክፍያዎች የተመደበ",
+    "Unallocated / Floating Advance": "ያልተመደበ / ተንሳፋፊ ቅድመ ክፍያ",
+    "SKU / Batch Records": "SKU / የጅምላ መዝገቦች",
+    "Total Inventory Valuation": "ጠቅላላ የዕቃ ግምገማ",
+    "Tracked Units (Serial / Lot)": "የተከታተሉ ክፍሎች (ሲሪያል / ሎት)",
 
     "header.title.Partners & Accounts": "አጋሮች እና ሂሳቦች",
     "header.desc.Manage customer profiles, supplier accounts, credit allowances, and primary contacts.":

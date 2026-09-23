@@ -4,6 +4,7 @@ import { EmptyRows, ReportFilters, ReportNavTabs, ReportSummaryCards } from "@/a
 import { StatusBadge } from "@/components/ui/badge";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
 import { TablePagination } from "@/components/ui/table-pagination";
+import { T } from "@/components/ui/t";
 import { paginateRows } from "@/lib/pagination";
 import { requirePermission } from "@/server/auth/session";
 import { displayReportMoney } from "@/lib/report-formatters";
@@ -38,14 +39,14 @@ export default async function ReceivablesReportPage({ searchParams }: Receivable
         <table className="w-full min-w-[980px] text-left text-sm">
           <thead className="bg-secondary/40 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
             <tr className="border-b border-border">
-              <th className="px-4 py-3">Invoice</th>
-              <th className="px-4 py-3">Customer</th>
-              <th className="px-4 py-3">Invoice Date</th>
-              <th className="px-4 py-3">Due Date</th>
-              <th className="px-4 py-3">Status</th>
-              <th className="px-4 py-3 text-right">Total</th>
-              <th className="px-4 py-3 text-right">Paid</th>
-              <th className="px-4 py-3 text-right">Residual</th>
+              <th className="px-4 py-3"><T k="Invoice" /></th>
+              <th className="px-4 py-3"><T k="report.customer" fallback="Customer" /></th>
+              <th className="px-4 py-3"><T k="report.invoiceDate" fallback="Invoice Date" /></th>
+              <th className="px-4 py-3"><T k="report.dueDate" fallback="Due Date" /></th>
+              <th className="px-4 py-3"><T k="field.status" /></th>
+              <th className="px-4 py-3 text-right"><T k="report.total" fallback="Total" /></th>
+              <th className="px-4 py-3 text-right"><T k="Paid" /></th>
+              <th className="px-4 py-3 text-right"><T k="Residual" /></th>
             </tr>
           </thead>
           <tbody>

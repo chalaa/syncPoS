@@ -4,6 +4,7 @@ import { EmptyRows, ReportFilters, ReportNavTabs, SummaryCard } from "@/app/admi
 import { Badge } from "@/components/ui/badge";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
 import { TablePagination } from "@/components/ui/table-pagination";
+import { T } from "@/components/ui/t";
 import { paginateRows } from "@/lib/pagination";
 import { requirePermission } from "@/server/auth/session";
 import { displayQuantity } from "@/server/inventory/stock";
@@ -54,15 +55,15 @@ export default async function StockReportPage({ searchParams }: StockReportPageP
         <table className="w-full min-w-[1120px] text-left text-sm">
           <thead className="bg-secondary/40 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
             <tr className="border-b border-border">
-              <th className="px-4 py-3">Product</th>
-              <th className="px-4 py-3">Location</th>
-              <th className="px-4 py-3">Tracking</th>
-              <th className="px-4 py-3">Serial / Lot</th>
-              <th className="px-4 py-3 text-right">On Hand</th>
-              <th className="px-4 py-3 text-right">Reserved</th>
-              <th className="px-4 py-3 text-right">Available</th>
-              <th className="px-4 py-3 text-right">Avg Cost</th>
-              <th className="px-4 py-3 text-right">Value</th>
+              <th className="px-4 py-3"><T k="Product" /></th>
+              <th className="px-4 py-3"><T k="field.location" fallback="Location" /></th>
+              <th className="px-4 py-3"><T k="field.trackingMode" fallback="Tracking" /></th>
+              <th className="px-4 py-3"><T k="return.serialLot" fallback="Serial / Lot" /></th>
+              <th className="px-4 py-3 text-right"><T k="product.onHand" fallback="On Hand" /></th>
+              <th className="px-4 py-3 text-right"><T k="product.reserved" fallback="Reserved" /></th>
+              <th className="px-4 py-3 text-right"><T k="product.available" fallback="Available" /></th>
+              <th className="px-4 py-3 text-right"><T k="report.avgCost" fallback="Avg Cost" /></th>
+              <th className="px-4 py-3 text-right"><T k="report.value" fallback="Value" /></th>
             </tr>
           </thead>
           <tbody>
@@ -80,10 +81,10 @@ export default async function StockReportPage({ searchParams }: StockReportPageP
                 </td>
                 <td className="px-4 py-3">
                   <Badge variant={row.trackingMode === "serial" ? "primary" : row.trackingMode === "lot" ? "accent" : "outline"} className="capitalize">
-                    {row.trackingMode}
+                    <T k={`status.${row.trackingMode}`} fallback={row.trackingMode} />
                   </Badge>
                 </td>
-                <td className="px-4 py-3 font-mono text-xs">{row.serialNo ?? row.lotNo ?? <span className="text-muted-foreground">Bulk</span>}</td>
+                <td className="px-4 py-3 font-mono text-xs">{row.serialNo ?? row.lotNo ?? <span className="text-muted-foreground"><T k="return.bulk" fallback="Bulk" /></span>}</td>
                 <td className="px-4 py-3 text-right font-medium">{displayQuantity(row.quantityOnHand)}</td>
                 <td className="px-4 py-3 text-right text-muted-foreground">{displayQuantity(row.quantityReserved)}</td>
                 <td className="px-4 py-3 text-right font-semibold text-primary">{displayQuantity(row.quantityAvailable)}</td>

@@ -19,6 +19,7 @@ import { type ReactNode, useTransition } from "react";
 
 import { Button } from "@/components/ui/button";
 import { TableSearchInput } from "@/components/ui/table-search-input";
+import { useTranslation } from "@/lib/i18n/use-translation";
 import { displayReportMoney } from "@/lib/report-formatters";
 import type { ReportSummary } from "@/server/reports/types";
 
@@ -34,6 +35,7 @@ const REPORT_TABS = [
 ];
 
 export function ReportNavTabs({ current }: { current: string }) {
+  const { t } = useTranslation();
   return (
     <div className="mb-6 border-b border-border">
       <div className="flex flex-wrap gap-1">
@@ -52,7 +54,7 @@ export function ReportNavTabs({ current }: { current: string }) {
               }`}
             >
               <Icon className="size-4" />
-              <span>{tab.label}</span>
+              <span>{t(`report.tab.${tab.id}`, tab.label)}</span>
             </Link>
           );
         })}
@@ -76,6 +78,7 @@ export function ReportFilters({
   paymentType?: string;
   children?: ReactNode;
 }) {
+  const { t } = useTranslation();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -99,7 +102,7 @@ export function ReportFilters({
       <div className="space-y-1 md:col-span-2">
         <span className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
           <SearchIcon className="size-3.5" />
-          Search
+          {t("Search")}
         </span>
         <TableSearchInput defaultValue={query ?? ""} placeholder="Filter keywords..." />
       </div>
@@ -107,7 +110,7 @@ export function ReportFilters({
       <label className="space-y-1">
         <span className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
           <CalendarIcon className="size-3.5" />
-          From
+          {t("report.from", "From")}
         </span>
         <input
           name="dateFrom"
@@ -121,7 +124,7 @@ export function ReportFilters({
       <label className="space-y-1">
         <span className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
           <CalendarIcon className="size-3.5" />
-          To
+          {t("report.to", "To")}
         </span>
         <input
           name="dateTo"
@@ -136,7 +139,7 @@ export function ReportFilters({
         <label className="space-y-1">
           <span className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
             <FilterIcon className="size-3.5" />
-            Status
+            {t("field.status")}
           </span>
           <input
             name="status"
@@ -152,7 +155,7 @@ export function ReportFilters({
         <label className="space-y-1">
           <span className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
             <FilterIcon className="size-3.5" />
-            Type
+            {t("field.type", "Type")}
           </span>
           <select
             name="paymentType"
@@ -160,9 +163,9 @@ export function ReportFilters({
             onChange={(e) => updateParam("paymentType", e.target.value)}
             className="h-10 w-full rounded-xl border border-input bg-background px-3 text-sm outline-none transition-colors focus:border-primary focus:ring-1 focus:ring-ring"
           >
-            <option value="">All Types</option>
-            <option value="inbound">Inbound</option>
-            <option value="outbound">Outbound</option>
+            <option value="">{t("report.allTypes", "All Types")}</option>
+            <option value="inbound">{t("Inbound")}</option>
+            <option value="outbound">{t("Outbound")}</option>
           </select>
         </label>
       ) : null}
@@ -173,7 +176,7 @@ export function ReportFilters({
         <Button asChild variant="outline" className="h-9 gap-1.5">
           <Link href={pathname}>
             <RotateCcwIcon className="size-3.5" />
-            Reset Filters
+            {t("report.resetFilters", "Reset Filters")}
           </Link>
         </Button>
       </div>
@@ -182,19 +185,20 @@ export function ReportFilters({
 }
 
 export function ReportSummaryCards({ summary }: { summary: ReportSummary }) {
+  const { t } = useTranslation();
   return (
     <>
       {/* Mobile View: Compact Micro-Metric Bar (sm:hidden) */}
       <div className="-mx-4 mb-3 flex gap-2 overflow-x-auto px-4 py-1 no-scrollbar touch-pan-x snap-x snap-mandatory sm:hidden">
         <div className="flex shrink-0 snap-start items-center gap-2 rounded-lg border border-border bg-card px-2.5 py-1.5 shadow-2xs">
           <div className="min-w-0">
-            <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Records</div>
+            <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{t("report.records", "Records")}</div>
             <div className="font-mono text-xs font-bold text-foreground">{summary.count}</div>
           </div>
         </div>
         <div className="flex shrink-0 snap-start items-center gap-2 rounded-lg border border-primary/30 bg-card px-2.5 py-1.5 shadow-2xs">
           <div className="min-w-0">
-            <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Gross Total</div>
+            <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{t("report.grossTotal", "Gross Total")}</div>
             <div className="font-mono text-xs font-bold text-primary">
               {displayReportMoney(summary.totalMinor, summary.currencyCode)}
             </div>
@@ -203,7 +207,7 @@ export function ReportSummaryCards({ summary }: { summary: ReportSummary }) {
         {summary.paidMinor !== undefined ? (
           <div className="flex shrink-0 snap-start items-center gap-2 rounded-lg border border-emerald-500/30 bg-card px-2.5 py-1.5 shadow-2xs">
             <div className="min-w-0">
-              <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Settled / Paid</div>
+              <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{t("report.settledPaid", "Settled / Paid")}</div>
               <div className="font-mono text-xs font-bold text-emerald-700 dark:text-emerald-400">
                 {displayReportMoney(summary.paidMinor, summary.currencyCode)}
               </div>
@@ -213,7 +217,7 @@ export function ReportSummaryCards({ summary }: { summary: ReportSummary }) {
         {summary.residualMinor !== undefined ? (
           <div className="flex shrink-0 snap-start items-center gap-2 rounded-lg border border-amber-500/30 bg-card px-2.5 py-1.5 shadow-2xs">
             <div className="min-w-0">
-              <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Residual</div>
+              <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{t("Residual")}</div>
               <div className="font-mono text-xs font-bold text-amber-700 dark:text-amber-400">
                 {displayReportMoney(summary.residualMinor, summary.currencyCode)}
               </div>
@@ -224,16 +228,16 @@ export function ReportSummaryCards({ summary }: { summary: ReportSummary }) {
 
       {/* Desktop/Tablet Summary Cards (hidden on mobile) */}
       <div className="hidden mb-6 sm:grid sm:grid-cols-2 md:grid-cols-4 sm:gap-3">
-        <SummaryCard label="Total Records" value={String(summary.count)} border="border-l-slate-400" />
+        <SummaryCard label={t("report.totalRecords", "Total Records")} value={String(summary.count)} border="border-l-slate-400" />
         <SummaryCard
-          label="Gross Total"
+          label={t("report.grossTotal", "Gross Total")}
           value={displayReportMoney(summary.totalMinor, summary.currencyCode)}
           border="border-l-primary"
           highlight="text-primary font-bold"
         />
         {summary.paidMinor !== undefined ? (
           <SummaryCard
-            label="Settled / Paid"
+            label={t("report.settledPaid", "Settled / Paid")}
             value={displayReportMoney(summary.paidMinor, summary.currencyCode)}
             border="border-l-emerald-600"
             highlight="text-emerald-700 dark:text-emerald-400 font-bold"
@@ -241,7 +245,7 @@ export function ReportSummaryCards({ summary }: { summary: ReportSummary }) {
         ) : null}
         {summary.residualMinor !== undefined ? (
           <SummaryCard
-            label="Open Balance / Residual"
+            label={t("report.openBalanceResidual", "Open Balance / Residual")}
             value={displayReportMoney(summary.residualMinor, summary.currencyCode)}
             border="border-l-accent"
             highlight="text-amber-700 dark:text-amber-400 font-bold"
@@ -263,20 +267,22 @@ export function SummaryCard({
   border?: string;
   highlight?: string;
 }) {
+  const { t } = useTranslation();
   return (
     <article className={`flex w-[68vw] min-w-[190px] max-w-[240px] shrink-0 snap-start flex-col justify-between rounded-xl border border-border bg-card p-3 shadow-xs transition-all hover:shadow-sm sm:w-auto sm:min-w-0 sm:max-w-none sm:p-4 ${border} border-l-4`}>
-      <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground truncate sm:text-xs">{label}</p>
+      <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground truncate sm:text-xs">{t(label, label)}</p>
       <p className={`mt-1 font-mono text-lg tracking-tight sm:text-xl ${highlight}`}>{value}</p>
     </article>
   );
 }
 
 export function EmptyRows({ colSpan }: { colSpan: number }) {
+  const { t } = useTranslation();
   return (
     <tr>
       <td colSpan={colSpan} className="px-4 py-12 text-center text-sm text-muted-foreground">
-        <p className="font-medium text-foreground">No records found</p>
-        <p className="mt-1 text-xs text-muted-foreground">Try adjusting your search keywords, status, or date range.</p>
+        <p className="font-medium text-foreground">{t("report.noRecordsFound", "No records found")}</p>
+        <p className="mt-1 text-xs text-muted-foreground">{t("report.emptyHint", "Try adjusting your search keywords, status, or date range.")}</p>
       </td>
     </tr>
   );

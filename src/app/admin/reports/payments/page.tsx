@@ -4,6 +4,7 @@ import { EmptyRows, ReportFilters, ReportNavTabs, SummaryCard } from "@/app/admi
 import { StatusBadge } from "@/components/ui/badge";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
 import { TablePagination } from "@/components/ui/table-pagination";
+import { T } from "@/components/ui/t";
 import { paginateRows } from "@/lib/pagination";
 import { requirePermission } from "@/server/auth/session";
 import { displayReportMoney } from "@/lib/report-formatters";
@@ -104,18 +105,18 @@ export default async function PaymentReportPage({ searchParams }: PaymentReportP
         <table className="w-full min-w-[1200px] text-left text-sm">
           <thead className="bg-secondary/40 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
             <tr className="border-b border-border">
-              <th className="px-4 py-3">Payment</th>
-              <th className="px-4 py-3">Date</th>
-              <th className="px-4 py-3">Type</th>
-              <th className="px-4 py-3">Status</th>
-              <th className="px-4 py-3">Partner</th>
-              <th className="px-4 py-3">Source</th>
-              <th className="px-4 py-3">Method</th>
-              <th className="px-4 py-3">Account / Bank</th>
-              <th className="px-4 py-3">Reference</th>
-              <th className="px-4 py-3 text-right">Amount</th>
-              <th className="px-4 py-3 text-right">Allocated</th>
-              <th className="px-4 py-3 text-right">Signed</th>
+              <th className="px-4 py-3"><T k="Payment" /></th>
+              <th className="px-4 py-3"><T k="field.date" fallback="Date" /></th>
+              <th className="px-4 py-3"><T k="field.type" fallback="Type" /></th>
+              <th className="px-4 py-3"><T k="field.status" /></th>
+              <th className="px-4 py-3"><T k="Partner" /></th>
+              <th className="px-4 py-3"><T k="report.source" fallback="Source" /></th>
+              <th className="px-4 py-3"><T k="payment.method" fallback="Method" /></th>
+              <th className="px-4 py-3"><T k="report.accountBank" fallback="Account / Bank" /></th>
+              <th className="px-4 py-3"><T k="Reference" /></th>
+              <th className="px-4 py-3 text-right"><T k="field.amount" fallback="Amount" /></th>
+              <th className="px-4 py-3 text-right"><T k="report.allocated" fallback="Allocated" /></th>
+              <th className="px-4 py-3 text-right"><T k="report.signed" fallback="Signed" /></th>
             </tr>
           </thead>
           <tbody>
@@ -136,7 +137,7 @@ export default async function PaymentReportPage({ searchParams }: PaymentReportP
                       ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400"
                       : "bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-400"
                   }`}>
-                    {row.paymentType}
+                    <T k={`status.${row.paymentType}`} fallback={row.paymentType} />
                   </span>
                 </td>
                 <td className="px-4 py-3">

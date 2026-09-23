@@ -4,6 +4,7 @@ import { EmptyRows, ReportFilters, ReportNavTabs, ReportSummaryCards } from "@/a
 import { StatusBadge } from "@/components/ui/badge";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
 import { TablePagination } from "@/components/ui/table-pagination";
+import { T } from "@/components/ui/t";
 import { paginateRows } from "@/lib/pagination";
 import { requirePermission } from "@/server/auth/session";
 import { displayReportMoney } from "@/lib/report-formatters";
@@ -38,16 +39,16 @@ export default async function ExpenseReportPage({ searchParams }: ExpenseReportP
         <table className="w-full min-w-[1180px] text-left text-sm">
           <thead className="bg-secondary/40 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
             <tr className="border-b border-border">
-              <th className="px-4 py-3">Expense</th>
-              <th className="px-4 py-3">Category</th>
-              <th className="px-4 py-3">Date</th>
-              <th className="px-4 py-3">Status</th>
-              <th className="px-4 py-3">Payment</th>
-              <th className="px-4 py-3">Vendor/Employee</th>
-              <th className="px-4 py-3">Location</th>
-              <th className="px-4 py-3 text-right">Amount</th>
-              <th className="px-4 py-3 text-right">Paid</th>
-              <th className="px-4 py-3 text-right">Residual</th>
+              <th className="px-4 py-3"><T k="Expense" /></th>
+              <th className="px-4 py-3"><T k="field.category" /></th>
+              <th className="px-4 py-3"><T k="field.date" fallback="Date" /></th>
+              <th className="px-4 py-3"><T k="field.status" /></th>
+              <th className="px-4 py-3"><T k="Payment" /></th>
+              <th className="px-4 py-3"><T k="report.vendorEmployee" fallback="Vendor/Employee" /></th>
+              <th className="px-4 py-3"><T k="field.location" fallback="Location" /></th>
+              <th className="px-4 py-3 text-right"><T k="field.amount" fallback="Amount" /></th>
+              <th className="px-4 py-3 text-right"><T k="Paid" /></th>
+              <th className="px-4 py-3 text-right"><T k="Residual" /></th>
             </tr>
           </thead>
           <tbody>
