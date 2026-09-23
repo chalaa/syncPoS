@@ -4,6 +4,7 @@ import { PlusIcon, Trash2Icon } from "lucide-react";
 import { type FormEvent, useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { useTranslation } from "@/lib/i18n/use-translation";
 import type { CustomerReturnableLine, ReturnFormOption } from "@/server/returns/types";
 
 type CustomerReturnRow = CustomerReturnableLine & {
@@ -52,6 +53,7 @@ export function CustomerReturnForm({
   lines: CustomerReturnableLine[];
   initialSalesOrderId?: string;
 }) {
+  const { t } = useTranslation();
   const validInitialSalesOrderId = salesOrders.some((order) => order.id === initialSalesOrderId) ? initialSalesOrderId ?? "" : "";
   const [salesOrderId, setSalesOrderId] = useState(validInitialSalesOrderId);
   const [rows, setRows] = useState<CustomerReturnRow[]>(() =>
@@ -90,25 +92,25 @@ export function CustomerReturnForm({
     const quantityByLine = new Map<string, number>();
 
     if (!salesOrderId) {
-      errors.push("Original sales order is required.");
+      errors.push(t("return.error.salesOrderRequired", "Original sales order is required."));
     }
 
     if (salesOrderId && positiveRows.length === 0) {
-      errors.push("At least one return quantity is required.");
+      errors.push(t("return.error.quantityRequired", "At least one return quantity is required."));
     }
 
     for (const row of positiveRows) {
       const quantity = Number(row.returnQuantity);
 
       if (!Number.isFinite(quantity) || quantity <= 0) {
-        errors.push(`${row.sku} has an invalid return quantity.`);
+        errors.push(`${row.sku} ${t("return.error.invalidQuantitySuffix", "has an invalid return quantity.")}`);
         continue;
       }
 
       quantityByLine.set(row.id, (quantityByLine.get(row.id) ?? 0) + quantity);
 
       if (row.trackingMode === "serial" && quantity !== 1) {
-        errors.push(`${row.sku} serial return quantity must be 1.`);
+        errors.push(`${row.sku} ${t("return.error.serialQuantitySuffix", "serial return quantity must be 1.")}`);
       }
     }
 
@@ -116,12 +118,14 @@ export function CustomerReturnForm({
       const row = rows.find((candidate) => candidate.id === lineId);
 
       if (row && quantity > Number(row.quantityRemaining)) {
-        errors.push(`${row.sku} total return quantity cannot exceed remaining ${row.quantityRemaining}.`);
+        errors.push(
+          `${row.sku} ${t("return.error.exceedsRemainingPrefix", "total return quantity cannot exceed remaining")} ${row.quantityRemaining}.`,
+        );
       }
     }
 
     return [...new Set(errors)];
-  }, [rows, salesOrderId]);
+  }, [rows, salesOrderId, t]);
 
   const refundTotalMinor = rows.reduce((total, row) => total + Math.round(row.unitRefundMinor * Number(row.returnQuantity || 0)), 0);
   const currencyCode = rows[0]?.currencyCode ?? "ETB";
@@ -136,18 +140,18 @@ export function CustomerReturnForm({
     <form action={action} className="rounded-lg border border-border bg-card p-5" onSubmit={handleSubmit}>
       <div className="grid gap-4 md:grid-cols-2">
         <label className="space-y-1">
-          <span className="text-xs font-medium text-muted-foreground">Original Sales Order</span>
+          <span className="text-xs font-medium text-muted-foreground">{t("return.originalSalesOrder", "Original Sales Order")}</span>
           <select name="salesOrderId" required value={salesOrderId} className={inputClass} onChange={(event) => changeOrder(event.target.value)}>
-            <option value="">Select sales order</option>
+            <option value="">{t("return.selectSalesOrder", "Select sales order")}</option>
             {salesOrders.map((order) => (
               <option key={order.id} value={order.id}>{order.code} - {order.name}</option>
             ))}
           </select>
         </label>
         <label className="space-y-1">
-          <span className="text-xs font-medium text-muted-foreground">Return Location</span>
+          <span className="text-xs font-medium text-muted-foreground">{t("return.returnLocation", "Return Location")}</span>
           <select name="destinationLocationId" required defaultValue="" className={inputClass}>
-            <option value="" disabled>Select location</option>
+            <option value="" disabled>{t("field.selectLocation", "Select location")}</option>
             {locations.map((location) => (
               <option key={location.id} value={location.id}>{location.code} - {location.name}</option>
             ))}
@@ -165,16 +169,16 @@ export function CustomerReturnForm({
         <table className="w-full min-w-[1120px] text-left text-sm">
           <thead className="text-xs uppercase text-muted-foreground">
             <tr className="border-b border-border">
-              <th className="px-2 py-2">Product</th>
-              <th className="px-2 py-2">Tracking</th>
-              <th className="px-2 py-2 text-right">Delivered</th>
-              <th className="px-2 py-2 text-right">Returned</th>
-              <th className="px-2 py-2 text-right">Remaining</th>
-              <th className="w-32 px-2 py-2 text-right">Return</th>
-              <th className="px-2 py-2">Condition</th>
-              <th className="px-2 py-2">Serial/Lot</th>
-              <th className="px-2 py-2 text-right">Refund</th>
-              <th className="w-28 px-2 py-2 text-right">Actions</th>
+              <th className="px-2 py-2">{t("Product", "Product")}</th>
+              <th className="px-2 py-2">{t("field.trackingMode", "Tracking")}</th>
+              <th className="px-2 py-2 text-right">{t("return.delivered", "Delivered")}</th>
+              <th className="px-2 py-2 text-right">{t("status.returned", "Returned")}</th>
+              <th className="px-2 py-2 text-right">{t("return.remainingCol", "Remaining")}</th>
+              <th className="w-32 px-2 py-2 text-right">{t("return.returnCol", "Return")}</th>
+              <th className="px-2 py-2">{t("return.condition", "Condition")}</th>
+              <th className="px-2 py-2">{t("return.serialLot", "Serial/Lot")}</th>
+              <th className="px-2 py-2 text-right">{t("return.refund", "Refund")}</th>
+              <th className="w-28 px-2 py-2 text-right">{t("action.actions")}</th>
             </tr>
           </thead>
           <tbody>
@@ -185,7 +189,7 @@ export function CustomerReturnForm({
                   <div className="font-medium">{row.productName}</div>
                   <div className="text-xs text-muted-foreground">{row.sku}</div>
                 </td>
-                <td className="px-2 py-3 capitalize">{row.trackingMode}</td>
+                <td className="px-2 py-3 capitalize">{t(`status.${row.trackingMode}`, row.trackingMode)}</td>
                 <td className="px-2 py-3 text-right">{row.quantityDelivered}</td>
                 <td className="px-2 py-3 text-right">{row.quantityReturned}</td>
                 <td className="px-2 py-3 text-right">{row.quantityRemaining}</td>
@@ -208,13 +212,13 @@ export function CustomerReturnForm({
                     className={inputClass}
                     onChange={(event) => updateRow(row.key, { condition: event.target.value as CustomerReturnRow["condition"] })}
                   >
-                    <option value="available">Available</option>
-                    <option value="returned">Returned</option>
-                    <option value="damaged">Damaged</option>
-                    <option value="scrapped">Scrapped</option>
+                    <option value="available">{t("status.available", "Available")}</option>
+                    <option value="returned">{t("status.returned", "Returned")}</option>
+                    <option value="damaged">{t("status.damaged", "Damaged")}</option>
+                    <option value="scrapped">{t("status.scrapped", "Scrapped")}</option>
                   </select>
                 </td>
-                <td className="px-2 py-3">{row.serialNo ?? row.lotNo ?? "Bulk"}</td>
+                <td className="px-2 py-3">{row.serialNo ?? row.lotNo ?? t("return.bulk", "Bulk")}</td>
                 <td className="px-2 py-3 text-right">{money(Math.round(row.unitRefundMinor * Number(row.returnQuantity || 0)), row.currencyCode)}</td>
                 <td className="px-2 py-3">
                   <div className="flex justify-end gap-2">
@@ -235,7 +239,9 @@ export function CustomerReturnForm({
             {rows.length === 0 ? (
               <tr>
                 <td colSpan={10} className="px-2 py-8 text-center text-muted-foreground">
-                  {selectedOrder ? "No returnable lines remain for this sales order." : "Select a sales order to load returnable lines."}
+                  {selectedOrder
+                    ? t("return.noLinesForOrder", "No returnable lines remain for this sales order.")
+                    : t("return.selectOrderHint", "Select a sales order to load returnable lines.")}
                 </td>
               </tr>
             ) : null}
@@ -245,18 +251,18 @@ export function CustomerReturnForm({
 
       <div className="mt-4 flex justify-end">
         <div className="rounded-md border border-border bg-muted/20 px-4 py-3 text-sm">
-          <span className="text-muted-foreground">Calculated refund </span>
+          <span className="text-muted-foreground">{t("return.calculatedRefund", "Calculated refund")} </span>
           <span className="font-semibold">{money(refundTotalMinor, currencyCode)}</span>
         </div>
       </div>
 
       <label className="mt-5 block space-y-1">
-        <span className="text-xs font-medium text-muted-foreground">Notes</span>
+        <span className="text-xs font-medium text-muted-foreground">{t("field.notes", "Notes")}</span>
         <textarea name="notes" rows={4} className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus:border-primary" />
       </label>
 
       <div className="mt-5 flex justify-end">
-        <Button type="submit" disabled={validationErrors.length > 0}>Create Return</Button>
+        <Button type="submit" disabled={validationErrors.length > 0}>{t("action.createReturn", "Create Return")}</Button>
       </div>
     </form>
   );
