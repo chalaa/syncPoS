@@ -5,6 +5,7 @@ import { Eye, PackagePlus } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { RelatedModelSelect, type RelatedModelOption } from "@/components/ui/related-model-select";
+import { useTranslation } from "@/lib/i18n/use-translation";
 import type { CategorySelectOption, SelectOption } from "@/server/catalog/types";
 import { NewProductModal } from "@/app/admin/products/new-product-modal";
 import { ProductDetailModal } from "@/app/admin/products/product-detail-modal";
@@ -48,6 +49,7 @@ export function ProductSelect({
   onValueChange,
   onOptionsChange,
 }: ProductSelectProps) {
+  const { t } = useTranslation();
   const [createdItems, setCreatedItems] = useState<ProductSelectOption[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [initialName, setInitialName] = useState("");
@@ -117,7 +119,7 @@ export function ProductSelect({
             emptyLabel={emptyLabel}
             inputClassName={inputClassName}
             error={error}
-            createLabel="Add Product..."
+            createLabel={t("Add Product...")}
             onCreateAndEdit={(query) => {
               setInitialName(query);
               setIsDialogOpen(true);
@@ -134,10 +136,10 @@ export function ProductSelect({
             size="icon"
             onClick={() => setIsDetailOpen(true)}
             className="size-9 sm:size-10 shrink-0 rounded-lg border-border/80 text-muted-foreground transition-all hover:border-[#0B5D4B]/40 hover:bg-emerald-500/10 hover:text-[#0B5D4B] dark:hover:text-emerald-300 active:scale-95"
-            title="View product details"
+            title={t("View product details")}
           >
             <Eye className="size-4" />
-            <span className="sr-only">View Product Details</span>
+            <span className="sr-only">{t("View Product Details")}</span>
           </Button>
         ) : null}
 
@@ -150,10 +152,10 @@ export function ProductSelect({
             setIsDialogOpen(true);
           }}
           className="size-9 sm:size-10 shrink-0 rounded-lg border-border/80 text-muted-foreground transition-all hover:border-[#0B5D4B]/40 hover:bg-emerald-500/10 hover:text-[#0B5D4B] dark:hover:text-emerald-300 active:scale-95"
-          title="Add new product"
+          title={t("Add new product")}
         >
           <PackagePlus className="size-4" />
-          <span className="sr-only">Add Product</span>
+          <span className="sr-only">{t("Add Product")}</span>
         </Button>
       </div>
 

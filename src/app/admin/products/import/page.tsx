@@ -2,6 +2,7 @@ import { CategoryImporter, ProductImporter } from "@/app/admin/products/import/p
 import { BackToProductsButton } from "@/app/admin/products/back-to-products-button";
 import { Notebook } from "@/components/ui/notebook";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
+import { T } from "@/components/ui/t";
 import { requirePermission } from "@/server/auth/session";
 
 export const dynamic = "force-dynamic";
@@ -33,12 +34,12 @@ export default async function ProductImportPage({ searchParams }: ProductImportP
         items={[
           {
             value: "products",
-            label: "Products",
+            label: <T k="Products" />,
             content: <ProductImporter />,
           },
           {
             value: "categories",
-            label: "Categories",
+            label: <T k="Categories" />,
             content: <CategoryImporter />,
           },
         ]}

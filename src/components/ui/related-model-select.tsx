@@ -8,6 +8,7 @@ import { createPortal } from "react-dom";
 
 import { cn } from "@/lib/utils";
 import { filterAndSortByFuzzy } from "@/lib/search-utils";
+import { useTranslation } from "@/lib/i18n/use-translation";
 
 import { useResizableDropdown } from "./use-resizable-dropdown";
 
@@ -72,6 +73,13 @@ export function RelatedModelSelect({
   onCreateAndEdit,
   onValueChange,
 }: RelatedModelSelectProps) {
+  const { t } = useTranslation();
+  const tLabel = label ? t(label, label) : label;
+  const tPlaceholder = t(placeholder, placeholder);
+  const tEmptyLabel = t(emptyLabel, emptyLabel);
+  const tClearLabel = t(clearLabel, clearLabel);
+  const tCreateLabel = t(createLabel, createLabel);
+  const tEditLabel = t(editLabel, editLabel);
   const [internalValue, setInternalValue] = useState(defaultValue ?? "");
   const [query, setQuery] = useState("");
   const [isOpen, setIsOpen] = useState(false);
@@ -325,7 +333,7 @@ export function RelatedModelSelect({
 
       <div ref={listRef} className="flex-1 overflow-y-auto p-1">
         {!trimmedQuery && visibleOptions.length > 0 ? (
-          <div className="px-3 py-2 text-xs font-normal text-muted-foreground">{placeholder}</div>
+          <div className="px-3 py-2 text-xs font-normal text-muted-foreground">{tPlaceholder}</div>
         ) : null}
         {!required && !trimmedQuery && selectedId ? (
           <button
@@ -337,7 +345,7 @@ export function RelatedModelSelect({
             onClick={() => selectOption("")}
             className="flex w-full rounded px-3 py-2 text-left text-sm text-muted-foreground transition-colors hover:bg-secondary/80 hover:text-foreground"
           >
-            {clearLabel}
+            {tClearLabel}
           </button>
         ) : null}
         {visibleOptions.map((option) => (
@@ -356,7 +364,7 @@ export function RelatedModelSelect({
           </button>
         ))}
         {filteredOptions.length === 0 ? (
-          <p className="px-3 py-4 text-sm font-normal text-muted-foreground">{emptyLabel}</p>
+          <p className="px-3 py-4 text-sm font-normal text-muted-foreground">{tEmptyLabel}</p>
         ) : null}
         {createHref || onCreateAndEdit || editRecordHref ? (
           <div className="border-t border-border pt-1">
@@ -375,7 +383,7 @@ export function RelatedModelSelect({
                 className="flex w-full items-center gap-2 rounded px-3 py-2 text-left text-sm text-foreground transition-colors hover:bg-secondary/80"
               >
                 <PlusIcon className="size-4" />
-                {trimmedQuery ? `${createLabel.replace(/\.\.\.$/, "")} "${trimmedQuery}"` : createLabel}
+                {trimmedQuery ? `${tCreateLabel.replace(/\.\.\.$/, "")} "${trimmedQuery}"` : tCreateLabel}
               </button>
             ) : null}
             {newRecordHref ? (
@@ -384,7 +392,7 @@ export function RelatedModelSelect({
                 className="flex w-full items-center gap-2 rounded px-3 py-2 text-left text-sm text-foreground transition-colors hover:bg-secondary/80"
               >
                 <PlusIcon className="size-4" />
-                {trimmedQuery ? `${createLabel.replace(/\.\.\.$/, "")} "${trimmedQuery}"` : createLabel}
+                {trimmedQuery ? `${tCreateLabel.replace(/\.\.\.$/, "")} "${trimmedQuery}"` : tCreateLabel}
               </Link>
             ) : null}
             {editRecordHref ? (
@@ -393,7 +401,7 @@ export function RelatedModelSelect({
                 className="flex w-full items-center gap-2 rounded px-3 py-2 text-left text-sm text-foreground transition-colors hover:bg-secondary/80"
               >
                 <PencilIcon className="size-4" />
-                {editLabel}
+                {tEditLabel}
                 <ExternalLinkIcon className="ml-auto size-3 text-muted-foreground" />
               </Link>
             ) : null}
@@ -427,7 +435,7 @@ export function RelatedModelSelect({
               setQuery("");
             }
           }}
-          placeholder={selectedLabel || placeholder}
+          placeholder={selectedLabel || tPlaceholder}
           className={cn(
             inputClass,
             inputClassName,
@@ -462,7 +470,7 @@ export function RelatedModelSelect({
       }}
       className={cn("relative flex flex-col gap-1 text-sm font-medium", isOpen ? "z-50" : "z-0", className)}
     >
-      {label}
+      {tLabel}
       {control}
     </label>
   );

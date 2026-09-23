@@ -5,6 +5,7 @@ import { ProductNavTabs } from "@/app/admin/products/product-nav-tabs";
 import { StatusBadge } from "@/components/ui/badge";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
 import { TablePagination } from "@/components/ui/table-pagination";
+import { T } from "@/components/ui/t";
 import { paginateRows } from "@/lib/pagination";
 import { requirePermission } from "@/server/auth/session";
 import { getProductTrackingRows, minorToDisplay } from "@/server/catalog/products";
@@ -49,13 +50,13 @@ function TrackingTable({ rows }: { rows: ProductTrackingListRow[] }) {
       <table className="w-full min-w-[920px] text-left text-sm">
         <thead className="border-b border-border bg-muted/50 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
           <tr>
-            <th className="px-4 py-3">Tracking Mode</th>
-            <th className="px-4 py-3">Reference / Serial</th>
-            <th className="px-4 py-3">Product</th>
-            <th className="px-4 py-3">Status</th>
-            <th className="px-4 py-3">Current Location</th>
-            <th className="px-4 py-3 text-right">On Hand</th>
-            <th className="px-4 py-3 text-right">Landed Cost</th>
+            <th className="px-4 py-3"><T k="field.trackingMode" fallback="Tracking Mode" /></th>
+            <th className="px-4 py-3"><T k="tracking.referenceSerial" fallback="Reference / Serial" /></th>
+            <th className="px-4 py-3"><T k="Product" /></th>
+            <th className="px-4 py-3"><T k="field.status" /></th>
+            <th className="px-4 py-3"><T k="tracking.currentLocation" fallback="Current Location" /></th>
+            <th className="px-4 py-3 text-right"><T k="product.onHand" fallback="On Hand" /></th>
+            <th className="px-4 py-3 text-right"><T k="tracking.landedCost" fallback="Landed Cost" /></th>
           </tr>
         </thead>
         <tbody className="divide-y divide-border">
@@ -66,7 +67,7 @@ function TrackingTable({ rows }: { rows: ProductTrackingListRow[] }) {
             >
               <td className="px-4 py-3">
                 <span className="inline-flex items-center rounded border border-border bg-secondary px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wider text-secondary-foreground">
-                  {row.kind}
+                  <T k={`status.${row.kind}`} fallback={row.kind} />
                 </span>
               </td>
               <td className="px-4 py-3 font-mono text-xs font-semibold text-foreground">
@@ -100,7 +101,7 @@ function TrackingTable({ rows }: { rows: ProductTrackingListRow[] }) {
           {rows.length === 0 ? (
             <tr>
               <td colSpan={7} className="px-4 py-12 text-center text-muted-foreground">
-                No lots or serials tracked in inventory yet.
+                <T k="tracking.emptyTitle" fallback="No lots or serials tracked in inventory yet." />
               </td>
             </tr>
           ) : null}

@@ -107,9 +107,12 @@ export function ProductImporter() {
       <section className="rounded-lg border border-border bg-card p-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h2 className="text-base font-semibold">Import file</h2>
+            <h2 className="text-base font-semibold">{t("import.file", "Import file")}</h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Upload the product template after filling product names, units, tracking modes, prices, taxes, and JSON specifications.
+              {t(
+                "import.productHint",
+                "Upload the product template after filling product names, units, tracking modes, prices, taxes, and JSON specifications.",
+              )}
             </p>
           </div>
           <Button asChild variant="outline">
@@ -137,9 +140,9 @@ export function ProductImporter() {
       <section className="rounded-lg border border-border bg-card">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border p-4">
           <div>
-            <h2 className="text-base font-semibold">Validation preview</h2>
+            <h2 className="text-base font-semibold">{t("import.validationPreview", "Validation preview")}</h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Product rows are imported only after every validation issue is fixed.
+              {t("import.productValidationHint", "Product rows are imported only after every validation issue is fixed.")}
             </p>
           </div>
           <form action={importAction}>
@@ -165,33 +168,33 @@ export function ProductImporter() {
           <table className="w-full min-w-[1260px] text-left text-sm">
             <thead className="bg-muted text-xs uppercase tracking-wide text-muted-foreground">
               <tr>
-                <th className="px-4 py-3">Row</th>
-                <th className="px-4 py-3">Action</th>
-                <th className="px-4 py-3">Item Code</th>
-                <th className="px-4 py-3">Product</th>
-                <th className="px-4 py-3">Category</th>
-                <th className="px-4 py-3">Brand</th>
-                <th className="px-4 py-3">Unit</th>
-                <th className="px-4 py-3">Tracking</th>
-                <th className="px-4 py-3 text-right">Sale Price</th>
-                <th className="px-4 py-3 text-right">Purchase Cost</th>
-                <th className="px-4 py-3">Errors</th>
+                <th className="px-4 py-3">{t("import.row", "Row")}</th>
+                <th className="px-4 py-3">{t("field.action", "Action")}</th>
+                <th className="px-4 py-3">{t("import.itemCode", "Item Code")}</th>
+                <th className="px-4 py-3">{t("Product", "Product")}</th>
+                <th className="px-4 py-3">{t("field.category")}</th>
+                <th className="px-4 py-3">{t("field.brand")}</th>
+                <th className="px-4 py-3">{t("field.unit")}</th>
+                <th className="px-4 py-3">{t("field.trackingMode", "Tracking")}</th>
+                <th className="px-4 py-3 text-right">{t("import.salePrice", "Sale Price")}</th>
+                <th className="px-4 py-3 text-right">{t("import.purchaseCost", "Purchase Cost")}</th>
+                <th className="px-4 py-3">{t("import.errors", "Errors")}</th>
               </tr>
             </thead>
             <tbody>
               {previewRows.map((row) => (
                 <tr key={`${row.rowNumber}-${row.sku || row.productName}`} className="border-t border-border">
                   <td className="px-4 py-3">{row.rowNumber}</td>
-                  <td className="px-4 py-3 capitalize">{row.action}</td>
-                  <td className="px-4 py-3 font-medium">{row.sku || "Auto"}</td>
+                  <td className="px-4 py-3 capitalize">{t(`status.${row.action}`, row.action)}</td>
+                  <td className="px-4 py-3 font-medium">{row.sku || t("import.auto", "Auto")}</td>
                   <td className="px-4 py-3">
-                    <div className="font-medium">{row.productName || "Missing"}</div>
+                    <div className="font-medium">{row.productName || t("import.missing", "Missing")}</div>
                     <div className="text-xs text-muted-foreground">{row.model || "-"}</div>
                   </td>
                   <td className="px-4 py-3">{row.categoryName || row.category || "-"}</td>
                   <td className="px-4 py-3">{row.brandName || row.brand || "-"}</td>
-                  <td className="px-4 py-3">{row.unitName || row.unit || "Missing"}</td>
-                  <td className="px-4 py-3">{row.trackingMode || "Missing"}</td>
+                  <td className="px-4 py-3">{row.unitName || row.unit || t("import.missing", "Missing")}</td>
+                  <td className="px-4 py-3">{row.trackingMode || t("import.missing", "Missing")}</td>
                   <td className="px-4 py-3 text-right">{moneyMinor(row.listPriceMinor)}</td>
                   <td className="px-4 py-3 text-right">{moneyMinor(row.standardCostMinor)}</td>
                   <td className="px-4 py-3">
@@ -205,7 +208,7 @@ export function ProductImporter() {
                         ))}
                       </div>
                     ) : (
-                      <span className="text-muted-foreground">Ready</span>
+                      <span className="text-muted-foreground">{t("import.ready", "Ready")}</span>
                     )}
                   </td>
                 </tr>
@@ -213,7 +216,7 @@ export function ProductImporter() {
               {previewRows.length === 0 ? (
                 <tr>
                   <td colSpan={11} className="px-4 py-10 text-center text-muted-foreground">
-                    Upload a CSV file to preview product rows.
+                    {t("import.uploadProductHint", "Upload a CSV file to preview product rows.")}
                   </td>
                 </tr>
               ) : null}
@@ -267,9 +270,10 @@ export function CategoryImporter() {
       <section className="rounded-lg border border-border bg-card p-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h2 className="text-base font-semibold">Category import file</h2>
+            <h2 className="text-base font-semibold">{t("import.categoryFile", "Category import file")}</h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Upload categories with specification names as JSON, for example {`["Power","Voltage","Fuel Type"]`}.
+              {t("import.categoryHint", "Upload categories with specification names as JSON, for example")}{" "}
+              {`["Power","Voltage","Fuel Type"]`}.
             </p>
           </div>
           <Button asChild variant="outline">
@@ -297,9 +301,9 @@ export function CategoryImporter() {
       <section className="rounded-lg border border-border bg-card">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border p-4">
           <div>
-            <h2 className="text-base font-semibold">Category validation preview</h2>
+            <h2 className="text-base font-semibold">{t("import.categoryValidationPreview", "Category validation preview")}</h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Categories are imported only after every validation issue is fixed.
+              {t("import.categoryValidationHint", "Categories are imported only after every validation issue is fixed.")}
             </p>
           </div>
           <form action={importAction}>
@@ -325,22 +329,22 @@ export function CategoryImporter() {
           <table className="w-full min-w-[900px] text-left text-sm">
             <thead className="bg-muted text-xs uppercase tracking-wide text-muted-foreground">
               <tr>
-                <th className="px-4 py-3">Row</th>
-                <th className="px-4 py-3">Action</th>
-                <th className="px-4 py-3">Code</th>
-                <th className="px-4 py-3">Category</th>
-                <th className="px-4 py-3">Specifications</th>
-                <th className="px-4 py-3">Errors</th>
+                <th className="px-4 py-3">{t("import.row", "Row")}</th>
+                <th className="px-4 py-3">{t("field.action", "Action")}</th>
+                <th className="px-4 py-3">{t("field.code")}</th>
+                <th className="px-4 py-3">{t("field.category")}</th>
+                <th className="px-4 py-3">{t("import.specifications", "Specifications")}</th>
+                <th className="px-4 py-3">{t("import.errors", "Errors")}</th>
               </tr>
             </thead>
             <tbody>
               {previewRows.map((row) => (
                 <tr key={`${row.rowNumber}-${row.code || row.name}`} className="border-t border-border">
                   <td className="px-4 py-3">{row.rowNumber}</td>
-                  <td className="px-4 py-3 capitalize">{row.action}</td>
-                  <td className="px-4 py-3 font-medium">{row.code || "Auto"}</td>
+                  <td className="px-4 py-3 capitalize">{t(`status.${row.action}`, row.action)}</td>
+                  <td className="px-4 py-3 font-medium">{row.code || t("import.auto", "Auto")}</td>
                   <td className="px-4 py-3">
-                    <div className="font-medium">{row.name || "Missing"}</div>
+                    <div className="font-medium">{row.name || t("import.missing", "Missing")}</div>
                     <div className="text-xs text-muted-foreground">{row.description || "-"}</div>
                   </td>
                   <td className="px-4 py-3">
@@ -359,7 +363,7 @@ export function CategoryImporter() {
                         ))}
                       </div>
                     ) : (
-                      <span className="text-muted-foreground">Ready</span>
+                      <span className="text-muted-foreground">{t("import.ready", "Ready")}</span>
                     )}
                   </td>
                 </tr>
@@ -367,7 +371,7 @@ export function CategoryImporter() {
               {previewRows.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-4 py-10 text-center text-muted-foreground">
-                    Upload a CSV file to preview category rows.
+                    {t("import.uploadCategoryHint", "Upload a CSV file to preview category rows.")}
                   </td>
                 </tr>
               ) : null}
