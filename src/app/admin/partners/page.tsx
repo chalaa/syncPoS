@@ -10,6 +10,7 @@ import { TableFilterSelect } from "@/components/ui/table-filter-select";
 import { TableSearchInput } from "@/components/ui/table-search-input";
 import { TablePagination } from "@/components/ui/table-pagination";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
+import { T } from "@/components/ui/t";
 import { paginateRows } from "@/lib/pagination";
 import {
   getPartnerFormOptions,
@@ -119,7 +120,7 @@ export default async function PartnersPage({ searchParams }: PartnersPageProps) 
               }`}
               href="/admin/partners"
             >
-              All Partners
+              <T k="All Partners" />
             </Link>
             <Link
               className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
@@ -127,7 +128,7 @@ export default async function PartnersPage({ searchParams }: PartnersPageProps) 
               }`}
               href="/admin/partners?role=customer"
             >
-              Customers
+              <T k="Customers" />
             </Link>
             <Link
               className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
@@ -135,7 +136,7 @@ export default async function PartnersPage({ searchParams }: PartnersPageProps) 
               }`}
               href="/admin/partners?role=supplier"
             >
-              Suppliers
+              <T k="Suppliers" />
             </Link>
           </div>
 
@@ -143,13 +144,13 @@ export default async function PartnersPage({ searchParams }: PartnersPageProps) 
             <table className="w-full min-w-[920px] text-left text-sm">
               <thead className="bg-secondary/40 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 <tr className="border-b border-border">
-                  <th className="px-4 py-3">Code</th>
-                  <th className="px-4 py-3">Partner</th>
-                  <th className="px-4 py-3">Role</th>
-                  <th className="px-4 py-3">Status</th>
-                  <th className="px-4 py-3">Contact</th>
-                  <th className="px-4 py-3 text-right">Credit limit</th>
-                  <th className="px-4 py-3 text-right">Actions</th>
+                  <th className="px-4 py-3"><T k="field.code" /></th>
+                  <th className="px-4 py-3"><T k="Partner" /></th>
+                  <th className="px-4 py-3"><T k="field.role" /></th>
+                  <th className="px-4 py-3"><T k="field.status" /></th>
+                  <th className="px-4 py-3"><T k="Contact" /></th>
+                  <th className="px-4 py-3 text-right"><T k="Credit limit" /></th>
+                  <th className="px-4 py-3 text-right"><T k="action.actions" /></th>
                 </tr>
               </thead>
               <tbody>
@@ -166,19 +167,19 @@ export default async function PartnersPage({ searchParams }: PartnersPageProps) 
                       <div className="text-xs text-muted-foreground">
                         {[partner.legalName, partner.tin ? `TIN ${partner.tin}` : null]
                           .filter(Boolean)
-                          .join(" / ") || "No legal detail"}
+                          .join(" / ") || <T k="No legal detail" />}
                       </div>
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex flex-wrap gap-1">
                         {partner.isCustomer ? (
                           <Badge variant="primary" className="text-[10px]">
-                            Customer
+                            <T k="Customer" />
                           </Badge>
                         ) : null}
                         {partner.isSupplier ? (
                           <Badge variant="accent" className="text-[10px]">
-                            Supplier
+                            <T k="Supplier" />
                           </Badge>
                         ) : null}
                       </div>
@@ -187,7 +188,7 @@ export default async function PartnersPage({ searchParams }: PartnersPageProps) 
                       <StatusBadge status={partner.status} size="sm" />
                     </td>
                     <td className="px-4 py-3">
-                      <div className="font-medium text-foreground">{partner.primaryContactName ?? "No contact"}</div>
+                      <div className="font-medium text-foreground">{partner.primaryContactName ?? <T k="No contact" />}</div>
                       <div className="text-xs text-muted-foreground">
                         {[partner.primaryContactPhone, partner.primaryContactEmail]
                           .filter(Boolean)
@@ -206,7 +207,7 @@ export default async function PartnersPage({ searchParams }: PartnersPageProps) 
                               variant="outline"
                               size="sm"
                             >
-                              Edit
+                              <T k="action.edit" />
                             </ButtonLink>
                             <DeleteConfirmationDialog
                               action={softDeletePartner}
@@ -218,7 +219,7 @@ export default async function PartnersPage({ searchParams }: PartnersPageProps) 
                           <form action={restorePartner}>
                             <input type="hidden" name="id" value={partner.id} />
                             <Button variant="outline" size="sm">
-                              Restore
+                              <T k="action.restore" />
                             </Button>
                           </form>
                         )}
@@ -229,8 +230,8 @@ export default async function PartnersPage({ searchParams }: PartnersPageProps) 
                 {partnerPage.rows.length === 0 ? (
                   <tr>
                     <td colSpan={7} className="px-4 py-12 text-center text-muted-foreground">
-                      <p className="font-medium text-foreground">No partners found</p>
-                      <p className="mt-1 text-xs text-muted-foreground">Try adjusting your search criteria.</p>
+                      <p className="font-medium text-foreground"><T k="No partners found" /></p>
+                      <p className="mt-1 text-xs text-muted-foreground"><T k="Try adjusting your search criteria." /></p>
                     </td>
                   </tr>
                 ) : null}

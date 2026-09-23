@@ -49,7 +49,10 @@ function PaymentTermForm({
       <DialogHeader>
         <DialogTitle>{title}</DialogTitle>
         <DialogDescription>
-          Define payment timing and notes used when assigning terms to partners.
+          {t(
+            "paymentTerm.modalDesc",
+            "Define payment timing and notes used when assigning terms to partners.",
+          )}
         </DialogDescription>
       </DialogHeader>
 
@@ -57,13 +60,13 @@ function PaymentTermForm({
       {record ? <input type="hidden" name="id" value={record.id} /> : null}
 
       <label className="flex flex-col gap-1 text-sm font-medium">
-        Name
+        {t("field.name", "Name")}
         <input name="name" required defaultValue={record?.name} className={inputClass} />
       </label>
       {record ? <input type="hidden" name="code" value={record.code} /> : null}
 
       <label className="flex flex-col gap-1 text-sm font-medium">
-        Due days
+        {t("field.dueDays", "Due days")}
         <input
           name="dueDays"
           type="number"
@@ -76,7 +79,7 @@ function PaymentTermForm({
       </label>
 
       <label className="flex flex-col gap-1 text-sm font-medium">
-        Description
+        {t("field.description", "Description")}
         <textarea
           name="description"
           defaultValue={record?.description ?? ""}
@@ -91,7 +94,7 @@ function PaymentTermForm({
           defaultChecked={record?.isActive ?? true}
           className="size-4 rounded border-input text-primary focus:ring-primary"
         />
-        Active
+        {t("field.active", "Active")}
       </label>
 
       <DialogFooter>
@@ -155,13 +158,13 @@ export function PaymentTermsManager({
         description="Standard credit intervals and settlement timelines applied to commercial invoices."
         actions={
           <PaymentTermDialog
-            label="New payment term"
+            label={t("action.newPaymentTerm", "New payment term")}
             action={createAction}
             returnPath={returnPath}
           >
             <Button size="sm">
               <PlusIcon className="size-4" data-icon="inline-start" />
-              New payment term
+              {t("action.newPaymentTerm", "New payment term")}
             </Button>
           </PaymentTermDialog>
         }
@@ -184,7 +187,7 @@ export function PaymentTermsManager({
               <tr>
                 <th className="px-4 py-3">{t("field.code")}</th>
                 <th className="px-4 py-3">{t("field.name")}</th>
-                <th className="px-4 py-3">Due Window</th>
+                <th className="px-4 py-3">{t("field.dueWindow", "Due Window")}</th>
                 <th className="px-4 py-3">{t("field.status")}</th>
                 <th className="px-4 py-3 text-right">{t("action.actions")}</th>
               </tr>
@@ -207,7 +210,7 @@ export function PaymentTermsManager({
                     ) : null}
                   </td>
                   <td className="px-4 py-3 text-foreground">
-                    <span className="font-semibold">{record.dueDays}</span> days
+                    <span className="font-semibold">{record.dueDays}</span> {t("common.days", "days")}
                   </td>
                   <td className="px-4 py-3">
                     <StatusBadge status={record.isActive ? "active" : "inactive"} />
@@ -217,14 +220,14 @@ export function PaymentTermsManager({
                       {!showDeleted ? (
                         <>
                           <PaymentTermDialog
-                            label={`Edit ${record.name}`}
+                            label={`${t("action.edit", "Edit")} ${record.name}`}
                             action={updateAction}
                             record={record}
                             returnPath={returnPath}
                           >
                             <Button variant="outline" size="sm" className="h-7 text-xs">
                               <EditIcon className="size-3.5" data-icon="inline-start" />
-                              Edit
+                              {t("action.edit", "Edit")}
                             </Button>
                           </PaymentTermDialog>
                           <DeleteConfirmationDialog
@@ -239,7 +242,7 @@ export function PaymentTermsManager({
                           <input type="hidden" name="returnPath" value={returnPath} />
                           <Button variant="outline" size="sm" className="h-7 text-xs">
                             <RotateCcwIcon className="size-3.5" data-icon="inline-start" />
-                            Restore
+                            {t("action.restore", "Restore")}
                           </Button>
                         </form>
                       )}
@@ -250,7 +253,7 @@ export function PaymentTermsManager({
               {records.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="px-4 py-12 text-center text-muted-foreground">
-                    No payment terms found.
+                    {t("paymentTerm.emptyTitle", "No payment terms found.")}
                   </td>
                 </tr>
               ) : null}

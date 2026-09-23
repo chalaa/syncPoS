@@ -49,8 +49,11 @@ export function DeleteConfirmationDialog({
   const displayDescription =
     description ??
     (itemName
-      ? `Are you sure you want to delete "${itemName}"? It will be moved to the Settings Archive.`
-      : "Are you sure you want to delete this item? It will be moved to the Settings Archive.");
+      ? `${t("confirm.deleteItemPrefix", "Are you sure you want to delete")} "${itemName}"? ${t("confirm.deleteItemSuffix", "It will be moved to the Settings Archive.")}`
+      : t(
+          "confirm.deleteGenericDescription",
+          "Are you sure you want to delete this item? It will be moved to the Settings Archive.",
+        ));
 
   return (
     <Dialog>

@@ -13,6 +13,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { useTranslation } from "@/lib/i18n/use-translation";
 import {
   addressTypeOptions,
   partnerStatusOptions,
@@ -32,6 +33,7 @@ export function NewPartnerModal({
   open: controlledOpen,
   onOpenChange: controlledOnOpenChange,
 }: NewPartnerModalProps) {
+  const { t } = useTranslation();
   const [internalOpen, setInternalOpen] = useState(false);
   const isControlled = controlledOpen !== undefined;
   const open = isControlled ? controlledOpen : internalOpen;
@@ -56,7 +58,7 @@ export function NewPartnerModal({
         <DialogTrigger asChild>
           <Button className="gap-2 bg-gradient-to-r from-[#0B5D4B] to-[#073B35] font-semibold text-white shadow-md shadow-[#0B5D4B]/20 transition-all hover:brightness-110 active:scale-[0.99] cursor-pointer">
             <Plus className="size-4 text-emerald-200" />
-            New partner
+            {t("action.newPartner", "New partner")}
           </Button>
         </DialogTrigger>
       ) : null}
@@ -74,17 +76,17 @@ export function NewPartnerModal({
             </div>
             <div>
               <DialogTitle className="text-base font-bold text-foreground tracking-tight">
-                New Partner
+                {t("modal.newPartner.title", "New Partner")}
               </DialogTitle>
               <p className="text-xs text-muted-foreground mt-0.5">
-                Create a customer, supplier, or dual-role account.
+                {t("modal.newPartner.desc", "Create a customer, supplier, or dual-role account.")}
               </p>
             </div>
           </div>
           <DialogClose
             type="button"
             className="rounded-lg p-1.5 sm:p-2 bg-red-500 text-white hover:bg-red-600 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/50 shadow-2xs"
-            aria-label="Close dialog"
+            aria-label={t("action.closeDialog", "Close dialog")}
             onClick={() => setOpen(false)}
           >
             <X className="size-4 sm:size-4.5" />
@@ -95,45 +97,45 @@ export function NewPartnerModal({
           <div className="grid gap-4 md:grid-cols-2">
             <label className="flex flex-col gap-1.5 text-xs font-semibold text-foreground">
               <span>
-                Display name <span className="text-destructive">*</span>
+                {t("field.displayName", "Display name")} <span className="text-destructive">*</span>
               </span>
               <input name="displayName" required maxLength={200} className={inputClass} />
             </label>
             <label className="flex flex-col gap-1.5 text-xs font-semibold text-foreground">
-              Legal name
+              {t("field.legalName", "Legal name")}
               <input name="legalName" maxLength={200} className={inputClass} />
             </label>
           </div>
 
           <div className="grid gap-4 md:grid-cols-3">
             <fieldset className="rounded-xl border border-border/80 bg-background/40 px-3 py-2">
-              <legend className="px-1 text-xs font-semibold">Role</legend>
+              <legend className="px-1 text-xs font-semibold">{t("field.role", "Role")}</legend>
               <label className="mt-1 flex items-center gap-2 text-xs font-medium">
                 <input name="isCustomer" type="checkbox" defaultChecked />
-                Customer
+                {t("Customer", "Customer")}
               </label>
               <label className="mt-2 flex items-center gap-2 text-xs font-medium">
                 <input name="isSupplier" type="checkbox" />
-                Supplier
+                {t("Supplier", "Supplier")}
               </label>
             </fieldset>
             <label className="flex flex-col gap-1.5 text-xs font-semibold text-foreground">
-              Payment term
+              {t("field.paymentTerm", "Payment term")}
               <select name="paymentTermId" className={inputClass}>
-                <option value="">None</option>
+                <option value="">{t("common.none", "None")}</option>
                 {paymentTerms.map((term) => (
                   <option key={term.id} value={term.id}>
-                    {term.name} ({term.dueDays} days)
+                    {term.name} ({term.dueDays} {t("common.days", "days")})
                   </option>
                 ))}
               </select>
             </label>
             <label className="flex flex-col gap-1.5 text-xs font-semibold text-foreground">
-              Status
+              {t("field.status", "Status")}
               <select name="status" defaultValue="active" className={inputClass}>
                 {partnerStatusOptions.map((status) => (
                   <option key={status} value={status}>
-                    {status}
+                    {t(`status.${status}`, status)}
                   </option>
                 ))}
               </select>
@@ -141,7 +143,7 @@ export function NewPartnerModal({
           </div>
 
           <label className="flex flex-col gap-1.5 text-xs font-semibold text-foreground">
-            Credit limit
+            {t("Credit limit", "Credit limit")}
             <input
               name="creditLimit"
               type="number"
@@ -153,64 +155,64 @@ export function NewPartnerModal({
           </label>
 
           <section className="grid gap-3 rounded-xl border border-border/80 bg-muted/20 p-4">
-            <h2 className="text-sm font-semibold text-foreground">Primary Contact</h2>
+            <h2 className="text-sm font-semibold text-foreground">{t("Primary Contact", "Primary Contact")}</h2>
             <div className="grid gap-3 md:grid-cols-2">
               <label className="flex flex-col gap-1.5 text-xs font-semibold text-foreground">
-                Name
+                {t("field.name", "Name")}
                 <input name="contactName" maxLength={160} className={inputClass} />
               </label>
               <label className="flex flex-col gap-1.5 text-xs font-semibold text-foreground">
-                Role/title
+                {t("field.roleTitle", "Role/title")}
                 <input name="contactRole" maxLength={100} className={inputClass} />
               </label>
               <label className="flex flex-col gap-1.5 text-xs font-semibold text-foreground">
-                Phone
+                {t("field.phone", "Phone")}
                 <input name="contactPhone" maxLength={40} className={inputClass} />
               </label>
               <label className="flex flex-col gap-1.5 text-xs font-semibold text-foreground">
-                Email
+                {t("field.email", "Email")}
                 <input name="contactEmail" type="email" maxLength={160} className={inputClass} />
               </label>
             </div>
           </section>
 
           <section className="grid gap-3 rounded-xl border border-border/80 bg-muted/20 p-4">
-            <h2 className="text-sm font-semibold text-foreground">Primary Address</h2>
+            <h2 className="text-sm font-semibold text-foreground">{t("Primary Address", "Primary Address")}</h2>
             <div className="grid gap-3 md:grid-cols-3">
               <label className="flex flex-col gap-1.5 text-xs font-semibold text-foreground">
-                Type
+                {t("field.type", "Type")}
                 <select name="addressType" defaultValue="office" className={inputClass}>
                   {addressTypeOptions.map((type) => (
                     <option key={type} value={type}>
-                      {type}
+                      {t(`status.${type}`, type)}
                     </option>
                   ))}
                 </select>
               </label>
               <label className="flex flex-col gap-1.5 text-xs font-semibold text-foreground md:col-span-2">
-                Label
+                {t("field.label", "Label")}
                 <input name="addressLabel" maxLength={100} className={inputClass} />
               </label>
             </div>
             <label className="flex flex-col gap-1.5 text-xs font-semibold text-foreground">
-              Address line 1
+              {t("field.addressLine1", "Address line 1")}
               <input name="addressLine1" maxLength={200} className={inputClass} />
             </label>
             <label className="flex flex-col gap-1.5 text-xs font-semibold text-foreground">
-              Address line 2
+              {t("field.addressLine2", "Address line 2")}
               <input name="addressLine2" maxLength={200} className={inputClass} />
             </label>
             <div className="grid gap-3 md:grid-cols-3">
               <label className="flex flex-col gap-1.5 text-xs font-semibold text-foreground">
-                City
+                {t("field.city", "City")}
                 <input name="city" maxLength={120} className={inputClass} />
               </label>
               <label className="flex flex-col gap-1.5 text-xs font-semibold text-foreground">
-                Region
+                {t("field.region", "Region")}
                 <input name="region" maxLength={120} className={inputClass} />
               </label>
               <label className="flex flex-col gap-1.5 text-xs font-semibold text-foreground">
-                Country <span className="text-destructive">*</span>
+                {t("field.country", "Country")} <span className="text-destructive">*</span>
                 <input
                   name="country"
                   defaultValue="Ethiopia"
@@ -223,7 +225,7 @@ export function NewPartnerModal({
           </section>
 
           <label className="flex flex-col gap-1.5 text-xs font-semibold text-foreground">
-            Notes
+            {t("field.notes", "Notes")}
             <textarea name="notes" rows={3} className={textareaClass} />
           </label>
 
@@ -234,14 +236,14 @@ export function NewPartnerModal({
               onClick={() => setOpen(false)}
               className="h-10 w-full sm:w-auto px-4 text-xs font-semibold justify-center"
             >
-              Cancel
+              {t("action.cancel", "Cancel")}
             </Button>
             <Button
               type="submit"
               className="h-10 w-full sm:w-auto px-5 gap-2 bg-gradient-to-r from-[#0B5D4B] to-[#073B35] font-semibold text-white shadow-md shadow-[#0B5D4B]/20 hover:brightness-110 active:scale-[0.99] justify-center"
             >
               <Plus className="size-4 text-emerald-200" />
-              Create partner
+              {t("action.createPartner", "Create partner")}
             </Button>
           </div>
         </form>

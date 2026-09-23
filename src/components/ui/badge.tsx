@@ -1,6 +1,9 @@
+"use client";
+
 import * as React from "react";
 import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
+import { useTranslation } from "@/lib/i18n/use-translation";
 
 const badgeVariants = cva(
   "inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors border select-none",
@@ -96,6 +99,8 @@ export const StatusBadge = React.forwardRef<
     className?: string;
   } & React.HTMLAttributes<HTMLDivElement>
 >(({ status, label, size = "default", className, ...props }, ref) => {
+  const { t } = useTranslation();
+
   if (!status) {
     return (
       <span ref={ref as React.Ref<HTMLSpanElement>} className="text-xs text-muted-foreground" {...props}>
@@ -105,7 +110,8 @@ export const StatusBadge = React.forwardRef<
   }
 
   const normalized = status.toLowerCase().trim();
-  const displayLabel = label ?? status.replace(/[_-]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+  const rawLabel = label ?? status.replace(/[_-]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+  const displayLabel = t(`status.${normalized}`, rawLabel);
 
   // Green / Posted / Completed / Success
   if (

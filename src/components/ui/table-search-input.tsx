@@ -61,7 +61,7 @@ export function TableSearchInput({
     return () => clearTimeout(timer);
   }, [value, pathname, router, searchParams, paramName]);
 
-  const displayPlaceholder = t("action.searchProducts", t(placeholder, placeholder));
+  const displayPlaceholder = t(placeholder, placeholder);
 
   return (
     <div className={cn("relative min-w-0 flex-1", className)}>

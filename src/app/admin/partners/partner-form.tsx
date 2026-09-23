@@ -4,6 +4,7 @@ import { ArrowUpRight, FileText, Receipt, ArrowLeft } from "lucide-react";
 import { Alert } from "@/components/ui/alert";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
+import { T } from "@/components/ui/t";
 import {
   addressTypeOptions,
   minorToDisplay,
@@ -45,7 +46,7 @@ function PartnerSmartSummary({ partner }: { partner: PartnerDetailRecord }) {
                   {partner.financial.invoiceCount}
                 </div>
                 <div className="text-xs font-medium text-muted-foreground">
-                  Customer Invoices
+                  <T k="Customer Invoices" />
                 </div>
               </div>
             </div>
@@ -66,7 +67,7 @@ function PartnerSmartSummary({ partner }: { partner: PartnerDetailRecord }) {
                   {partner.financial.billCount}
                 </div>
                 <div className="text-xs font-medium text-muted-foreground">
-                  Vendor Bills
+                  <T k="Vendor Bills" />
                 </div>
               </div>
             </div>
@@ -78,7 +79,7 @@ function PartnerSmartSummary({ partner }: { partner: PartnerDetailRecord }) {
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <div className="rounded-xl border border-border border-l-4 border-l-amber-500 bg-card p-4 shadow-xs">
           <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            Customer unpaid
+            <T k="Customer unpaid" />
           </div>
           <div className="mt-1 text-xl font-bold tracking-tight text-foreground">
             {money(partner.financial.receivableResidualMinor, partner.currencyCode)}
@@ -86,7 +87,7 @@ function PartnerSmartSummary({ partner }: { partner: PartnerDetailRecord }) {
         </div>
         <div className="rounded-xl border border-border border-l-4 border-l-emerald-600 bg-card p-4 shadow-xs">
           <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            Available credit
+            <T k="Available credit" />
           </div>
           <div className="mt-1 text-xl font-bold tracking-tight text-foreground">
             {money(partner.financial.remainingCreditMinor, partner.currencyCode)}
@@ -94,7 +95,7 @@ function PartnerSmartSummary({ partner }: { partner: PartnerDetailRecord }) {
         </div>
         <div className="rounded-xl border border-border border-l-4 border-l-rose-500 bg-card p-4 shadow-xs">
           <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            Supplier unpaid
+            <T k="Supplier unpaid" />
           </div>
           <div className="mt-1 text-xl font-bold tracking-tight text-foreground">
             {money(partner.financial.payableResidualMinor, partner.currencyCode)}
@@ -108,7 +109,7 @@ function PartnerSmartSummary({ partner }: { partner: PartnerDetailRecord }) {
           }`}
         >
           <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            Net balance
+            <T k="Net balance" />
           </div>
           <div
             className={`mt-1 text-xl font-bold tracking-tight ${
@@ -134,10 +135,10 @@ export function PartnerForm({ mode, partner, paymentTerms, error }: PartnerFormP
     <PageShell maxWidth="max-w-5xl">
       <PageHeader
         eyebrow="Partners"
-        title={title}
+        title={<T k={title} />}
         actions={
           <ButtonLink href="/admin/partners" variant="outline">
-            Back to partners
+            <T k="Back to partners" />
           </ButtonLink>
         }
       />
@@ -153,7 +154,7 @@ export function PartnerForm({ mode, partner, paymentTerms, error }: PartnerFormP
 
           <div className="grid gap-4 md:grid-cols-2">
             <label className="grid gap-1 text-sm font-medium">
-              Display name
+              <T k="field.displayName" />
               <input
                 name="displayName"
                 defaultValue={partner?.displayName}
@@ -163,7 +164,7 @@ export function PartnerForm({ mode, partner, paymentTerms, error }: PartnerFormP
               />
             </label>
             <label className="grid gap-1 text-sm font-medium">
-              Legal name
+              <T k="field.legalName" />
               <input
                 name="legalName"
                 defaultValue={partner?.legalName ?? ""}
@@ -175,33 +176,33 @@ export function PartnerForm({ mode, partner, paymentTerms, error }: PartnerFormP
 
           <div className="grid gap-4 md:grid-cols-3">
             <fieldset className="rounded-md border border-border bg-background/40 px-3 py-2">
-              <legend className="px-1 text-sm font-medium">Role</legend>
+              <legend className="px-1 text-sm font-medium"><T k="field.role" /></legend>
               <label className="mt-1 flex items-center gap-2 text-sm">
                 <input name="isCustomer" type="checkbox" defaultChecked={partner?.isCustomer ?? true} />
-                Customer
+                <T k="Customer" />
               </label>
               <label className="mt-2 flex items-center gap-2 text-sm">
                 <input name="isSupplier" type="checkbox" defaultChecked={partner?.isSupplier ?? false} />
-                Supplier
+                <T k="Supplier" />
               </label>
             </fieldset>
             <label className="grid gap-1 text-sm font-medium">
-              Payment term
+              <T k="field.paymentTerm" />
               <select
                 name="paymentTermId"
                 defaultValue={partner?.paymentTermId ?? ""}
                 className="h-10 rounded-md border border-input bg-background px-3 font-normal text-foreground"
               >
-                <option value="">None</option>
+                <option value=""><T k="common.none" /></option>
                 {paymentTerms.map((term) => (
                   <option key={term.id} value={term.id}>
-                    {term.name} ({term.dueDays} days)
+                    {term.name} ({term.dueDays} <T k="common.days" />)
                   </option>
                 ))}
               </select>
             </label>
             <label className="grid gap-1 text-sm font-medium">
-              Status
+              <T k="field.status" />
               <select
                 name="status"
                 defaultValue={partner?.status ?? "active"}
@@ -209,7 +210,7 @@ export function PartnerForm({ mode, partner, paymentTerms, error }: PartnerFormP
               >
                 {partnerStatusOptions.map((status) => (
                   <option key={status} value={status}>
-                    {status}
+                    <T k={`status.${status}`} />
                   </option>
                 ))}
               </select>
@@ -217,7 +218,7 @@ export function PartnerForm({ mode, partner, paymentTerms, error }: PartnerFormP
           </div>
 
           <label className="grid gap-1 text-sm font-medium">
-            Credit limit
+            <T k="Credit limit" />
             <input
               name="creditLimit"
               type="number"
@@ -229,10 +230,10 @@ export function PartnerForm({ mode, partner, paymentTerms, error }: PartnerFormP
           </label>
 
           <section className="grid gap-4 rounded-lg border border-border bg-muted/20 p-4">
-            <h2 className="text-base font-semibold text-foreground">Primary Contact</h2>
+            <h2 className="text-base font-semibold text-foreground"><T k="Primary Contact" /></h2>
             <div className="grid gap-4 md:grid-cols-2">
               <label className="grid gap-1 text-sm font-medium">
-                Name
+                <T k="field.name" />
                 <input
                   name="contactName"
                   defaultValue={partner?.primaryContact?.fullName ?? ""}
@@ -241,7 +242,7 @@ export function PartnerForm({ mode, partner, paymentTerms, error }: PartnerFormP
                 />
               </label>
               <label className="grid gap-1 text-sm font-medium">
-                Role/title
+                <T k="field.roleTitle" />
                 <input
                   name="contactRole"
                   defaultValue={partner?.primaryContact?.roleTitle ?? ""}
@@ -250,7 +251,7 @@ export function PartnerForm({ mode, partner, paymentTerms, error }: PartnerFormP
                 />
               </label>
               <label className="grid gap-1 text-sm font-medium">
-                Phone
+                <T k="field.phone" />
                 <input
                   name="contactPhone"
                   defaultValue={partner?.primaryContact?.phone ?? ""}
@@ -259,7 +260,7 @@ export function PartnerForm({ mode, partner, paymentTerms, error }: PartnerFormP
                 />
               </label>
               <label className="grid gap-1 text-sm font-medium">
-                Email
+                <T k="field.email" />
                 <input
                   name="contactEmail"
                   type="email"
@@ -272,10 +273,10 @@ export function PartnerForm({ mode, partner, paymentTerms, error }: PartnerFormP
           </section>
 
           <section className="grid gap-4 rounded-lg border border-border bg-muted/20 p-4">
-            <h2 className="text-base font-semibold text-foreground">Primary Address</h2>
+            <h2 className="text-base font-semibold text-foreground"><T k="Primary Address" /></h2>
             <div className="grid gap-4 md:grid-cols-3">
               <label className="grid gap-1 text-sm font-medium">
-                Type
+                <T k="field.type" />
                 <select
                   name="addressType"
                   defaultValue={partner?.primaryAddress?.addressType ?? "office"}
@@ -283,13 +284,13 @@ export function PartnerForm({ mode, partner, paymentTerms, error }: PartnerFormP
                 >
                   {addressTypeOptions.map((type) => (
                     <option key={type} value={type}>
-                      {type}
+                      <T k={`status.${type}`} fallback={type} />
                     </option>
                   ))}
                 </select>
               </label>
               <label className="grid gap-1 text-sm font-medium md:col-span-2">
-                Label
+                <T k="field.label" />
                 <input
                   name="addressLabel"
                   defaultValue={partner?.primaryAddress?.label ?? ""}
@@ -299,7 +300,7 @@ export function PartnerForm({ mode, partner, paymentTerms, error }: PartnerFormP
               </label>
             </div>
             <label className="grid gap-1 text-sm font-medium">
-              Address line 1
+              <T k="field.addressLine1" />
               <input
                 name="addressLine1"
                 defaultValue={partner?.primaryAddress?.line1 ?? ""}
@@ -308,7 +309,7 @@ export function PartnerForm({ mode, partner, paymentTerms, error }: PartnerFormP
               />
             </label>
             <label className="grid gap-1 text-sm font-medium">
-              Address line 2
+              <T k="field.addressLine2" />
               <input
                 name="addressLine2"
                 defaultValue={partner?.primaryAddress?.line2 ?? ""}
@@ -318,7 +319,7 @@ export function PartnerForm({ mode, partner, paymentTerms, error }: PartnerFormP
             </label>
             <div className="grid gap-4 md:grid-cols-3">
               <label className="grid gap-1 text-sm font-medium">
-                City
+                <T k="field.city" />
                 <input
                   name="city"
                   defaultValue={partner?.primaryAddress?.city ?? ""}
@@ -327,7 +328,7 @@ export function PartnerForm({ mode, partner, paymentTerms, error }: PartnerFormP
                 />
               </label>
               <label className="grid gap-1 text-sm font-medium">
-                Region
+                <T k="field.region" />
                 <input
                   name="region"
                   defaultValue={partner?.primaryAddress?.region ?? ""}
@@ -336,7 +337,7 @@ export function PartnerForm({ mode, partner, paymentTerms, error }: PartnerFormP
                 />
               </label>
               <label className="grid gap-1 text-sm font-medium">
-                Country
+                <T k="field.country" />
                 <input
                   name="country"
                   defaultValue={partner?.primaryAddress?.country ?? "Ethiopia"}
@@ -349,7 +350,7 @@ export function PartnerForm({ mode, partner, paymentTerms, error }: PartnerFormP
           </section>
 
           <label className="grid gap-1 text-sm font-medium">
-            Notes
+            <T k="field.notes" />
             <textarea
               name="notes"
               defaultValue={partner?.notes ?? ""}
@@ -360,10 +361,10 @@ export function PartnerForm({ mode, partner, paymentTerms, error }: PartnerFormP
 
           <div className="flex flex-wrap justify-end gap-3 border-t border-border pt-4">
             <ButtonLink href="/admin/partners" variant="outline">
-              Cancel
+              <T k="action.cancel" />
             </ButtonLink>
             <Button type="submit">
-              {submitLabel}
+              <T k={submitLabel} />
             </Button>
           </div>
         </form>
