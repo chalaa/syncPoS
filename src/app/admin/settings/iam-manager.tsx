@@ -28,6 +28,7 @@ import {
 } from "@/components/ui/dialog";
 import { ManyToManyTags, type ManyToManyTagOption } from "@/components/ui/many-to-many-tags";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
+import { useTranslation } from "@/lib/i18n/use-translation";
 import type { IamManagementData, IamRoleRow, IamUserRow } from "@/server/iam/types";
 
 type UserMutation = (formData: FormData) => Promise<void>;
@@ -65,13 +66,14 @@ function UserForm({
   employeeOptions: ManyToManyTagOption[];
   returnPath: string;
 }) {
+  const { t } = useTranslation();
   const [roleIds, setRoleIds] = useState(user?.roleIds ?? []);
 
   return (
     <form action={action} className="flex flex-col gap-4">
       <DialogHeader>
         <DialogTitle>{title}</DialogTitle>
-        <DialogDescription>Assign login access and business roles.</DialogDescription>
+        <DialogDescription>{t("iam.userModalDesc", "Assign login access and business roles.")}</DialogDescription>
       </DialogHeader>
 
       <input type="hidden" name="returnPath" value={returnPath} />
@@ -79,20 +81,20 @@ function UserForm({
 
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="flex flex-col gap-1 text-sm font-medium">
-          Username
+          {t("field.username", "Username")}
           <input name="username" required defaultValue={user?.username} className={inputClass} />
         </label>
         <label className="flex flex-col gap-1 text-sm font-medium">
-          Email
+          {t("field.email", "Email")}
           <input name="email" type="email" defaultValue={user?.email ?? ""} className={inputClass} />
         </label>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="flex flex-col gap-1 text-sm font-medium">
-          Employee
+          {t("Employee", "Employee")}
           <select name="employeeId" defaultValue={user?.employeeId ?? ""} className={inputClass}>
-            <option value="">No employee</option>
+            <option value="">{t("iam.noEmployee", "No employee")}</option>
             {employeeOptions.map((employee) => (
               <option key={employee.id} value={employee.id}>
                 {employee.label}
@@ -101,17 +103,17 @@ function UserForm({
           </select>
         </label>
         <label className="flex flex-col gap-1 text-sm font-medium">
-          Status
+          {t("field.status")}
           <select name="status" defaultValue={user?.status ?? "active"} className={inputClass}>
-            <option value="active">Active</option>
-            <option value="disabled">Disabled</option>
-            <option value="locked">Locked</option>
+            <option value="active">{t("status.active")}</option>
+            <option value="disabled">{t("status.disabled")}</option>
+            <option value="locked">{t("status.locked")}</option>
           </select>
         </label>
       </div>
 
       <label className="flex flex-col gap-1 text-sm font-medium">
-        Password
+        {t("field.password", "Password")}
         <input
           name="password"
           type="password"
@@ -123,13 +125,13 @@ function UserForm({
       </label>
 
       <label className="flex flex-col gap-1 text-sm font-medium">
-        Roles
+        {t("iam.roles", "Roles")}
         <ManyToManyTags
           name="roleIds"
           options={roles}
           value={roleIds}
           onChange={setRoleIds}
-          placeholder="Select role"
+          placeholder={t("iam.selectRole", "Select role")}
         />
       </label>
 
@@ -140,16 +142,16 @@ function UserForm({
           defaultChecked={user?.emailVerified ?? false}
           className="size-4 rounded border-input"
         />
-        Email verified
+        {t("iam.emailVerified", "Email verified")}
       </label>
 
       <DialogFooter>
         <DialogClose asChild>
           <Button type="button" variant="outline">
-            Cancel
+            {t("action.cancel")}
           </Button>
         </DialogClose>
-        <Button>{user ? "Save changes" : "Create user"}</Button>
+        <Button>{user ? t("Save changes") : t("iam.createUser", "Create user")}</Button>
       </DialogFooter>
     </form>
   );
@@ -202,37 +204,38 @@ function RoleForm({
   permissions: ManyToManyTagOption[];
   returnPath: string;
 }) {
+  const { t } = useTranslation();
   const [permissionIds, setPermissionIds] = useState(role?.permissionIds ?? []);
 
   return (
     <form action={action} className="flex flex-col gap-4">
       <DialogHeader>
         <DialogTitle>{title}</DialogTitle>
-        <DialogDescription>Configure access rules for a group of users.</DialogDescription>
+        <DialogDescription>{t("iam.roleModalDesc", "Configure access rules for a group of users.")}</DialogDescription>
       </DialogHeader>
 
       <input type="hidden" name="returnPath" value={returnPath} />
       {role ? <input type="hidden" name="id" value={role.id} /> : null}
 
       <label className="flex flex-col gap-1 text-sm font-medium">
-        Name
+        {t("field.name", "Name")}
         <input name="name" required defaultValue={role?.name} className={inputClass} />
       </label>
       {role ? <input type="hidden" name="code" value={role.code} /> : null}
 
       <label className="flex flex-col gap-1 text-sm font-medium">
-        Description
+        {t("field.description", "Description")}
         <textarea name="description" defaultValue={role?.description ?? ""} className={textareaClass} />
       </label>
 
       <label className="flex flex-col gap-1 text-sm font-medium">
-        Permissions
+        {t("Permissions", "Permissions")}
         <ManyToManyTags
           name="permissionIds"
           options={permissions}
           value={permissionIds}
           onChange={setPermissionIds}
-          placeholder="Select permission"
+          placeholder={t("iam.selectPermission", "Select permission")}
         />
       </label>
 
@@ -243,16 +246,16 @@ function RoleForm({
           defaultChecked={role?.isActive ?? true}
           className="size-4 rounded border-input"
         />
-        Active
+        {t("field.active", "Active")}
       </label>
 
       <DialogFooter>
         <DialogClose asChild>
           <Button type="button" variant="outline">
-            Cancel
+            {t("action.cancel")}
           </Button>
         </DialogClose>
-        <Button>{role ? "Save changes" : "Create role"}</Button>
+        <Button>{role ? t("Save changes") : t("iam.createRole", "Create role")}</Button>
       </DialogFooter>
     </form>
   );
@@ -301,6 +304,7 @@ export function IamManager({
   error,
   returnPath,
 }: IamManagerProps) {
+  const { t } = useTranslation();
   const activeRoles = roles
     .filter((role) => role.isActive)
     .map((role) => ({ id: role.id, label: role.name }));
@@ -322,14 +326,14 @@ export function IamManager({
           actions={
             canManageRoles ? (
               <RoleDialog
-                label="New role"
+                label={t("iam.newRole", "New role")}
                 action={createRole}
                 permissions={activePermissions}
                 returnPath={returnPath}
               >
                 <Button>
                   <PlusIcon data-icon="inline-start" />
-                  New role
+                  {t("iam.newRole", "New role")}
                 </Button>
               </RoleDialog>
             ) : null
@@ -343,12 +347,12 @@ export function IamManager({
           <table className="w-full min-w-[980px] text-left text-sm">
             <thead className="bg-secondary/40 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               <tr className="border-b border-border">
-                <th className="px-4 py-3">Role</th>
-                <th className="px-4 py-3">Flags</th>
-                <th className="px-4 py-3 text-right">Users</th>
-                <th className="px-4 py-3 text-right">Permissions</th>
-                <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3 text-right">Actions</th>
+                <th className="px-4 py-3">{t("Role", "Role")}</th>
+                <th className="px-4 py-3">{t("iam.flags", "Flags")}</th>
+                <th className="px-4 py-3 text-right">{t("Users", "Users")}</th>
+                <th className="px-4 py-3 text-right">{t("Permissions", "Permissions")}</th>
+                <th className="px-4 py-3">{t("field.status")}</th>
+                <th className="px-4 py-3 text-right">{t("action.actions")}</th>
               </tr>
             </thead>
             <tbody>
@@ -361,14 +365,14 @@ export function IamManager({
                   <td className="px-4 py-3">
                     <div className="flex flex-wrap gap-1">
                       <Badge variant={role.isSystem ? "dark" : "outline"} className="text-[10px]">
-                        {role.isSystem ? "System" : "Custom"}
+                        {role.isSystem ? t("iam.system", "System") : t("iam.custom", "Custom")}
                       </Badge>
                       <Badge variant={role.isEditable ? "secondary" : "muted"} className="text-[10px]">
-                        {role.isEditable ? "Editable" : "Locked"}
+                        {role.isEditable ? t("iam.editable", "Editable") : t("status.locked")}
                       </Badge>
                       {role.isDeletable ? null : (
                         <Badge variant="destructive" className="text-[10px]">
-                          Protected
+                          {t("iam.protected", "Protected")}
                         </Badge>
                       )}
                     </div>
@@ -383,7 +387,7 @@ export function IamManager({
                       {canManageRoles ? (
                         <>
                           <RoleDialog
-                            label={`Edit ${role.name}`}
+                            label={`${t("action.edit", "Edit")} ${role.name}`}
                             action={updateRole}
                             role={role}
                             permissions={activePermissions}
@@ -391,7 +395,7 @@ export function IamManager({
                           >
                             <Button type="button" variant="outline" size="icon" disabled={!role.isEditable}>
                               <EditIcon />
-                              <span className="sr-only">Edit role</span>
+                              <span className="sr-only">{t("iam.editRole", "Edit role")}</span>
                             </Button>
                           </RoleDialog>
                           <DeleteConfirmationDialog
@@ -401,12 +405,12 @@ export function IamManager({
                           >
                             <Button variant="danger" size="icon" disabled={!role.isDeletable}>
                               <Trash2Icon />
-                              <span className="sr-only">Delete role</span>
+                              <span className="sr-only">{t("iam.deleteRole", "Delete role")}</span>
                             </Button>
                           </DeleteConfirmationDialog>
                         </>
                       ) : (
-                        <span className="text-xs text-muted-foreground">View only</span>
+                        <span className="text-xs text-muted-foreground">{t("iam.viewOnly", "View only")}</span>
                       )}
                     </div>
                   </td>
@@ -431,11 +435,11 @@ export function IamManager({
           <table className="w-full min-w-[900px] text-left text-sm">
             <thead className="bg-secondary/40 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               <tr className="border-b border-border">
-                <th className="px-4 py-3">Permission</th>
-                <th className="px-4 py-3">Application</th>
-                <th className="px-4 py-3">Feature</th>
-                <th className="px-4 py-3">Action</th>
-                <th className="px-4 py-3">Status</th>
+                <th className="px-4 py-3">{t("Permission", "Permission")}</th>
+                <th className="px-4 py-3">{t("iam.application", "Application")}</th>
+                <th className="px-4 py-3">{t("iam.feature", "Feature")}</th>
+                <th className="px-4 py-3">{t("field.action", "Action")}</th>
+                <th className="px-4 py-3">{t("field.status")}</th>
               </tr>
             </thead>
             <tbody>
@@ -472,7 +476,7 @@ export function IamManager({
         actions={
           canManageUsers ? (
             <UserDialog
-              label="New user"
+              label={t("iam.newUser", "New user")}
               action={createUser}
               roles={activeRoles}
               employeeOptions={employeeOptions}
@@ -480,7 +484,7 @@ export function IamManager({
             >
               <Button>
                 <UserPlusIcon data-icon="inline-start" />
-                New user
+                {t("iam.newUser", "New user")}
               </Button>
             </UserDialog>
           ) : null
@@ -494,15 +498,15 @@ export function IamManager({
         <table className="w-full min-w-[1120px] text-left text-sm">
           <thead className="bg-secondary/40 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
             <tr className="border-b border-border">
-              <th className="px-4 py-3">User</th>
-              <th className="px-4 py-3">Employee</th>
-              <th className="px-4 py-3">Roles</th>
-              <th className="px-4 py-3">Email Verified</th>
-              <th className="px-4 py-3">Failed Logins</th>
-              <th className="px-4 py-3">Locked Until</th>
-              <th className="px-4 py-3">Last Login</th>
-              <th className="px-4 py-3">Status</th>
-              <th className="px-4 py-3 text-right">Actions</th>
+              <th className="px-4 py-3">{t("User", "User")}</th>
+              <th className="px-4 py-3">{t("Employee", "Employee")}</th>
+              <th className="px-4 py-3">{t("iam.roles", "Roles")}</th>
+              <th className="px-4 py-3">{t("iam.emailVerified", "Email verified")}</th>
+              <th className="px-4 py-3">{t("iam.failedLogins", "Failed Logins")}</th>
+              <th className="px-4 py-3">{t("iam.lockedUntil", "Locked Until")}</th>
+              <th className="px-4 py-3">{t("iam.lastLogin", "Last Login")}</th>
+              <th className="px-4 py-3">{t("field.status")}</th>
+              <th className="px-4 py-3 text-right">{t("action.actions")}</th>
             </tr>
           </thead>
           <tbody>
@@ -526,7 +530,7 @@ export function IamManager({
                 </td>
                 <td className="px-4 py-3">
                   <Badge variant={user.emailVerified ? "success" : "muted"} className="text-[11px]">
-                    {user.emailVerified ? "Verified" : "Unverified"}
+                    {user.emailVerified ? t("status.verified") : t("iam.unverified", "Unverified")}
                   </Badge>
                 </td>
                 <td className="px-4 py-3 text-muted-foreground">{user.failedLoginAttempts}</td>
@@ -540,7 +544,7 @@ export function IamManager({
                     {canManageUsers ? (
                       <>
                         <UserDialog
-                          label={`Edit ${user.username}`}
+                          label={`${t("action.edit", "Edit")} ${user.username}`}
                           action={updateUser}
                           user={user}
                           roles={activeRoles}
@@ -549,7 +553,7 @@ export function IamManager({
                         >
                           <Button type="button" variant="outline" size="icon">
                             <EditIcon />
-                            <span className="sr-only">Edit user</span>
+                            <span className="sr-only">{t("iam.editUser", "Edit user")}</span>
                           </Button>
                         </UserDialog>
                         <form action={unlockUser}>
@@ -557,7 +561,7 @@ export function IamManager({
                           <input type="hidden" name="returnPath" value={returnPath} />
                           <Button variant="outline" size="icon" disabled={user.status === "active" && !user.lockedUntil}>
                             <KeyRoundIcon />
-                            <span className="sr-only">Unlock user</span>
+                            <span className="sr-only">{t("iam.unlockUser", "Unlock user")}</span>
                           </Button>
                         </form>
                         <form action={disableUser}>
@@ -565,12 +569,12 @@ export function IamManager({
                           <input type="hidden" name="returnPath" value={returnPath} />
                           <Button variant="danger" size="icon" disabled={user.status === "disabled"}>
                             <ShieldIcon />
-                            <span className="sr-only">Disable user</span>
+                            <span className="sr-only">{t("iam.disableUser", "Disable user")}</span>
                           </Button>
                         </form>
                       </>
                     ) : (
-                      <span className="text-xs text-muted-foreground">View only</span>
+                      <span className="text-xs text-muted-foreground">{t("iam.viewOnly", "View only")}</span>
                     )}
                   </div>
                 </td>

@@ -2,6 +2,7 @@ import { removeLocationApprover, assignLocationApprover } from "@/app/admin/sett
 import { Button } from "@/components/ui/button";
 import { DeleteConfirmationDialog } from "@/components/ui/delete-confirmation-dialog";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
+import { T } from "@/components/ui/t";
 import { TablePagination } from "@/components/ui/table-pagination";
 import { paginateRows } from "@/lib/pagination";
 import { requirePermission } from "@/server/auth/session";
@@ -47,9 +48,9 @@ export default async function LocationApproversPage({ searchParams }: LocationAp
 
         <form action={assignLocationApprover} className="grid gap-3 rounded-lg border border-border bg-card p-4 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
           <label className="grid gap-1 text-sm font-medium">
-            Location
+            <T k="field.location" fallback="Location" />
             <select name="locationId" className={inputClass} defaultValue="">
-              <option value="" disabled>Select location</option>
+              <option value="" disabled><T k="field.selectLocation" fallback="Select location" /></option>
               {data.locations.map((location) => (
                 <option key={location.id} value={location.id}>
                   {location.code} / {location.name}
@@ -58,9 +59,9 @@ export default async function LocationApproversPage({ searchParams }: LocationAp
             </select>
           </label>
           <label className="grid gap-1 text-sm font-medium">
-            Approver
+            <T k="approver.approver" fallback="Approver" />
             <select name="userId" className={inputClass} defaultValue="">
-              <option value="" disabled>Select user</option>
+              <option value="" disabled><T k="approver.selectUser" fallback="Select user" /></option>
               {data.users.map((user) => (
                 <option key={user.id} value={user.id}>
                   {user.username}{user.email ? ` / ${user.email}` : ""}
@@ -68,24 +69,24 @@ export default async function LocationApproversPage({ searchParams }: LocationAp
               ))}
             </select>
           </label>
-          <Button type="submit">Assign</Button>
+          <Button type="submit"><T k="approver.assign" fallback="Assign" /></Button>
         </form>
 
         <div className="overflow-x-auto rounded-lg border border-border bg-card">
           <table className="w-full min-w-[680px] border-collapse text-sm">
             <thead>
               <tr className="border-b border-border bg-muted/40 text-left text-xs font-semibold uppercase text-muted-foreground">
-                <th className="px-4 py-3">Location</th>
-                <th className="px-4 py-3">Approver</th>
-                <th className="px-4 py-3">Status</th>
-                <th className="w-32 px-4 py-3 text-right">Actions</th>
+                <th className="px-4 py-3"><T k="field.location" fallback="Location" /></th>
+                <th className="px-4 py-3"><T k="approver.approver" fallback="Approver" /></th>
+                <th className="px-4 py-3"><T k="field.status" /></th>
+                <th className="w-32 px-4 py-3 text-right"><T k="action.actions" /></th>
               </tr>
             </thead>
             <tbody>
               {data.approvers.length === 0 ? (
                 <tr>
                   <td colSpan={4} className="px-4 py-8 text-center text-muted-foreground">
-                    No approval-controlled locations yet.
+                    <T k="approver.emptyTitle" fallback="No approval-controlled locations yet." />
                   </td>
                 </tr>
               ) : (
@@ -99,7 +100,7 @@ export default async function LocationApproversPage({ searchParams }: LocationAp
                       <div className="font-medium">{approver.username}</div>
                       <div className="text-xs text-muted-foreground">{approver.userEmail ?? "-"}</div>
                     </td>
-                    <td className="px-4 py-3">{approver.isActive ? "Active" : "Inactive"}</td>
+                    <td className="px-4 py-3">{approver.isActive ? <T k="Active" /> : <T k="Inactive" />}</td>
                     <td className="px-4 py-3 text-right">
                       <DeleteConfirmationDialog
                         title="Remove Location Approver"

@@ -20,6 +20,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
+import { useTranslation } from "@/lib/i18n/use-translation";
 import type { PaymentAccountRow, PaymentMethodOption, PaymentMethodRow } from "@/server/payments/types";
 
 type PaymentMutation = (formData: FormData) => Promise<void>;
@@ -76,61 +77,62 @@ function MethodForm({
   record?: PaymentMethodRow;
   returnPath: string;
 }) {
+  const { t } = useTranslation();
   return (
     <form action={action} className="flex flex-col gap-4">
       <DialogHeader>
         <DialogTitle>{title}</DialogTitle>
-        <DialogDescription>Define how payments can be received or paid out.</DialogDescription>
+        <DialogDescription>{t("payment.methodModalDesc", "Define how payments can be received or paid out.")}</DialogDescription>
       </DialogHeader>
 
       <input type="hidden" name="returnPath" value={returnPath} />
       {record ? <input type="hidden" name="id" value={record.id} /> : null}
 
       <label className="flex flex-col gap-1 text-sm font-medium">
-        Name
+        {t("field.name", "Name")}
         <input name="name" required defaultValue={record?.name} className={inputClass} />
       </label>
       {record ? <input type="hidden" name="code" value={record.code} /> : null}
 
       <label className="flex flex-col gap-1 text-sm font-medium">
-        Type
+        {t("field.type", "Type")}
         <select name="methodType" required defaultValue={record?.methodType ?? "cash"} className={inputClass}>
-          <option value="cash">Cash</option>
-          <option value="bank_transfer">Bank transfer</option>
-          <option value="mobile_money">Mobile money</option>
-          <option value="card">Card</option>
+          <option value="cash">{t("status.cash")}</option>
+          <option value="bank_transfer">{t("status.bank_transfer")}</option>
+          <option value="mobile_money">{t("status.mobile_money")}</option>
+          <option value="card">{t("status.card")}</option>
         </select>
       </label>
 
       <div className="grid gap-3 rounded-md border border-border p-3">
         <label className="flex items-center gap-2 text-sm font-medium">
           <input type="checkbox" name="allowInbound" defaultChecked={record?.allowInbound ?? true} className="size-4 rounded border-input" />
-          Allow inbound customer payments
+          {t("payment.allowInbound", "Allow inbound customer payments")}
         </label>
         <label className="flex items-center gap-2 text-sm font-medium">
           <input type="checkbox" name="allowOutbound" defaultChecked={record?.allowOutbound ?? false} className="size-4 rounded border-input" />
-          Allow outbound supplier/expense payments
+          {t("payment.allowOutbound", "Allow outbound supplier/expense payments")}
         </label>
         <label className="flex items-center gap-2 text-sm font-medium">
           <input type="checkbox" name="requiresReference" defaultChecked={record?.requiresReference ?? false} className="size-4 rounded border-input" />
-          Require payment reference
+          {t("payment.requireReference", "Require payment reference")}
         </label>
         <label className="flex items-center gap-2 text-sm font-medium">
           <input type="checkbox" name="isActive" defaultChecked={record?.isActive ?? true} className="size-4 rounded border-input" />
-          Active
+          {t("field.active", "Active")}
         </label>
       </div>
 
       <label className="flex flex-col gap-1 text-sm font-medium">
-        Notes
+        {t("field.notes", "Notes")}
         <textarea name="notes" defaultValue={record?.notes ?? ""} className={textareaClass} />
       </label>
 
       <DialogFooter>
         <DialogClose asChild>
-          <Button type="button" variant="outline">Cancel</Button>
+          <Button type="button" variant="outline">{t("action.cancel")}</Button>
         </DialogClose>
-        <Button>{record ? "Save changes" : "Create"}</Button>
+        <Button>{record ? t("Save changes") : t("action.create")}</Button>
       </DialogFooter>
     </form>
   );
@@ -149,20 +151,23 @@ function AccountForm({
   methods: PaymentMethodOption[];
   returnPath: string;
 }) {
+  const { t } = useTranslation();
   return (
     <form action={action} className="flex flex-col gap-4">
       <DialogHeader>
         <DialogTitle>{title}</DialogTitle>
-        <DialogDescription>Define the cash drawer, bank, wallet, or card account used for payment posting.</DialogDescription>
+        <DialogDescription>
+          {t("payment.accountModalDesc", "Define the cash drawer, bank, wallet, or card account used for payment posting.")}
+        </DialogDescription>
       </DialogHeader>
 
       <input type="hidden" name="returnPath" value={returnPath} />
       {record ? <input type="hidden" name="id" value={record.id} /> : null}
 
       <label className="flex flex-col gap-1 text-sm font-medium">
-        Payment method
+        {t("payment.paymentMethod", "Payment method")}
         <select name="paymentMethodId" required defaultValue={record?.paymentMethodId ?? ""} className={inputClass}>
-          <option value="">Select method</option>
+          <option value="">{t("payment.selectMethod", "Select method")}</option>
           {methods.map((method) => (
             <option key={method.id} value={method.id}>
               {method.code} / {method.name}
@@ -172,24 +177,24 @@ function AccountForm({
       </label>
 
       <label className="flex flex-col gap-1 text-sm font-medium">
-        Name
+        {t("field.name", "Name")}
         <input name="name" required defaultValue={record?.name} className={inputClass} />
       </label>
       {record ? <input type="hidden" name="code" value={record.code} /> : null}
 
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="flex flex-col gap-1 text-sm font-medium">
-          Institution
+          {t("payment.institution", "Institution")}
           <input name="institutionName" defaultValue={record?.institutionName ?? ""} className={inputClass} />
         </label>
         <label className="flex flex-col gap-1 text-sm font-medium">
-          Account number
+          {t("payment.accountNumber", "Account number")}
           <input name="accountNumber" defaultValue={record?.accountNumber ?? ""} className={inputClass} />
         </label>
       </div>
 
       <label className="flex flex-col gap-1 text-sm font-medium">
-        Opening balance
+        {t("payment.openingBalance", "Opening balance")}
         <input
           name="openingBalance"
           type="number"
@@ -207,13 +212,13 @@ function AccountForm({
             defaultChecked={record?.verifyEtEnabled ?? false}
             className="size-4 rounded border-input"
           />
-          Verify references with Verify.ET
+          {t("payment.verifyEtCheckbox", "Verify references with Verify.ET")}
         </label>
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="flex flex-col gap-1 text-sm font-medium">
-            Verify.ET bank
+            {t("payment.verifyEtBank", "Verify.ET bank")}
             <select name="verifyEtBank" defaultValue={record?.verifyEtBank ?? ""} className={inputClass}>
-              <option value="">No bank selected</option>
+              <option value="">{t("payment.noBankSelected", "No bank selected")}</option>
               <option value="cbe">CBE</option>
               <option value="boa">Bank of Abyssinia</option>
               <option value="telebirr">Telebirr</option>
@@ -226,11 +231,11 @@ function AccountForm({
             </select>
           </label>
           <label className="flex flex-col gap-1 text-sm font-medium">
-            Settlement account
+            {t("payment.settlementAccount", "Settlement account")}
             <input
               name="verifyEtSettlementAccount"
               defaultValue={record?.verifyEtSettlementAccount ?? ""}
-              placeholder="Receiver account or wallet phone"
+              placeholder={t("payment.settlementAccountPlaceholder", "Receiver account or wallet phone")}
               className={inputClass}
             />
           </label>
@@ -239,19 +244,19 @@ function AccountForm({
 
       <label className="flex items-center gap-2 text-sm font-medium">
         <input type="checkbox" name="isActive" defaultChecked={record?.isActive ?? true} className="size-4 rounded border-input" />
-        Active
+        {t("field.active", "Active")}
       </label>
 
       <label className="flex flex-col gap-1 text-sm font-medium">
-        Notes
+        {t("field.notes", "Notes")}
         <textarea name="notes" defaultValue={record?.notes ?? ""} className={textareaClass} />
       </label>
 
       <DialogFooter>
         <DialogClose asChild>
-          <Button type="button" variant="outline">Cancel</Button>
+          <Button type="button" variant="outline">{t("action.cancel")}</Button>
         </DialogClose>
-        <Button>{record ? "Save changes" : "Create"}</Button>
+        <Button>{record ? t("Save changes") : t("action.create")}</Button>
       </DialogFooter>
     </form>
   );
@@ -324,6 +329,7 @@ export function PaymentConfigManager({
   deleteAccountAction,
   restoreAccountAction,
 }: PaymentConfigManagerProps) {
+  const { t } = useTranslation();
   const methodTab = tab === "methods";
 
   return (
@@ -333,17 +339,17 @@ export function PaymentConfigManager({
         title="Payment Configuration"
         actions={
           methodTab ? (
-            <MethodDialog label="New payment method" action={createMethodAction} returnPath={returnPath}>
+            <MethodDialog label={t("payment.newMethod", "New payment method")} action={createMethodAction} returnPath={returnPath}>
               <Button>
                 <PlusIcon data-icon="inline-start" />
-                New method
+                {t("payment.newMethodShort", "New method")}
               </Button>
             </MethodDialog>
           ) : (
-            <AccountDialog label="New payment account" action={createAccountAction} methods={methodOptions} returnPath={returnPath}>
+            <AccountDialog label={t("payment.newAccount", "New payment account")} action={createAccountAction} methods={methodOptions} returnPath={returnPath}>
               <Button>
                 <PlusIcon data-icon="inline-start" />
-                New account
+                {t("payment.newAccountShort", "New account")}
               </Button>
             </AccountDialog>
           )
@@ -357,15 +363,19 @@ export function PaymentConfigManager({
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border p-4">
           <div className="flex rounded-lg border border-border bg-muted/60 p-1 text-sm">
             <Button asChild variant={methodTab ? "secondary" : "ghost"} size="sm" className="h-7 text-xs">
-              <Link href="/admin/settings/payments">Methods</Link>
+              <Link href="/admin/settings/payments">{t("payment.methods", "Methods")}</Link>
             </Button>
             <Button asChild variant={!methodTab ? "secondary" : "ghost"} size="sm" className="h-7 text-xs">
-              <Link href="/admin/settings/payments?tab=accounts">Accounts</Link>
+              <Link href="/admin/settings/payments?tab=accounts">{t("payment.accounts", "Accounts")}</Link>
             </Button>
           </div>
           <TableSearchInput
             defaultValue={query}
-            placeholder={methodTab ? "Search method code, name, or notes..." : "Search account code, name, institution, or number..."}
+            placeholder={
+              methodTab
+                ? t("payment.searchMethods", "Search method code, name, or notes...")
+                : t("payment.searchAccounts", "Search account code, name, institution, or number...")
+            }
             className="sm:max-w-xl"
           />
         </div>
@@ -410,18 +420,19 @@ function MethodTable({
   deleteAction: PaymentMutation;
   restoreAction: PaymentMutation;
 }) {
+  const { t } = useTranslation();
   return (
     <div className="overflow-x-auto">
       <table className="w-full min-w-[980px] text-left text-sm">
         <thead className="border-b border-border bg-muted/50 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
           <tr>
-            <th className="px-4 py-3">Method</th>
-            <th className="px-4 py-3">Type</th>
-            <th className="px-4 py-3">Direction</th>
-            <th className="px-4 py-3">Reference</th>
-            <th className="px-4 py-3">Verification</th>
-            <th className="px-4 py-3">Status</th>
-            <th className="px-4 py-3 text-right">Actions</th>
+            <th className="px-4 py-3">{t("payment.methodCol", "Method")}</th>
+            <th className="px-4 py-3">{t("field.type", "Type")}</th>
+            <th className="px-4 py-3">{t("payment.direction", "Direction")}</th>
+            <th className="px-4 py-3">{t("Reference", "Reference")}</th>
+            <th className="px-4 py-3">{t("payment.verification", "Verification")}</th>
+            <th className="px-4 py-3">{t("field.status")}</th>
+            <th className="px-4 py-3 text-right">{t("action.actions")}</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-border">
@@ -432,11 +443,11 @@ function MethodTable({
             >
               <td className="px-4 py-3">
                 <div className="font-medium text-foreground">{record.code} / {record.name}</div>
-                <div className="text-xs text-muted-foreground">{record.notes || "No notes"}</div>
+                <div className="text-xs text-muted-foreground">{record.notes || t("payment.noNotes", "No notes")}</div>
               </td>
-              <td className="px-4 py-3 capitalize text-foreground">{methodTypeLabel(record.methodType)}</td>
-              <td className="px-4 py-3 text-foreground">{directions(record)}</td>
-              <td className="px-4 py-3 text-foreground">{record.requiresReference ? "Required" : "Optional"}</td>
+              <td className="px-4 py-3 capitalize text-foreground">{t(`status.${record.methodType}`, methodTypeLabel(record.methodType))}</td>
+              <td className="px-4 py-3 text-foreground">{t(directions(record), directions(record))}</td>
+              <td className="px-4 py-3 text-foreground">{record.requiresReference ? t("payment.required", "Required") : t("payment.optional", "Optional")}</td>
               <td className="px-4 py-3">
                 <StatusBadge status={record.isActive ? "active" : "inactive"} />
               </td>
@@ -444,10 +455,10 @@ function MethodTable({
                 <div className="flex justify-end gap-2">
                   {!showDeleted ? (
                     <>
-                      <MethodDialog label={`Edit ${record.name}`} action={updateAction} record={record} returnPath={returnPath}>
+                      <MethodDialog label={`${t("action.edit", "Edit")} ${record.name}`} action={updateAction} record={record} returnPath={returnPath}>
                         <Button variant="outline" size="sm" className="h-7 text-xs">
                           <EditIcon className="size-3.5" data-icon="inline-start" />
-                          Edit
+                          {t("action.edit", "Edit")}
                         </Button>
                       </MethodDialog>
                       <DeleteConfirmationDialog
@@ -462,7 +473,7 @@ function MethodTable({
                       <input type="hidden" name="returnPath" value={returnPath} />
                       <Button variant="outline" size="sm" className="h-7 text-xs">
                         <RotateCcwIcon className="size-3.5" data-icon="inline-start" />
-                        Restore
+                        {t("action.restore", "Restore")}
                       </Button>
                     </form>
                   )}
@@ -472,7 +483,7 @@ function MethodTable({
           ))}
           {records.length === 0 ? (
             <tr>
-              <td colSpan={6} className="px-4 py-12 text-center text-muted-foreground">No payment methods found.</td>
+              <td colSpan={6} className="px-4 py-12 text-center text-muted-foreground">{t("payment.noMethodsFound", "No payment methods found.")}</td>
             </tr>
           ) : null}
         </tbody>
@@ -498,17 +509,18 @@ function AccountTable({
   deleteAction: PaymentMutation;
   restoreAction: PaymentMutation;
 }) {
+  const { t } = useTranslation();
   return (
     <div className="overflow-x-auto">
       <table className="w-full min-w-[1040px] text-left text-sm">
         <thead className="border-b border-border bg-muted/50 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
           <tr>
-            <th className="px-4 py-3">Account</th>
-            <th className="px-4 py-3">Method</th>
-            <th className="px-4 py-3">Institution</th>
-            <th className="px-4 py-3 text-right">Opening</th>
-            <th className="px-4 py-3">Status</th>
-            <th className="px-4 py-3 text-right">Actions</th>
+            <th className="px-4 py-3">{t("field.account", "Account")}</th>
+            <th className="px-4 py-3">{t("payment.methodCol", "Method")}</th>
+            <th className="px-4 py-3">{t("payment.institution", "Institution")}</th>
+            <th className="px-4 py-3 text-right">{t("payment.opening", "Opening")}</th>
+            <th className="px-4 py-3">{t("field.status")}</th>
+            <th className="px-4 py-3 text-right">{t("action.actions")}</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-border">
@@ -519,11 +531,11 @@ function AccountTable({
             >
               <td className="px-4 py-3">
                 <div className="font-medium text-foreground">{record.code} / {record.name}</div>
-                <div className="text-xs text-muted-foreground">{record.notes || "No notes"}</div>
+                <div className="text-xs text-muted-foreground">{record.notes || t("payment.noNotes", "No notes")}</div>
               </td>
               <td className="px-4 py-3">
                 <div className="font-medium text-foreground">{record.paymentMethodName}</div>
-                <div className="text-xs capitalize text-muted-foreground">{methodTypeLabel(record.paymentMethodType)}</div>
+                <div className="text-xs capitalize text-muted-foreground">{t(`status.${record.paymentMethodType}`, methodTypeLabel(record.paymentMethodType))}</div>
               </td>
               <td className="px-4 py-3 text-foreground">
                 <div>{record.institutionName ?? "-"}</div>
@@ -534,10 +546,10 @@ function AccountTable({
                 {record.verifyEtEnabled ? (
                   <div>
                     <div className="font-medium">Verify.ET</div>
-                    <div className="text-xs text-muted-foreground">{record.verifyEtBank ?? "No bank"} / {record.verifyEtSettlementAccount ?? "No settlement"}</div>
+                    <div className="text-xs text-muted-foreground">{record.verifyEtBank ?? t("payment.noBank", "No bank")} / {record.verifyEtSettlementAccount ?? t("payment.noSettlement", "No settlement")}</div>
                   </div>
                 ) : (
-                  <span className="text-muted-foreground">Not required</span>
+                  <span className="text-muted-foreground">{t("payment.notRequired", "Not required")}</span>
                 )}
               </td>
               <td className="px-4 py-3">
@@ -547,10 +559,10 @@ function AccountTable({
                 <div className="flex justify-end gap-2">
                   {!showDeleted ? (
                     <>
-                      <AccountDialog label={`Edit ${record.name}`} action={updateAction} record={record} methods={methods} returnPath={returnPath}>
+                      <AccountDialog label={`${t("action.edit", "Edit")} ${record.name}`} action={updateAction} record={record} methods={methods} returnPath={returnPath}>
                         <Button variant="outline" size="sm" className="h-7 text-xs">
                           <EditIcon className="size-3.5" data-icon="inline-start" />
-                          Edit
+                          {t("action.edit", "Edit")}
                         </Button>
                       </AccountDialog>
                       <DeleteConfirmationDialog
@@ -565,7 +577,7 @@ function AccountTable({
                       <input type="hidden" name="returnPath" value={returnPath} />
                       <Button variant="outline" size="sm" className="h-7 text-xs">
                         <RotateCcwIcon className="size-3.5" data-icon="inline-start" />
-                        Restore
+                        {t("action.restore", "Restore")}
                       </Button>
                     </form>
                   )}
@@ -575,7 +587,7 @@ function AccountTable({
           ))}
           {records.length === 0 ? (
             <tr>
-              <td colSpan={7} className="px-4 py-10 text-center text-muted-foreground">No payment accounts found.</td>
+              <td colSpan={7} className="px-4 py-10 text-center text-muted-foreground">{t("payment.noAccountsFound", "No payment accounts found.")}</td>
             </tr>
           ) : null}
         </tbody>

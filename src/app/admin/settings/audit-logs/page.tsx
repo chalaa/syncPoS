@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
 import { TableSearchInput } from "@/components/ui/table-search-input";
 import { TablePagination } from "@/components/ui/table-pagination";
+import { T } from "@/components/ui/t";
 import { requirePermission } from "@/server/auth/session";
 import { getAuditLogList } from "@/server/audit/audit-logs";
 
@@ -55,11 +56,11 @@ export default async function AuditLogsPage({ searchParams }: AuditLogsPageProps
       <section className="mb-5 rounded-lg border border-border bg-card p-4">
         <div className="grid gap-3 lg:grid-cols-[1.4fr_1fr_1fr] lg:items-end">
           <div className="grid gap-1 text-sm font-medium">
-            Search
+            <T k="Search" fallback="Search" />
             <TableSearchInput defaultValue={params.q ?? ""} placeholder="Action, entity, actor, metadata..." />
           </div>
           <Button asChild variant="outline" className="w-fit">
-            <Link href="/admin/settings/audit-logs">Clear Filters</Link>
+            <Link href="/admin/settings/audit-logs"><T k="Clear Filters" /></Link>
           </Button>
         </div>
       </section>
@@ -68,14 +69,14 @@ export default async function AuditLogsPage({ searchParams }: AuditLogsPageProps
         <table className="w-full min-w-[1280px] text-left text-sm">
           <thead className="bg-muted/40 text-xs uppercase text-muted-foreground">
             <tr>
-              <th className="px-4 py-3">Time</th>
-              <th className="px-4 py-3">Action</th>
-              <th className="px-4 py-3">Severity</th>
-              <th className="px-4 py-3">Entity</th>
-              <th className="px-4 py-3">Actor</th>
-              <th className="px-4 py-3">Location</th>
-              <th className="px-4 py-3">IP</th>
-              <th className="px-4 py-3 text-right">Details</th>
+              <th className="px-4 py-3"><T k="audit.time" fallback="Time" /></th>
+              <th className="px-4 py-3"><T k="field.action" fallback="Action" /></th>
+              <th className="px-4 py-3"><T k="audit.severity" fallback="Severity" /></th>
+              <th className="px-4 py-3"><T k="audit.entity" fallback="Entity" /></th>
+              <th className="px-4 py-3"><T k="audit.actor" fallback="Actor" /></th>
+              <th className="px-4 py-3"><T k="field.location" fallback="Location" /></th>
+              <th className="px-4 py-3"><T k="audit.ip" fallback="IP" /></th>
+              <th className="px-4 py-3 text-right"><T k="audit.details" fallback="Details" /></th>
             </tr>
           </thead>
           <tbody>
@@ -85,26 +86,26 @@ export default async function AuditLogsPage({ searchParams }: AuditLogsPageProps
                 <td className="px-4 py-3 font-medium">{row.action}</td>
                 <td className="px-4 py-3">
                   <span className={`rounded-md border px-2 py-1 text-xs font-medium capitalize ${severityClass(row.severity)}`}>
-                    {row.severity}
+                    <T k={`status.${row.severity}`} fallback={row.severity} />
                   </span>
                 </td>
                 <td className="px-4 py-3">
                   <div>{row.entityType}</div>
                   <div className="max-w-48 truncate text-xs text-muted-foreground">{row.entityId ?? "-"}</div>
                 </td>
-                <td className="px-4 py-3">{row.actorUsername ?? "System"}</td>
+                <td className="px-4 py-3">{row.actorUsername ?? <T k="audit.system" fallback="System" />}</td>
                 <td className="px-4 py-3">{row.locationCode ?? "-"}</td>
                 <td className="px-4 py-3">{row.ipAddress ?? "-"}</td>
                 <td className="px-4 py-3 text-right">
                   <Button asChild variant="outline" size="sm">
-                    <Link href={`/admin/settings/audit-logs/${row.id}`}>View</Link>
+                    <Link href={`/admin/settings/audit-logs/${row.id}`}><T k="action.view" fallback="View" /></Link>
                   </Button>
                 </td>
               </tr>
             ))}
             {result.rows.length === 0 ? (
               <tr>
-                <td colSpan={8} className="px-4 py-10 text-center text-muted-foreground">No audit logs found.</td>
+                <td colSpan={8} className="px-4 py-10 text-center text-muted-foreground"><T k="audit.emptyTitle" fallback="No audit logs found." /></td>
               </tr>
             ) : null}
           </tbody>

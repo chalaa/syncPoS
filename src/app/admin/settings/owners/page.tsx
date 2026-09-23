@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { DeleteConfirmationDialog } from "@/components/ui/delete-confirmation-dialog";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
 import { TablePagination } from "@/components/ui/table-pagination";
+import { T } from "@/components/ui/t";
 import { paginateRows } from "@/lib/pagination";
 import { requirePermission } from "@/server/auth/session";
 import { getDefaultCompany } from "@/server/catalog/products";
@@ -78,7 +79,7 @@ export default async function OwnersPage({ searchParams }: OwnersPageProps) {
             <input type="hidden" name="returnPath" value={returnPath} />
             <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
               <label className="flex flex-1 flex-col gap-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                New Owner Name
+                <T k="owner.newOwnerName" fallback="New Owner Name" />
                 <input
                   name="name"
                   required
@@ -88,7 +89,7 @@ export default async function OwnersPage({ searchParams }: OwnersPageProps) {
               </label>
               <Button type="submit" size="sm">
                 <Plus className="size-4" data-icon="inline-start" />
-                Add Owner
+                <T k="owner.addOwner" fallback="Add Owner" />
               </Button>
             </div>
 
@@ -96,7 +97,7 @@ export default async function OwnersPage({ searchParams }: OwnersPageProps) {
               <div className="flex flex-col gap-1.5 pt-2 border-t border-border/60">
                 <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
                   <Store className="size-3.5 text-primary" />
-                  Assign Connected Shops / Locations:
+                  <T k="owner.assignShops" fallback="Assign Connected Shops / Locations:" />
                 </span>
                 <div className="flex flex-wrap gap-2 pt-1">
                   {allLocations.map((loc) => (
@@ -136,15 +137,15 @@ export default async function OwnersPage({ searchParams }: OwnersPageProps) {
             <table className="w-full min-w-[640px] border-collapse text-left text-sm">
               <thead>
                 <tr className="border-b border-border bg-muted/50 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  <th className="px-4 py-3">Owner Details & Shop Assignments</th>
-                  <th className="w-48 px-4 py-3 text-right">Actions</th>
+                  <th className="px-4 py-3"><T k="owner.detailsAndShops" fallback="Owner Details & Shop Assignments" /></th>
+                  <th className="w-48 px-4 py-3 text-right"><T k="action.actions" /></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
                 {records.length === 0 ? (
                   <tr>
                     <td colSpan={2} className="px-4 py-12 text-center text-muted-foreground">
-                      No owners found.
+                      <T k="owner.emptyTitle" fallback="No owners found." />
                     </td>
                   </tr>
                 ) : (
@@ -179,7 +180,7 @@ export default async function OwnersPage({ searchParams }: OwnersPageProps) {
                               />
                               <Button type="submit" variant="secondary" size="sm" className="h-9 shrink-0">
                                 <Check className="size-3.5" data-icon="inline-start" />
-                                Save
+                                <T k="action.save" />
                               </Button>
                             </div>
 
@@ -187,7 +188,7 @@ export default async function OwnersPage({ searchParams }: OwnersPageProps) {
                             {allLocations.length > 0 && (
                               <div className="flex flex-wrap items-center gap-2 pt-0.5">
                                 <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
-                                  Linked Shops:
+                                  <T k="owner.linkedShops" fallback="Linked Shops:" />
                                 </span>
                                 {allLocations.map((loc) => {
                                   const isChecked = owner.locationIds.includes(loc.id);
@@ -223,7 +224,7 @@ export default async function OwnersPage({ searchParams }: OwnersPageProps) {
                             <input type="hidden" name="returnPath" value={returnPath} />
                             <Button type="submit" variant="outline" size="sm" className="h-8 text-xs">
                               <RotateCcw className="size-3.5" data-icon="inline-start" />
-                              Restore
+                              <T k="action.restore" />
                             </Button>
                           </form>
                         ) : (

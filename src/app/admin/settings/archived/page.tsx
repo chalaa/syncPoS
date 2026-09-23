@@ -19,6 +19,7 @@ import { Button } from "@/components/ui/button";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
 import { TableSearchInput } from "@/components/ui/table-search-input";
 import { TablePagination } from "@/components/ui/table-pagination";
+import { T } from "@/components/ui/t";
 import { paginateRows } from "@/lib/pagination";
 import {
   getArchivedSummary,
@@ -118,7 +119,7 @@ export default async function ArchivedPage({ searchParams }: ArchivedPageProps) 
                       : "text-muted-foreground hover:bg-muted hover:text-foreground"
                   }`}
                 >
-                  <span>{tab.label}</span>
+                  <span><T k={tab.label} /></span>
                   <span
                     className={`rounded-full px-1.5 py-0.25 text-[10px] font-bold ${
                       isActive
@@ -149,11 +150,11 @@ export default async function ArchivedPage({ searchParams }: ArchivedPageProps) 
             <table className="w-full min-w-[768px] border-collapse text-left text-sm">
               <thead>
                 <tr className="border-b border-border bg-muted/50 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  <th className="px-4 py-3">Type</th>
-                  <th className="px-4 py-3">Item / Reference</th>
-                  <th className="px-4 py-3">Amount / Context</th>
-                  <th className="px-4 py-3">Archived On</th>
-                  <th className="px-4 py-3 text-right">Action</th>
+                  <th className="px-4 py-3"><T k="field.type" fallback="Type" /></th>
+                  <th className="px-4 py-3"><T k="archived.itemReference" fallback="Item / Reference" /></th>
+                  <th className="px-4 py-3"><T k="archived.amountContext" fallback="Amount / Context" /></th>
+                  <th className="px-4 py-3"><T k="archived.archivedOn" fallback="Archived On" /></th>
+                  <th className="px-4 py-3 text-right"><T k="field.action" fallback="Action" /></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
@@ -162,11 +163,16 @@ export default async function ArchivedPage({ searchParams }: ArchivedPageProps) 
                     <td colSpan={5} className="px-4 py-16 text-center">
                       <div className="mx-auto flex max-w-xs flex-col items-center justify-center text-center">
                         <Archive className="size-10 text-muted-foreground/40 mb-2" />
-                        <p className="font-semibold text-foreground">No archived items found</p>
+                        <p className="font-semibold text-foreground"><T k="archived.emptyTitle" fallback="No archived items found" /></p>
                         <p className="text-xs text-muted-foreground mt-1">
-                          {query
-                            ? `No records match "${query}". Try clearing your search.`
-                            : "There are currently no soft-deleted records in this category."}
+                          {query ? (
+                            <>
+                              <T k="archived.noMatchPrefix" fallback="No records match" /> &quot;{query}&quot;.{" "}
+                              <T k="archived.clearSearchSuffix" fallback="Try clearing your search." />
+                            </>
+                          ) : (
+                            <T k="archived.emptyCategoryHint" fallback="There are currently no soft-deleted records in this category." />
+                          )}
                         </p>
                       </div>
                     </td>
@@ -226,7 +232,7 @@ export default async function ArchivedPage({ searchParams }: ArchivedPageProps) 
                             <input type="hidden" name="returnPath" value={returnPath} />
                             <Button type="submit" variant="outline" size="sm" className="h-8 text-xs gap-1">
                               <RotateCcw className="size-3.5" data-icon="inline-start" />
-                              Restore
+                              <T k="action.restore" />
                             </Button>
                           </form>
                         </td>

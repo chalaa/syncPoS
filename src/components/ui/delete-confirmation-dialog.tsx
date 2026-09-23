@@ -44,10 +44,10 @@ export function DeleteConfirmationDialog({
 }: DeleteConfirmationDialogProps) {
   const { t } = useTranslation();
 
-  const dialogTitle = title ?? t("action.confirmDeletion", "Confirm Deletion");
-  const buttonTriggerLabel = triggerLabel ?? t("action.delete", "Delete");
+  const dialogTitle = title ? t(title, title) : t("action.confirmDeletion", "Confirm Deletion");
+  const buttonTriggerLabel = triggerLabel ? t(triggerLabel, triggerLabel) : t("action.delete", "Delete");
   const displayDescription =
-    description ??
+    (description ? t(description, description) : undefined) ??
     (itemName
       ? `${t("confirm.deleteItemPrefix", "Are you sure you want to delete")} "${itemName}"? ${t("confirm.deleteItemSuffix", "It will be moved to the Settings Archive.")}`
       : t(
