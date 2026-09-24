@@ -8,6 +8,7 @@ import { Alert } from "@/components/ui/alert";
 import { Badge, StatusBadge } from "@/components/ui/badge";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
+import { T } from "@/components/ui/t";
 import { cn } from "@/lib/utils";
 import { paginateRows, type PaginationMeta } from "@/lib/pagination";
 import { requirePermission, getUserPermissionCodes } from "@/server/auth/session";
@@ -98,7 +99,7 @@ export default async function PurchasingPage({ searchParams }: PurchasingPagePro
         notice={params.notice}
         error={params.error}
         pagination={page.pagination}
-        actions={<ButtonLink href="/admin/purchasing/landed-costs/new">New Landed Cost</ButtonLink>}
+        actions={<ButtonLink href="/admin/purchasing/landed-costs/new"><T k="purchasing.newLandedCost" fallback="New Landed Cost" /></ButtonLink>}
       >
         <LandedCostList landedCosts={page.rows} />
       </PurchasingLayout>
@@ -132,7 +133,7 @@ export default async function PurchasingPage({ searchParams }: PurchasingPagePro
         notice={params.notice}
         error={params.error}
         pagination={page.pagination}
-        actions={canCreateOrders ? <ButtonLink href="/admin/purchasing/returns/new">New Supplier Return</ButtonLink> : null}
+        actions={canCreateOrders ? <ButtonLink href="/admin/purchasing/returns/new"><T k="purchasing.newSupplierReturn" fallback="New Supplier Return" /></ButtonLink> : null}
       >
         <SupplierReturnList returns={page.rows} />
       </PurchasingLayout>
@@ -226,14 +227,14 @@ function SupplierReturnList({ returns }: { returns: SupplierReturnListRow[] }) {
         <table className="w-full min-w-[900px] text-left text-sm">
           <thead>
             <tr className="border-b border-border bg-muted/40 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-              <th className="px-4 py-3">Return No</th>
-              <th className="px-4 py-3">Receipt Ref</th>
-              <th className="px-4 py-3">Supplier</th>
-              <th className="px-4 py-3">Status</th>
-              <th className="px-4 py-3">Date</th>
-              <th className="px-4 py-3 text-right">Lines</th>
-              <th className="px-4 py-3 text-right">Vendor Refund</th>
-              <th className="px-4 py-3 text-right">Actions</th>
+              <th className="px-4 py-3"><T k="purchasing.returnNo" fallback="Return No" /></th>
+              <th className="px-4 py-3"><T k="purchasing.receiptRef" fallback="Receipt Ref" /></th>
+              <th className="px-4 py-3"><T k="Supplier" /></th>
+              <th className="px-4 py-3"><T k="field.status" /></th>
+              <th className="px-4 py-3"><T k="field.date" fallback="Date" /></th>
+              <th className="px-4 py-3 text-right"><T k="purchasing.lines" fallback="Lines" /></th>
+              <th className="px-4 py-3 text-right"><T k="purchasing.vendorRefund" fallback="Vendor Refund" /></th>
+              <th className="px-4 py-3 text-right"><T k="action.actions" /></th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border/60">
@@ -255,14 +256,14 @@ function SupplierReturnList({ returns }: { returns: SupplierReturnListRow[] }) {
                   {displayReturnMoney(record.refundAmountMinor, record.currencyCode)}
                 </td>
                 <td className="px-4 py-3.5 text-right">
-                  <ButtonLink href={`/admin/purchasing/returns/${record.id}`} size="sm" variant="outline" className="h-8 px-2.5 text-xs">Details</ButtonLink>
+                  <ButtonLink href={`/admin/purchasing/returns/${record.id}`} size="sm" variant="outline" className="h-8 px-2.5 text-xs"><T k="action.details" fallback="Details" /></ButtonLink>
                 </td>
               </tr>
             ))}
             {returns.length === 0 ? (
               <tr>
                 <td colSpan={8} className="px-4 py-12 text-center text-sm text-muted-foreground">
-                  No supplier returns recorded yet.
+                  <T k="purchasing.noReturnsYet" fallback="No supplier returns recorded yet." />
                 </td>
               </tr>
             ) : null}
@@ -280,23 +281,23 @@ function LandedCostList({ landedCosts }: { landedCosts: PurchaseLandedCostListRo
         <table className="w-full min-w-[1040px] text-left text-sm">
           <thead>
             <tr className="border-b border-border bg-muted/40 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-              <th className="px-4 py-3">Cost No</th>
-              <th className="px-4 py-3">Cost Type</th>
-              <th className="px-4 py-3">Status</th>
-              <th className="px-4 py-3">Purchase Order</th>
-              <th className="px-4 py-3">Receipt</th>
-              <th className="px-4 py-3">Vendor</th>
-              <th className="px-4 py-3">Allocation</th>
-              <th className="px-4 py-3 text-right">Lines</th>
-              <th className="px-4 py-3 text-right">Amount</th>
-              <th className="px-4 py-3 text-right">Actions</th>
+              <th className="px-4 py-3"><T k="purchasing.costNo" fallback="Cost No" /></th>
+              <th className="px-4 py-3"><T k="purchasing.costType" fallback="Cost Type" /></th>
+              <th className="px-4 py-3"><T k="field.status" /></th>
+              <th className="px-4 py-3"><T k="Purchase Order" /></th>
+              <th className="px-4 py-3"><T k="purchasing.receipt" fallback="Receipt" /></th>
+              <th className="px-4 py-3"><T k="purchasing.vendor" fallback="Vendor" /></th>
+              <th className="px-4 py-3"><T k="purchasing.allocation" fallback="Allocation" /></th>
+              <th className="px-4 py-3 text-right"><T k="purchasing.lines" fallback="Lines" /></th>
+              <th className="px-4 py-3 text-right"><T k="field.amount" fallback="Amount" /></th>
+              <th className="px-4 py-3 text-right"><T k="action.actions" /></th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border/60">
             {landedCosts.map((cost) => (
               <tr key={cost.id} className="group transition-colors hover:bg-muted/30">
                 <td className="px-4 py-3.5 font-mono text-xs font-bold text-foreground">{cost.costNo}</td>
-                <td className="px-4 py-3.5 text-xs font-medium uppercase tracking-wider text-muted-foreground">{cost.costType}</td>
+                <td className="px-4 py-3.5 text-xs font-medium uppercase tracking-wider text-muted-foreground"><T k={`status.${cost.costType}`} fallback={cost.costType} /></td>
                 <td className="px-4 py-3.5">
                   <StatusBadge status={cost.status} />
                 </td>
@@ -311,14 +312,14 @@ function LandedCostList({ landedCosts }: { landedCosts: PurchaseLandedCostListRo
                 </td>
                 <td className="px-4 py-3.5 text-xs font-mono text-muted-foreground">{cost.receiptNo ?? "-"}</td>
                 <td className="px-4 py-3.5 font-medium text-foreground">{cost.vendorName ?? "-"}</td>
-                <td className="px-4 py-3.5 text-xs text-muted-foreground capitalize">{cost.allocationMethod}</td>
+                <td className="px-4 py-3.5 text-xs text-muted-foreground capitalize"><T k={`status.${cost.allocationMethod}`} fallback={cost.allocationMethod} /></td>
                 <td className="px-4 py-3.5 text-right font-mono text-xs">{cost.allocationCount}</td>
                 <td className="px-4 py-3.5 text-right font-mono text-xs font-bold text-foreground">
                   {displayPurchaseMoney(cost.amountMinor, cost.currencyCode)}
                 </td>
                 <td className="px-4 py-3.5 text-right">
                   <ButtonLink href={`/admin/purchasing/landed-costs/${cost.id}`} size="sm" variant="outline" className="h-8 px-2.5 text-xs">
-                    Details
+                    <T k="action.details" fallback="Details" />
                   </ButtonLink>
                 </td>
               </tr>
@@ -326,7 +327,7 @@ function LandedCostList({ landedCosts }: { landedCosts: PurchaseLandedCostListRo
             {landedCosts.length === 0 ? (
               <tr>
                 <td colSpan={10} className="px-4 py-12 text-center text-sm text-muted-foreground">
-                  No landed costs recorded yet.
+                  <T k="purchasing.noLandedCostsYet" fallback="No landed costs recorded yet." />
                 </td>
               </tr>
             ) : null}
@@ -339,16 +340,16 @@ function LandedCostList({ landedCosts }: { landedCosts: PurchaseLandedCostListRo
 
 function PurchaseOrderList({ orders }: { orders: PurchaseOrderListRow[] }) {
   const statusOptions = [
-    { value: "draft", label: "Draft" },
-    { value: "confirmed", label: "Confirmed" },
-    { value: "partially_received", label: "Partially Received" },
-    { value: "received", label: "Received" },
-    { value: "cancelled", label: "Cancelled" },
+    { value: "draft", label: "status.draft" },
+    { value: "confirmed", label: "status.confirmed" },
+    { value: "partially_received", label: "status.partially_received" },
+    { value: "received", label: "status.received" },
+    { value: "cancelled", label: "status.cancelled" },
   ];
 
   const paymentTermOptions = [
-    { value: "cash", label: "Cash" },
-    { value: "credit", label: "Credit" },
+    { value: "cash", label: "status.cash" },
+    { value: "credit", label: "status.credit" },
   ];
 
   return (
@@ -368,7 +369,7 @@ function PurchaseOrderList({ orders }: { orders: PurchaseOrderListRow[] }) {
           />
           <TableFilterSelect
             paramName="paymentTerm"
-            label="Term"
+            label="purchasing.term"
             options={paymentTermOptions}
             allLabel="All Terms"
           />
@@ -378,16 +379,16 @@ function PurchaseOrderList({ orders }: { orders: PurchaseOrderListRow[] }) {
         <table className="w-full min-w-[1080px] text-left text-sm">
           <thead>
             <tr className="border-b border-border bg-muted/40 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-              <th className="px-4 py-3">Order No</th>
-              <th className="px-4 py-3">Supplier</th>
-              <th className="px-4 py-3">Order Status</th>
-              <th className="px-4 py-3">Order Date</th>
-              <th className="px-4 py-3">Payment Settlement</th>
-              <th className="px-4 py-3">Deliver To</th>
-              <th className="px-4 py-3 text-right">Ordered Qty</th>
-              <th className="px-4 py-3 text-right">Received Qty</th>
-              <th className="px-4 py-3 text-right">Grand Total</th>
-              <th className="px-4 py-3 text-right">Actions</th>
+              <th className="px-4 py-3"><T k="purchasing.orderNo" fallback="Order No" /></th>
+              <th className="px-4 py-3"><T k="Supplier" /></th>
+              <th className="px-4 py-3"><T k="purchasing.orderStatus" fallback="Order Status" /></th>
+              <th className="px-4 py-3"><T k="purchasing.orderDate" fallback="Order Date" /></th>
+              <th className="px-4 py-3"><T k="purchasing.paymentSettlement" fallback="Payment Settlement" /></th>
+              <th className="px-4 py-3"><T k="purchasing.deliverTo" fallback="Deliver To" /></th>
+              <th className="px-4 py-3 text-right"><T k="purchasing.orderedQty" fallback="Ordered Qty" /></th>
+              <th className="px-4 py-3 text-right"><T k="purchasing.receivedQty" fallback="Received Qty" /></th>
+              <th className="px-4 py-3 text-right"><T k="purchasing.grandTotal" fallback="Grand Total" /></th>
+              <th className="px-4 py-3 text-right"><T k="action.actions" /></th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border/60">
@@ -401,7 +402,7 @@ function PurchaseOrderList({ orders }: { orders: PurchaseOrderListRow[] }) {
                 <td className="px-4 py-3.5">
                   <div className="font-semibold text-foreground group-hover:text-primary transition-colors">{order.supplierName}</div>
                   {order.vendorReference ? (
-                    <div className="text-xs text-muted-foreground">Ref {order.vendorReference}</div>
+                    <div className="text-xs text-muted-foreground"><T k="purchasing.ref" fallback="Ref" /> {order.vendorReference}</div>
                   ) : null}
                 </td>
                 <td className="px-4 py-3.5">
@@ -410,23 +411,31 @@ function PurchaseOrderList({ orders }: { orders: PurchaseOrderListRow[] }) {
                 <td className="px-4 py-3.5">
                   <div className="text-xs text-muted-foreground">{order.orderDate}</div>
                   {order.paymentTerm === "credit" ? (
-                    <div className="text-[11px] text-muted-foreground">Due {order.paymentDueDate ?? "-"}</div>
+                    <div className="text-[11px] text-muted-foreground"><T k="purchasing.due" fallback="Due" /> {order.paymentDueDate ?? "-"}</div>
                   ) : null}
                 </td>
                 <td className="px-4 py-3.5">
                   <div className="flex flex-col gap-1">
-                    <span className="text-xs font-semibold capitalize text-foreground">{order.paymentTerm}</span>
+                    <span className="text-xs font-semibold capitalize text-foreground"><T k={`status.${order.paymentTerm}`} fallback={order.paymentTerm} /></span>
                     {Number(order.totalMinor) === 0 || Number(order.residualAmountMinor) === 0 ? (
-                      <StatusBadge status="paid" label="Fully Paid" />
+                      <StatusBadge status="paid" label={<T k="purchasing.fullyPaid" fallback="Fully Paid" />} />
                     ) : Number(order.residualAmountMinor) < Number(order.totalMinor) ? (
                       <StatusBadge
                         status="partially_paid"
-                        label={`Due ${displayPurchaseMoney(order.residualAmountMinor, order.currencyCode)}`}
+                        label={
+                          <>
+                            <T k="purchasing.due" fallback="Due" /> {displayPurchaseMoney(order.residualAmountMinor, order.currencyCode)}
+                          </>
+                        }
                       />
                     ) : (
                       <StatusBadge
                         status="unpaid"
-                        label={`Unpaid ${displayPurchaseMoney(order.residualAmountMinor, order.currencyCode)}`}
+                        label={
+                          <>
+                            <T k="status.unpaid" /> {displayPurchaseMoney(order.residualAmountMinor, order.currencyCode)}
+                          </>
+                        }
                       />
                     )}
                   </div>
@@ -439,7 +448,7 @@ function PurchaseOrderList({ orders }: { orders: PurchaseOrderListRow[] }) {
                 </td>
                 <td className="px-4 py-3.5 text-right">
                   <ButtonLink href={`/admin/purchasing/${order.id}`} size="sm" variant="outline" className="h-8 px-2.5 text-xs">
-                    Open
+                    <T k="purchasing.open" fallback="Open" />
                   </ButtonLink>
                 </td>
               </tr>
@@ -447,9 +456,9 @@ function PurchaseOrderList({ orders }: { orders: PurchaseOrderListRow[] }) {
             {orders.length === 0 ? (
               <tr>
                 <td colSpan={10} className="px-4 py-12 text-center text-sm text-muted-foreground">
-                  No purchase orders recorded yet.{" "}
+                  <T k="purchasing.noOrdersYet" fallback="No purchase orders recorded yet." />{" "}
                   <Link href="/admin/purchasing/new" className="font-semibold text-primary underline-offset-4 hover:underline">
-                    Create the first PO →
+                    <T k="purchasing.createFirstPo" fallback="Create the first PO →" />
                   </Link>
                 </td>
               </tr>
@@ -468,16 +477,16 @@ function ReceiptList({ receipts }: { receipts: PurchaseReceiptListRow[] }) {
         <table className="w-full min-w-[980px] text-left text-sm">
           <thead>
             <tr className="border-b border-border bg-muted/40 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-              <th className="px-4 py-3">Receipt No</th>
-              <th className="px-4 py-3">PO Ref</th>
-              <th className="px-4 py-3">Supplier</th>
-              <th className="px-4 py-3">Status</th>
-              <th className="px-4 py-3">Date</th>
-              <th className="px-4 py-3">Warehouse</th>
-              <th className="px-4 py-3 text-right">Lines</th>
-              <th className="px-4 py-3 text-right">Received Qty</th>
-              <th className="px-4 py-3 text-right">Total Value</th>
-              <th className="px-4 py-3 text-right">Actions</th>
+              <th className="px-4 py-3"><T k="purchasing.receiptNo" fallback="Receipt No" /></th>
+              <th className="px-4 py-3"><T k="purchasing.poRef" fallback="PO Ref" /></th>
+              <th className="px-4 py-3"><T k="Supplier" /></th>
+              <th className="px-4 py-3"><T k="field.status" /></th>
+              <th className="px-4 py-3"><T k="field.date" fallback="Date" /></th>
+              <th className="px-4 py-3"><T k="status.warehouse" fallback="Warehouse" /></th>
+              <th className="px-4 py-3 text-right"><T k="purchasing.lines" fallback="Lines" /></th>
+              <th className="px-4 py-3 text-right"><T k="purchasing.receivedQty" fallback="Received Qty" /></th>
+              <th className="px-4 py-3 text-right"><T k="purchasing.totalValue" fallback="Total Value" /></th>
+              <th className="px-4 py-3 text-right"><T k="action.actions" /></th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border/60">
@@ -488,7 +497,7 @@ function ReceiptList({ receipts }: { receipts: PurchaseReceiptListRow[] }) {
                     {receipt.receiptNo}
                   </Link>
                   {receipt.supplierInvoiceNo ? (
-                    <div className="text-xs text-muted-foreground">Inv: {receipt.supplierInvoiceNo}</div>
+                    <div className="text-xs text-muted-foreground"><T k="purchasing.invAbbrev" fallback="Inv:" /> {receipt.supplierInvoiceNo}</div>
                   ) : null}
                 </td>
                 <td className="px-4 py-3.5">
@@ -509,7 +518,7 @@ function ReceiptList({ receipts }: { receipts: PurchaseReceiptListRow[] }) {
                 </td>
                 <td className="px-4 py-3.5 text-right">
                   <ButtonLink href={`/admin/purchasing/receipts/${receipt.id}`} size="sm" variant="outline" className="h-8 px-2.5 text-xs">
-                    Details
+                    <T k="action.details" fallback="Details" />
                   </ButtonLink>
                 </td>
               </tr>
@@ -517,7 +526,7 @@ function ReceiptList({ receipts }: { receipts: PurchaseReceiptListRow[] }) {
             {receipts.length === 0 ? (
               <tr>
                 <td colSpan={10} className="px-4 py-12 text-center text-sm text-muted-foreground">
-                  No goods receipts recorded yet.
+                  <T k="purchasing.noReceiptsYet" fallback="No goods receipts recorded yet." />
                 </td>
               </tr>
             ) : null}
@@ -535,16 +544,16 @@ function PaymentList({ payments }: { payments: PaymentListRow[] }) {
         <table className="w-full min-w-[1040px] text-left text-sm">
           <thead>
             <tr className="border-b border-border bg-muted/40 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-              <th className="px-4 py-3">Payment No</th>
-              <th className="px-4 py-3">Supplier</th>
-              <th className="px-4 py-3">Status</th>
-              <th className="px-4 py-3">Date</th>
-              <th className="px-4 py-3">Payment Method</th>
-              <th className="px-4 py-3">Account</th>
-              <th className="px-4 py-3">Reference</th>
-              <th className="px-4 py-3 text-right">Amount</th>
-              <th className="px-4 py-3 text-right">Allocated</th>
-              <th className="px-4 py-3 text-right">Actions</th>
+              <th className="px-4 py-3"><T k="purchasing.paymentNo" fallback="Payment No" /></th>
+              <th className="px-4 py-3"><T k="Supplier" /></th>
+              <th className="px-4 py-3"><T k="field.status" /></th>
+              <th className="px-4 py-3"><T k="field.date" fallback="Date" /></th>
+              <th className="px-4 py-3"><T k="purchasing.paymentMethod" fallback="Payment Method" /></th>
+              <th className="px-4 py-3"><T k="field.account" fallback="Account" /></th>
+              <th className="px-4 py-3"><T k="Reference" /></th>
+              <th className="px-4 py-3 text-right"><T k="field.amount" fallback="Amount" /></th>
+              <th className="px-4 py-3 text-right"><T k="report.allocated" fallback="Allocated" /></th>
+              <th className="px-4 py-3 text-right"><T k="action.actions" /></th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border/60">
@@ -571,7 +580,7 @@ function PaymentList({ payments }: { payments: PaymentListRow[] }) {
                 </td>
                 <td className="px-4 py-3.5 text-right">
                   <ButtonLink href={`/admin/purchasing/payments/${payment.id}`} size="sm" variant="outline" className="h-8 px-2.5 text-xs">
-                    Details
+                    <T k="action.details" fallback="Details" />
                   </ButtonLink>
                 </td>
               </tr>
@@ -579,7 +588,7 @@ function PaymentList({ payments }: { payments: PaymentListRow[] }) {
             {payments.length === 0 ? (
               <tr>
                 <td colSpan={10} className="px-4 py-12 text-center text-sm text-muted-foreground">
-                  No supplier payments recorded yet.
+                  <T k="purchasing.noPaymentsYet" fallback="No supplier payments recorded yet." />
                 </td>
               </tr>
             ) : null}

@@ -15,6 +15,7 @@ import {
 import { CloseConfirmDialog } from "@/components/ui/close-confirm-dialog";
 import { PurchaseOrderForm, type PurchaseOrderFormHandle } from "@/app/admin/purchasing/purchase-order-form";
 import { createPurchaseOrder } from "@/app/admin/purchasing/actions";
+import { useTranslation } from "@/lib/i18n/use-translation";
 import type { ProductSelect } from "@/app/admin/products/product-select";
 import type { PurchaseFormOption, PurchaseTaxOption } from "@/server/purchasing/types";
 import type { OwnerOption } from "@/server/owners/types";
@@ -46,6 +47,7 @@ export function NewPurchaseOrderModal({
   defaultDate = "",
   trigger,
 }: NewPurchaseOrderModalProps) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(initialOpen);
   const [confirmClose, setConfirmClose] = useState(false);
   const formRef = useRef<PurchaseOrderFormHandle>(null);
@@ -117,7 +119,7 @@ export function NewPurchaseOrderModal({
           {trigger ?? (
             <Button className="gap-2 bg-gradient-to-r from-[#0B5D4B] to-[#073B35] font-semibold text-white shadow-md shadow-[#0B5D4B]/20 transition-all hover:brightness-110 active:scale-[0.99]">
               <PlusIcon className="size-4 text-emerald-200" />
-              New RFQ
+              {t("purchasing.newRfq", "New RFQ")}
             </Button>
           )}
         </DialogTrigger>
@@ -150,14 +152,14 @@ export function NewPurchaseOrderModal({
               <div className="space-y-0.5">
                 <div className="flex items-center gap-2">
                   <DialogTitle className="text-lg font-bold tracking-tight text-foreground">
-                    New Request for Quotation
+                    {t("purchasing.newRfqTitle", "New Request for Quotation")}
                   </DialogTitle>
                   <span className="rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-[11px] font-semibold text-[#0B5D4B] dark:text-emerald-300 border border-[#0B5D4B]/20">
-                    Draft RFQ
+                    {t("purchasing.draftRfq", "Draft RFQ")}
                   </span>
                 </div>
                 <DialogDescription className="text-xs text-muted-foreground">
-                  Prepare specifications, sourcing details, and order lines to send to vendors.
+                  {t("purchasing.newRfqDesc", "Prepare specifications, sourcing details, and order lines to send to vendors.")}
                 </DialogDescription>
               </div>
             </div>
@@ -165,7 +167,7 @@ export function NewPurchaseOrderModal({
               type="button"
               onClick={handleCloseRequest}
               className="rounded-lg p-1.5 sm:p-2 bg-red-500 text-white hover:bg-red-600 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/50 shadow-2xs"
-              aria-label="Close"
+              aria-label={t("action.close", "Close")}
             >
               <X className="size-4 sm:size-4.5" />
             </button>
@@ -196,7 +198,7 @@ export function NewPurchaseOrderModal({
       <CloseConfirmDialog
         open={confirmClose}
         onOpenChange={setConfirmClose}
-        draftLabel="Save as Draft RFQ"
+        draftLabel={t("purchasing.saveAsDraftRfq", "Save as Draft RFQ")}
         onSaveDraft={handleSaveDraftAndClose}
         onDiscard={closeImmediately}
       />

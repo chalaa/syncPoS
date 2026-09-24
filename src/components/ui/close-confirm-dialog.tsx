@@ -9,6 +9,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { useTranslation } from "@/lib/i18n/use-translation";
 
 export type CloseConfirmDialogProps = {
   open: boolean;
@@ -28,6 +29,7 @@ export function CloseConfirmDialog({
   onSaveDraft,
   onDiscard,
 }: CloseConfirmDialogProps) {
+  const { t } = useTranslation();
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
@@ -50,10 +52,10 @@ export function CloseConfirmDialog({
                 </div>
                 <div className="min-w-0">
                   <DialogTitle className="text-base font-bold text-foreground leading-tight">
-                    Unsaved Changes
+                    {t("closeConfirm.title", "Unsaved Changes")}
                   </DialogTitle>
                   <DialogDescription className="text-xs text-muted-foreground mt-0.5">
-                    You have unsaved work. What would you like to do?
+                    {t("closeConfirm.desc", "You have unsaved work. What would you like to do?")}
                   </DialogDescription>
                 </div>
               </div>
@@ -61,7 +63,7 @@ export function CloseConfirmDialog({
                 type="button"
                 onClick={() => onOpenChange(false)}
                 className="rounded-lg p-1.5 bg-red-500 text-white hover:bg-red-600 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/50 shadow-2xs shrink-0"
-                aria-label="Close dialog"
+                aria-label={t("action.closeDialog", "Close dialog")}
               >
                 <X className="size-4" />
               </button>
@@ -76,7 +78,7 @@ export function CloseConfirmDialog({
               className="w-full gap-2 h-10 bg-gradient-to-r from-[#0B5D4B] to-[#073B35] text-white font-semibold shadow-md shadow-[#0B5D4B]/20 hover:brightness-110 active:scale-[0.99] transition-all"
             >
               <FileText className="size-4 text-emerald-200" />
-              {draftLabel}
+              {t(draftLabel, draftLabel)}
             </Button>
 
             <Button
@@ -86,7 +88,7 @@ export function CloseConfirmDialog({
               className="w-full gap-2 h-10 border-destructive/40 text-destructive hover:bg-destructive/5 hover:border-destructive/60 font-semibold transition-all"
             >
               <Trash2 className="size-4" />
-              Discard &amp; Close
+              {t("closeConfirm.discardAndClose", "Discard & Close")}
             </Button>
 
             <Button
@@ -96,7 +98,7 @@ export function CloseConfirmDialog({
               className="w-full gap-2 h-9 text-muted-foreground hover:text-foreground text-sm font-medium"
             >
               <X className="size-3.5" />
-              Continue Editing
+              {t("closeConfirm.continueEditing", "Continue Editing")}
             </Button>
           </div>
         </div>

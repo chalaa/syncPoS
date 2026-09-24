@@ -94,7 +94,7 @@ export const StatusBadge = React.forwardRef<
   HTMLDivElement,
   {
     status: string | null | undefined;
-    label?: string;
+    label?: React.ReactNode;
     size?: "sm" | "default" | "lg";
     className?: string;
   } & React.HTMLAttributes<HTMLDivElement>
@@ -110,8 +110,13 @@ export const StatusBadge = React.forwardRef<
   }
 
   const normalized = status.toLowerCase().trim();
-  const rawLabel = label ?? status.replace(/[_-]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
-  const displayLabel = t(`status.${normalized}`, rawLabel);
+  const fallbackLabel = status.replace(/[_-]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+  const displayLabel =
+    label !== undefined
+      ? typeof label === "string"
+        ? t(label, label)
+        : label
+      : t(`status.${normalized}`, fallbackLabel);
 
   // Green / Posted / Completed / Success
   if (
