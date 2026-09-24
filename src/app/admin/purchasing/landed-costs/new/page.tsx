@@ -3,6 +3,7 @@ import { LandedCostForm } from "@/app/admin/purchasing/landed-costs/landed-cost-
 import { Alert } from "@/components/ui/alert";
 import { ButtonLink } from "@/components/ui/button";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
+import { T } from "@/components/ui/t";
 import { requirePermission } from "@/server/auth/session";
 import { getPurchaseLandedCostFormOptions } from "@/server/purchasing/purchasing";
 
@@ -30,7 +31,7 @@ export default async function NewLandedCostPage({ searchParams }: NewLandedCostP
       <PageHeader
         eyebrow="Purchasing / Landed Cost"
         title="New Landed Cost"
-        actions={<ButtonLink href="/admin/purchasing?view=landed-costs" variant="outline">Back to landed costs</ButtonLink>}
+        actions={<ButtonLink href="/admin/purchasing?view=landed-costs" variant="outline"><T k="purchasing.backToLandedCosts" fallback="Back to landed costs" /></ButtonLink>}
       />
 
       {query.error ? <Alert kind="error">{query.error}</Alert> : null}

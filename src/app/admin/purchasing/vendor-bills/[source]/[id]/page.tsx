@@ -9,6 +9,7 @@ import { StatusBadge } from "@/components/ui/badge";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
 import { DetailStatCard } from "@/components/ui/detail-stat-card";
+import { T } from "@/components/ui/t";
 import { requirePermission } from "@/server/auth/session";
 import { getActivePaymentAccounts } from "@/server/payments/payments";
 import {
@@ -56,11 +57,13 @@ export default async function VendorBillDetailPage({ params, searchParams }: Ven
         title={bill.billNo}
         actions={
           <div className="flex flex-wrap gap-2">
-            <ButtonLink href="/admin/purchasing?view=supplier-bills" variant="outline">Back to vendor bills</ButtonLink>
+            <ButtonLink href="/admin/purchasing?view=supplier-bills" variant="outline"><T k="purchasing.backToVendorBills" fallback="Back to vendor bills" /></ButtonLink>
             {bill.source === "vendor_bill" && bill.status === "posted" && bill.residualAmountMinor > 0 ? (
               <PaymentFormDialog
                 title="Register Supplier Payment"
                 description={`Register and post payment for ${bill.billNo}.`}
+                descriptionVariant="registerAndPost"
+                documentNo={bill.billNo}
                 triggerLabel="Register Payment"
                 submitLabel="Post Payment"
                 action={registerSupplierPayment}
@@ -74,13 +77,13 @@ export default async function VendorBillDetailPage({ params, searchParams }: Ven
             {bill.source === "vendor_bill" && bill.status === "draft" ? (
               <form action={postVendorBill}>
                 <input type="hidden" name="vendorBillId" value={bill.id} />
-                <Button>Post Bill</Button>
+                <Button><T k="purchasing.postBill" fallback="Post Bill" /></Button>
               </form>
             ) : null}
             {bill.source === "vendor_bill" && bill.status !== "cancelled" ? (
               <form action={cancelVendorBill}>
                 <input type="hidden" name="vendorBillId" value={bill.id} />
-                <Button variant="danger">Cancel</Button>
+                <Button variant="danger"><T k="action.cancel" /></Button>
               </form>
             ) : null}
           </div>
@@ -123,7 +126,7 @@ export default async function VendorBillDetailPage({ params, searchParams }: Ven
       <section className="rounded-lg border border-border bg-card p-5">
         <div className="mb-5 grid gap-4 md:grid-cols-4">
           <div>
-            <p className="text-xs font-medium uppercase text-muted-foreground">Purchase Order</p>
+            <p className="text-xs font-medium uppercase text-muted-foreground"><T k="Purchase Order" /></p>
             {bill.purchaseOrderId ? (
               <Link href={`/admin/purchasing/${bill.purchaseOrderId}`} className="mt-1 block text-sm font-medium text-primary underline-offset-4 hover:underline">
                 {bill.orderNo}
@@ -133,47 +136,53 @@ export default async function VendorBillDetailPage({ params, searchParams }: Ven
             )}
           </div>
           <div>
-            <p className="text-xs font-medium uppercase text-muted-foreground">Supplier</p>
+            <p className="text-xs font-medium uppercase text-muted-foreground"><T k="Supplier" /></p>
             <p className="mt-1 text-sm font-medium">{bill.supplierName}</p>
           </div>
           <div>
-            <p className="text-xs font-medium uppercase text-muted-foreground">Status</p>
+            <p className="text-xs font-medium uppercase text-muted-foreground"><T k="field.status" /></p>
             <div className="mt-1">
               <StatusBadge status={bill.status} size="sm" />
             </div>
           </div>
           <div>
-            <p className="text-xs font-medium uppercase text-muted-foreground">Total</p>
+            <p className="text-xs font-medium uppercase text-muted-foreground"><T k="report.total" fallback="Total" /></p>
             <p className="mt-1 text-sm font-medium">{displayPurchaseMoney(bill.totalMinor, bill.currencyCode)}</p>
           </div>
           <div>
-            <p className="text-xs font-medium uppercase text-muted-foreground">Residual</p>
+            <p className="text-xs font-medium uppercase text-muted-foreground"><T k="Residual" /></p>
             <p className="mt-1 text-sm font-medium">{displayPurchaseMoney(bill.residualAmountMinor, bill.currencyCode)}</p>
           </div>
           <div>
-            <p className="text-xs font-medium uppercase text-muted-foreground">Payment Status</p>
+            <p className="text-xs font-medium uppercase text-muted-foreground"><T k="Payment Status" /></p>
             <div className="mt-1">
               <StatusBadge status={bill.paymentStatus} size="sm" />
             </div>
           </div>
           <div>
-            <p className="text-xs font-medium uppercase text-muted-foreground">Bill Date</p>
+            <p className="text-xs font-medium uppercase text-muted-foreground"><T k="purchasing.billDate" fallback="Bill Date" /></p>
             <p className="mt-1 text-sm font-medium">{bill.billDate}</p>
           </div>
           <div>
-            <p className="text-xs font-medium uppercase text-muted-foreground">Due Date</p>
+            <p className="text-xs font-medium uppercase text-muted-foreground"><T k="report.dueDate" fallback="Due Date" /></p>
             <p className="mt-1 text-sm font-medium">{bill.dueDate ?? "-"}</p>
           </div>
           <div>
-            <p className="text-xs font-medium uppercase text-muted-foreground">Vendor Reference</p>
+            <p className="text-xs font-medium uppercase text-muted-foreground"><T k="purchasing.vendorReference" fallback="Vendor Reference" /></p>
             <p className="mt-1 text-sm font-medium">{bill.vendorReference ?? "-"}</p>
           </div>
           <div>
-            <p className="text-xs font-medium uppercase text-muted-foreground">Source</p>
-            <p className="mt-1 text-sm font-medium">{bill.source === "placeholder" ? "Receipt placeholder" : "Vendor bill"}</p>
+            <p className="text-xs font-medium uppercase text-muted-foreground"><T k="report.source" fallback="Source" /></p>
+            <p className="mt-1 text-sm font-medium">
+              {bill.source === "placeholder" ? (
+                <T k="purchasing.receiptPlaceholder" fallback="Receipt placeholder" />
+              ) : (
+                <T k="purchasing.vendorBill" fallback="Vendor bill" />
+              )}
+            </p>
           </div>
           <div>
-            <p className="text-xs font-medium uppercase text-muted-foreground">Receipt</p>
+            <p className="text-xs font-medium uppercase text-muted-foreground"><T k="purchasing.receipt" fallback="Receipt" /></p>
             {bill.goodsReceiptId ? (
               <Link href={`/admin/purchasing/receipts/${bill.goodsReceiptId}`} className="mt-1 block text-sm font-medium text-primary underline-offset-4 hover:underline">
                 {bill.receiptNo}
@@ -192,12 +201,12 @@ export default async function VendorBillDetailPage({ params, searchParams }: Ven
                 <table className="w-full min-w-[860px] text-left text-sm">
                   <thead className="text-xs uppercase text-muted-foreground">
                     <tr className="border-b border-border">
-                      <th className="px-3 py-2">Line</th>
-                      <th className="px-3 py-2 text-right">Quantity</th>
-                      <th className="px-3 py-2 text-right">Unit Price</th>
-                      {hasTaxInLines ? <th className="px-3 py-2">Taxes</th> : null}
-                      {hasTaxInLines ? <th className="px-3 py-2 text-right">Tax</th> : null}
-                      <th className="px-3 py-2 text-right">Total</th>
+                      <th className="px-3 py-2"><T k="purchasing.line" fallback="Line" /></th>
+                      <th className="px-3 py-2 text-right"><T k="purchasing.quantity" fallback="Quantity" /></th>
+                      <th className="px-3 py-2 text-right"><T k="purchasing.unitPrice" fallback="Unit Price" /></th>
+                      {hasTaxInLines ? <th className="px-3 py-2"><T k="purchasing.taxes" fallback="Taxes" /></th> : null}
+                      {hasTaxInLines ? <th className="px-3 py-2 text-right"><T k="report.tax" fallback="Tax" /></th> : null}
+                      <th className="px-3 py-2 text-right"><T k="report.total" fallback="Total" /></th>
                     </tr>
                   </thead>
                   <tbody>
@@ -222,17 +231,17 @@ export default async function VendorBillDetailPage({ params, searchParams }: Ven
         ) : (
           <div className="grid gap-2 border-t border-border pt-4 text-sm md:grid-cols-3">
             <div>
-              <span className="text-muted-foreground">{bill.taxAmountMinor > 0 ? "Untaxed " : "Subtotal "}</span>
+              <span className="text-muted-foreground">{bill.taxAmountMinor > 0 ? <T k="purchasing.untaxedSpace" fallback="Untaxed " /> : <T k="purchasing.subtotalSpace" fallback="Subtotal " />}</span>
               <span className="font-medium">{displayPurchaseMoney(bill.untaxedAmountMinor, bill.currencyCode)}</span>
             </div>
             {bill.taxAmountMinor > 0 ? (
               <div>
-                <span className="text-muted-foreground">Tax </span>
+                <span className="text-muted-foreground"><T k="purchasing.taxSpace" fallback="Tax " /></span>
                 <span className="font-medium">{displayPurchaseMoney(bill.taxAmountMinor, bill.currencyCode)}</span>
               </div>
             ) : null}
             <div>
-              <span className="text-muted-foreground">Total </span>
+              <span className="text-muted-foreground"><T k="purchasing.totalSpace" fallback="Total " /></span>
               <span className="font-medium">{displayPurchaseMoney(bill.totalMinor, bill.currencyCode)}</span>
             </div>
           </div>

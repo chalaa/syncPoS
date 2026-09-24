@@ -4,6 +4,7 @@ import { CalculatorIcon } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import { Button, ButtonLink } from "@/components/ui/button";
+import { useTranslation } from "@/lib/i18n/use-translation";
 import type {
   PurchaseLandedCostDetail,
   PurchaseLandedCostFormOptions,
@@ -68,6 +69,7 @@ export function LandedCostForm({
   initialReceiptId,
   submitLabel,
 }: LandedCostFormProps) {
+  const { t } = useTranslation();
   const initialManualAmounts = useMemo(() => {
     const entries = cost?.allocations.map((allocation) => [
       allocation.goodsReceiptLineId,
@@ -103,7 +105,7 @@ export function LandedCostForm({
 
         <div className="grid gap-4 md:grid-cols-2">
           <label className="flex flex-col gap-1 text-sm font-medium">
-            Receipt
+            {t("purchasing.receipt", "Receipt")}
             <select
               name="goodsReceiptId"
               required
@@ -112,7 +114,7 @@ export function LandedCostForm({
               className={inputClass}
               disabled={cost?.status === "posted"}
             >
-              <option value="">Select receipt</option>
+              <option value="">{t("purchasing.selectReceipt", "Select receipt")}</option>
               {options.receipts.map((receiptOption) => (
                 <option key={receiptOption.id} value={receiptOption.id}>
                   {receiptOption.receiptNo} / {receiptOption.orderNo} / {receiptOption.supplierName}
@@ -122,9 +124,9 @@ export function LandedCostForm({
           </label>
 
           <label className="flex flex-col gap-1 text-sm font-medium">
-            Vendor
+            {t("purchasing.vendor", "Vendor")}
             <select name="vendorId" defaultValue={cost?.vendorId ?? ""} className={inputClass} disabled={cost?.status === "posted"}>
-              <option value="">No separate vendor</option>
+              <option value="">{t("purchasing.noSeparateVendor", "No separate vendor")}</option>
               {options.vendors.map((vendor) => (
                 <option key={vendor.id} value={vendor.id}>
                   {vendor.code} / {vendor.name}
@@ -134,18 +136,18 @@ export function LandedCostForm({
           </label>
 
           <label className="flex flex-col gap-1 text-sm font-medium">
-            Cost Type
+            {t("purchasing.costType", "Cost Type")}
             <select name="costType" defaultValue={cost?.costType ?? "freight"} className={inputClass} disabled={cost?.status === "posted"}>
-              <option value="freight">Freight</option>
-              <option value="customs">Customs</option>
-              <option value="insurance">Insurance</option>
-              <option value="handling">Handling</option>
-              <option value="other">Other</option>
+              <option value="freight">{t("status.freight")}</option>
+              <option value="customs">{t("status.customs")}</option>
+              <option value="insurance">{t("status.insurance")}</option>
+              <option value="handling">{t("status.handling")}</option>
+              <option value="other">{t("status.other")}</option>
             </select>
           </label>
 
           <label className="flex flex-col gap-1 text-sm font-medium">
-            Allocation
+            {t("purchasing.allocation", "Allocation")}
             <select
               name="allocationMethod"
               value={allocationMethod}
@@ -153,14 +155,14 @@ export function LandedCostForm({
               className={inputClass}
               disabled={cost?.status === "posted"}
             >
-              <option value="value">By value</option>
-              <option value="quantity">By quantity</option>
-              <option value="manual">Manual</option>
+              <option value="value">{t("purchasing.byValue", "By value")}</option>
+              <option value="quantity">{t("purchasing.byQuantity", "By quantity")}</option>
+              <option value="manual">{t("status.manual")}</option>
             </select>
           </label>
 
           <label className="flex flex-col gap-1 text-sm font-medium">
-            Amount
+            {t("field.amount", "Amount")}
             <input
               name="amount"
               required
@@ -175,7 +177,7 @@ export function LandedCostForm({
         </div>
 
         <label className="flex flex-col gap-1 text-sm font-medium">
-          Notes
+          {t("field.notes", "Notes")}
           <textarea
             name="notes"
             rows={4}
@@ -190,10 +192,10 @@ export function LandedCostForm({
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border p-4">
               <div className="flex items-center gap-2">
                 <CalculatorIcon className="size-4 text-primary" />
-                <h2 className="text-sm font-semibold">Allocation Preview</h2>
+                <h2 className="text-sm font-semibold">{t("purchasing.allocationPreview", "Allocation Preview")}</h2>
               </div>
               <div className="text-sm">
-                <span className="text-muted-foreground">Preview total </span>
+                <span className="text-muted-foreground">{t("purchasing.previewTotal", "Preview total")} </span>
                 <span className="font-semibold">{displayMinor(previewTotalMinor, currencyCode)}</span>
               </div>
             </div>
@@ -201,11 +203,11 @@ export function LandedCostForm({
               <table className="w-full min-w-[860px] text-left text-sm">
                 <thead className="text-xs uppercase text-muted-foreground">
                   <tr className="border-b border-border">
-                    <th className="px-3 py-2">Product</th>
-                    <th className="px-3 py-2 text-right">Quantity</th>
-                    <th className="px-3 py-2 text-right">Receipt Value</th>
-                    <th className="px-3 py-2 text-right">Basis</th>
-                    <th className="px-3 py-2 text-right">Allocation</th>
+                    <th className="px-3 py-2">{t("Product", "Product")}</th>
+                    <th className="px-3 py-2 text-right">{t("purchasing.quantity", "Quantity")}</th>
+                    <th className="px-3 py-2 text-right">{t("purchasing.receiptValue", "Receipt Value")}</th>
+                    <th className="px-3 py-2 text-right">{t("purchasing.basis", "Basis")}</th>
+                    <th className="px-3 py-2 text-right">{t("purchasing.allocation", "Allocation")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -255,9 +257,9 @@ export function LandedCostForm({
 
         <div className="flex justify-end gap-2">
           <ButtonLink href={cost ? `/admin/purchasing/landed-costs/${cost.id}` : "/admin/purchasing?view=landed-costs"} variant="outline">
-            Cancel
+            {t("action.cancel")}
           </ButtonLink>
-          {cost?.status === "posted" ? null : <Button disabled={!receipt || receipt.lines.length === 0}>{submitLabel}</Button>}
+          {cost?.status === "posted" ? null : <Button disabled={!receipt || receipt.lines.length === 0}>{t(submitLabel, submitLabel)}</Button>}
         </div>
       </form>
     </section>

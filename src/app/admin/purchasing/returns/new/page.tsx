@@ -3,6 +3,7 @@ import { SupplierReturnForm } from "@/app/admin/returns/supplier-return-form";
 import { Alert } from "@/components/ui/alert";
 import { ButtonLink } from "@/components/ui/button";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
+import { T } from "@/components/ui/t";
 import { requirePermission } from "@/server/auth/session";
 import { getReturnFormOptions } from "@/server/returns/returns";
 
@@ -30,7 +31,7 @@ export default async function NewSupplierReturnPage({ searchParams }: NewSupplie
       <PageHeader
         eyebrow="Purchasing"
         title="New Supplier Return"
-        actions={<ButtonLink href="/admin/purchasing?view=returns" variant="outline">Back to returns</ButtonLink>}
+        actions={<ButtonLink href="/admin/purchasing?view=returns" variant="outline"><T k="purchasing.backToReturns" fallback="Back to returns" /></ButtonLink>}
       />
 
       {query.error ? <Alert kind="error">{query.error}</Alert> : null}

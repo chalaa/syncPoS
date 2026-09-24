@@ -5,6 +5,7 @@ import { postLandedCost } from "@/app/admin/purchasing/actions";
 import { Alert } from "@/components/ui/alert";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
+import { T } from "@/components/ui/t";
 import { requirePermission } from "@/server/auth/session";
 import {
   displayPurchaseMoney,
@@ -40,14 +41,14 @@ export default async function LandedCostDetailPage({ params, searchParams }: Lan
         title={cost.costNo}
         actions={
           <div className="flex flex-wrap gap-2">
-            <ButtonLink href="/admin/purchasing?view=landed-costs" variant="outline">Back to landed costs</ButtonLink>
+            <ButtonLink href="/admin/purchasing?view=landed-costs" variant="outline"><T k="purchasing.backToLandedCosts" fallback="Back to landed costs" /></ButtonLink>
             {cost.status !== "posted" && cost.status !== "cancelled" ? (
-              <ButtonLink href={`/admin/purchasing/landed-costs/${cost.id}/edit`} variant="outline">Edit</ButtonLink>
+              <ButtonLink href={`/admin/purchasing/landed-costs/${cost.id}/edit`} variant="outline"><T k="action.edit" /></ButtonLink>
             ) : null}
             {cost.status === "allocated" ? (
               <form action={postLandedCost}>
                 <input type="hidden" name="landedCostId" value={cost.id} />
-                <Button>Post to Inventory</Button>
+                <Button><T k="purchasing.postToInventory" fallback="Post to Inventory" /></Button>
               </form>
             ) : null}
           </div>
@@ -60,23 +61,23 @@ export default async function LandedCostDetailPage({ params, searchParams }: Lan
       <section className="rounded-lg border border-border bg-card p-5">
         <div className="mb-5 grid gap-4 md:grid-cols-4">
           <div>
-            <p className="text-xs font-medium uppercase text-muted-foreground">Status</p>
-            <p className="mt-1 text-sm font-medium capitalize">{statusLabel(cost.status)}</p>
+            <p className="text-xs font-medium uppercase text-muted-foreground"><T k="field.status" /></p>
+            <p className="mt-1 text-sm font-medium capitalize"><T k={`status.${cost.status}`} fallback={statusLabel(cost.status)} /></p>
           </div>
           <div>
-            <p className="text-xs font-medium uppercase text-muted-foreground">Type</p>
-            <p className="mt-1 text-sm font-medium capitalize">{statusLabel(cost.costType)}</p>
+            <p className="text-xs font-medium uppercase text-muted-foreground"><T k="field.type" fallback="Type" /></p>
+            <p className="mt-1 text-sm font-medium capitalize"><T k={`status.${cost.costType}`} fallback={statusLabel(cost.costType)} /></p>
           </div>
           <div>
-            <p className="text-xs font-medium uppercase text-muted-foreground">Allocation</p>
-            <p className="mt-1 text-sm font-medium capitalize">{statusLabel(cost.allocationMethod)}</p>
+            <p className="text-xs font-medium uppercase text-muted-foreground"><T k="purchasing.allocation" fallback="Allocation" /></p>
+            <p className="mt-1 text-sm font-medium capitalize"><T k={`status.${cost.allocationMethod}`} fallback={statusLabel(cost.allocationMethod)} /></p>
           </div>
           <div>
-            <p className="text-xs font-medium uppercase text-muted-foreground">Amount</p>
+            <p className="text-xs font-medium uppercase text-muted-foreground"><T k="field.amount" fallback="Amount" /></p>
             <p className="mt-1 text-sm font-medium">{displayPurchaseMoney(cost.amountMinor, cost.currencyCode)}</p>
           </div>
           <div>
-            <p className="text-xs font-medium uppercase text-muted-foreground">Purchase Order</p>
+            <p className="text-xs font-medium uppercase text-muted-foreground"><T k="Purchase Order" /></p>
             {cost.purchaseOrderId ? (
               <Link href={`/admin/purchasing/${cost.purchaseOrderId}`} className="mt-1 block text-sm font-medium text-primary underline-offset-4 hover:underline">
                 {cost.orderNo}
@@ -86,7 +87,7 @@ export default async function LandedCostDetailPage({ params, searchParams }: Lan
             )}
           </div>
           <div>
-            <p className="text-xs font-medium uppercase text-muted-foreground">Receipt</p>
+            <p className="text-xs font-medium uppercase text-muted-foreground"><T k="purchasing.receipt" fallback="Receipt" /></p>
             {cost.goodsReceiptId ? (
               <Link href={`/admin/purchasing/receipts/${cost.goodsReceiptId}`} className="mt-1 block text-sm font-medium text-primary underline-offset-4 hover:underline">
                 {cost.receiptNo}
@@ -96,11 +97,11 @@ export default async function LandedCostDetailPage({ params, searchParams }: Lan
             )}
           </div>
           <div>
-            <p className="text-xs font-medium uppercase text-muted-foreground">Vendor</p>
+            <p className="text-xs font-medium uppercase text-muted-foreground"><T k="purchasing.vendor" fallback="Vendor" /></p>
             <p className="mt-1 text-sm font-medium">{cost.vendorName ?? "-"}</p>
           </div>
           <div>
-            <p className="text-xs font-medium uppercase text-muted-foreground">Notes</p>
+            <p className="text-xs font-medium uppercase text-muted-foreground"><T k="field.notes" fallback="Notes" /></p>
             <p className="mt-1 text-sm font-medium">{cost.notes ?? "-"}</p>
           </div>
         </div>
@@ -109,12 +110,12 @@ export default async function LandedCostDetailPage({ params, searchParams }: Lan
           <table className="w-full min-w-[900px] text-left text-sm">
             <thead className="text-xs uppercase text-muted-foreground">
               <tr className="border-b border-border">
-                <th className="px-3 py-2">Product</th>
-                <th className="px-3 py-2 text-right">Qty</th>
-                <th className="px-3 py-2 text-right">Receipt Cost</th>
-                <th className="px-3 py-2 text-right">Current Landed</th>
-                <th className="px-3 py-2 text-right">Basis</th>
-                <th className="px-3 py-2 text-right">Allocated</th>
+                <th className="px-3 py-2"><T k="Product" /></th>
+                <th className="px-3 py-2 text-right"><T k="purchasing.qtyAbbrevHeader" fallback="Qty" /></th>
+                <th className="px-3 py-2 text-right"><T k="purchasing.receiptCost" fallback="Receipt Cost" /></th>
+                <th className="px-3 py-2 text-right"><T k="purchasing.currentLanded" fallback="Current Landed" /></th>
+                <th className="px-3 py-2 text-right"><T k="purchasing.basis" fallback="Basis" /></th>
+                <th className="px-3 py-2 text-right"><T k="report.allocated" fallback="Allocated" /></th>
               </tr>
             </thead>
             <tbody>
@@ -132,13 +133,13 @@ export default async function LandedCostDetailPage({ params, searchParams }: Lan
                 </tr>
               ))}
               <tr className="border-t border-border bg-muted/40 font-semibold">
-                <td colSpan={5} className="px-3 py-3 text-right">Allocation Total</td>
+                <td colSpan={5} className="px-3 py-3 text-right"><T k="purchasing.allocationTotal" fallback="Allocation Total" /></td>
                 <td className="px-3 py-3 text-right">{displayPurchaseMoney(allocationTotalMinor, cost.currencyCode)}</td>
               </tr>
               {cost.allocations.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-3 py-8 text-center text-muted-foreground">
-                    No receipt lines allocated.
+                    <T k="purchasing.noReceiptLinesAllocated" fallback="No receipt lines allocated." />
                   </td>
                 </tr>
               ) : null}

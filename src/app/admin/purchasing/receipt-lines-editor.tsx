@@ -5,6 +5,7 @@ import { type FormEvent, useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { DialogClose, DialogFooter } from "@/components/ui/dialog";
+import { useTranslation } from "@/lib/i18n/use-translation";
 import type { PurchaseFormOption, PurchaseOrderDetailLine } from "@/server/purchasing/types";
 
 type ReceiptRow = PurchaseOrderDetailLine & {
@@ -51,6 +52,7 @@ export function ReceiptLinesEditor({
   locations: PurchaseFormOption[];
   lines: PurchaseOrderDetailLine[];
 }) {
+  const { t } = useTranslation();
   const [locationId, setLocationId] = useState(defaultLocationId ?? "");
   const [rows, setRows] = useState<ReceiptRow[]>(() =>
     lines
@@ -85,11 +87,11 @@ export function ReceiptLinesEditor({
     const serials = new Set<string>();
 
     if (!locationId) {
-      errors.push("Receiving location is required.");
+      errors.push(t("purchasing.error.receivingLocationRequired", "Receiving location is required."));
     }
 
     if (positiveRows.length === 0) {
-      errors.push("At least one receipt line quantity is required.");
+      errors.push(t("purchasing.error.receiptQuantityRequired", "At least one receipt line quantity is required."));
     }
 
     for (const row of positiveRows) {
@@ -97,37 +99,39 @@ export function ReceiptLinesEditor({
       quantityByPurchaseLine.set(row.id, (quantityByPurchaseLine.get(row.id) ?? 0) + quantity);
 
       if (quantity < 0) {
-        errors.push(`${row.sku} has an invalid quantity.`);
+        errors.push(`${row.sku} ${t("purchasing.error.invalidQuantitySuffix", "has an invalid quantity.")}`);
       }
 
       if (row.trackingMode === "serial") {
         if (quantity !== 1) {
-          errors.push(`${row.sku} serial rows must have quantity 1.`);
+          errors.push(`${row.sku} ${t("purchasing.error.serialRowsQuantitySuffix", "serial rows must have quantity 1.")}`);
         }
 
         if (!row.serialNo.trim()) {
-          errors.push(`${row.sku} requires a serial number.`);
+          errors.push(`${row.sku} ${t("purchasing.error.requiresSerialSuffix", "requires a serial number.")}`);
         } else if (serials.has(row.serialNo.trim())) {
-          errors.push(`Serial ${row.serialNo.trim()} is duplicated in this receipt.`);
+          errors.push(`${t("purchasing.error.serialPrefix", "Serial")} ${row.serialNo.trim()} ${t("purchasing.error.serialDuplicateSuffix", "is duplicated in this receipt.")}`);
         }
 
         serials.add(row.serialNo.trim());
       }
 
       if (row.trackingMode === "lot" && !row.lotNo.trim()) {
-        errors.push(`${row.sku} requires a lot number.`);
+        errors.push(`${row.sku} ${t("purchasing.error.requiresLotSuffix", "requires a lot number.")}`);
       }
     }
 
     for (const [purchaseLineId, quantity] of quantityByPurchaseLine) {
       const line = rows.find((row) => row.id === purchaseLineId);
       if (line && quantity > line.remainingQuantity) {
-        errors.push(`${line.sku} total received quantity cannot exceed remaining quantity ${line.remainingQuantity}.`);
+        errors.push(
+          `${line.sku} ${t("purchasing.error.exceedsRemainingQtyPrefix", "total received quantity cannot exceed remaining quantity")} ${line.remainingQuantity}.`,
+        );
       }
     }
 
     return [...new Set(errors)];
-  }, [locationId, rows]);
+  }, [locationId, rows, t]);
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     if (validationErrors.length > 0) {
@@ -140,7 +144,7 @@ export function ReceiptLinesEditor({
       <input type="hidden" name="purchaseOrderId" value={purchaseOrderId} />
       <div className="grid gap-4 md:grid-cols-2">
         <label className="flex flex-col gap-1 text-sm font-medium">
-          Receive To
+          {t("purchasing.receiveTo", "Receive To")}
           <select
             name="locationId"
             required
@@ -148,7 +152,7 @@ export function ReceiptLinesEditor({
             className={inputClass}
             onChange={(event) => setLocationId(event.target.value)}
           >
-            <option value="">Select location</option>
+            <option value="">{t("field.selectLocation", "Select location")}</option>
             {locations.map((location) => (
               <option key={location.id} value={location.id}>
                 {location.code} / {location.name}
@@ -157,7 +161,7 @@ export function ReceiptLinesEditor({
           </select>
         </label>
         <label className="flex flex-col gap-1 text-sm font-medium">
-          Supplier Invoice
+          {t("purchasing.supplierInvoice", "Supplier Invoice")}
           <input name="supplierInvoiceNo" className={inputClass} />
         </label>
       </div>
@@ -172,12 +176,12 @@ export function ReceiptLinesEditor({
         <table className="w-full min-w-[1060px] text-left text-sm">
           <thead className="text-xs uppercase text-muted-foreground">
             <tr className="border-b border-border">
-              <th className="px-2 py-2">Product</th>
-              <th className="px-2 py-2 text-right">Remaining</th>
-              <th className="w-32 px-2 py-2 text-right">Receive</th>
-              <th className="w-44 px-2 py-2">Serial Number</th>
-              <th className="w-44 px-2 py-2">Lot Number</th>
-              <th className="w-28 px-2 py-2 text-right">Actions</th>
+              <th className="px-2 py-2">{t("Product", "Product")}</th>
+              <th className="px-2 py-2 text-right">{t("purchasing.remaining", "Remaining")}</th>
+              <th className="w-32 px-2 py-2 text-right">{t("purchasing.receive", "Receive")}</th>
+              <th className="w-44 px-2 py-2">{t("purchasing.serialNumber", "Serial Number")}</th>
+              <th className="w-44 px-2 py-2">{t("purchasing.lotNumber", "Lot Number")}</th>
+              <th className="w-28 px-2 py-2 text-right">{t("action.actions")}</th>
             </tr>
           </thead>
           <tbody>
@@ -186,7 +190,7 @@ export function ReceiptLinesEditor({
                 <td className="px-2 py-3">
                   <input type="hidden" name="purchaseOrderLineId" value={row.id} />
                   <div className="font-medium">{row.productName}</div>
-                  <div className="text-xs text-muted-foreground">{row.sku} / {row.trackingMode}</div>
+                  <div className="text-xs text-muted-foreground">{row.sku} / {t(`status.${row.trackingMode}`, row.trackingMode)}</div>
                 </td>
                 <td className="px-2 py-3 text-right">{row.remainingQuantity}</td>
                 <td className="px-2 py-3">
@@ -253,7 +257,7 @@ export function ReceiptLinesEditor({
             {rows.length === 0 ? (
               <tr>
                 <td colSpan={6} className="px-2 py-8 text-center text-muted-foreground">
-                  No remaining quantity to receive.
+                  {t("purchasing.noRemainingQty", "No remaining quantity to receive.")}
                 </td>
               </tr>
             ) : null}
@@ -263,10 +267,10 @@ export function ReceiptLinesEditor({
 
       <DialogFooter>
         <DialogClose asChild>
-          <Button type="button" variant="outline">Cancel</Button>
+          <Button type="button" variant="outline">{t("action.cancel")}</Button>
         </DialogClose>
         <Button type="submit" disabled={validationErrors.length > 0}>
-          Post Receipt
+          {t("purchasing.postReceipt", "Post Receipt")}
         </Button>
       </DialogFooter>
     </form>

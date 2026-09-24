@@ -5,6 +5,7 @@ import { LandedCostForm } from "@/app/admin/purchasing/landed-costs/landed-cost-
 import { Alert } from "@/components/ui/alert";
 import { ButtonLink } from "@/components/ui/button";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
+import { T } from "@/components/ui/t";
 import { requirePermission } from "@/server/auth/session";
 import {
   getPurchaseLandedCostDetail,
@@ -40,8 +41,8 @@ export default async function EditLandedCostPage({ params, searchParams }: EditL
     <PageShell>
       <PageHeader
         eyebrow="Purchasing / Landed Cost"
-        title={`Edit ${cost.costNo}`}
-        actions={<ButtonLink href={`/admin/purchasing/landed-costs/${cost.id}`} variant="outline">Back to landed cost</ButtonLink>}
+        title={<><T k="action.edit" /> {cost.costNo}</>}
+        actions={<ButtonLink href={`/admin/purchasing/landed-costs/${cost.id}`} variant="outline"><T k="purchasing.backToLandedCost" fallback="Back to landed cost" /></ButtonLink>}
       />
 
       {query.error ? <Alert kind="error">{query.error}</Alert> : null}

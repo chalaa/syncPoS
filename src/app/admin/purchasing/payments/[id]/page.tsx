@@ -12,6 +12,7 @@ import { Alert } from "@/components/ui/alert";
 import { StatusBadge } from "@/components/ui/badge";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
+import { T } from "@/components/ui/t";
 import { requirePermission } from "@/server/auth/session";
 import { displayPaymentMoney, getActivePaymentAccounts, getPaymentDetail } from "@/server/payments/payments";
 
@@ -53,11 +54,13 @@ export default async function PaymentDetailPage({ params, searchParams }: Paymen
         title={payment.paymentNo}
         actions={
           <div className="flex flex-wrap gap-2">
-            <ButtonLink href="/admin/purchasing?view=payments" variant="outline">Back to payments</ButtonLink>
+            <ButtonLink href="/admin/purchasing?view=payments" variant="outline"><T k="purchasing.backToPayments" fallback="Back to payments" /></ButtonLink>
             {isSupplierPayment && payment.status === "draft" ? (
               <PaymentFormDialog
                 title="Edit Supplier Payment"
                 description={`Update draft payment ${payment.paymentNo}.`}
+                descriptionVariant="updateDraft"
+                documentNo={payment.paymentNo}
                 triggerLabel="Edit Payment"
                 submitLabel="Save Payment"
                 action={updateSupplierPayment}
@@ -77,13 +80,13 @@ export default async function PaymentDetailPage({ params, searchParams }: Paymen
             {isSupplierPayment && payment.status === "draft" ? (
               <form action={postSupplierPayment}>
                 <input type="hidden" name="paymentId" value={payment.id} />
-                <Button>Post Payment</Button>
+                <Button><T k="Post Payment" /></Button>
               </form>
             ) : null}
             {isSupplierPayment && payment.status !== "cancelled" ? (
               <form action={cancelSupplierPayment}>
                 <input type="hidden" name="paymentId" value={payment.id} />
-                <Button variant="danger">Cancel</Button>
+                <Button variant="danger"><T k="action.cancel" /></Button>
               </form>
             ) : null}
           </div>
@@ -101,9 +104,9 @@ export default async function PaymentDetailPage({ params, searchParams }: Paymen
               className="group flex flex-col rounded-lg border border-border bg-card px-4 py-2 text-sm shadow-xs transition-all hover:border-primary/50 hover:bg-secondary/40"
             >
               <span className="text-lg font-bold tracking-tight text-foreground transition-colors group-hover:text-primary">
-                {payment.allocations.find((allocation) => allocation.purchaseOrderId === purchaseOrderId)?.purchaseOrderNo ?? "Purchase Order"}
+                {payment.allocations.find((allocation) => allocation.purchaseOrderId === purchaseOrderId)?.purchaseOrderNo ?? <T k="Purchase Order" />}
               </span>
-              <span className="text-xs font-medium text-muted-foreground">Purchase Order</span>
+              <span className="text-xs font-medium text-muted-foreground"><T k="Purchase Order" /></span>
             </Link>
           ) : null}
         </div>
@@ -113,72 +116,72 @@ export default async function PaymentDetailPage({ params, searchParams }: Paymen
       <section className="rounded-lg border border-border bg-card p-5">
         <div className="mb-5 grid gap-4 md:grid-cols-4">
           <div>
-            <p className="text-xs font-medium uppercase text-muted-foreground">Status</p>
+            <p className="text-xs font-medium uppercase text-muted-foreground"><T k="field.status" /></p>
             <div className="mt-1">
               <StatusBadge status={payment.status} size="sm" />
             </div>
           </div>
           <div>
-            <p className="text-xs font-medium uppercase text-muted-foreground">Type</p>
-            <p className="mt-1 text-sm font-medium capitalize">{statusLabel(payment.paymentType)}</p>
+            <p className="text-xs font-medium uppercase text-muted-foreground"><T k="field.type" fallback="Type" /></p>
+            <p className="mt-1 text-sm font-medium capitalize"><T k={`status.${payment.paymentType}`} fallback={statusLabel(payment.paymentType)} /></p>
           </div>
           <div>
-            <p className="text-xs font-medium uppercase text-muted-foreground">Supplier</p>
+            <p className="text-xs font-medium uppercase text-muted-foreground"><T k="Supplier" /></p>
             <p className="mt-1 text-sm font-medium">{payment.partnerName ?? "-"}</p>
           </div>
           <div>
-            <p className="text-xs font-medium uppercase text-muted-foreground">Amount</p>
+            <p className="text-xs font-medium uppercase text-muted-foreground"><T k="field.amount" fallback="Amount" /></p>
             <p className="mt-1 text-sm font-medium">{displayPaymentMoney(payment.amountMinor, payment.currencyCode)}</p>
           </div>
           <div>
-            <p className="text-xs font-medium uppercase text-muted-foreground">Payment Date</p>
+            <p className="text-xs font-medium uppercase text-muted-foreground"><T k="purchasing.paymentDateField" fallback="Payment Date" /></p>
             <p className="mt-1 text-sm font-medium">{payment.paymentDate}</p>
           </div>
           <div>
-            <p className="text-xs font-medium uppercase text-muted-foreground">Method</p>
+            <p className="text-xs font-medium uppercase text-muted-foreground"><T k="payment.method" fallback="Method" /></p>
             <p className="mt-1 text-sm font-medium">{payment.paymentMethodName}</p>
           </div>
           <div>
-            <p className="text-xs font-medium uppercase text-muted-foreground">Account</p>
+            <p className="text-xs font-medium uppercase text-muted-foreground"><T k="field.account" fallback="Account" /></p>
             <p className="mt-1 text-sm font-medium">{payment.paymentAccountName}</p>
           </div>
           <div>
-            <p className="text-xs font-medium uppercase text-muted-foreground">Reference</p>
+            <p className="text-xs font-medium uppercase text-muted-foreground"><T k="Reference" /></p>
             <p className="mt-1 text-sm font-medium">{payment.reference ?? "-"}</p>
           </div>
           <div>
-            <p className="text-xs font-medium uppercase text-muted-foreground">Verification Policy</p>
-            <p className="mt-1 text-sm font-medium">Advisory; unverified lines can still post</p>
+            <p className="text-xs font-medium uppercase text-muted-foreground"><T k="purchasing.verificationPolicy" fallback="Verification Policy" /></p>
+            <p className="mt-1 text-sm font-medium"><T k="purchasing.verificationPolicyHint" fallback="Advisory; unverified lines can still post" /></p>
           </div>
           <div>
-            <p className="text-xs font-medium uppercase text-muted-foreground">Posted At</p>
+            <p className="text-xs font-medium uppercase text-muted-foreground"><T k="purchasing.postedAt" fallback="Posted At" /></p>
             <p className="mt-1 text-sm font-medium">{payment.postedAt ?? "-"}</p>
           </div>
           <div>
-            <p className="text-xs font-medium uppercase text-muted-foreground">Cancelled At</p>
+            <p className="text-xs font-medium uppercase text-muted-foreground"><T k="purchasing.cancelledAt" fallback="Cancelled At" /></p>
             <p className="mt-1 text-sm font-medium">{payment.cancelledAt ?? "-"}</p>
           </div>
           <div>
-            <p className="text-xs font-medium uppercase text-muted-foreground">Notes</p>
+            <p className="text-xs font-medium uppercase text-muted-foreground"><T k="field.notes" fallback="Notes" /></p>
             <p className="mt-1 text-sm font-medium">{payment.notes ?? "-"}</p>
           </div>
           <div>
-            <p className="text-xs font-medium uppercase text-muted-foreground">Related Document</p>
+            <p className="text-xs font-medium uppercase text-muted-foreground"><T k="purchasing.relatedDocument" fallback="Related Document" /></p>
             {vendorBillId ? (
               <Link href={`/admin/purchasing/vendor-bills/vendor_bill/${vendorBillId}`} className="mt-1 block text-sm font-medium text-primary underline-offset-4 hover:underline">
-                Open vendor bill
+                <T k="purchasing.openVendorBill" fallback="Open vendor bill" />
               </Link>
             ) : purchaseOrderId ? (
               <Link href={`/admin/purchasing/${purchaseOrderId}`} className="mt-1 block text-sm font-medium text-primary underline-offset-4 hover:underline">
-                Open purchase order
+                <T k="purchasing.openPurchaseOrder" fallback="Open purchase order" />
               </Link>
             ) : expenseId ? (
               <Link href={`/admin/operations/expenses/${expenseId}`} className="mt-1 block text-sm font-medium text-primary underline-offset-4 hover:underline">
-                Open expense
+                <T k="purchasing.openExpense" fallback="Open expense" />
               </Link>
             ) : customerInvoiceId ? (
               <Link href={`/admin/sales/invoices/${customerInvoiceId}`} className="mt-1 block text-sm font-medium text-primary underline-offset-4 hover:underline">
-                Open customer invoice
+                <T k="purchasing.openCustomerInvoice" fallback="Open customer invoice" />
               </Link>
             ) : (
               <p className="mt-1 text-sm font-medium">-</p>
@@ -190,13 +193,13 @@ export default async function PaymentDetailPage({ params, searchParams }: Paymen
           <table className="w-full min-w-[760px] text-left text-sm">
             <thead className="text-xs uppercase text-muted-foreground">
               <tr className="border-b border-border">
-                <th className="px-3 py-2">Method</th>
-                <th className="px-3 py-2">Account</th>
-                <th className="px-3 py-2">Reference</th>
-                <th className="px-3 py-2">Note</th>
-                <th className="px-3 py-2">Verification</th>
-                <th className="px-3 py-2 text-right">Verified Amount</th>
-                <th className="px-3 py-2 text-right">Amount</th>
+                <th className="px-3 py-2"><T k="payment.method" fallback="Method" /></th>
+                <th className="px-3 py-2"><T k="field.account" fallback="Account" /></th>
+                <th className="px-3 py-2"><T k="Reference" /></th>
+                <th className="px-3 py-2"><T k="Note" /></th>
+                <th className="px-3 py-2"><T k="payment.verification" fallback="Verification" /></th>
+                <th className="px-3 py-2 text-right"><T k="purchasing.verifiedAmount" fallback="Verified Amount" /></th>
+                <th className="px-3 py-2 text-right"><T k="field.amount" fallback="Amount" /></th>
               </tr>
             </thead>
             <tbody>
@@ -213,7 +216,7 @@ export default async function PaymentDetailPage({ params, searchParams }: Paymen
                         <form action={verifyPaymentLine}>
                           <input type="hidden" name="paymentLineId" value={line.id} />
                           <input type="hidden" name="returnPath" value={`/admin/purchasing/payments/${payment.id}`} />
-                          <Button size="sm" variant="outline">Verify</Button>
+                          <Button size="sm" variant="outline"><T k="purchasing.verify" fallback="Verify" /></Button>
                         </form>
                       ) : null}
                     </div>
@@ -234,8 +237,8 @@ export default async function PaymentDetailPage({ params, searchParams }: Paymen
           <table className="w-full min-w-[760px] text-left text-sm">
             <thead className="text-xs uppercase text-muted-foreground">
               <tr className="border-b border-border">
-                <th className="px-3 py-2">Document</th>
-                <th className="px-3 py-2 text-right">Allocated</th>
+                <th className="px-3 py-2"><T k="purchasing.document" fallback="Document" /></th>
+                <th className="px-3 py-2 text-right"><T k="report.allocated" fallback="Allocated" /></th>
               </tr>
             </thead>
             <tbody>
@@ -280,7 +283,7 @@ function VerificationStatus({
   status: string;
   message: string | null;
 }) {
-  const label = status.replace(/_/g, " ");
+  const fallbackLabel = status.replace(/_/g, " ");
   const className = status === "verified"
     ? "border-emerald-200 bg-emerald-50 text-emerald-700"
     : status === "failed"
@@ -289,7 +292,7 @@ function VerificationStatus({
 
   return (
     <span title={message ?? undefined} className={`rounded-md border px-2 py-1 text-xs font-medium capitalize ${className}`}>
-      {label}
+      <T k={`status.${status}`} fallback={fallbackLabel} />
     </span>
   );
 }

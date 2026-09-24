@@ -8,6 +8,7 @@ import { Button, ButtonLink } from "@/components/ui/button";
 import { Notebook } from "@/components/ui/notebook";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
 import { DetailStatCard } from "@/components/ui/detail-stat-card";
+import { T } from "@/components/ui/t";
 import { requirePermission } from "@/server/auth/session";
 import { displayReturnMoney, getSupplierReturnDetail } from "@/server/returns/returns";
 import type { ReturnDetailLine } from "@/server/returns/types";
@@ -40,11 +41,11 @@ export default async function SupplierReturnPage({ params, searchParams }: Suppl
         title={record.returnNo}
         actions={
           <div className="flex flex-wrap gap-2">
-            <ButtonLink href="/admin/purchasing?view=returns" variant="outline">Back to returns</ButtonLink>
+            <ButtonLink href="/admin/purchasing?view=returns" variant="outline"><T k="purchasing.backToReturns" fallback="Back to returns" /></ButtonLink>
             {record.status === "draft" ? (
               <form action={postSupplierReturn}>
                 <input type="hidden" name="id" value={record.id} />
-                <Button>Post Supplier Return</Button>
+                <Button><T k="purchasing.postSupplierReturn" fallback="Post Supplier Return" /></Button>
               </form>
             ) : null}
           </div>
@@ -69,7 +70,7 @@ export default async function SupplierReturnPage({ params, searchParams }: Suppl
               <span className="text-lg font-bold tracking-tight text-foreground transition-colors group-hover:text-primary">
                 1
               </span>
-              <span className="text-xs font-medium text-muted-foreground">Supplier Return Move</span>
+              <span className="text-xs font-medium text-muted-foreground"><T k="purchasing.supplierReturnMove" fallback="Supplier Return Move" /></span>
             </Link>
           ) : null}
         </div>
@@ -80,14 +81,14 @@ export default async function SupplierReturnPage({ params, searchParams }: Suppl
         <div className="mb-5 grid gap-4 md:grid-cols-4">
           <Info label="Supplier" value={record.supplierName} />
           <div>
-            <p className="text-xs font-medium uppercase text-muted-foreground">Status</p>
+            <p className="text-xs font-medium uppercase text-muted-foreground"><T k="field.status" /></p>
             <div className="mt-1">
               <StatusBadge status={record.status} size="sm" />
             </div>
           </div>
-          <Info label="Return Date" value={record.returnDate} />
-          <Info label="Source" value={record.sourceLocationCode} />
-          <Info label="Vendor Refund Amount" value={displayReturnMoney(record.refundAmountMinor, record.currencyCode)} />
+          <Info label="purchasing.returnDate" value={record.returnDate} />
+          <Info label="report.source" value={record.sourceLocationCode} />
+          <Info label="purchasing.vendorRefundAmount" value={displayReturnMoney(record.refundAmountMinor, record.currencyCode)} />
         </div>
 
         <ReturnLines lines={record.lines} />
@@ -97,8 +98,8 @@ export default async function SupplierReturnPage({ params, searchParams }: Suppl
           items={[
             {
               value: "other",
-              label: "Other Information",
-              content: <p className="text-sm text-muted-foreground">{record.notes || "No notes"}</p>,
+              label: <T k="purchasing.otherInformation" fallback="Other Information" />,
+              content: <p className="text-sm text-muted-foreground">{record.notes || <T k="payment.noNotes" fallback="No notes" />}</p>,
             },
           ]}
         />
@@ -113,11 +114,11 @@ function ReturnLines({ lines }: { lines: ReturnDetailLine[] }) {
       <table className="w-full min-w-[860px] text-left text-sm">
         <thead className="text-xs uppercase text-muted-foreground">
           <tr className="border-b border-border">
-            <th className="px-3 py-2">Product</th>
-            <th className="px-3 py-2 text-right">Quantity</th>
-            <th className="px-3 py-2">Condition</th>
-            <th className="px-3 py-2">Tracking</th>
-            <th className="px-3 py-2 text-right">Refund</th>
+            <th className="px-3 py-2"><T k="Product" /></th>
+            <th className="px-3 py-2 text-right"><T k="purchasing.quantity" fallback="Quantity" /></th>
+            <th className="px-3 py-2"><T k="return.condition" fallback="Condition" /></th>
+            <th className="px-3 py-2"><T k="field.trackingMode" fallback="Tracking" /></th>
+            <th className="px-3 py-2 text-right"><T k="return.refund" fallback="Refund" /></th>
           </tr>
         </thead>
         <tbody>
@@ -128,8 +129,8 @@ function ReturnLines({ lines }: { lines: ReturnDetailLine[] }) {
                 <div className="text-xs text-muted-foreground">{line.sku}</div>
               </td>
               <td className="px-3 py-3 text-right">{line.quantityReturned}</td>
-              <td className="px-3 py-3 capitalize">{label(line.condition)}</td>
-              <td className="px-3 py-3">{line.serialNo ?? line.lotNo ?? "Bulk"}</td>
+              <td className="px-3 py-3 capitalize"><T k={`status.${line.condition}`} fallback={label(line.condition)} /></td>
+              <td className="px-3 py-3">{line.serialNo ?? line.lotNo ?? <T k="return.bulk" fallback="Bulk" />}</td>
               <td className="px-3 py-3 text-right">{displayReturnMoney(line.refundAmountMinor, line.currencyCode)}</td>
             </tr>
           ))}
@@ -142,7 +143,7 @@ function ReturnLines({ lines }: { lines: ReturnDetailLine[] }) {
 function Info({ label: name, value }: { label: string; value: string }) {
   return (
     <div>
-      <p className="text-xs font-medium uppercase text-muted-foreground">{name}</p>
+      <p className="text-xs font-medium uppercase text-muted-foreground"><T k={name} /></p>
       <p className="mt-1 text-sm font-medium capitalize">{value}</p>
     </div>
   );

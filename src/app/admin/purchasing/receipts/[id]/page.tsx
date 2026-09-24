@@ -6,6 +6,7 @@ import { StatusBadge } from "@/components/ui/badge";
 import { ButtonLink } from "@/components/ui/button";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
 import { DetailStatCard } from "@/components/ui/detail-stat-card";
+import { T } from "@/components/ui/t";
 import { requirePermission } from "@/server/auth/session";
 import {
   displayPurchaseMoney,
@@ -40,8 +41,8 @@ export default async function ReceiptDetailPage({ params, searchParams }: Receip
         title={receipt.receiptNo}
         actions={
           <div className="flex flex-wrap gap-2">
-            <ButtonLink href="/admin/purchasing?view=receipts" variant="outline">Back to receipts</ButtonLink>
-            <ButtonLink href={`/admin/purchasing/landed-costs/new?receiptId=${receipt.id}`} variant="outline">Add Landed Cost</ButtonLink>
+            <ButtonLink href="/admin/purchasing?view=receipts" variant="outline"><T k="purchasing.backToReceipts" fallback="Back to receipts" /></ButtonLink>
+            <ButtonLink href={`/admin/purchasing/landed-costs/new?receiptId=${receipt.id}`} variant="outline"><T k="purchasing.addLandedCost" fallback="Add Landed Cost" /></ButtonLink>
           </div>
         }
       />
@@ -67,39 +68,39 @@ export default async function ReceiptDetailPage({ params, searchParams }: Receip
       <section className="rounded-lg border border-border bg-card p-5">
         <div className="mb-5 grid gap-4 md:grid-cols-4">
           <div>
-            <p className="text-xs font-medium uppercase text-muted-foreground">Purchase Order</p>
+            <p className="text-xs font-medium uppercase text-muted-foreground"><T k="Purchase Order" /></p>
             <Link href={`/admin/purchasing/${receipt.purchaseOrderId}`} className="mt-1 block text-sm font-medium text-primary underline-offset-4 hover:underline">
               {receipt.orderNo}
             </Link>
           </div>
           <div>
-            <p className="text-xs font-medium uppercase text-muted-foreground">Supplier</p>
+            <p className="text-xs font-medium uppercase text-muted-foreground"><T k="Supplier" /></p>
             <p className="mt-1 text-sm font-medium">{receipt.supplierName}</p>
           </div>
           <div>
-            <p className="text-xs font-medium uppercase text-muted-foreground">Status</p>
+            <p className="text-xs font-medium uppercase text-muted-foreground"><T k="field.status" /></p>
             <div className="mt-1">
               <StatusBadge status={receipt.status} size="sm" />
             </div>
           </div>
           <div>
-            <p className="text-xs font-medium uppercase text-muted-foreground">Total</p>
+            <p className="text-xs font-medium uppercase text-muted-foreground"><T k="report.total" fallback="Total" /></p>
             <p className="mt-1 text-sm font-medium">{displayPurchaseMoney(receipt.totalMinor, receipt.currencyCode)}</p>
           </div>
           <div>
-            <p className="text-xs font-medium uppercase text-muted-foreground">Receipt Date</p>
+            <p className="text-xs font-medium uppercase text-muted-foreground"><T k="purchasing.receiptDate" fallback="Receipt Date" /></p>
             <p className="mt-1 text-sm font-medium">{receipt.receiptDate}</p>
           </div>
           <div>
-            <p className="text-xs font-medium uppercase text-muted-foreground">Source Location</p>
+            <p className="text-xs font-medium uppercase text-muted-foreground"><T k="purchasing.sourceLocation" fallback="Source Location" /></p>
             <p className="mt-1 text-sm font-medium">{receipt.sourceLocationCode ?? "VENDORS"}</p>
           </div>
           <div>
-            <p className="text-xs font-medium uppercase text-muted-foreground">Destination Location</p>
+            <p className="text-xs font-medium uppercase text-muted-foreground"><T k="purchasing.destinationLocation" fallback="Destination Location" /></p>
             <p className="mt-1 text-sm font-medium">{receipt.locationCode ?? "-"}</p>
           </div>
           <div>
-            <p className="text-xs font-medium uppercase text-muted-foreground">Supplier Invoice</p>
+            <p className="text-xs font-medium uppercase text-muted-foreground"><T k="purchasing.supplierInvoice" fallback="Supplier Invoice" /></p>
             <p className="mt-1 text-sm font-medium">{receipt.supplierInvoiceNo ?? "-"}</p>
           </div>
         </div>
@@ -108,12 +109,12 @@ export default async function ReceiptDetailPage({ params, searchParams }: Receip
           <table className="w-full min-w-[860px] text-left text-sm">
             <thead className="text-xs uppercase text-muted-foreground">
               <tr className="border-b border-border">
-                <th className="px-3 py-2">Product</th>
-                <th className="px-3 py-2 text-right">Quantity</th>
-                <th className="px-3 py-2">Tracking</th>
-                <th className="px-3 py-2 text-right">Unit Cost</th>
-                <th className="px-3 py-2 text-right">Landed Cost</th>
-                <th className="px-3 py-2 text-right">Total</th>
+                <th className="px-3 py-2"><T k="Product" /></th>
+                <th className="px-3 py-2 text-right"><T k="purchasing.quantity" fallback="Quantity" /></th>
+                <th className="px-3 py-2"><T k="field.trackingMode" fallback="Tracking" /></th>
+                <th className="px-3 py-2 text-right"><T k="purchasing.unitCost" fallback="Unit Cost" /></th>
+                <th className="px-3 py-2 text-right"><T k="Landed Costs" fallback="Landed Cost" /></th>
+                <th className="px-3 py-2 text-right"><T k="report.total" fallback="Total" /></th>
               </tr>
             </thead>
             <tbody>

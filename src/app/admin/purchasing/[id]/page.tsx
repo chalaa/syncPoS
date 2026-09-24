@@ -23,6 +23,7 @@ import {
 import { Notebook } from "@/components/ui/notebook";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
 import { DetailStatCard } from "@/components/ui/detail-stat-card";
+import { T } from "@/components/ui/t";
 import { requirePermission } from "@/server/auth/session";
 import {
   displayPurchaseMoney,
@@ -64,12 +65,12 @@ function CreateReceiptDialog({
   return (
     <Dialog>
       <DialogTrigger asChild>
-        <Button>Create Receipt</Button>
+        <Button><T k="purchasing.createReceipt" fallback="Create Receipt" /></Button>
       </DialogTrigger>
       <DialogContent className="max-w-5xl">
         <DialogHeader>
-          <DialogTitle>Create Receipt</DialogTitle>
-          <DialogDescription>Receive products against {order.orderNo}.</DialogDescription>
+          <DialogTitle><T k="purchasing.createReceipt" fallback="Create Receipt" /></DialogTitle>
+          <DialogDescription><T k="purchasing.receiveProductsAgainst" fallback="Receive products against" /> {order.orderNo}.</DialogDescription>
         </DialogHeader>
         <ReceiptLinesEditor
           action={postGoodsReceipt}
@@ -107,7 +108,7 @@ export default async function PurchaseOrderDetailPage({ params, searchParams }: 
       <PageHeader
         eyebrow="Purchasing"
         title={order.orderNo}
-        actions={<ButtonLink href="/admin/purchasing" variant="outline">Back to orders</ButtonLink>}
+        actions={<ButtonLink href="/admin/purchasing" variant="outline"><T k="purchasing.backToOrders" fallback="Back to orders" /></ButtonLink>}
       />
 
       {query.notice ? <Alert kind="success">{query.notice}</Alert> : null}
@@ -142,9 +143,13 @@ export default async function PurchaseOrderDetailPage({ params, searchParams }: 
             <StatusBadge
               status={order.totalMinor === 0 || order.residualAmountMinor === 0 ? "paid" : order.residualAmountMinor < order.totalMinor ? "partially_paid" : "unpaid"}
               label={
-                order.totalMinor === 0 || order.residualAmountMinor === 0
-                  ? "Fully Paid"
-                  : `Unpaid ${displayPurchaseMoney(order.residualAmountMinor, order.currencyCode)}`
+                order.totalMinor === 0 || order.residualAmountMinor === 0 ? (
+                  <T k="purchasing.fullyPaid" fallback="Fully Paid" />
+                ) : (
+                  <>
+                    <T k="status.unpaid" /> {displayPurchaseMoney(order.residualAmountMinor, order.currencyCode)}
+                  </>
+                )
               }
               size="lg"
             />
@@ -157,6 +162,8 @@ export default async function PurchaseOrderDetailPage({ params, searchParams }: 
             <PaymentFormDialog
               title="Register Payment"
               description={`Register and post payment for ${order.orderNo}.`}
+              descriptionVariant="registerAndPost"
+              documentNo={order.orderNo}
               triggerLabel="Register Payment"
               submitLabel="Post Payment"
               action={registerSupplierPayment}
@@ -169,12 +176,12 @@ export default async function PurchaseOrderDetailPage({ params, searchParams }: 
           ) : null}
           {order.receiptCount > 0 ? (
             <ButtonLink href={`/admin/purchasing/landed-costs/new?purchaseOrderId=${order.id}`} variant="outline">
-              Add Landed Cost
+              <T k="purchasing.addLandedCost" fallback="Add Landed Cost" />
             </ButtonLink>
           ) : null}
           {canCreateReturn ? (
             <ButtonLink href={`/admin/purchasing/returns/new?purchaseOrderId=${order.id}`} variant="outline">
-              Add Return
+              <T k="purchasing.addReturn" fallback="Add Return" />
             </ButtonLink>
           ) : null}
         </div>
@@ -200,44 +207,44 @@ export default async function PurchaseOrderDetailPage({ params, searchParams }: 
         <section className="rounded-lg border border-border bg-card p-5">
           <div className="mb-5 grid gap-4 md:grid-cols-3">
             <div>
-              <p className="text-xs font-medium uppercase text-muted-foreground">Supplier</p>
+              <p className="text-xs font-medium uppercase text-muted-foreground"><T k="Supplier" /></p>
               <p className="mt-1 text-sm font-medium">{order.supplierName}</p>
             </div>
             <div>
-              <p className="text-xs font-medium uppercase text-muted-foreground">Owner</p>
+              <p className="text-xs font-medium uppercase text-muted-foreground"><T k="Owner" /></p>
               <p className="mt-1 text-sm font-medium">{order.ownerName ?? "-"}</p>
             </div>
             <div>
-              <p className="text-xs font-medium uppercase text-muted-foreground">Reference</p>
+              <p className="text-xs font-medium uppercase text-muted-foreground"><T k="Reference" /></p>
               <p className="mt-1 text-sm font-medium">{order.vendorReference ?? "-"}</p>
             </div>
             <div>
-              <p className="text-xs font-medium uppercase text-muted-foreground">Payment Term</p>
-              <p className="mt-1 text-sm font-medium capitalize">{order.paymentTerm}</p>
+              <p className="text-xs font-medium uppercase text-muted-foreground"><T k="purchasing.paymentTerm" fallback="Payment Term" /></p>
+              <p className="mt-1 text-sm font-medium capitalize"><T k={`status.${order.paymentTerm}`} fallback={order.paymentTerm} /></p>
             </div>
             <div>
-              <p className="text-xs font-medium uppercase text-muted-foreground">Order Date</p>
+              <p className="text-xs font-medium uppercase text-muted-foreground"><T k="purchasing.orderDate" fallback="Order Date" /></p>
               <p className="mt-1 text-sm font-medium">{order.orderDate}</p>
             </div>
             {order.paymentTerm === "credit" ? (
               <div>
-                <p className="text-xs font-medium uppercase text-muted-foreground">Payment Date</p>
+                <p className="text-xs font-medium uppercase text-muted-foreground"><T k="purchasing.paymentDate" fallback="Payment Date" /></p>
                 <p className="mt-1 text-sm font-medium">{order.paymentDueDate ?? "-"}</p>
               </div>
             ) : null}
             {order.totalMinor === 0 ? (
               <div>
-                <p className="text-xs font-medium uppercase text-muted-foreground">Payment</p>
-                <p className="mt-1 text-sm font-bold text-emerald-700">Fully Paid</p>
+                <p className="text-xs font-medium uppercase text-muted-foreground"><T k="Payment" /></p>
+                <p className="mt-1 text-sm font-bold text-emerald-700"><T k="purchasing.fullyPaid" fallback="Fully Paid" /></p>
               </div>
             ) : (
               <>
                 <div>
-                  <p className="text-xs font-medium uppercase text-muted-foreground">Paid</p>
+                  <p className="text-xs font-medium uppercase text-muted-foreground"><T k="Paid" /></p>
                   <p className="mt-1 text-sm font-medium">{displayPurchaseMoney(order.paidMinor, order.currencyCode)}</p>
                 </div>
                 <div>
-                  <p className="text-xs font-medium uppercase text-muted-foreground">Unpaid</p>
+                  <p className="text-xs font-medium uppercase text-muted-foreground"><T k="status.unpaid" /></p>
                   <p className="mt-1 text-sm font-medium">{displayPurchaseMoney(order.residualAmountMinor, order.currencyCode)}</p>
                 </div>
               </>
@@ -252,18 +259,18 @@ export default async function PurchaseOrderDetailPage({ params, searchParams }: 
                 items={[
                   {
                     value: "order-lines",
-                    label: "Order Lines",
+                    label: <T k="purchasing.orderLines" fallback="Order Lines" />,
                     content: (
                       <div className="overflow-x-auto">
                         <table className="w-full min-w-[860px] text-left text-sm">
                           <thead className="text-xs uppercase text-muted-foreground">
                             <tr className="border-b border-border">
-                              <th className="px-2 py-2">Product</th>
-                              <th className="px-2 py-2 text-right">Ordered</th>
-                              <th className="px-2 py-2 text-right">Received</th>
-                              <th className="px-2 py-2 text-right">Unit Cost</th>
-                              {hasTaxInLines ? <th className="px-2 py-2 text-right">Tax</th> : null}
-                              <th className="px-2 py-2 text-right">Total</th>
+                              <th className="px-2 py-2"><T k="Product" /></th>
+                              <th className="px-2 py-2 text-right"><T k="purchasing.ordered" fallback="Ordered" /></th>
+                              <th className="px-2 py-2 text-right"><T k="status.received" fallback="Received" /></th>
+                              <th className="px-2 py-2 text-right"><T k="purchasing.unitCost" fallback="Unit Cost" /></th>
+                              {hasTaxInLines ? <th className="px-2 py-2 text-right"><T k="report.tax" fallback="Tax" /></th> : null}
+                              <th className="px-2 py-2 text-right"><T k="report.total" fallback="Total" /></th>
                             </tr>
                           </thead>
                           <tbody>
@@ -272,7 +279,8 @@ export default async function PurchaseOrderDetailPage({ params, searchParams }: 
                                 <td className="px-2 py-3">
                                   <div className="font-medium">{line.productName}</div>
                                   <div className="text-xs text-muted-foreground">
-                                    {line.sku} / {line.trackingMode}{line.taxNames ? ` / Taxes ${line.taxNames}` : ""}
+                                    {line.sku} / <T k={`status.${line.trackingMode}`} fallback={line.trackingMode} />
+                                    {line.taxNames ? <> / <T k="purchasing.taxesAbbrev" fallback="Taxes" /> {line.taxNames}</> : ""}
                                   </div>
                                 </td>
                                 <td className="px-2 py-3 text-right">{line.quantityOrdered}</td>
@@ -291,8 +299,8 @@ export default async function PurchaseOrderDetailPage({ params, searchParams }: 
                   },
                   {
                     value: "other-information",
-                    label: "Other Information",
-                    content: <p className="text-sm text-muted-foreground">{order.notes || "No notes"}</p>,
+                    label: <T k="purchasing.otherInformation" fallback="Other Information" />,
+                    content: <p className="text-sm text-muted-foreground">{order.notes || <T k="payment.noNotes" fallback="No notes" />}</p>,
                   },
                 ]}
               />
