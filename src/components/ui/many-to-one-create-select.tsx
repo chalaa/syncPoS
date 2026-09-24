@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { filterAndSortByFuzzy } from "@/lib/search-utils";
+import { useTranslation } from "@/lib/i18n/use-translation";
 
 import { useResizableDropdown } from "./use-resizable-dropdown";
 
@@ -60,6 +61,10 @@ export function ManyToOneCreateSelect({
   onValueChange,
   error: fieldError,
 }: ManyToOneCreateSelectProps) {
+  const { t } = useTranslation();
+  const tLabel = t(label, label);
+  const tPlaceholder = t(placeholder, placeholder);
+  const tEntityLabel = t(entityLabel, entityLabel);
   const [internalValue, setInternalValue] = useState(defaultValue ?? "");
   const [createdItems, setCreatedItems] = useState<ManyToOneOption[]>([]);
   const [query, setQuery] = useState("");
@@ -267,7 +272,11 @@ export function ManyToOneCreateSelect({
         setIsDialogOpen(false);
         onValueChange?.(created.id);
       } catch (err) {
-        setError(err instanceof Error ? err.message : `Could not create ${entityLabel.toLowerCase()}.`);
+        setError(
+          err instanceof Error
+            ? err.message
+            : `${t("manyToOne.couldNotCreate", "Could not create")} ${tEntityLabel}.`,
+        );
       }
     });
   }
@@ -279,7 +288,7 @@ export function ManyToOneCreateSelect({
         "group flex h-3.5 w-full shrink-0 cursor-ns-resize items-center justify-center bg-muted/40 transition-colors hover:bg-muted active:bg-muted/80 select-none",
         openUpward ? "border-b border-border/60 rounded-t-md" : "border-t border-border/60 rounded-b-md",
       )}
-      title="Drag to resize height"
+      title={t("dnd.resizeHint", "Drag to resize height")}
     >
       <div className="h-1 w-8 rounded-full bg-muted-foreground/30 transition-colors group-hover:bg-muted-foreground/70" />
     </div>
@@ -362,8 +371,8 @@ export function ManyToOneCreateSelect({
         {filteredItems.length === 0 ? (
           <p className="px-3 py-3 text-xs text-muted-foreground">
             {trimmedQuery
-              ? `No existing ${entityLabel.toLowerCase()} matching "${trimmedQuery}".`
-              : `No ${entityLabel.toLowerCase()}s found.`}
+              ? `${t("manyToOne.noExistingMatching", "No existing")} ${tEntityLabel} ${t("manyToOne.matching", "matching")} "${trimmedQuery}".`
+              : `${t("manyToOne.noneFound", "No")} ${tEntityLabel} ${t("manyToOne.found", "found.")}`}
           </p>
         ) : null}
 
@@ -380,7 +389,7 @@ export function ManyToOneCreateSelect({
               className="flex w-full items-center gap-2 rounded px-3 py-2 text-left text-sm text-foreground transition-colors hover:bg-secondary/80 disabled:opacity-60 font-medium"
             >
               <PlusIcon className="size-4 text-[#0B5D4B]" />
-              {isPending ? "Creating..." : `Quick Create "${trimmedQuery}"`}
+              {isPending ? t("manyToOne.creating", "Creating...") : `${t("manyToOne.quickCreate", "Quick Create")} "${trimmedQuery}"`}
             </button>
             <button
               type="button"
@@ -396,7 +405,7 @@ export function ManyToOneCreateSelect({
               className="flex w-full items-center gap-2 rounded px-3 py-2 text-left text-sm text-foreground transition-colors hover:bg-secondary/80 font-medium"
             >
               <PlusIcon className="size-4 text-[#0B5D4B]" />
-              Create & Edit ({entityLabel})...
+              {t("manyToOne.createAndEdit", "Create & Edit")} ({tEntityLabel})...
             </button>
           </div>
         ) : null}
@@ -410,7 +419,7 @@ export function ManyToOneCreateSelect({
 
   return (
     <div ref={rootRef} className="relative flex flex-col gap-1 text-sm font-medium">
-      <span>{label}</span>
+      <span>{tLabel}</span>
       <input type="hidden" name={name} value={selectedId} />
       <div className="flex items-center gap-1.5 w-full">
         <div className="relative flex-1 min-w-0">
@@ -438,7 +447,7 @@ export function ManyToOneCreateSelect({
                 openSelectionList();
               }
             }}
-            placeholder={selectedLabel || placeholder}
+            placeholder={selectedLabel || tPlaceholder}
             className={cn(inputClass, "w-full pl-9", fieldError ? "border-destructive focus-visible:border-destructive" : "")}
           />
         </div>
@@ -452,10 +461,10 @@ export function ManyToOneCreateSelect({
             setIsDialogOpen(true);
           }}
           className="size-9 sm:size-10 shrink-0 rounded-lg border-border/80 text-muted-foreground transition-all hover:border-[#0B5D4B]/40 hover:bg-emerald-500/10 hover:text-[#0B5D4B] dark:hover:text-emerald-300 active:scale-95"
-          title={`Create and select new ${entityLabel.toLowerCase()}`}
+          title={`${t("manyToOne.createAndSelectNew", "Create and select new")} ${tEntityLabel}`}
         >
           <UserPlus className="size-4" />
-          <span className="sr-only">Add {entityLabel}</span>
+          <span className="sr-only">{t("manyToOne.add", "Add")} {tEntityLabel}</span>
         </Button>
 
         {dropdown}
@@ -495,6 +504,8 @@ function CustomerCreateDialog({
   onOpenChange: (open: boolean) => void;
   onCreate: (input: CreateCustomerInput) => void;
 }) {
+  const { t } = useTranslation();
+  const tEntityLabel = t(entityLabel, entityLabel);
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent overlayClassName="z-[70]" className="z-[75] w-[calc(100%-1.5rem)] sm:w-full max-w-2xl max-h-[92vh] sm:max-h-[90vh] overflow-y-auto outline-none">
@@ -514,41 +525,43 @@ function CustomerCreateDialog({
           }}
         >
           <DialogHeader>
-            <DialogTitle>Create {entityLabel}</DialogTitle>
-            <DialogDescription>Create a new {entityLabel.toLowerCase()} and automatically select it on this document.</DialogDescription>
+            <DialogTitle>{t("manyToOne.create", "Create")} {tEntityLabel}</DialogTitle>
+            <DialogDescription>
+              {t("manyToOne.createDesc", "Create a new")} {tEntityLabel} {t("manyToOne.createDescSuffix", "and automatically select it on this document.")}
+            </DialogDescription>
           </DialogHeader>
 
           {error ? <p className="rounded-md border border-destructive/30 p-3 text-sm text-destructive">{error}</p> : null}
 
           <div className="grid gap-4 md:grid-cols-2">
             <label className="flex flex-col gap-1 text-sm font-medium">
-              Display Name <span className="text-destructive">*</span>
-              <input name="displayName" required defaultValue={initialName} className={inputClass} placeholder={`e.g. Acme ${entityLabel}`} />
+              {t("field.displayName", "Display Name")} <span className="text-destructive">*</span>
+              <input name="displayName" required defaultValue={initialName} className={inputClass} placeholder={`${t("manyToOne.egAcme", "e.g. Acme")} ${tEntityLabel}`} />
             </label>
             <label className="flex flex-col gap-1 text-sm font-medium">
-              Legal Name
-              <input name="legalName" className={inputClass} placeholder="Official business name" />
+              {t("field.legalName", "Legal Name")}
+              <input name="legalName" className={inputClass} placeholder={t("manyToOne.officialBusinessName", "Official business name")} />
             </label>
             <label className="flex flex-col gap-1 text-sm font-medium">
-              TIN
-              <input name="tin" className={inputClass} placeholder="Tax Identification Number" />
+              {t("field.tin", "TIN")}
+              <input name="tin" className={inputClass} placeholder={t("manyToOne.taxIdNumber", "Tax Identification Number")} />
             </label>
             <label className="flex flex-col gap-1 text-sm font-medium">
-              Phone
+              {t("field.phone", "Phone")}
               <input name="phone" className={inputClass} placeholder="+251..." />
             </label>
             <label className="flex flex-col gap-1 text-sm font-medium md:col-span-2">
-              Email
+              {t("field.email", "Email")}
               <input name="email" type="email" className={inputClass} placeholder="contact@domain.com" />
             </label>
           </div>
 
           <DialogFooter className="flex flex-col-reverse sm:flex-row justify-end gap-2">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-              Cancel
+              {t("action.cancel")}
             </Button>
             <Button type="submit" disabled={isPending} className="bg-[#0B5D4B] hover:bg-[#073B35] text-white font-semibold">
-              {isPending ? "Creating..." : `Create & Select ${entityLabel}`}
+              {isPending ? t("manyToOne.creating", "Creating...") : `${t("manyToOne.createAndSelect", "Create & Select")} ${tEntityLabel}`}
             </Button>
           </DialogFooter>
         </form>

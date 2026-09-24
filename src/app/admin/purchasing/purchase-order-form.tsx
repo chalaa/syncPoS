@@ -28,6 +28,7 @@ import { Notebook } from "@/components/ui/notebook";
 import { ProductSelect, type ProductSelectOption } from "@/app/admin/products/product-select";
 import { RelatedModelSelect } from "@/components/ui/related-model-select";
 import { useFormValidation, type FormValidationResult } from "@/hooks/use-form-validation";
+import { useTranslation } from "@/lib/i18n/use-translation";
 import { cn } from "@/lib/utils";
 import { createSupplierFromPurchasing } from "@/app/admin/purchasing/actions";
 import type { PurchaseFormOption, PurchaseOrderDetail, PurchaseTaxOption } from "@/server/purchasing/types";
@@ -117,53 +118,53 @@ function fieldKey(field: string, key: string) {
   return `${field}:${key}`;
 }
 
-function validatePurchaseOrderForm(values: PurchaseFormValues): FormValidationResult {
+function validatePurchaseOrderForm(values: PurchaseFormValues, t: (key: string, fallback?: string) => string): FormValidationResult {
   const fieldErrors: Record<string, string> = {};
 
   if (!values.supplierId) {
-    fieldErrors.supplierId = "Select a supplier.";
+    fieldErrors.supplierId = t("purchasing.error.selectSupplier", "Select a supplier.");
   }
 
   if (!values.ownerId) {
-    fieldErrors.ownerId = "Select an owner.";
+    fieldErrors.ownerId = t("purchasing.error.selectOwner", "Select an owner.");
   }
 
   if (!values.deliverToLocationId) {
-    fieldErrors.deliverToLocationId = "Select the receiving warehouse.";
+    fieldErrors.deliverToLocationId = t("purchasing.error.selectWarehouse", "Select the receiving warehouse.");
   }
 
   if (!values.orderDate) {
-    fieldErrors.orderDate = "Select an order date.";
+    fieldErrors.orderDate = t("purchasing.error.selectOrderDate", "Select an order date.");
   }
 
   if (values.paymentTerm === "credit" && !values.paymentDueDate) {
-    fieldErrors.paymentDueDate = "Select the payment date.";
+    fieldErrors.paymentDueDate = t("purchasing.error.selectPaymentDate", "Select the payment date.");
   }
 
   const activeLines = values.lines.filter((line) => line.productId || line.quantity || line.unitCost || line.taxIds.length > 0);
 
   activeLines.forEach((line) => {
     if (!line.productId) {
-      fieldErrors[fieldKey("productId", line.key)] = "Select a product.";
+      fieldErrors[fieldKey("productId", line.key)] = t("purchasing.error.selectProduct", "Select a product.");
     }
 
     if (!line.ownerId && !values.ownerId) {
-      fieldErrors[fieldKey("ownerId", line.key)] = "Select an owner.";
+      fieldErrors[fieldKey("ownerId", line.key)] = t("purchasing.error.selectOwner", "Select an owner.");
     }
 
     const quantity = Number(line.quantity);
     if (!Number.isFinite(quantity) || quantity <= 0) {
-      fieldErrors[fieldKey("quantity", line.key)] = "Enter a quantity greater than zero.";
+      fieldErrors[fieldKey("quantity", line.key)] = t("purchasing.error.enterQuantity", "Enter a quantity greater than zero.");
     }
 
     const unitCost = Number(line.unitCost);
     if (!Number.isFinite(unitCost) || unitCost < 0) {
-      fieldErrors[fieldKey("unitCost", line.key)] = "Enter a valid unit cost.";
+      fieldErrors[fieldKey("unitCost", line.key)] = t("purchasing.error.enterUnitCost", "Enter a valid unit cost.");
     }
   });
 
   return {
-    formErrors: activeLines.length === 0 ? ["Add at least one purchase order line."] : [],
+    formErrors: activeLines.length === 0 ? [t("purchasing.error.addOneLine", "Add at least one purchase order line.")] : [],
     fieldErrors,
   };
 }
@@ -208,6 +209,7 @@ export const PurchaseOrderForm = forwardRef<PurchaseOrderFormHandle, PurchaseOrd
     isModal = false,
     onCancel,
   }, ref) {
+  const { t } = useTranslation();
   const [isPending, startTransition] = useTransition();
   const [step, setStep] = useState<1 | 2>(1);
   const [submitIntent, setSubmitIntent] = useState<"draft" | "confirm">("confirm");
@@ -335,7 +337,11 @@ export const PurchaseOrderForm = forwardRef<PurchaseOrderFormHandle, PurchaseOrd
     }),
     [supplierId, headerOwnerId, deliverToLocationId, paymentTerm, orderDate, paymentDueDate, lines],
   );
-  const { formErrors, fieldErrors, isValid } = useFormValidation(validationValues, validatePurchaseOrderForm);
+  const validate = useCallback(
+    (values: PurchaseFormValues) => validatePurchaseOrderForm(values, t),
+    [t],
+  );
+  const { formErrors, fieldErrors, isValid } = useFormValidation(validationValues, validate);
   const taxById = useMemo(() => new Map(taxes.map((tax) => [tax.id, tax])), [taxes]);
   const productById = useMemo(() => new Map(productOptions.map((product) => [product.id, product])), [productOptions]);
 
@@ -473,7 +479,7 @@ export const PurchaseOrderForm = forwardRef<PurchaseOrderFormHandle, PurchaseOrd
 
       {error || serverError ? (
         <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-3.5 text-sm text-destructive flex items-center gap-2">
-          <span className="font-semibold">Error:</span> {serverError ?? error}
+          <span className="font-semibold">{t("common.error", "Error:")}</span> {serverError ?? error}
         </div>
       ) : null}
 
@@ -506,7 +512,7 @@ export const PurchaseOrderForm = forwardRef<PurchaseOrderFormHandle, PurchaseOrd
             >
               {step === 2 ? <Check className="size-3" /> : "1"}
             </span>
-            <span>1. Order Details & Lines</span>
+            <span>{t("purchasing.step1Title", "1. Order Details & Lines")}</span>
           </button>
 
           <div className="h-0.5 w-6 bg-border sm:w-10" />
@@ -535,14 +541,14 @@ export const PurchaseOrderForm = forwardRef<PurchaseOrderFormHandle, PurchaseOrd
             >
               2
             </span>
-            <span>2. Review & Confirm</span>
+            <span>{t("purchasing.step2Title", "2. Review & Confirm")}</span>
           </button>
         </div>
 
         <div className="hidden sm:flex items-center gap-2 text-xs text-muted-foreground">
-          <span className="font-mono font-medium">Step {step} of 2</span>
+          <span className="font-mono font-medium">{t("purchasing.stepOf", "Step")} {step} {t("purchasing.of2", "of 2")}</span>
           <span className="text-[11px] font-medium text-[#0B5D4B] dark:text-emerald-400">
-            {step === 1 ? "Drafting specifications" : "Ready for confirmation"}
+            {step === 1 ? t("purchasing.draftingSpecs", "Drafting specifications") : t("purchasing.readyForConfirmation", "Ready for confirmation")}
           </span>
         </div>
       </div>
@@ -558,9 +564,9 @@ export const PurchaseOrderForm = forwardRef<PurchaseOrderFormHandle, PurchaseOrd
               <div className="flex size-6 items-center justify-center rounded-md bg-[#0B5D4B]/10 text-[#0B5D4B] dark:bg-emerald-950 dark:text-emerald-300">
                 <Truck className="size-3.5" />
               </div>
-              <span>Sourcing & Logistics</span>
+              <span>{t("purchasing.sourcingLogistics", "Sourcing & Logistics")}</span>
             </div>
-            <span className="text-[11px] font-medium text-muted-foreground">Vendor & Warehouse</span>
+            <span className="text-[11px] font-medium text-muted-foreground">{t("purchasing.vendorWarehouse", "Vendor & Warehouse")}</span>
           </div>
 
           <div className="grid gap-3.5 sm:grid-cols-2">
@@ -603,9 +609,9 @@ export const PurchaseOrderForm = forwardRef<PurchaseOrderFormHandle, PurchaseOrd
               <div className="flex size-6 items-center justify-center rounded-md bg-[#D9A441]/15 text-[#D9A441] dark:bg-amber-950 dark:text-amber-300">
                 <Wallet className="size-3.5" />
               </div>
-              <span>Commercial Terms & Schedule</span>
+              <span>{t("purchasing.commercialTerms", "Commercial Terms & Schedule")}</span>
             </div>
-            <span className="text-[11px] font-medium text-muted-foreground">Payment & Dates</span>
+            <span className="text-[11px] font-medium text-muted-foreground">{t("purchasing.paymentAndDates", "Payment & Dates")}</span>
           </div>
 
           <div className="grid gap-3.5 sm:grid-cols-2">
@@ -624,7 +630,7 @@ export const PurchaseOrderForm = forwardRef<PurchaseOrderFormHandle, PurchaseOrd
             </div>
 
             <div className="flex flex-col gap-1 text-sm font-medium">
-              <span>Payment Term</span>
+              <span>{t("purchasing.paymentTerm", "Payment Term")}</span>
               <input type="hidden" name="paymentTerm" value={paymentTerm} />
               <div className="grid grid-cols-2 gap-1 rounded-lg border border-input bg-muted/40 p-1">
                 <button
@@ -638,7 +644,7 @@ export const PurchaseOrderForm = forwardRef<PurchaseOrderFormHandle, PurchaseOrd
                   )}
                 >
                   <Coins className="size-3.5 text-[#D9A441]" />
-                  <span>Cash</span>
+                  <span>{t("status.cash")}</span>
                 </button>
                 <button
                   type="button"
@@ -651,14 +657,14 @@ export const PurchaseOrderForm = forwardRef<PurchaseOrderFormHandle, PurchaseOrd
                   )}
                 >
                   <Calendar className="size-3.5 text-[#0B5D4B]" />
-                  <span>Credit</span>
+                  <span>{t("status.credit")}</span>
                 </button>
               </div>
             </div>
 
             <div>
               <label className="flex flex-col gap-1 text-sm font-medium">
-                <span>Order Date</span>
+                <span>{t("purchasing.orderDate", "Order Date")}</span>
                 <input
                   name="orderDate"
                   type="date"
@@ -673,7 +679,7 @@ export const PurchaseOrderForm = forwardRef<PurchaseOrderFormHandle, PurchaseOrd
             {paymentTerm === "credit" ? (
               <div>
                 <label className="flex flex-col gap-1 text-sm font-medium">
-                  <span>Payment Due Date</span>
+                  <span>{t("purchasing.paymentDueDate", "Payment Due Date")}</span>
                   <input
                     name="paymentDueDate"
                     type="date"
@@ -687,7 +693,7 @@ export const PurchaseOrderForm = forwardRef<PurchaseOrderFormHandle, PurchaseOrd
             ) : (
               <div className="hidden sm:flex flex-col justify-end text-xs text-muted-foreground pb-2">
                 <p className="rounded-lg bg-muted/40 px-3 py-2 text-[11px] leading-relaxed text-muted-foreground">
-                  Cash transaction — settled upon goods arrival.
+                  {t("purchasing.cashTransactionHint", "Cash transaction — settled upon goods arrival.")}
                 </p>
               </div>
             )}
@@ -705,7 +711,7 @@ export const PurchaseOrderForm = forwardRef<PurchaseOrderFormHandle, PurchaseOrd
               label: (
                 <span className="flex items-center gap-2">
                   <Package className="size-4 text-[#0B5D4B]" />
-                  <span>Order Items</span>
+                  <span>{t("purchasing.orderItems", "Order Items")}</span>
                   <span className="inline-flex items-center justify-center rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-bold text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
                     {lines.length}
                   </span>
@@ -750,7 +756,7 @@ export const PurchaseOrderForm = forwardRef<PurchaseOrderFormHandle, PurchaseOrd
                               <div className="min-w-0 flex-1">
                                 <div className="flex items-center gap-2 flex-wrap">
                                   <h4 className="text-xs font-bold text-foreground truncate">
-                                    {product ? product.name : <span className="text-muted-foreground italic">No product selected</span>}
+                                    {product ? product.name : <span className="text-muted-foreground italic">{t("purchasing.noProductSelected", "No product selected")}</span>}
                                   </h4>
                                   {product?.code ? (
                                     <span className="rounded bg-muted/60 px-1.5 py-0.5 font-mono text-[9px] text-muted-foreground">
@@ -760,11 +766,11 @@ export const PurchaseOrderForm = forwardRef<PurchaseOrderFormHandle, PurchaseOrd
                                 </div>
 
                                 <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground mt-0.5 font-mono">
-                                  <span>Qty: <strong className="text-foreground">{line.quantity || "1"}</strong></span>
+                                  <span>{t("purchasing.qtyAbbrev", "Qty:")} <strong className="text-foreground">{line.quantity || "1"}</strong></span>
                                   <span>•</span>
-                                  <span>Cost: <strong className="text-foreground">ETB {money(Number(line.unitCost) || 0)}</strong></span>
+                                  <span>{t("purchasing.costAbbrev", "Cost:")} <strong className="text-foreground">ETB {money(Number(line.unitCost) || 0)}</strong></span>
                                   <span>•</span>
-                                  <span>Total: <strong className="text-[#0B5D4B] dark:text-emerald-400 font-bold">ETB {money(lineTotals[index]?.total ?? 0)}</strong></span>
+                                  <span>{t("purchasing.totalAbbrev", "Total:")} <strong className="text-[#0B5D4B] dark:text-emerald-400 font-bold">ETB {money(lineTotals[index]?.total ?? 0)}</strong></span>
                                 </div>
                               </div>
                             </div>
@@ -776,10 +782,10 @@ export const PurchaseOrderForm = forwardRef<PurchaseOrderFormHandle, PurchaseOrd
                                 size="icon"
                                 onClick={() => toggleEditLine(line.key)}
                                 className="size-7 text-[#0B5D4B] hover:bg-emerald-500/10 hover:text-[#0B5D4B] active:scale-95 transition-all"
-                                title="Edit this product line"
+                                title={t("purchasing.editThisLine", "Edit this product line")}
                               >
                                 <Pencil className="size-3.5" />
-                                <span className="sr-only">Edit item</span>
+                                <span className="sr-only">{t("purchasing.editItem", "Edit item")}</span>
                               </Button>
 
                               <Button
@@ -789,10 +795,10 @@ export const PurchaseOrderForm = forwardRef<PurchaseOrderFormHandle, PurchaseOrd
                                 disabled={lines.length === 1}
                                 onClick={() => removeLine(line.key)}
                                 className="size-7 text-muted-foreground/60 hover:bg-destructive/10 hover:text-destructive active:scale-95 disabled:opacity-20 transition-all"
-                                title="Remove item"
+                                title={t("purchasing.removeItem", "Remove item")}
                               >
                                 <Trash2Icon className="size-3.5" />
-                                <span className="sr-only">Remove item</span>
+                                <span className="sr-only">{t("purchasing.removeItem", "Remove item")}</span>
                               </Button>
                             </div>
                           </div>
@@ -847,7 +853,7 @@ export const PurchaseOrderForm = forwardRef<PurchaseOrderFormHandle, PurchaseOrd
                                   className="h-8 gap-1.5 text-xs font-bold bg-[#0B5D4B] text-white hover:bg-[#073B35] shadow-xs px-3 rounded-lg transition-all"
                                 >
                                   <Check className="size-3.5" />
-                                  Update
+                                  {t("action.update", "Update")}
                                 </Button>
                               ) : null}
 
@@ -858,10 +864,10 @@ export const PurchaseOrderForm = forwardRef<PurchaseOrderFormHandle, PurchaseOrd
                                 disabled={lines.length === 1}
                                 onClick={() => removeLine(line.key)}
                                 className="size-8 text-muted-foreground/60 transition-colors hover:bg-destructive/10 hover:text-destructive active:scale-95 disabled:opacity-20 shrink-0"
-                                title="Remove this item"
+                                title={t("purchasing.removeThisItem", "Remove this item")}
                               >
                                 <Trash2Icon className="size-4" />
-                                <span className="sr-only">Remove item</span>
+                                <span className="sr-only">{t("purchasing.removeItem", "Remove item")}</span>
                               </Button>
                             </div>
                           </div>
@@ -876,8 +882,8 @@ export const PurchaseOrderForm = forwardRef<PurchaseOrderFormHandle, PurchaseOrd
                             {/* Quantity */}
                             <div className="flex flex-col gap-1.5 col-span-1">
                               <label className="text-xs font-semibold text-foreground flex items-center justify-between">
-                                <span>Quantity</span>
-                                <span className="text-[10px] text-muted-foreground font-normal">Units</span>
+                                <span>{t("purchasing.quantity", "Quantity")}</span>
+                                <span className="text-[10px] text-muted-foreground font-normal">{t("purchasing.units", "Units")}</span>
                               </label>
                               <input
                                 type="number"
@@ -900,7 +906,7 @@ export const PurchaseOrderForm = forwardRef<PurchaseOrderFormHandle, PurchaseOrd
                             {/* Unit Cost */}
                             <div className="flex flex-col gap-1.5 col-span-1">
                               <label className="text-xs font-semibold text-foreground flex items-center justify-between">
-                                <span>Unit Cost</span>
+                                <span>{t("purchasing.unitCost", "Unit Cost")}</span>
                                 <span className="text-[10px] text-muted-foreground font-normal">ETB</span>
                               </label>
                               <div className="relative flex items-center">
@@ -932,9 +938,9 @@ export const PurchaseOrderForm = forwardRef<PurchaseOrderFormHandle, PurchaseOrd
                                 <label className="text-xs font-semibold text-foreground flex items-center justify-between">
                                   <span className="flex items-center gap-1">
                                     <Tag className="size-3 text-[#0B5D4B]" />
-                                    <span>Taxes</span>
+                                    <span>{t("purchasing.taxes", "Taxes")}</span>
                                   </span>
-                                  <span className="text-[10px] text-muted-foreground font-normal">Click to toggle</span>
+                                  <span className="text-[10px] text-muted-foreground font-normal">{t("purchasing.clickToToggle", "Click to toggle")}</span>
                                 </label>
                                 <div className="flex flex-wrap gap-1.5 min-h-[40px] items-center p-1 rounded-lg border border-input bg-background">
                                   {taxes.map((tax) => {
@@ -967,13 +973,13 @@ export const PurchaseOrderForm = forwardRef<PurchaseOrderFormHandle, PurchaseOrd
 
                             {/* Line Financial Total Summary */}
                             <div className="flex flex-col items-end justify-center rounded-lg bg-muted/40 border border-border/50 p-2.5 h-[62px] col-span-2 sm:col-span-1">
-                              <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Line Total</span>
+                              <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{t("purchasing.lineTotal", "Line Total")}</span>
                               <span className="font-mono text-base font-extrabold text-[#0B5D4B] dark:text-emerald-400">
                                 ETB {money(lineTotals[index]?.total ?? 0)}
                               </span>
                               {taxes.length > 0 && (lineTotals[index]?.taxAmount ?? 0) > 0 ? (
                                 <span className="text-[10px] text-muted-foreground font-mono">
-                                  Untaxed: ETB {money(lineTotals[index]?.subtotal ?? 0)}
+                                  {t("purchasing.untaxedAbbrev", "Untaxed:")} ETB {money(lineTotals[index]?.subtotal ?? 0)}
                                 </span>
                               ) : null}
                             </div>
@@ -982,15 +988,15 @@ export const PurchaseOrderForm = forwardRef<PurchaseOrderFormHandle, PurchaseOrd
                           {/* Card Footer: Subtle Line Owner info & override */}
                           <div className="mt-3 flex items-center justify-between pt-2.5 text-xs text-muted-foreground border-t border-border/50">
                             <div className="flex items-center gap-2">
-                              <span>Assigned to:</span>
+                              <span>{t("purchasing.assignedTo", "Assigned to:")}</span>
                               <span className="font-semibold text-foreground">
-                                {owner?.name ?? "Order Owner"}
+                                {owner?.name ?? t("purchasing.orderOwner", "Order Owner")}
                               </span>
                             </div>
 
                             <details className="text-right">
                               <summary className="cursor-pointer text-[#0B5D4B] hover:underline font-medium list-none">
-                                Assign different owner
+                                {t("purchasing.assignDifferentOwner", "Assign different owner")}
                               </summary>
                               <div className="mt-2 w-56 text-left">
                                 <RelatedModelSelect
@@ -1018,23 +1024,23 @@ export const PurchaseOrderForm = forwardRef<PurchaseOrderFormHandle, PurchaseOrd
                       className="w-full sm:w-auto gap-2 border-dashed border-[#0B5D4B]/50 bg-emerald-500/5 text-[#0B5D4B] font-semibold hover:bg-emerald-500/10 hover:border-[#0B5D4B] transition-all py-2.5 px-5 rounded-xl text-xs"
                     >
                       <PlusIcon className="size-4" />
-                      + Add Product
+                      {t("purchasing.addProduct", "+ Add Product")}
                     </Button>
 
                   {/* Financial Grand Summary Card */}
                   <div className="w-full sm:w-80 rounded-xl border border-border/80 bg-gradient-to-b from-card to-muted/20 p-4 text-xs shadow-xs">
                     <div className="flex justify-between items-center py-1 text-muted-foreground">
-                      <span>Untaxed Subtotal</span>
+                      <span>{t("purchasing.untaxedSubtotal", "Untaxed Subtotal")}</span>
                       <span className="font-mono font-medium text-foreground">ETB {money(totals.subtotal)}</span>
                     </div>
                     <div className="flex justify-between items-center py-1 text-muted-foreground">
-                      <span>Applicable Taxes</span>
+                      <span>{t("purchasing.applicableTaxes", "Applicable Taxes")}</span>
                       <span className="font-mono font-medium text-foreground">ETB {money(totals.taxAmount)}</span>
                     </div>
                     <div className="mt-2.5 flex justify-between items-baseline border-t border-border/80 pt-2.5">
                       <div>
-                        <span className="text-sm font-bold text-foreground">Total RFQ Value</span>
-                        <p className="text-[10px] text-muted-foreground">Ethiopian Birr (ETB)</p>
+                        <span className="text-sm font-bold text-foreground">{t("purchasing.totalRfqValue", "Total RFQ Value")}</span>
+                        <p className="text-[10px] text-muted-foreground">{t("purchasing.ethiopianBirr", "Ethiopian Birr (ETB)")}</p>
                       </div>
                       <span className="font-mono text-lg font-extrabold text-[#0B5D4B] dark:text-emerald-400">
                         ETB {money(totals.total)}
@@ -1050,7 +1056,7 @@ export const PurchaseOrderForm = forwardRef<PurchaseOrderFormHandle, PurchaseOrd
             label: (
               <span className="flex items-center gap-2">
                 <FileText className="size-4 text-muted-foreground" />
-                <span>Terms & Notes</span>
+                <span>{t("purchasing.termsAndNotes", "Terms & Notes")}</span>
                 {order?.notes ? <span className="size-1.5 rounded-full bg-[#0B5D4B]" /> : null}
               </span>
             ),
@@ -1059,14 +1065,17 @@ export const PurchaseOrderForm = forwardRef<PurchaseOrderFormHandle, PurchaseOrd
                 <label className="flex flex-col gap-1.5 text-xs font-medium text-foreground">
                   <span className="flex items-center gap-1.5">
                     <FileText className="size-3.5 text-[#0B5D4B]" />
-                    <span>Terms of Delivery & Internal Notes</span>
+                    <span>{t("purchasing.termsOfDeliveryNotes", "Terms of Delivery & Internal Notes")}</span>
                   </span>
                   <textarea
                     name="notes"
                     value={notes}
                     onChange={(event) => setNotes(event.target.value)}
                     rows={4}
-                    placeholder="Specify delivery timeline, shipping instructions, or terms agreed with the supplier..."
+                    placeholder={t(
+                      "purchasing.notesPlaceholder",
+                      "Specify delivery timeline, shipping instructions, or terms agreed with the supplier...",
+                    )}
                     className="rounded-xl border border-input bg-background/80 p-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0B5D4B]/30 resize-y leading-relaxed"
                   />
                 </label>
@@ -1087,14 +1096,17 @@ export const PurchaseOrderForm = forwardRef<PurchaseOrderFormHandle, PurchaseOrd
               <ShieldCheck className="size-5 text-emerald-200" />
             </div>
             <div>
-              <h3 className="text-sm font-bold text-foreground tracking-tight">Review & Confirmation</h3>
+              <h3 className="text-sm font-bold text-foreground tracking-tight">{t("purchasing.reviewAndConfirmation", "Review & Confirmation")}</h3>
               <p className="text-xs text-muted-foreground">
-                Confirm vendor sourcing, warehouse destination, and line costs before executing order confirmation.
+                {t(
+                  "purchasing.reviewHint",
+                  "Confirm vendor sourcing, warehouse destination, and line costs before executing order confirmation.",
+                )}
               </p>
             </div>
           </div>
           <span className="hidden sm:inline-flex rounded-full bg-[#D9A441]/15 px-2.5 py-1 text-[11px] font-bold text-[#D9A441] border border-[#D9A441]/30">
-            Final Approval
+            {t("purchasing.finalApproval", "Final Approval")}
           </span>
         </div>
 
@@ -1105,19 +1117,19 @@ export const PurchaseOrderForm = forwardRef<PurchaseOrderFormHandle, PurchaseOrd
             <div className="flex items-center justify-between pb-2 border-b border-border/60">
               <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">
                 <Truck className="size-3.5 text-[#0B5D4B]" />
-                <span>Vendor & Sourcing</span>
+                <span>{t("purchasing.vendorAndSourcing", "Vendor & Sourcing")}</span>
               </div>
-              <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">Logistics</span>
+              <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">{t("purchasing.logistics", "Logistics")}</span>
             </div>
             <div className="grid grid-cols-2 gap-3 text-xs">
               <div>
-                <span className="text-muted-foreground text-[11px]">Supplier</span>
+                <span className="text-muted-foreground text-[11px]">{t("Supplier")}</span>
                 <p className="font-semibold text-foreground text-sm mt-0.5">
                   {suppliers.find((s) => s.id === supplierId)?.name || "—"}
                 </p>
               </div>
               <div>
-                <span className="text-muted-foreground text-[11px]">Deliver To Warehouse</span>
+                <span className="text-muted-foreground text-[11px]">{t("purchasing.deliverToWarehouse", "Deliver To Warehouse")}</span>
                 <p className="font-semibold text-foreground text-sm mt-0.5">
                   {locations.find((l) => l.id === deliverToLocationId)?.name || "—"}
                 </p>
@@ -1130,7 +1142,7 @@ export const PurchaseOrderForm = forwardRef<PurchaseOrderFormHandle, PurchaseOrd
             <div className="flex items-center justify-between pb-2 border-b border-border/60">
               <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">
                 <Wallet className="size-3.5 text-[#D9A441]" />
-                <span>Commercial Terms</span>
+                <span>{t("purchasing.commercialTermsShort", "Commercial Terms")}</span>
               </div>
               <span
                 className={cn(
@@ -1140,26 +1152,26 @@ export const PurchaseOrderForm = forwardRef<PurchaseOrderFormHandle, PurchaseOrd
                     : "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
                 )}
               >
-                {paymentTerm}
+                {t(`status.${paymentTerm}`, paymentTerm)}
               </span>
             </div>
             <div className="grid grid-cols-3 gap-2 text-xs">
               <div>
-                <span className="text-muted-foreground text-[11px]">Owner</span>
+                <span className="text-muted-foreground text-[11px]">{t("Owner", "Owner")}</span>
                 <p className="font-semibold text-foreground mt-0.5">
                   {owners.find((o) => o.id === headerOwnerId)?.name || "—"}
                 </p>
               </div>
               <div>
-                <span className="text-muted-foreground text-[11px]">Order Date</span>
+                <span className="text-muted-foreground text-[11px]">{t("purchasing.orderDate", "Order Date")}</span>
                 <p className="font-mono font-semibold text-foreground mt-0.5">
                   {orderDate || "—"}
                 </p>
               </div>
               <div>
-                <span className="text-muted-foreground text-[11px]">Payment Due</span>
+                <span className="text-muted-foreground text-[11px]">{t("purchasing.paymentDue", "Payment Due")}</span>
                 <p className="font-mono font-semibold text-foreground mt-0.5">
-                  {paymentTerm === "credit" ? (paymentDueDate || "—") : "Upon Receipt"}
+                  {paymentTerm === "credit" ? (paymentDueDate || "—") : t("purchasing.uponReceipt", "Upon Receipt")}
                 </p>
               </div>
             </div>
@@ -1171,9 +1183,9 @@ export const PurchaseOrderForm = forwardRef<PurchaseOrderFormHandle, PurchaseOrd
           <div className="flex items-center justify-between border-b border-border/70 bg-muted/30 px-4 py-3">
             <div className="flex items-center gap-2">
               <Package className="size-4 text-[#0B5D4B]" />
-              <span className="text-xs font-bold uppercase tracking-wider text-foreground">Order Lines Breakdown</span>
+              <span className="text-xs font-bold uppercase tracking-wider text-foreground">{t("purchasing.orderLinesBreakdown", "Order Lines Breakdown")}</span>
               <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[11px] font-bold text-[#0B5D4B] dark:text-emerald-300">
-                {lines.length} {lines.length === 1 ? "Line" : "Lines"}
+                {lines.length} {lines.length === 1 ? t("purchasing.line", "Line") : t("purchasing.lines", "Lines")}
               </span>
             </div>
           </div>
@@ -1183,12 +1195,12 @@ export const PurchaseOrderForm = forwardRef<PurchaseOrderFormHandle, PurchaseOrd
               <thead className="border-b border-border/60 bg-muted/20 text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">
                 <tr>
                   <th className="py-2.5 px-4 w-12 text-center">#</th>
-                  <th className="py-2.5 px-4">Product</th>
-                  <th className="py-2.5 px-4">Owner</th>
-                  <th className="py-2.5 px-4 text-right">Quantity</th>
-                  <th className="py-2.5 px-4 text-right">Unit Cost (ETB)</th>
-                  {taxes.length > 0 ? <th className="py-2.5 px-4">Taxes</th> : null}
-                  <th className="py-2.5 px-4 text-right font-bold text-foreground">Line Total (ETB)</th>
+                  <th className="py-2.5 px-4">{t("Product", "Product")}</th>
+                  <th className="py-2.5 px-4">{t("Owner", "Owner")}</th>
+                  <th className="py-2.5 px-4 text-right">{t("purchasing.quantity", "Quantity")}</th>
+                  <th className="py-2.5 px-4 text-right">{t("purchasing.unitCostEtb", "Unit Cost (ETB)")}</th>
+                  {taxes.length > 0 ? <th className="py-2.5 px-4">{t("purchasing.taxes", "Taxes")}</th> : null}
+                  <th className="py-2.5 px-4 text-right font-bold text-foreground">{t("purchasing.lineTotalEtb", "Line Total (ETB)")}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/40 font-medium">
@@ -1203,15 +1215,15 @@ export const PurchaseOrderForm = forwardRef<PurchaseOrderFormHandle, PurchaseOrd
                         {String(index + 1).padStart(2, "0")}
                       </td>
                       <td className="py-3 px-4">
-                        <div className="font-semibold text-foreground">{product?.name || "Unspecified Product"}</div>
+                        <div className="font-semibold text-foreground">{product?.name || t("purchasing.unspecifiedProduct", "Unspecified Product")}</div>
                         {product?.code ? (
                           <span className="inline-block rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground mt-0.5">
-                            SKU: {product.code}
+                            {t("purchasing.skuAbbrev", "SKU:")} {product.code}
                           </span>
                         ) : null}
                       </td>
                       <td className="py-3 px-4 text-muted-foreground">
-                        {lineOwner?.name || "Order Owner"}
+                        {lineOwner?.name || t("purchasing.orderOwner", "Order Owner")}
                       </td>
                       <td className="py-3 px-4 text-right font-mono font-semibold text-foreground">
                         {line.quantity}
@@ -1222,7 +1234,7 @@ export const PurchaseOrderForm = forwardRef<PurchaseOrderFormHandle, PurchaseOrd
                       {taxes.length > 0 ? (
                         <td className="py-3 px-4">
                           {selectedTaxes.length === 0 ? (
-                            <span className="text-muted-foreground text-[11px]">None</span>
+                            <span className="text-muted-foreground text-[11px]">{t("None", "None")}</span>
                           ) : (
                             <div className="flex flex-wrap gap-1">
                               {selectedTaxes.map((tax) => (
@@ -1253,7 +1265,7 @@ export const PurchaseOrderForm = forwardRef<PurchaseOrderFormHandle, PurchaseOrd
           <div className="rounded-xl border border-border/80 bg-muted/20 p-4 text-xs">
             <div className="flex items-center gap-2 font-bold uppercase tracking-wider text-muted-foreground text-[11px] mb-1.5">
               <FileText className="size-3.5 text-[#0B5D4B]" />
-              <span>Delivery Terms & Notes</span>
+              <span>{t("purchasing.deliveryTermsAndNotes", "Delivery Terms & Notes")}</span>
             </div>
             <p className="text-foreground whitespace-pre-wrap leading-relaxed">{notes}</p>
           </div>
@@ -1263,19 +1275,19 @@ export const PurchaseOrderForm = forwardRef<PurchaseOrderFormHandle, PurchaseOrd
         <div className="flex justify-end">
           <div className="w-full sm:w-80 rounded-xl border border-border/80 bg-gradient-to-b from-card to-muted/20 p-4 text-xs shadow-xs">
             <div className="flex justify-between items-center py-1 text-muted-foreground">
-              <span>{totals.taxAmount > 0 ? "Untaxed Subtotal" : "Subtotal"}</span>
+              <span>{totals.taxAmount > 0 ? t("purchasing.untaxedSubtotal", "Untaxed Subtotal") : t("purchasing.subtotal", "Subtotal")}</span>
               <span className="font-mono font-medium text-foreground">ETB {money(totals.subtotal)}</span>
             </div>
             {totals.taxAmount > 0 ? (
               <div className="flex justify-between items-center py-1 text-muted-foreground">
-                <span>Applicable Taxes</span>
+                <span>{t("purchasing.applicableTaxes", "Applicable Taxes")}</span>
                 <span className="font-mono font-medium text-foreground">ETB {money(totals.taxAmount)}</span>
               </div>
             ) : null}
             <div className="mt-2.5 flex justify-between items-baseline border-t border-border/80 pt-2.5">
               <div>
-                <span className="text-sm font-bold text-foreground">Total Order Value</span>
-                <p className="text-[10px] text-muted-foreground">Ethiopian Birr (ETB)</p>
+                <span className="text-sm font-bold text-foreground">{t("purchasing.totalOrderValue", "Total Order Value")}</span>
+                <p className="text-[10px] text-muted-foreground">{t("purchasing.ethiopianBirr", "Ethiopian Birr (ETB)")}</p>
               </div>
               <span className="font-mono text-xl font-extrabold text-[#0B5D4B] dark:text-emerald-400">
                 ETB {money(totals.total)}
@@ -1301,12 +1313,12 @@ export const PurchaseOrderForm = forwardRef<PurchaseOrderFormHandle, PurchaseOrd
                 <div className="flex items-center gap-1.5 rounded-lg border border-border/60 bg-muted/40 px-2.5 py-1">
                   <Package className="size-3.5 text-[#0B5D4B]" />
                   <span className="font-medium text-muted-foreground">
-                    {lines.filter((l) => l.productId).length} / {lines.length} {lines.length === 1 ? "Item specified" : "Items specified"}
+                    {lines.filter((l) => l.productId).length} / {lines.length} {lines.length === 1 ? t("purchasing.itemSpecified", "Item specified") : t("purchasing.itemsSpecified", "Items specified")}
                   </span>
                 </div>
               ) : null}
               <div className="hidden sm:flex items-baseline gap-1.5 text-muted-foreground">
-                <span>Total Value:</span>
+                <span>{t("purchasing.totalValue", "Total Value:")}</span>
                 <strong className="font-mono text-base font-extrabold text-[#0B5D4B] dark:text-emerald-400">
                   ETB {money(totals.total)}
                 </strong>
@@ -1322,7 +1334,7 @@ export const PurchaseOrderForm = forwardRef<PurchaseOrderFormHandle, PurchaseOrd
                   disabled={isPending}
                   className="px-4 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted/80"
                 >
-                  Cancel
+                  {t("action.cancel")}
                 </Button>
               ) : null}
 
@@ -1333,7 +1345,7 @@ export const PurchaseOrderForm = forwardRef<PurchaseOrderFormHandle, PurchaseOrd
                 disabled={isPending}
                 className="px-4 text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-muted/80 border-border"
               >
-                Save as Draft RFQ
+                {t("purchasing.saveAsDraftRfq", "Save as Draft RFQ")}
               </Button>
 
               <Button
@@ -1345,7 +1357,7 @@ export const PurchaseOrderForm = forwardRef<PurchaseOrderFormHandle, PurchaseOrd
                   "bg-gradient-to-r from-[#0B5D4B] via-[#073B35] to-[#0B5D4B]"
                 )}
               >
-                <span>Continue to Confirmation</span>
+                <span>{t("purchasing.continueToConfirmation", "Continue to Confirmation")}</span>
                 <ArrowRight className="size-3.5 text-emerald-200" />
               </Button>
             </div>
@@ -1361,7 +1373,7 @@ export const PurchaseOrderForm = forwardRef<PurchaseOrderFormHandle, PurchaseOrd
                 className="gap-1.5 px-4 text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-muted/80"
               >
                 <ArrowLeft className="size-3.5" />
-                <span>Back to Edit</span>
+                <span>{t("purchasing.backToEdit", "Back to Edit")}</span>
               </Button>
             </div>
 
@@ -1373,7 +1385,7 @@ export const PurchaseOrderForm = forwardRef<PurchaseOrderFormHandle, PurchaseOrd
                 disabled={isPending}
                 className="px-4 text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-muted/80 border-border"
               >
-                Save as Draft RFQ
+                {t("purchasing.saveAsDraftRfq", "Save as Draft RFQ")}
               </Button>
 
               <Button
@@ -1388,12 +1400,12 @@ export const PurchaseOrderForm = forwardRef<PurchaseOrderFormHandle, PurchaseOrd
                 {isPending ? (
                   <>
                     <Loader2 className="size-4 animate-spin" />
-                    <span>Confirming Order...</span>
+                    <span>{t("purchasing.confirmingOrder", "Confirming Order...")}</span>
                   </>
                 ) : (
                   <>
                     <CheckCircle2 className="size-4 text-emerald-200" />
-                    <span>Confirm Purchase Order</span>
+                    <span>{t("purchasing.confirmPurchaseOrder", "Confirm Purchase Order")}</span>
                   </>
                 )}
               </Button>

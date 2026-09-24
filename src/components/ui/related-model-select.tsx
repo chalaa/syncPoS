@@ -268,7 +268,7 @@ export function RelatedModelSelect({
         "group flex h-3.5 w-full shrink-0 cursor-ns-resize items-center justify-center bg-muted/40 transition-colors hover:bg-muted active:bg-muted/80 select-none",
         openUpward ? "border-b border-border/60 rounded-t-md" : "border-t border-border/60 rounded-b-md",
       )}
-      title="Drag to resize height"
+      title={t("dnd.resizeHint", "Drag to resize height")}
     >
       <div className="h-1 w-8 rounded-full bg-muted-foreground/30 transition-colors group-hover:bg-muted-foreground/70" />
     </div>
