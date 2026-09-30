@@ -156,118 +156,140 @@ export async function getDashboardReport(overrideLocationId?: string | null): Pr
       )`
     : sql``;
 
+  const salesOrderLocFilter = validLocId
+    ? sql` and so.source_location_id = ${validLocId}::uuid`
+    : sql``;
+
   const [summary] = await db.execute<{
     salesTodayMinor: number;
-    customerPaymentsTodayMinor: number;
+    salesUnpaidTodayMinor: number;
+    purchasesTodayMinor: number;
+    purchasesUnpaidTodayMinor: number;
     expensesTodayMinor: number;
-    supplierPaymentsTodayMinor: number;
-    receivableResidualMinor: number;
-    payableResidualMinor: number;
-    stockValueMinor: number;
-    pendingPurchaseOrders: number;
-    pendingReceipts: number;
     currencyCode: string;
   }>(sql`
     select
       coalesce((
-        select sum(ci.total_minor)
-        from customer_invoices ci
-        left join sales_orders so on so.id = ci.sales_order_id
-        left join deliveries d on d.id = ci.delivery_id
-        where ci.company_id = ${company.id}
-          and ci.deleted_at is null
-          and ci.status = 'posted'
-          and ci.invoice_date = ${today}::date
-          ${salesLocFilter}
+        select sum(total) from (
+          select so.total_minor as total
+          from sales_orders so
+          where so.company_id = ${company.id}
+            and so.deleted_at is null
+            and so.status <> 'cancelled'
+            and (so.order_date = ${today}::date or so.created_at::date = ${today}::date)
+            ${salesOrderLocFilter}
+          union all
+          select ci.total_minor as total
+          from customer_invoices ci
+          where ci.company_id = ${company.id}
+            and ci.deleted_at is null
+            and ci.status <> 'cancelled'
+            and ci.sales_order_id is null
+            and (ci.invoice_date = ${today}::date or ci.created_at::date = ${today}::date)
+            ${salesLocFilter}
+        ) s
       ), 0)::bigint as "salesTodayMinor",
       coalesce((
-        select sum(p.amount_minor)
-        from payments p
-        where p.company_id = ${company.id}
-          and p.deleted_at is null
-          and p.status = 'posted'
-          and p.payment_type = 'inbound'
-          and p.payment_date = ${today}::date
-          ${custPaymentLocFilter}
-      ), 0)::bigint as "customerPaymentsTodayMinor",
+        select sum(unpaid) from (
+          select greatest(so.total_minor - coalesce((
+            select sum(pa.amount_minor)
+            from payment_allocations pa
+            inner join payments p on p.id = pa.payment_id
+            where (pa.sales_order_id = so.id or pa.customer_invoice_id in (select ci.id from customer_invoices ci where ci.sales_order_id = so.id))
+              and pa.deleted_at is null
+              and p.deleted_at is null
+              and p.status = 'posted'
+          ), 0), 0) as unpaid
+          from sales_orders so
+          where so.company_id = ${company.id}
+            and so.deleted_at is null
+            and so.status <> 'cancelled'
+            and (so.order_date = ${today}::date or so.created_at::date = ${today}::date)
+            ${salesOrderLocFilter}
+          union all
+          select greatest(ci.total_minor - coalesce((
+            select sum(pa.amount_minor)
+            from payment_allocations pa
+            inner join payments p on p.id = pa.payment_id
+            where pa.customer_invoice_id = ci.id
+              and pa.deleted_at is null
+              and p.deleted_at is null
+              and p.status = 'posted'
+          ), 0), 0) as unpaid
+          from customer_invoices ci
+          where ci.company_id = ${company.id}
+            and ci.deleted_at is null
+            and ci.status <> 'cancelled'
+            and ci.sales_order_id is null
+            and (ci.invoice_date = ${today}::date or ci.created_at::date = ${today}::date)
+            ${salesLocFilter}
+        ) su
+      ), 0)::bigint as "salesUnpaidTodayMinor",
+      coalesce((
+        select sum(total) from (
+          select po.total_minor as total
+          from purchase_orders po
+          where po.company_id = ${company.id}
+            and po.deleted_at is null
+            and po.status <> 'cancelled'
+            and (po.order_date = ${today}::date or po.created_at::date = ${today}::date)
+            ${poLocFilter}
+          union all
+          select vb.total_minor as total
+          from vendor_bills vb
+          where vb.company_id = ${company.id}
+            and vb.deleted_at is null
+            and vb.status <> 'cancelled'
+            and vb.purchase_order_id is null
+            and (vb.bill_date = ${today}::date or vb.created_at::date = ${today}::date)
+            ${payLocFilter}
+        ) p_tot
+      ), 0)::bigint as "purchasesTodayMinor",
+      coalesce((
+        select sum(unpaid) from (
+          select greatest(po.total_minor - coalesce((
+            select sum(pa.amount_minor)
+            from payment_allocations pa
+            inner join payments p on p.id = pa.payment_id
+            where (pa.purchase_order_id = po.id or pa.vendor_bill_id in (select vb.id from vendor_bills vb where vb.purchase_order_id = po.id))
+              and pa.deleted_at is null
+              and p.deleted_at is null
+              and p.status = 'posted'
+          ), 0), 0) as unpaid
+          from purchase_orders po
+          where po.company_id = ${company.id}
+            and po.deleted_at is null
+            and po.status <> 'cancelled'
+            and (po.order_date = ${today}::date or po.created_at::date = ${today}::date)
+            ${poLocFilter}
+          union all
+          select greatest(vb.total_minor - coalesce((
+            select sum(pa.amount_minor)
+            from payment_allocations pa
+            inner join payments p on p.id = pa.payment_id
+            where pa.vendor_bill_id = vb.id
+              and pa.deleted_at is null
+              and p.deleted_at is null
+              and p.status = 'posted'
+          ), 0), 0) as unpaid
+          from vendor_bills vb
+          where vb.company_id = ${company.id}
+            and vb.deleted_at is null
+            and vb.status <> 'cancelled'
+            and vb.purchase_order_id is null
+            and (vb.bill_date = ${today}::date or vb.created_at::date = ${today}::date)
+            ${payLocFilter}
+        ) pu
+      ), 0)::bigint as "purchasesUnpaidTodayMinor",
       coalesce((
         select sum(e.amount_minor)
         from expenses e
         where e.company_id = ${company.id}
           and e.deleted_at is null
           and e.status <> 'cancelled'
-          and e.expense_date = ${today}::date
+          and (e.expense_date = ${today}::date or e.created_at::date = ${today}::date)
           ${expenseLocFilter}
       ), 0)::bigint as "expensesTodayMinor",
-      coalesce((
-        select sum(p.amount_minor)
-        from payments p
-        where p.company_id = ${company.id}
-          and p.deleted_at is null
-          and p.status = 'posted'
-          and p.payment_type = 'outbound'
-          and p.payment_date = ${today}::date
-          ${supplierPaymentLocFilter}
-      ), 0)::bigint as "supplierPaymentsTodayMinor",
-      coalesce((
-        select sum(greatest(ci.total_minor - coalesce((
-          select sum(pa.amount_minor)
-          from payment_allocations pa
-          inner join payments p on p.id = pa.payment_id
-          where pa.customer_invoice_id = ci.id
-            and pa.deleted_at is null
-            and p.deleted_at is null
-            and p.status = 'posted'
-        ), 0), 0))
-        from customer_invoices ci
-        left join sales_orders so on so.id = ci.sales_order_id
-        left join deliveries d on d.id = ci.delivery_id
-        where ci.company_id = ${company.id}
-          and ci.deleted_at is null
-          and ci.status <> 'cancelled'
-          ${recLocFilter}
-      ), 0)::bigint as "receivableResidualMinor",
-      coalesce((
-        select sum(greatest(vb.total_minor - coalesce((
-          select sum(pa.amount_minor)
-          from payment_allocations pa
-          inner join payments p on p.id = pa.payment_id
-          where pa.vendor_bill_id = vb.id
-            and pa.deleted_at is null
-            and p.deleted_at is null
-            and p.status = 'posted'
-        ), 0), 0))
-        from vendor_bills vb
-        left join purchase_orders po on po.id = vb.purchase_order_id
-        left join goods_receipts gr on gr.id = vb.goods_receipt_id
-        where vb.company_id = ${company.id}
-          and vb.deleted_at is null
-          and vb.status <> 'cancelled'
-          ${payLocFilter}
-      ), 0)::bigint as "payableResidualMinor",
-      coalesce((
-        select sum(cast(sb.quantity_on_hand as numeric) * sb.average_cost_minor)
-        from stock_balances sb
-        where sb.company_id = ${company.id}
-          and sb.deleted_at is null
-          ${stockLocFilter}
-      ), 0)::bigint as "stockValueMinor",
-      coalesce((
-        select count(*)
-        from purchase_orders po
-        where po.company_id = ${company.id}
-          and po.deleted_at is null
-          and po.status in ('draft', 'confirmed', 'partially_received')
-          ${poLocFilter}
-      ), 0)::int as "pendingPurchaseOrders",
-      coalesce((
-        select count(*)
-        from goods_receipts gr
-        where gr.company_id = ${company.id}
-          and gr.deleted_at is null
-          and gr.status <> 'posted'
-          ${grLocFilter}
-      ), 0)::int as "pendingReceipts",
       ${company.baseCurrencyCode}::text as "currencyCode"
   `);
 
@@ -346,28 +368,20 @@ export async function getDashboardReport(overrideLocationId?: string | null): Pr
 
   const resolved = summary ?? {
     salesTodayMinor: 0,
-    customerPaymentsTodayMinor: 0,
+    salesUnpaidTodayMinor: 0,
+    purchasesTodayMinor: 0,
+    purchasesUnpaidTodayMinor: 0,
     expensesTodayMinor: 0,
-    supplierPaymentsTodayMinor: 0,
-    receivableResidualMinor: 0,
-    payableResidualMinor: 0,
-    stockValueMinor: 0,
-    pendingPurchaseOrders: 0,
-    pendingReceipts: 0,
     currencyCode: company.baseCurrencyCode,
   };
 
   return {
     metrics: [
-      { label: "Today Sales", value: displayReportMoney(resolved.salesTodayMinor, resolved.currencyCode), href: "/admin/reports/sales", tone: "success" },
-      { label: "Customer Payments Today", value: displayReportMoney(resolved.customerPaymentsTodayMinor, resolved.currencyCode), href: "/admin/reports/payment-accounts?paymentType=inbound", tone: "success" },
-      { label: "Expenses Today", value: displayReportMoney(resolved.expensesTodayMinor, resolved.currencyCode), href: "/admin/reports/expenses", tone: "warning" },
-      { label: "Outbound Payments Today", value: displayReportMoney(resolved.supplierPaymentsTodayMinor, resolved.currencyCode), href: "/admin/reports/payment-accounts?paymentType=outbound", tone: "warning" },
-      { label: "Receivables", value: displayReportMoney(resolved.receivableResidualMinor, resolved.currencyCode), href: "/admin/reports/receivables", tone: "danger" },
-      { label: "Payables", value: displayReportMoney(resolved.payableResidualMinor, resolved.currencyCode), href: "/admin/reports/payables", tone: "warning" },
-      { label: "Stock Value", value: displayReportMoney(resolved.stockValueMinor, resolved.currencyCode), href: "/admin/reports/stock" },
-      { label: "Pending Purchases", value: String(resolved.pendingPurchaseOrders), href: "/admin/purchasing" },
-      { label: "Pending Receipts", value: String(resolved.pendingReceipts), href: "/admin/purchasing?view=receipts" },
+      { label: "Total Purchased", value: displayReportMoney(resolved.purchasesTodayMinor, resolved.currencyCode), href: "/admin/purchasing", tone: "warning" },
+      { label: "Total Sales", value: displayReportMoney(resolved.salesTodayMinor, resolved.currencyCode), href: "/admin/sales", tone: "success" },
+      { label: "Total Purchase Unpaid", value: displayReportMoney(resolved.purchasesUnpaidTodayMinor, resolved.currencyCode), href: "/admin/purchasing?paymentStatus=unpaid", tone: "danger" },
+      { label: "Total Sales Unpaid", value: displayReportMoney(resolved.salesUnpaidTodayMinor, resolved.currencyCode), href: "/admin/sales?paymentStatus=unpaid", tone: "danger" },
+      { label: "Total Expense", value: displayReportMoney(resolved.expensesTodayMinor, resolved.currencyCode), href: "/admin/operations/expenses", tone: "warning" },
     ],
     paymentAccounts,
     recentActivity,
