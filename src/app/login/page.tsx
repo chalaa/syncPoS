@@ -71,7 +71,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
           <form action={login} className="space-y-4">
             <div>
               <label htmlFor="phone" className="block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Phone Number
+                Phone Number or Username
               </label>
               <div className="relative mt-1.5">
                 <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-muted-foreground">
@@ -80,10 +80,10 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
                 <input
                   id="phone"
                   name="phone"
-                  type="tel"
+                  type="text"
                   required
-                  autoComplete="tel"
-                  placeholder="e.g. 0911223344 or +251..."
+                  autoComplete="username tel"
+                  placeholder="e.g. 0911223344 or admin"
                   className="h-11 w-full rounded-md border border-input bg-background pl-9.5 pr-3 text-sm font-medium text-foreground transition-all placeholder:text-muted-foreground/60 focus:border-ring focus:ring-2 focus:ring-ring/20"
                 />
               </div>
