@@ -5,6 +5,7 @@ import { ExternalLink, Layers, Package, ShieldCheck, Tag, Trash2, RotateCcw } fr
 
 import { minorToDisplay } from "@/lib/catalog-utils";
 import { Button, ButtonLink } from "@/components/ui/button";
+import { ClickableTableRow } from "@/components/ui/clickable-table-row";
 import { DeleteConfirmationDialog } from "@/components/ui/delete-confirmation-dialog";
 import { ProductDetailModal } from "./product-detail-modal";
 import { restoreProduct, softDeleteProduct } from "./actions";
@@ -109,7 +110,7 @@ export function ProductListTable({
           </thead>
           <tbody className="divide-y divide-border/60">
             {products.map((product) => (
-              <tr key={product.id} className="group transition-colors hover:bg-muted/30">
+              <ClickableTableRow key={product.id} onClickRow={() => handleOpen(product.id)}>
                 <td className="px-4 py-3.5 align-middle">
                   <button
                     type="button"
@@ -227,7 +228,7 @@ export function ProductListTable({
                     )}
                   </div>
                 </td>
-              </tr>
+              </ClickableTableRow>
             ))}
             {products.length === 0 ? (
               <tr>

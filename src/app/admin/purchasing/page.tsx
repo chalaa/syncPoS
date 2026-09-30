@@ -7,6 +7,7 @@ import { TablePagination } from "@/components/ui/table-pagination";
 import { Alert } from "@/components/ui/alert";
 import { Badge, StatusBadge } from "@/components/ui/badge";
 import { Button, ButtonLink } from "@/components/ui/button";
+import { ClickableTableRow } from "@/components/ui/clickable-table-row";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
 import { T } from "@/components/ui/t";
 import { cn } from "@/lib/utils";
@@ -314,7 +315,7 @@ function SupplierReturnList({ returns }: { returns: SupplierReturnListRow[] }) {
           </thead>
           <tbody className="divide-y divide-border/60">
             {returns.map((record) => (
-              <tr key={record.id} className="group transition-colors hover:bg-muted/30">
+              <ClickableTableRow key={record.id} href={`/admin/purchasing/returns/${record.id}`}>
                 <td className="px-4 py-3.5">
                   <Link href={`/admin/purchasing/returns/${record.id}`} className="font-mono text-xs font-bold text-primary hover:underline">
                     {record.returnNo}
@@ -333,7 +334,7 @@ function SupplierReturnList({ returns }: { returns: SupplierReturnListRow[] }) {
                 <td className="px-4 py-3.5 text-right">
                   <ButtonLink href={`/admin/purchasing/returns/${record.id}`} size="sm" variant="outline" className="h-8 px-2.5 text-xs"><T k="action.details" fallback="Details" /></ButtonLink>
                 </td>
-              </tr>
+              </ClickableTableRow>
             ))}
             {returns.length === 0 ? (
               <tr>
@@ -394,7 +395,7 @@ function LandedCostList({ landedCosts }: { landedCosts: PurchaseLandedCostListRo
           </thead>
           <tbody className="divide-y divide-border/60">
             {landedCosts.map((cost) => (
-              <tr key={cost.id} className="group transition-colors hover:bg-muted/30">
+              <ClickableTableRow key={cost.id} href={`/admin/purchasing/landed-costs/${cost.id}`}>
                 <td className="px-4 py-3.5 font-mono text-xs font-bold text-foreground">{cost.costNo}</td>
                 <td className="px-4 py-3.5 text-xs font-medium uppercase tracking-wider text-muted-foreground"><T k={`status.${cost.costType}`} fallback={cost.costType} /></td>
                 <td className="px-4 py-3.5">
@@ -421,7 +422,7 @@ function LandedCostList({ landedCosts }: { landedCosts: PurchaseLandedCostListRo
                     <T k="action.details" fallback="Details" />
                   </ButtonLink>
                 </td>
-              </tr>
+              </ClickableTableRow>
             ))}
             {landedCosts.length === 0 ? (
               <tr>
@@ -521,7 +522,7 @@ function PurchaseOrderList({
           </thead>
           <tbody className="divide-y divide-border/60">
             {orders.map((order) => (
-              <tr key={order.id} className="group transition-colors hover:bg-muted/30">
+              <ClickableTableRow key={order.id} href={`/admin/purchasing/${order.id}`}>
                 <td className="px-4 py-3.5">
                   <Link href={`/admin/purchasing/${order.id}`} className="inline-flex items-center gap-1.5 rounded-lg border border-primary/20 bg-primary/5 px-2.5 py-1 font-mono text-xs font-bold text-primary transition-all hover:bg-primary/10 hover:border-primary/40">
                     {order.orderNo}
@@ -579,7 +580,7 @@ function PurchaseOrderList({
                     <T k="purchasing.open" fallback="Open" />
                   </ButtonLink>
                 </td>
-              </tr>
+              </ClickableTableRow>
             ))}
             {orders.length === 0 ? (
               <tr>
@@ -647,7 +648,7 @@ function ReceiptList({
           </thead>
           <tbody className="divide-y divide-border/60">
             {receipts.map((receipt) => (
-              <tr key={receipt.id} className="group transition-colors hover:bg-muted/30">
+              <ClickableTableRow key={receipt.id} href={`/admin/purchasing/receipts/${receipt.id}`}>
                 <td className="px-4 py-3.5">
                   <Link href={`/admin/purchasing/receipts/${receipt.id}`} className="font-mono text-xs font-bold text-primary hover:underline">
                     {receipt.receiptNo}
@@ -677,7 +678,7 @@ function ReceiptList({
                     <T k="action.details" fallback="Details" />
                   </ButtonLink>
                 </td>
-              </tr>
+              </ClickableTableRow>
             ))}
             {receipts.length === 0 ? (
               <tr>
@@ -728,7 +729,7 @@ function PaymentList({ payments }: { payments: PaymentListRow[] }) {
           </thead>
           <tbody className="divide-y divide-border/60">
             {payments.map((payment) => (
-              <tr key={payment.id} className="group transition-colors hover:bg-muted/30">
+              <ClickableTableRow key={payment.id} href={`/admin/purchasing/payments/${payment.id}`}>
                 <td className="px-4 py-3.5">
                   <Link href={`/admin/purchasing/payments/${payment.id}`} className="font-mono text-xs font-bold text-primary hover:underline">
                     {payment.paymentNo}
@@ -753,7 +754,7 @@ function PaymentList({ payments }: { payments: PaymentListRow[] }) {
                     <T k="action.details" fallback="Details" />
                   </ButtonLink>
                 </td>
-              </tr>
+              </ClickableTableRow>
             ))}
             {payments.length === 0 ? (
               <tr>

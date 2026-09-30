@@ -5,6 +5,7 @@ import { TableFilterSelect } from "@/components/ui/table-filter-select";
 import { TableSearchInput } from "@/components/ui/table-search-input";
 import { StatusBadge } from "@/components/ui/badge";
 import { ButtonLink } from "@/components/ui/button";
+import { ClickableTableRow } from "@/components/ui/clickable-table-row";
 import { useTranslation } from "@/lib/i18n/use-translation";
 import { displayReturnMoney, displaySalesMoney } from "@/lib/catalog-utils";
 import type { CustomerReturnListRow } from "@/server/returns/types";
@@ -49,7 +50,7 @@ export function CustomerReturnList({ returns }: { returns: CustomerReturnListRow
           </thead>
           <tbody className="divide-y divide-border/60">
             {returns.map((record) => (
-              <tr key={record.id} className="group transition-colors hover:bg-muted/30">
+              <ClickableTableRow key={record.id} href={`/admin/sales/returns/${record.id}`}>
                 <td className="px-4 py-3.5">
                   <Link href={`/admin/sales/returns/${record.id}`} className="font-mono text-xs font-bold text-primary hover:underline">
                     {record.returnNo}
@@ -70,7 +71,7 @@ export function CustomerReturnList({ returns }: { returns: CustomerReturnListRow
                     {t("action.details", "Details")}
                   </ButtonLink>
                 </td>
-              </tr>
+              </ClickableTableRow>
             ))}
             {returns.length === 0 ? (
               <tr>
@@ -137,7 +138,7 @@ export function CustomerInvoiceList({ invoices }: { invoices: CustomerInvoiceLis
           </thead>
           <tbody className="divide-y divide-border/60">
             {invoices.map((invoice) => (
-              <tr key={invoice.id} className="group transition-colors hover:bg-muted/30">
+              <ClickableTableRow key={invoice.id} href={`/admin/sales/invoices/${invoice.id}`}>
                 <td className="px-4 py-3.5">
                   <Link href={`/admin/sales/invoices/${invoice.id}`} className="font-mono text-xs font-bold text-primary hover:underline">
                     {invoice.invoiceNo}
@@ -178,7 +179,7 @@ export function CustomerInvoiceList({ invoices }: { invoices: CustomerInvoiceLis
                     {t("action.details", "Details")}
                   </ButtonLink>
                 </td>
-              </tr>
+              </ClickableTableRow>
             ))}
             {invoices.length === 0 ? (
               <tr>
@@ -234,7 +235,7 @@ export function CustomerPaymentList({ payments }: { payments: PaymentListRow[] }
           </thead>
           <tbody className="divide-y divide-border/60">
             {payments.map((payment) => (
-              <tr key={payment.id} className="group transition-colors hover:bg-muted/30">
+              <ClickableTableRow key={payment.id} href={`/admin/sales/payments/${payment.id}`}>
                 <td className="px-4 py-3.5">
                   <Link href={`/admin/sales/payments/${payment.id}`} className="font-mono text-xs font-bold text-primary hover:underline">
                     {payment.paymentNo}
@@ -259,7 +260,7 @@ export function CustomerPaymentList({ payments }: { payments: PaymentListRow[] }
                     {t("action.details", "Details")}
                   </ButtonLink>
                 </td>
-              </tr>
+              </ClickableTableRow>
             ))}
             {payments.length === 0 ? (
               <tr>
@@ -316,7 +317,7 @@ export function DeliveryList({ deliveries }: { deliveries: DeliveryListRow[] }) 
           </thead>
           <tbody className="divide-y divide-border/60">
             {deliveries.map((delivery) => (
-              <tr key={delivery.id} className="group transition-colors hover:bg-muted/30">
+              <ClickableTableRow key={delivery.id} href={`/admin/sales/deliveries/${delivery.id}`}>
                 <td className="px-4 py-3.5">
                   <Link href={`/admin/sales/deliveries/${delivery.id}`} className="font-mono text-xs font-bold text-primary hover:underline">
                     {delivery.deliveryNo}
@@ -343,7 +344,7 @@ export function DeliveryList({ deliveries }: { deliveries: DeliveryListRow[] }) 
                     {t("action.details", "Details")}
                   </ButtonLink>
                 </td>
-              </tr>
+              </ClickableTableRow>
             ))}
             {deliveries.length === 0 ? (
               <tr>
@@ -442,7 +443,7 @@ export function SalesOrderList({
           </thead>
           <tbody className="divide-y divide-border/60">
             {orders.map((order) => (
-              <tr key={order.id} className="group transition-colors hover:bg-muted/30">
+              <ClickableTableRow key={order.id} href={`/admin/sales/${order.id}`}>
                 <td className="px-4 py-3.5">
                   <Link href={`/admin/sales/${order.id}`} className="inline-flex items-center gap-1.5 rounded-lg border border-primary/20 bg-primary/5 px-2.5 py-1 font-mono text-xs font-bold text-primary transition-all hover:bg-primary/10 hover:border-primary/40">
                     {order.orderNo}
@@ -491,7 +492,7 @@ export function SalesOrderList({
                     {t("action.details", "Details")}
                   </ButtonLink>
                 </td>
-              </tr>
+              </ClickableTableRow>
             ))}
             {orders.length === 0 ? (
               <tr>

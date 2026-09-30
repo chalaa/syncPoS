@@ -19,6 +19,7 @@ import { NewInventoryOperationModal } from "@/app/admin/inventory/operations/new
 import { OperationDetailModal } from "@/app/admin/inventory/operations/operation-detail-modal";
 import { StatusBadge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ClickableTableRow } from "@/components/ui/clickable-table-row";
 import { TableFilterSelect } from "@/components/ui/table-filter-select";
 import { TableSearchInput } from "@/components/ui/table-search-input";
 import { cn } from "@/lib/utils";
@@ -191,10 +192,9 @@ export function OperationsTableClient({
             </thead>
             <tbody className="divide-y divide-border/60">
               {rows.map((row) => (
-                <tr
+                <ClickableTableRow
                   key={row.id}
-                  onClick={() => setSelectedOperationId(row.id)}
-                  className="group transition-colors hover:bg-[#0B5D4B]/5 dark:hover:bg-[#0B5D4B]/10 cursor-pointer"
+                  onClickRow={() => setSelectedOperationId(row.id)}
                 >
                   <td className="px-4 py-3.5">
                     <button
@@ -242,7 +242,7 @@ export function OperationsTableClient({
                       {t("action.view", "View")}
                     </Button>
                   </td>
-                </tr>
+                </ClickableTableRow>
               ))}
               {rows.length === 0 && (
                 <tr>

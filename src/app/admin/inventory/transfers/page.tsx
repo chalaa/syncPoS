@@ -4,6 +4,7 @@ import { ArrowLeftRight, Eye, Plus } from "lucide-react";
 import { Alert } from "@/components/ui/alert";
 import { StatusBadge } from "@/components/ui/badge";
 import { ButtonLink } from "@/components/ui/button";
+import { ClickableTableRow } from "@/components/ui/clickable-table-row";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
 import { TablePagination } from "@/components/ui/table-pagination";
 import { T } from "@/components/ui/t";
@@ -87,9 +88,9 @@ function TransferList({ transfers }: { transfers: TransferListRow[] }) {
           </thead>
           <tbody className="divide-y divide-border/60">
             {transfers.map((transfer) => (
-              <tr
+              <ClickableTableRow
                 key={transfer.id}
-                className="group transition-colors hover:bg-[#0B5D4B]/5 dark:hover:bg-[#0B5D4B]/10"
+                href={`/admin/inventory/transfers/${transfer.id}`}
               >
                 <td className="px-4 py-3.5 font-mono text-xs font-bold text-primary">
                   <Link
@@ -128,7 +129,7 @@ function TransferList({ transfers }: { transfers: TransferListRow[] }) {
                     <T k="action.details" fallback="Details" />
                   </ButtonLink>
                 </td>
-              </tr>
+              </ClickableTableRow>
             ))}
             {transfers.length === 0 && (
               <tr>

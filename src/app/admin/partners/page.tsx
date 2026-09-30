@@ -5,6 +5,7 @@ import { NewPartnerModal } from "@/app/admin/partners/new-partner-modal";
 import { Alert } from "@/components/ui/alert";
 import { Badge, StatusBadge } from "@/components/ui/badge";
 import { Button, ButtonLink } from "@/components/ui/button";
+import { ClickableTableRow } from "@/components/ui/clickable-table-row";
 import { DeleteConfirmationDialog } from "@/components/ui/delete-confirmation-dialog";
 import { TableFilterSelect } from "@/components/ui/table-filter-select";
 import { TableSearchInput } from "@/components/ui/table-search-input";
@@ -155,7 +156,7 @@ export default async function PartnersPage({ searchParams }: PartnersPageProps) 
               </thead>
               <tbody>
                 {partnerPage.rows.map((partner) => (
-                  <tr key={partner.id} className="border-t border-border transition-colors hover:bg-secondary/30">
+                  <ClickableTableRow key={partner.id} href={`/admin/partners/${partner.id}`}>
                     <td className="px-4 py-3 font-mono text-xs font-semibold text-foreground">{partner.code}</td>
                     <td className="px-4 py-3">
                       <Link
@@ -225,7 +226,7 @@ export default async function PartnersPage({ searchParams }: PartnersPageProps) 
                         )}
                       </div>
                     </td>
-                  </tr>
+                  </ClickableTableRow>
                 ))}
                 {partnerPage.rows.length === 0 ? (
                   <tr>

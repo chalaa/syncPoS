@@ -6,6 +6,7 @@ import { NewExpenseModal } from "@/app/admin/operations/expenses/new-expense-mod
 import { Alert } from "@/components/ui/alert";
 import { StatusBadge } from "@/components/ui/badge";
 import { Button, ButtonLink } from "@/components/ui/button";
+import { ClickableTableRow } from "@/components/ui/clickable-table-row";
 import { TableFilterSelect } from "@/components/ui/table-filter-select";
 import { TableSearchInput } from "@/components/ui/table-search-input";
 import { TablePagination } from "@/components/ui/table-pagination";
@@ -149,7 +150,7 @@ function ExpenseTable({ rows, showCancelled }: { rows: ExpenseListRow[]; showCan
         </thead>
         <tbody>
           {rows.map((expense) => (
-            <tr key={expense.id} className="border-t border-border transition-colors hover:bg-secondary/30">
+            <ClickableTableRow key={expense.id} href={`/admin/operations/expenses/${expense.id}`}>
               <td className="px-4 py-3">
                 <Link href={`/admin/operations/expenses/${expense.id}`} className="font-semibold text-primary underline-offset-4 hover:underline">
                   {expense.expenseNo}
@@ -188,7 +189,7 @@ function ExpenseTable({ rows, showCancelled }: { rows: ExpenseListRow[]; showCan
                   ) : null}
                 </div>
               </td>
-            </tr>
+            </ClickableTableRow>
           ))}
           {rows.length === 0 ? (
             <tr>
