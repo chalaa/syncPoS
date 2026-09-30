@@ -3,6 +3,7 @@ import { InventoryAdjustmentForm } from "@/app/admin/inventory/operations/adjust
 import { Alert } from "@/components/ui/alert";
 import { ButtonLink } from "@/components/ui/button";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
+import { T } from "@/components/ui/t";
 import { requirePermission } from "@/server/auth/session";
 import { getInventoryAdjustmentFormOptions } from "@/server/inventory/stock";
 
@@ -20,12 +21,20 @@ export default async function NewAdjustmentPage({ searchParams }: NewAdjustmentP
   return (
     <PageShell>
       <PageHeader
-        eyebrow="Inventory / Adjustment"
-        title="New Adjustment"
-        actions={<ButtonLink href="/admin/inventory/operations?view=adjustments" variant="outline">Back to adjustments</ButtonLink>}
+        eyebrow={<T k="inventory.adjustmentEyebrow" fallback="Inventory / Adjustment" />}
+        title={<T k="inventory.newAdjustment" fallback="New Adjustment" />}
+        actions={
+          <ButtonLink href="/admin/inventory/operations?view=adjustments" variant="outline">
+            <T k="inventory.backToAdjustments" fallback="Back to adjustments" />
+          </ButtonLink>
+        }
       />
 
-      {query.error ? <Alert kind="error">{query.error}</Alert> : null}
+      {query.error ? (
+        <Alert kind="error">
+          <T k={query.error} fallback={query.error} />
+        </Alert>
+      ) : null}
 
       <InventoryAdjustmentForm action={createInventoryAdjustment} owners={options.owners} locations={options.locations} products={options.products} balances={options.balances} />
     </PageShell>

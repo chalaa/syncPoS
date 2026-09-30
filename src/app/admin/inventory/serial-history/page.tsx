@@ -3,6 +3,7 @@ import {
   SerialHistoryTable,
 } from "@/app/admin/inventory/movement-table";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
+import { T } from "@/components/ui/t";
 import { requirePermission } from "@/server/auth/session";
 import { getSerialHistory, parseAsOfDate } from "@/server/inventory/stock";
 
@@ -29,9 +30,14 @@ export default async function SerialHistoryPage({ searchParams }: SerialHistoryP
   return (
     <PageShell>
       <PageHeader
-        eyebrow="Inventory Workspace"
-        title="Serial & Lot Movement History"
-        description="End-to-end provenance, receipts, transfers, deliveries, and returns for specific machine serial numbers."
+        eyebrow={<T k="header.eyebrow.inventoryWorkspace" fallback="Inventory Workspace" />}
+        title={<T k="inventory.serialHistoryTitle" fallback="Serial & Lot Movement History" />}
+        description={
+          <T
+            k="inventory.serialHistoryDesc"
+            fallback="End-to-end provenance, receipts, transfers, deliveries, and returns for specific machine serial numbers."
+          />
+        }
       />
 
       <section className="rounded-xl border border-border bg-card shadow-xs">

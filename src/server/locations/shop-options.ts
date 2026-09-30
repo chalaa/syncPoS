@@ -71,3 +71,15 @@ export async function getUserShopOptions(
 
   return getAllActiveDisplayShops(companyId);
 }
+
+export async function getSelectedShopId(): Promise<string | null> {
+  try {
+    const { cookies } = await import("next/headers");
+    const cookieStore = await cookies();
+    const locationId = cookieStore.get("syncpos-selected-location")?.value;
+    return locationId ? locationId.trim() : null;
+  } catch {
+    return null;
+  }
+}
+

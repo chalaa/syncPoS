@@ -137,12 +137,16 @@ export async function getProductList(params: {
   categoryId?: string;
   brandId?: string;
   status?: string;
+  unitId?: string;
+  trackingMode?: string;
 }) {
   const company = await getDefaultCompany();
   const query = params.query?.trim();
   const deletedFilter = params.showDeleted ? isNotNull(products.deletedAt) : isNull(products.deletedAt);
   const categoryFilter = params.categoryId ? eq(products.categoryId, params.categoryId) : undefined;
   const brandFilter = params.brandId ? eq(products.brandId, params.brandId) : undefined;
+  const unitFilter = params.unitId ? eq(products.unitId, params.unitId) : undefined;
+  const trackingFilter = params.trackingMode ? eq(products.trackingMode, params.trackingMode as any) : undefined;
   const statusFilter =
     params.status === "active"
       ? eq(products.isActive, true)
@@ -171,6 +175,8 @@ export async function getProductList(params: {
     deletedFilter,
     categoryFilter,
     brandFilter,
+    unitFilter,
+    trackingFilter,
     statusFilter,
     ...tokenFilters,
   ].filter(Boolean);

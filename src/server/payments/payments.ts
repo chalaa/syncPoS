@@ -33,6 +33,8 @@ import type {
   SalesOrderPaymentSummary,
 } from "@/server/payments/types";
 
+import { getSelectedShopId } from "@/server/locations/shop-options";
+
 export function displayPaymentMoney(value: number, currencyCode: string) {
   return `${currencyCode} ${minorToDisplay(value)}`;
 }
@@ -199,8 +201,10 @@ export async function getPaymentList(params: {
   expenseId?: string;
   customerInvoiceId?: string;
   salesOrderId?: string;
+  locationId?: string;
 }): Promise<PaymentListRow[]> {
   const company = await getDefaultCompany();
+  const locationId = params.locationId ?? await getSelectedShopId();
 
   return db.execute<PaymentListRow>(sql`
     select
@@ -225,6 +229,30 @@ export async function getPaymentList(params: {
     where p.company_id = ${company.id}
       and p.deleted_at is null
       and (${params.paymentType ?? null}::payment_type is null or p.payment_type = ${params.paymentType ?? null}::payment_type)
+      and (
+        ${locationId}::uuid is null
+        or exists (
+          select 1
+          from payment_allocations target_loc_pal
+          left join sales_orders target_so on target_so.id = target_loc_pal.sales_order_id
+          left join customer_invoices target_ci on target_ci.id = target_loc_pal.customer_invoice_id
+          left join sales_orders target_ciso on target_ciso.id = target_ci.sales_order_id
+          left join purchase_orders target_po on target_po.id = target_loc_pal.purchase_order_id
+          left join vendor_bills target_vb on target_vb.id = target_loc_pal.vendor_bill_id
+          left join purchase_orders target_vbpo on target_vbpo.id = target_vb.purchase_order_id
+          left join expenses target_ex on target_ex.id = target_loc_pal.expense_id
+          where target_loc_pal.payment_id = p.id
+            and target_loc_pal.deleted_at is null
+            and (
+              target_so.source_location_id = ${locationId}::uuid
+              or target_ciso.source_location_id = ${locationId}::uuid
+              or target_po.deliver_to_location_id = ${locationId}::uuid
+              or target_vbpo.deliver_to_location_id = ${locationId}::uuid
+              or target_ex.location_id = ${locationId}::uuid
+              or target_loc_pal.location_id = ${locationId}::uuid
+            )
+        )
+      )
       and (
         ${params.vendorBillId ?? null}::uuid is null
         or exists (

@@ -15,6 +15,7 @@ import { StatusBadge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { TableSearchInput } from "@/components/ui/table-search-input";
 import { cn } from "@/lib/utils";
+import { useTranslation } from "@/lib/i18n/use-translation";
 import {
   displayMoneyMinor,
   displayQuantity,
@@ -56,6 +57,7 @@ export function ProductStockCardFilters({
   asOfDate: string;
   products: StockFilterOption[];
 }) {
+  const { t } = useTranslation();
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -74,20 +76,20 @@ export function ProductStockCardFilters({
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 items-end">
         {/* Search */}
         <div className="flex flex-col gap-1 text-xs font-semibold text-muted-foreground">
-          <span>Search Movements</span>
-          <TableSearchInput defaultValue={query} placeholder="Movement no, source doc..." />
+          <span>{t("field.searchMovements", "Search Movements")}</span>
+          <TableSearchInput defaultValue={query} placeholder={t("inventory.movementSearchPlaceholder", "Movement no, source doc...")} />
         </div>
 
         {/* Product Select */}
         <label className="flex flex-col gap-1 text-xs font-semibold text-muted-foreground">
-          <span>Product Ledger</span>
+          <span>{t("inventory.productLedger", "Product Ledger")}</span>
           <select
             name="productId"
             defaultValue={productId}
             onChange={(e) => updateParam("productId", e.target.value)}
             className="h-10 rounded-xl border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring transition-colors"
           >
-            <option value="">All Products</option>
+            <option value="">{t("field.allProducts", "All Products")}</option>
             {products.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.code} · {p.name}
@@ -98,7 +100,7 @@ export function ProductStockCardFilters({
 
         {/* As of Date */}
         <label className="flex flex-col gap-1 text-xs font-semibold text-muted-foreground">
-          <span>As Of Date</span>
+          <span>{t("field.asOfDate", "As Of Date")}</span>
           <input
             name="asOfDate"
             type="date"
@@ -113,20 +115,22 @@ export function ProductStockCardFilters({
 }
 
 export function ProductStockCardTable({ rows }: { rows: ProductStockCardRow[] }) {
+  const { t } = useTranslation();
+
   return (
     <div className="overflow-x-auto">
       <table className="w-full min-w-[1040px] text-left text-sm">
         <thead>
           <tr className="border-b border-border/80 bg-muted/40 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-            <th className="px-4 py-3.5">Date</th>
-            <th className="px-4 py-3.5">Movement No</th>
-            <th className="px-4 py-3.5">Type</th>
-            <th className="px-4 py-3.5">Owner</th>
-            <th className="px-4 py-3.5">From</th>
-            <th className="px-4 py-3.5">To</th>
-            <th className="px-4 py-3.5">Serial</th>
-            <th className="px-4 py-3.5 text-right">Quantity</th>
-            <th className="px-4 py-3.5 text-right">Total Cost</th>
+            <th className="px-4 py-3.5">{t("sales.col.date", "Date")}</th>
+            <th className="px-4 py-3.5">{t("inventory.movementNo", "Movement No")}</th>
+            <th className="px-4 py-3.5">{t("field.type", "Type")}</th>
+            <th className="px-4 py-3.5">{t("field.stockOwner", "Owner")}</th>
+            <th className="px-4 py-3.5">{t("field.from", "From")}</th>
+            <th className="px-4 py-3.5">{t("field.to", "To")}</th>
+            <th className="px-4 py-3.5">{t("field.serial", "Serial")}</th>
+            <th className="px-4 py-3.5 text-right">{t("sales.form.qty", "Quantity")}</th>
+            <th className="px-4 py-3.5 text-right">{t("field.totalCost", "Total Cost")}</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-border/60">
@@ -176,9 +180,9 @@ export function ProductStockCardTable({ rows }: { rows: ProductStockCardRow[] })
                 <div className="mx-auto flex size-12 items-center justify-center rounded-2xl bg-muted/60 text-muted-foreground mb-3">
                   <Boxes className="size-6" />
                 </div>
-                <p className="font-bold text-sm text-foreground">No stock card movements found</p>
+                <p className="font-bold text-sm text-foreground">{t("inventory.noMovements", "No stock card movements found")}</p>
                 <p className="mt-1 text-xs text-muted-foreground max-w-sm mx-auto">
-                  Try selecting a specific product from the dropdown above to view its chronological ledger.
+                  {t("inventory.selectProductHint", "Try selecting a specific product from the dropdown above to view its chronological ledger.")}
                 </p>
               </td>
             </tr>
@@ -196,6 +200,7 @@ export function SerialHistoryFilters({
   serialQuery: string;
   asOfDate: string;
 }) {
+  const { t } = useTranslation();
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -214,17 +219,17 @@ export function SerialHistoryFilters({
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 items-end">
         {/* Serial input */}
         <div className="flex flex-col gap-1 text-xs font-semibold text-muted-foreground sm:col-span-2 lg:col-span-1">
-          <span>Serial or Machine Tag</span>
+          <span>{t("field.serialTag", "Serial or Machine Tag")}</span>
           <TableSearchInput
             paramName="serial"
             defaultValue={serialQuery}
-            placeholder="Serial number, engine, chassis..."
+            placeholder={t("inventory.serialSearchPlaceholder", "Serial number, engine, chassis...")}
           />
         </div>
 
         {/* As of Date */}
         <label className="flex flex-col gap-1 text-xs font-semibold text-muted-foreground">
-          <span>As Of Date</span>
+          <span>{t("field.asOfDate", "As Of Date")}</span>
           <input
             name="asOfDate"
             type="date"
@@ -239,20 +244,22 @@ export function SerialHistoryFilters({
 }
 
 export function SerialHistoryTable({ rows }: { rows: SerialHistoryRow[] }) {
+  const { t } = useTranslation();
+
   return (
     <div className="overflow-x-auto">
       <table className="w-full min-w-[1080px] text-left text-sm">
         <thead>
           <tr className="border-b border-border/80 bg-muted/40 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-            <th className="px-4 py-3.5">Serial / Tag</th>
-            <th className="px-4 py-3.5">Product</th>
-            <th className="px-4 py-3.5">Current Location</th>
-            <th className="px-4 py-3.5">Owner</th>
-            <th className="px-4 py-3.5">Date</th>
-            <th className="px-4 py-3.5">Movement</th>
-            <th className="px-4 py-3.5">From</th>
-            <th className="px-4 py-3.5">To</th>
-            <th className="px-4 py-3.5 text-right">Quantity</th>
+            <th className="px-4 py-3.5">{t("field.serialTag", "Serial / Tag")}</th>
+            <th className="px-4 py-3.5">{t("sales.col.product", "Product")}</th>
+            <th className="px-4 py-3.5">{t("field.currentLocation", "Current Location")}</th>
+            <th className="px-4 py-3.5">{t("field.stockOwner", "Owner")}</th>
+            <th className="px-4 py-3.5">{t("sales.col.date", "Date")}</th>
+            <th className="px-4 py-3.5">{t("field.movement", "Movement")}</th>
+            <th className="px-4 py-3.5">{t("field.from", "From")}</th>
+            <th className="px-4 py-3.5">{t("field.to", "To")}</th>
+            <th className="px-4 py-3.5 text-right">{t("sales.form.qty", "Quantity")}</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-border/60">
@@ -298,9 +305,9 @@ export function SerialHistoryTable({ rows }: { rows: SerialHistoryRow[] }) {
                 <div className="mx-auto flex size-12 items-center justify-center rounded-2xl bg-muted/60 text-muted-foreground mb-3">
                   <Barcode className="size-6" />
                 </div>
-                <p className="font-bold text-sm text-foreground">No serial history found</p>
+                <p className="font-bold text-sm text-foreground">{t("inventory.noSerialHistory", "No serial history found")}</p>
                 <p className="mt-1 text-xs text-muted-foreground max-w-sm mx-auto">
-                  Enter a serial number or machine tag above to inspect its provenance lifecycle.
+                  {t("inventory.enterSerialHint", "Enter a serial number or machine tag above to inspect its provenance lifecycle.")}
                 </p>
               </td>
             </tr>

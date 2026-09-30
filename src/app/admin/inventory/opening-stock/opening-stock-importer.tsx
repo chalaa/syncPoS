@@ -10,6 +10,7 @@ import {
 } from "@/app/admin/inventory/opening-stock/actions";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { useTranslation } from "@/lib/i18n/use-translation";
 import type { OpeningStockPreviewState } from "@/server/inventory/types";
 
 const openingStockInitialState: OpeningStockPreviewState = {
@@ -39,6 +40,7 @@ function errorReportHref(rows: { rowNumber: number; sku: string; productName: st
 }
 
 export function OpeningStockImporter() {
+  const { t } = useTranslation();
   const [previewState, validateAction, isValidating] = useActionState(
     validateOpeningStockImport,
     openingStockInitialState,
@@ -79,15 +81,15 @@ export function OpeningStockImporter() {
       <section className="rounded-lg border border-border bg-card p-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h2 className="text-base font-semibold">Import file</h2>
+            <h2 className="text-base font-semibold">{t("inventory.importFile", "Import file")}</h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Upload the CSV template after filling products, owners, locations, quantities, costs, and serial numbers.
+              {t("inventory.uploadCsvDesc", "Upload the CSV template after filling products, owners, locations, quantities, costs, and serial numbers.")}
             </p>
           </div>
           <Button asChild variant="outline">
             <Link href="/admin/inventory/opening-stock/template">
               <DownloadIcon data-icon="inline-start" />
-              Template
+              {t("inventory.template", "Template")}
             </Link>
           </Button>
         </div>
@@ -101,7 +103,7 @@ export function OpeningStockImporter() {
           />
           <Button disabled={isValidating}>
             <UploadIcon data-icon="inline-start" />
-            {isValidating ? "Validating..." : "Validate preview"}
+            {isValidating ? t("inventory.validating", "Validating...") : t("inventory.validatePreview", "Validate preview")}
           </Button>
         </form>
       </section>
@@ -109,9 +111,9 @@ export function OpeningStockImporter() {
       <section className="rounded-lg border border-border bg-card">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border p-4">
           <div>
-            <h2 className="text-base font-semibold">Validation preview</h2>
+            <h2 className="text-base font-semibold">{t("inventory.validationPreview", "Validation preview")}</h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Fix all row errors before importing opening balances.
+              {t("inventory.fixRowErrors", "Fix all row errors before importing opening balances.")}
             </p>
           </div>
           <form action={importAction}>
@@ -124,13 +126,13 @@ export function OpeningStockImporter() {
                     download="opening-stock-error-report.csv"
                   >
                     <DownloadIcon data-icon="inline-start" />
-                    Error report
+                    {t("inventory.errorReport", "Error report")}
                   </a>
                 </Button>
               ) : null}
               <Button disabled={!canImport || isImporting}>
                 <CheckCircleIcon data-icon="inline-start" />
-                {isImporting ? "Importing..." : "Import opening stock"}
+                {isImporting ? t("inventory.importing", "Importing...") : t("inventory.importOpeningStock", "Import opening stock")}
               </Button>
             </div>
           </form>
@@ -140,29 +142,29 @@ export function OpeningStockImporter() {
           <table className="w-full min-w-[1160px] text-left text-sm">
             <thead className="bg-muted text-xs uppercase tracking-wide text-muted-foreground">
               <tr>
-                <th className="px-4 py-3">Row</th>
-                <th className="px-4 py-3">Item Code</th>
-                <th className="px-4 py-3">Product</th>
-                <th className="px-4 py-3">Owner</th>
-                <th className="px-4 py-3">Location</th>
-                <th className="px-4 py-3 text-right">Qty</th>
-                <th className="px-4 py-3 text-right">Unit cost</th>
-                <th className="px-4 py-3">Serial</th>
-                <th className="px-4 py-3">Errors</th>
+                <th className="px-4 py-3">{t("table.row", "Row")}</th>
+                <th className="px-4 py-3">{t("table.itemCode", "Item Code")}</th>
+                <th className="px-4 py-3">{t("table.product", "Product")}</th>
+                <th className="px-4 py-3">{t("table.owner", "Owner")}</th>
+                <th className="px-4 py-3">{t("table.location", "Location")}</th>
+                <th className="px-4 py-3 text-right">{t("table.qty", "Qty")}</th>
+                <th className="px-4 py-3 text-right">{t("table.unitCost", "Unit cost")}</th>
+                <th className="px-4 py-3">{t("table.serial", "Serial")}</th>
+                <th className="px-4 py-3">{t("table.errors", "Errors")}</th>
               </tr>
             </thead>
             <tbody>
               {previewRows.map((row) => (
                 <tr key={`${row.rowNumber}-${row.sku}-${row.serialNo}`} className="border-t border-border">
                   <td className="px-4 py-3">{row.rowNumber}</td>
-                  <td className="px-4 py-3 font-medium">{row.sku || "Missing"}</td>
+                  <td className="px-4 py-3 font-medium">{row.sku || t("inventory.missing", "Missing")}</td>
                   <td className="px-4 py-3">
-                    <div>{row.productName || "Unknown product"}</div>
+                    <div>{row.productName || t("inventory.unknownProduct", "Unknown product")}</div>
                     <div className="text-xs text-muted-foreground">{row.trackingMode}</div>
                   </td>
-                  <td className="px-4 py-3">{row.ownerName || "Missing"}</td>
+                  <td className="px-4 py-3">{row.ownerName || t("inventory.missing", "Missing")}</td>
                   <td className="px-4 py-3">
-                    <div>{row.locationCode || "Missing"}</div>
+                    <div>{row.locationCode || t("inventory.missing", "Missing")}</div>
                     <div className="text-xs text-muted-foreground">{row.locationName}</div>
                   </td>
                   <td className="px-4 py-3 text-right">{row.quantity}</td>
@@ -179,7 +181,7 @@ export function OpeningStockImporter() {
                         ))}
                       </div>
                     ) : (
-                      <span className="text-muted-foreground">Ready</span>
+                      <span className="text-muted-foreground">{t("inventory.ready", "Ready")}</span>
                     )}
                   </td>
                 </tr>
@@ -187,7 +189,7 @@ export function OpeningStockImporter() {
               {previewRows.length === 0 ? (
                 <tr>
                   <td colSpan={9} className="px-4 py-10 text-center text-muted-foreground">
-                    Upload a CSV file to preview opening stock rows.
+                    {t("inventory.uploadCsvPrompt", "Upload a CSV file to preview opening stock rows.")}
                   </td>
                 </tr>
               ) : null}

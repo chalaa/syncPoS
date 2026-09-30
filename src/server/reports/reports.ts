@@ -5,6 +5,7 @@ import { sql } from "drizzle-orm";
 import { displayReportMoney } from "@/lib/report-formatters";
 import { getDefaultCompany } from "@/server/catalog/products";
 import { db } from "@/server/db/client";
+import { getSelectedShopId } from "@/server/locations/shop-options";
 import type {
   DashboardPaymentAccount,
   DashboardRecentActivity,
@@ -27,6 +28,7 @@ export function normalizeReportFilters(params: {
   status?: string;
   paymentType?: string;
   paymentAccountId?: string;
+  locationId?: string;
 }): ReportFilters {
   const paymentType =
     params.paymentType === "inbound" || params.paymentType === "outbound"
@@ -40,6 +42,7 @@ export function normalizeReportFilters(params: {
     status: params.status?.trim() || undefined,
     paymentType,
     paymentAccountId: params.paymentAccountId?.trim() || undefined,
+    locationId: params.locationId?.trim() || undefined,
   };
 }
 
@@ -60,9 +63,98 @@ export function summarizeMoney<T extends { totalMinor?: number; amountMinor?: nu
   );
 }
 
-export async function getDashboardReport(): Promise<DashboardReport> {
+export function parseValidLocationId(rawLocId?: string | null): string | null {
+  if (!rawLocId || rawLocId === "all") return null;
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(rawLocId) ? rawLocId : null;
+}
+
+export async function getDashboardReport(overrideLocationId?: string | null): Promise<DashboardReport> {
   const company = await getDefaultCompany();
   const today = new Date().toISOString().slice(0, 10);
+  const locationIdRaw = overrideLocationId !== undefined ? overrideLocationId : await getSelectedShopId();
+  const validLocId = parseValidLocationId(locationIdRaw);
+
+  const salesLocFilter = validLocId
+    ? sql` and (so.source_location_id = ${validLocId}::uuid or d.source_location_id = ${validLocId}::uuid)`
+    : sql``;
+
+  const custPaymentLocFilter = validLocId
+    ? sql` and exists (
+        select 1
+        from payment_allocations pa
+        left join customer_invoices ci on ci.id = pa.customer_invoice_id
+        left join deliveries d on d.id = ci.delivery_id
+        left join sales_orders so on so.id = ci.sales_order_id or so.id = pa.sales_order_id
+        where pa.payment_id = p.id
+          and pa.deleted_at is null
+          and (so.source_location_id = ${validLocId}::uuid or d.source_location_id = ${validLocId}::uuid)
+      )`
+    : sql``;
+
+  const expenseLocFilter = validLocId
+    ? sql` and e.location_id = ${validLocId}::uuid`
+    : sql``;
+
+  const supplierPaymentLocFilter = validLocId
+    ? sql` and exists (
+        select 1
+        from payment_allocations pa
+        left join vendor_bills vb on vb.id = pa.vendor_bill_id
+        left join goods_receipts gr on gr.id = vb.goods_receipt_id
+        left join purchase_orders po on po.id = vb.purchase_order_id or po.id = pa.purchase_order_id
+        left join expenses ex on ex.id = pa.expense_id
+        where pa.payment_id = p.id
+          and pa.deleted_at is null
+          and (po.deliver_to_location_id = ${validLocId}::uuid or gr.location_id = ${validLocId}::uuid or ex.location_id = ${validLocId}::uuid)
+      )`
+    : sql``;
+
+  const recLocFilter = validLocId
+    ? sql` and (so.source_location_id = ${validLocId}::uuid or d.source_location_id = ${validLocId}::uuid)`
+    : sql``;
+
+  const payLocFilter = validLocId
+    ? sql` and (po.deliver_to_location_id = ${validLocId}::uuid or gr.location_id = ${validLocId}::uuid)`
+    : sql``;
+
+  const stockLocFilter = validLocId
+    ? sql` and sb.location_id = ${validLocId}::uuid`
+    : sql``;
+
+  const poLocFilter = validLocId
+    ? sql` and po.deliver_to_location_id = ${validLocId}::uuid`
+    : sql``;
+
+  const grLocFilter = validLocId
+    ? sql` and gr.location_id = ${validLocId}::uuid`
+    : sql``;
+
+  const recentInvoiceLocFilter = validLocId
+    ? sql` and (so.source_location_id = ${validLocId}::uuid or d.source_location_id = ${validLocId}::uuid)`
+    : sql``;
+
+  const recentBillLocFilter = validLocId
+    ? sql` and (po.deliver_to_location_id = ${validLocId}::uuid or gr.location_id = ${validLocId}::uuid)`
+    : sql``;
+
+  const recentPaymentLocFilter = validLocId
+    ? sql` and exists (
+        select 1
+        from payment_allocations pa
+        left join sales_orders so on so.id = pa.sales_order_id
+        left join customer_invoices ci on ci.id = pa.customer_invoice_id
+        left join sales_orders ciso on ciso.id = ci.sales_order_id
+        left join deliveries cid on cid.id = ci.delivery_id
+        left join purchase_orders po on po.id = pa.purchase_order_id
+        left join vendor_bills vb on vb.id = pa.vendor_bill_id
+        left join purchase_orders vbpo on vbpo.id = vb.purchase_order_id
+        left join goods_receipts vbgr on vbgr.id = vb.goods_receipt_id
+        left join expenses ex on ex.id = pa.expense_id
+        where pa.payment_id = p.id
+          and pa.deleted_at is null
+          and (so.source_location_id = ${validLocId}::uuid or ciso.source_location_id = ${validLocId}::uuid or cid.source_location_id = ${validLocId}::uuid or po.deliver_to_location_id = ${validLocId}::uuid or vbpo.deliver_to_location_id = ${validLocId}::uuid or vbgr.location_id = ${validLocId}::uuid or ex.location_id = ${validLocId}::uuid)
+      )`
+    : sql``;
 
   const [summary] = await db.execute<{
     salesTodayMinor: number;
@@ -77,10 +169,46 @@ export async function getDashboardReport(): Promise<DashboardReport> {
     currencyCode: string;
   }>(sql`
     select
-      coalesce((select sum(ci.total_minor) from customer_invoices ci where ci.company_id = ${company.id} and ci.deleted_at is null and ci.status = 'posted' and ci.invoice_date = ${today}::date), 0)::bigint as "salesTodayMinor",
-      coalesce((select sum(p.amount_minor) from payments p where p.company_id = ${company.id} and p.deleted_at is null and p.status = 'posted' and p.payment_type = 'inbound' and p.payment_date = ${today}::date), 0)::bigint as "customerPaymentsTodayMinor",
-      coalesce((select sum(e.amount_minor) from expenses e where e.company_id = ${company.id} and e.deleted_at is null and e.status <> 'cancelled' and e.expense_date = ${today}::date), 0)::bigint as "expensesTodayMinor",
-      coalesce((select sum(p.amount_minor) from payments p where p.company_id = ${company.id} and p.deleted_at is null and p.status = 'posted' and p.payment_type = 'outbound' and p.payment_date = ${today}::date), 0)::bigint as "supplierPaymentsTodayMinor",
+      coalesce((
+        select sum(ci.total_minor)
+        from customer_invoices ci
+        left join sales_orders so on so.id = ci.sales_order_id
+        left join deliveries d on d.id = ci.delivery_id
+        where ci.company_id = ${company.id}
+          and ci.deleted_at is null
+          and ci.status = 'posted'
+          and ci.invoice_date = ${today}::date
+          ${salesLocFilter}
+      ), 0)::bigint as "salesTodayMinor",
+      coalesce((
+        select sum(p.amount_minor)
+        from payments p
+        where p.company_id = ${company.id}
+          and p.deleted_at is null
+          and p.status = 'posted'
+          and p.payment_type = 'inbound'
+          and p.payment_date = ${today}::date
+          ${custPaymentLocFilter}
+      ), 0)::bigint as "customerPaymentsTodayMinor",
+      coalesce((
+        select sum(e.amount_minor)
+        from expenses e
+        where e.company_id = ${company.id}
+          and e.deleted_at is null
+          and e.status <> 'cancelled'
+          and e.expense_date = ${today}::date
+          ${expenseLocFilter}
+      ), 0)::bigint as "expensesTodayMinor",
+      coalesce((
+        select sum(p.amount_minor)
+        from payments p
+        where p.company_id = ${company.id}
+          and p.deleted_at is null
+          and p.status = 'posted'
+          and p.payment_type = 'outbound'
+          and p.payment_date = ${today}::date
+          ${supplierPaymentLocFilter}
+      ), 0)::bigint as "supplierPaymentsTodayMinor",
       coalesce((
         select sum(greatest(ci.total_minor - coalesce((
           select sum(pa.amount_minor)
@@ -92,9 +220,12 @@ export async function getDashboardReport(): Promise<DashboardReport> {
             and p.status = 'posted'
         ), 0), 0))
         from customer_invoices ci
+        left join sales_orders so on so.id = ci.sales_order_id
+        left join deliveries d on d.id = ci.delivery_id
         where ci.company_id = ${company.id}
           and ci.deleted_at is null
           and ci.status <> 'cancelled'
+          ${recLocFilter}
       ), 0)::bigint as "receivableResidualMinor",
       coalesce((
         select sum(greatest(vb.total_minor - coalesce((
@@ -107,13 +238,36 @@ export async function getDashboardReport(): Promise<DashboardReport> {
             and p.status = 'posted'
         ), 0), 0))
         from vendor_bills vb
+        left join purchase_orders po on po.id = vb.purchase_order_id
+        left join goods_receipts gr on gr.id = vb.goods_receipt_id
         where vb.company_id = ${company.id}
           and vb.deleted_at is null
           and vb.status <> 'cancelled'
+          ${payLocFilter}
       ), 0)::bigint as "payableResidualMinor",
-      coalesce((select sum(cast(sb.quantity_on_hand as numeric) * sb.average_cost_minor) from stock_balances sb where sb.company_id = ${company.id} and sb.deleted_at is null), 0)::bigint as "stockValueMinor",
-      coalesce((select count(*) from purchase_orders po where po.company_id = ${company.id} and po.deleted_at is null and po.status in ('draft', 'confirmed', 'partially_received')), 0)::int as "pendingPurchaseOrders",
-      coalesce((select count(*) from goods_receipts gr where gr.company_id = ${company.id} and gr.deleted_at is null and gr.status <> 'posted'), 0)::int as "pendingReceipts",
+      coalesce((
+        select sum(cast(sb.quantity_on_hand as numeric) * sb.average_cost_minor)
+        from stock_balances sb
+        where sb.company_id = ${company.id}
+          and sb.deleted_at is null
+          ${stockLocFilter}
+      ), 0)::bigint as "stockValueMinor",
+      coalesce((
+        select count(*)
+        from purchase_orders po
+        where po.company_id = ${company.id}
+          and po.deleted_at is null
+          and po.status in ('draft', 'confirmed', 'partially_received')
+          ${poLocFilter}
+      ), 0)::int as "pendingPurchaseOrders",
+      coalesce((
+        select count(*)
+        from goods_receipts gr
+        where gr.company_id = ${company.id}
+          and gr.deleted_at is null
+          and gr.status <> 'posted'
+          ${grLocFilter}
+      ), 0)::int as "pendingReceipts",
       ${company.baseCurrencyCode}::text as "currencyCode"
   `);
 
@@ -145,17 +299,27 @@ export async function getDashboardReport(): Promise<DashboardReport> {
       select ci.id, ci.invoice_no as "documentNo", 'Customer invoice' as "activityType", ci.invoice_date::text as "activityDate", customer.display_name as "partyName", ci.total_minor as "amountMinor", ci.currency_code as "currencyCode", '/admin/sales/invoices/' || ci.id::text as "href"
       from customer_invoices ci
       inner join partners customer on customer.id = ci.customer_id
-      where ci.company_id = ${company.id} and ci.deleted_at is null
+      left join sales_orders so on so.id = ci.sales_order_id
+      left join deliveries d on d.id = ci.delivery_id
+      where ci.company_id = ${company.id}
+        and ci.deleted_at is null
+        ${recentInvoiceLocFilter}
       union all
       select vb.id, vb.bill_no as "documentNo", 'Vendor bill' as "activityType", vb.bill_date::text as "activityDate", supplier.display_name as "partyName", vb.total_minor as "amountMinor", vb.currency_code as "currencyCode", '/admin/purchasing/vendor-bills/vendor_bill/' || vb.id::text as "href"
       from vendor_bills vb
       inner join partners supplier on supplier.id = vb.supplier_id
-      where vb.company_id = ${company.id} and vb.deleted_at is null
+      left join purchase_orders po on po.id = vb.purchase_order_id
+      left join goods_receipts gr on gr.id = vb.goods_receipt_id
+      where vb.company_id = ${company.id}
+        and vb.deleted_at is null
+        ${recentBillLocFilter}
       union all
       select p.id, p.payment_no as "documentNo", case when p.payment_type = 'inbound' then 'Customer payment' else 'Supplier/expense payment' end as "activityType", p.payment_date::text as "activityDate", partner.display_name as "partyName", p.amount_minor as "amountMinor", p.currency_code as "currencyCode", case when p.payment_type = 'inbound' then '/admin/sales/payments/' || p.id::text else '/admin/purchasing/payments/' || p.id::text end as "href"
       from payments p
       left join partners partner on partner.id = p.partner_id
-      where p.company_id = ${company.id} and p.deleted_at is null
+      where p.company_id = ${company.id}
+        and p.deleted_at is null
+        ${recentPaymentLocFilter}
     ) activity
     order by "activityDate" desc, "documentNo" desc
     limit 10
@@ -175,6 +339,7 @@ export async function getDashboardReport(): Promise<DashboardReport> {
       and sb.deleted_at is null
       and p.deleted_at is null
       and cast(sb.quantity_available as numeric) <= 0
+      ${stockLocFilter}
     order by p.name asc, l.code asc
     limit 8
   `);
@@ -213,6 +378,11 @@ export async function getDashboardReport(): Promise<DashboardReport> {
 export async function getSalesReport(filters: ReportFilters): Promise<SalesReportRow[]> {
   const company = await getDefaultCompany();
   const query = filters.query ?? "";
+  const rawLocId = filters.locationId ?? await getSelectedShopId();
+  const validLocId = parseValidLocationId(rawLocId);
+  const locFilter = validLocId
+    ? sql` and (so.source_location_id = ${validLocId}::uuid or loc.id = ${validLocId}::uuid)`
+    : sql``;
 
   return db.execute<SalesReportRow>(sql`
     select
@@ -241,6 +411,7 @@ export async function getSalesReport(filters: ReportFilters): Promise<SalesRepor
     left join payments p on p.id = pa.payment_id
     where ci.company_id = ${company.id}
       and ci.deleted_at is null
+      ${locFilter}
       and (${filters.dateFrom ?? null}::date is null or ci.invoice_date >= ${filters.dateFrom ?? null}::date)
       and (${filters.dateTo ?? null}::date is null or ci.invoice_date <= ${filters.dateTo ?? null}::date)
       and (${filters.status ?? null}::text is null or ci.status::text = ${filters.status ?? null})
@@ -253,6 +424,11 @@ export async function getSalesReport(filters: ReportFilters): Promise<SalesRepor
 export async function getExpenseReport(filters: ReportFilters): Promise<ExpenseReportRow[]> {
   const company = await getDefaultCompany();
   const query = filters.query ?? "";
+  const rawLocId = filters.locationId ?? await getSelectedShopId();
+  const validLocId = parseValidLocationId(rawLocId);
+  const locFilter = validLocId
+    ? sql` and e.location_id = ${validLocId}::uuid`
+    : sql``;
 
   return db.execute<ExpenseReportRow>(sql`
     select
@@ -282,6 +458,7 @@ export async function getExpenseReport(filters: ReportFilters): Promise<ExpenseR
     left join payments p on p.id = pa.payment_id
     where e.company_id = ${company.id}
       and e.deleted_at is null
+      ${locFilter}
       and (${filters.dateFrom ?? null}::date is null or e.expense_date >= ${filters.dateFrom ?? null}::date)
       and (${filters.dateTo ?? null}::date is null or e.expense_date <= ${filters.dateTo ?? null}::date)
       and (${filters.status ?? null}::text is null or e.status::text = ${filters.status ?? null})
@@ -294,6 +471,26 @@ export async function getExpenseReport(filters: ReportFilters): Promise<ExpenseR
 export async function getPaymentAccountStatement(filters: ReportFilters): Promise<PaymentAccountStatementRow[]> {
   const company = await getDefaultCompany();
   const query = filters.query ?? "";
+  const rawLocId = filters.locationId ?? await getSelectedShopId();
+  const validLocId = parseValidLocationId(rawLocId);
+  const locFilter = validLocId
+    ? sql` and exists (
+        select 1
+        from payment_allocations allocations
+        left join sales_orders so on so.id = allocations.sales_order_id
+        left join customer_invoices ci on ci.id = allocations.customer_invoice_id
+        left join sales_orders ciso on ciso.id = ci.sales_order_id
+        left join deliveries cid on cid.id = ci.delivery_id
+        left join purchase_orders po on po.id = allocations.purchase_order_id
+        left join vendor_bills vb on vb.id = allocations.vendor_bill_id
+        left join purchase_orders vbpo on vbpo.id = vb.purchase_order_id
+        left join goods_receipts vbgr on vbgr.id = vb.goods_receipt_id
+        left join expenses ex on ex.id = allocations.expense_id
+        where allocations.payment_id = p.id
+          and allocations.deleted_at is null
+          and (so.source_location_id = ${validLocId}::uuid or ciso.source_location_id = ${validLocId}::uuid or cid.source_location_id = ${validLocId}::uuid or po.deliver_to_location_id = ${validLocId}::uuid or vbpo.deliver_to_location_id = ${validLocId}::uuid or vbgr.location_id = ${validLocId}::uuid or ex.location_id = ${validLocId}::uuid)
+      )`
+    : sql``;
 
   return db.execute<PaymentAccountStatementRow>(sql`
     select
@@ -318,6 +515,7 @@ export async function getPaymentAccountStatement(filters: ReportFilters): Promis
     left join payment_allocations pal on pal.payment_id = p.id and pal.deleted_at is null
     where p.company_id = ${company.id}
       and p.deleted_at is null
+      ${locFilter}
       and (${filters.dateFrom ?? null}::date is null or p.payment_date >= ${filters.dateFrom ?? null}::date)
       and (${filters.dateTo ?? null}::date is null or p.payment_date <= ${filters.dateTo ?? null}::date)
       and (${filters.paymentType ?? null}::payment_type is null or p.payment_type = ${filters.paymentType ?? null}::payment_type)
@@ -331,6 +529,26 @@ export async function getPaymentAccountStatement(filters: ReportFilters): Promis
 export async function getPaymentReport(filters: ReportFilters): Promise<PaymentReportRow[]> {
   const company = await getDefaultCompany();
   const query = filters.query ?? "";
+  const rawLocId = filters.locationId ?? await getSelectedShopId();
+  const validLocId = parseValidLocationId(rawLocId);
+  const locFilter = validLocId
+    ? sql` and exists (
+        select 1
+        from payment_allocations allocations
+        left join sales_orders so on so.id = allocations.sales_order_id
+        left join customer_invoices cust_inv on cust_inv.id = allocations.customer_invoice_id
+        left join sales_orders ciso on ciso.id = cust_inv.sales_order_id
+        left join deliveries cid on cid.id = cust_inv.delivery_id
+        left join purchase_orders po on po.id = allocations.purchase_order_id
+        left join vendor_bills vbill on vbill.id = allocations.vendor_bill_id
+        left join purchase_orders vbpo on vbpo.id = vbill.purchase_order_id
+        left join goods_receipts vbgr on vbgr.id = vbill.goods_receipt_id
+        left join expenses ex on ex.id = allocations.expense_id
+        where allocations.payment_id = p.id
+          and allocations.deleted_at is null
+          and (so.source_location_id = ${validLocId}::uuid or ciso.source_location_id = ${validLocId}::uuid or cid.source_location_id = ${validLocId}::uuid or po.deliver_to_location_id = ${validLocId}::uuid or vbpo.deliver_to_location_id = ${validLocId}::uuid or vbgr.location_id = ${validLocId}::uuid or ex.location_id = ${validLocId}::uuid)
+      )`
+    : sql``;
 
   return db.execute<PaymentReportRow>(sql`
     select
@@ -371,6 +589,7 @@ export async function getPaymentReport(filters: ReportFilters): Promise<PaymentR
     left join expenses e on e.id = pal.expense_id and e.deleted_at is null
     where p.company_id = ${company.id}
       and p.deleted_at is null
+      ${locFilter}
       and (${filters.dateFrom ?? null}::date is null or p.payment_date >= ${filters.dateFrom ?? null}::date)
       and (${filters.dateTo ?? null}::date is null or p.payment_date <= ${filters.dateTo ?? null}::date)
       and (${filters.status ?? null}::text is null or p.status::text = ${filters.status ?? null})
@@ -395,6 +614,11 @@ export async function getPaymentReport(filters: ReportFilters): Promise<PaymentR
 export async function getStockReport(filters: ReportFilters): Promise<StockReportRow[]> {
   const company = await getDefaultCompany();
   const query = filters.query ?? "";
+  const rawLocId = filters.locationId ?? await getSelectedShopId();
+  const validLocId = parseValidLocationId(rawLocId);
+  const locFilter = validLocId
+    ? sql` and l.id = ${validLocId}::uuid`
+    : sql``;
 
   return db.execute<StockReportRow>(sql`
     select
@@ -423,6 +647,7 @@ export async function getStockReport(filters: ReportFilters): Promise<StockRepor
     where sb.company_id = ${company.id}
       and sb.deleted_at is null
       and p.deleted_at is null
+      ${locFilter}
       and (${query} = '' or p.sku ilike ${`%${query}%`} or p.name ilike ${`%${query}%`} or l.code ilike ${`%${query}%`} or ps.serial_no ilike ${`%${query}%`} or pl.lot_no ilike ${`%${query}%`})
     order by p.name asc, l.code asc, ps.serial_no asc, pl.lot_no asc
   `);
@@ -431,6 +656,11 @@ export async function getStockReport(filters: ReportFilters): Promise<StockRepor
 export async function getReceivablesReport(filters: ReportFilters): Promise<ReceivableReportRow[]> {
   const company = await getDefaultCompany();
   const query = filters.query ?? "";
+  const rawLocId = filters.locationId ?? await getSelectedShopId();
+  const validLocId = parseValidLocationId(rawLocId);
+  const locFilter = validLocId
+    ? sql` and (so.source_location_id = ${validLocId}::uuid or d.source_location_id = ${validLocId}::uuid)`
+    : sql``;
 
   return db.execute<ReceivableReportRow>(sql`
     select
@@ -451,11 +681,13 @@ export async function getReceivablesReport(filters: ReportFilters): Promise<Rece
     from customer_invoices ci
     inner join partners customer on customer.id = ci.customer_id
     left join sales_orders so on so.id = ci.sales_order_id
+    left join deliveries d on d.id = ci.delivery_id
     left join payment_allocations pa on pa.customer_invoice_id = ci.id
     left join payments p on p.id = pa.payment_id
     where ci.company_id = ${company.id}
       and ci.deleted_at is null
       and ci.status <> 'cancelled'
+      ${locFilter}
       and (${filters.dateFrom ?? null}::date is null or ci.invoice_date >= ${filters.dateFrom ?? null}::date)
       and (${filters.dateTo ?? null}::date is null or ci.invoice_date <= ${filters.dateTo ?? null}::date)
       and (${query} = '' or ci.invoice_no ilike ${`%${query}%`} or customer.display_name ilike ${`%${query}%`} or so.order_no ilike ${`%${query}%`})
@@ -468,6 +700,11 @@ export async function getReceivablesReport(filters: ReportFilters): Promise<Rece
 export async function getPayablesReport(filters: ReportFilters): Promise<PayableReportRow[]> {
   const company = await getDefaultCompany();
   const query = filters.query ?? "";
+  const rawLocId = filters.locationId ?? await getSelectedShopId();
+  const validLocId = parseValidLocationId(rawLocId);
+  const locFilter = validLocId
+    ? sql` and (po.deliver_to_location_id = ${validLocId}::uuid or gr.location_id = ${validLocId}::uuid)`
+    : sql``;
 
   return db.execute<PayableReportRow>(sql`
     select
@@ -488,11 +725,13 @@ export async function getPayablesReport(filters: ReportFilters): Promise<Payable
     from vendor_bills vb
     inner join partners supplier on supplier.id = vb.supplier_id
     left join purchase_orders po on po.id = vb.purchase_order_id
+    left join goods_receipts gr on gr.id = vb.goods_receipt_id
     left join payment_allocations pa on pa.vendor_bill_id = vb.id
     left join payments p on p.id = pa.payment_id
     where vb.company_id = ${company.id}
       and vb.deleted_at is null
       and vb.status <> 'cancelled'
+      ${locFilter}
       and (${filters.dateFrom ?? null}::date is null or vb.bill_date >= ${filters.dateFrom ?? null}::date)
       and (${filters.dateTo ?? null}::date is null or vb.bill_date <= ${filters.dateTo ?? null}::date)
       and (${query} = '' or vb.bill_no ilike ${`%${query}%`} or supplier.display_name ilike ${`%${query}%`} or po.order_no ilike ${`%${query}%`})

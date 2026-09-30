@@ -3,6 +3,7 @@ import {
   ProductStockCardTable,
 } from "@/app/admin/inventory/movement-table";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
+import { T } from "@/components/ui/t";
 import { requirePermission } from "@/server/auth/session";
 import {
   getInventoryFilterOptions,
@@ -39,9 +40,14 @@ export default async function StockCardPage({ searchParams }: StockCardPageProps
   return (
     <PageShell>
       <PageHeader
-        eyebrow="Inventory Workspace"
-        title="Product Stock Card"
-        description="Continuous running balance ledger tracking ins, outs, unit costs, and remaining quantities."
+        eyebrow={<T k="header.eyebrow.inventoryWorkspace" fallback="Inventory Workspace" />}
+        title={<T k="inventory.stockCardTitle" fallback="Product Stock Card" />}
+        description={
+          <T
+            k="inventory.stockCardDesc"
+            fallback="Continuous running balance ledger tracking ins, outs, unit costs, and remaining quantities."
+          />
+        }
       />
 
       <section className="rounded-xl border border-border bg-card shadow-xs">

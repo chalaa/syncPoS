@@ -6,6 +6,7 @@ import { StatusBadge } from "@/components/ui/badge";
 import { ButtonLink } from "@/components/ui/button";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
 import { TablePagination } from "@/components/ui/table-pagination";
+import { T } from "@/components/ui/t";
 import { paginateRows } from "@/lib/pagination";
 import { requirePermission } from "@/server/auth/session";
 import { getTransferList } from "@/server/transfers/transfers";
@@ -30,9 +31,9 @@ export default async function TransfersPage({ searchParams }: TransfersPageProps
   return (
     <PageShell>
       <PageHeader
-        eyebrow="Inventory Workspace"
-        title="Multi-Stage Transit Transfers"
-        description="Shipments and transfers moving between locations through an in-transit staging state."
+        eyebrow={<T k="header.eyebrow.inventoryWorkspace" fallback="Inventory Workspace" />}
+        title={<T k="header.title.transitTransfers" fallback="Multi-Stage Transit Transfers" />}
+        description={<T k="inventory.transitTransfersDesc" fallback="Shipments and transfers moving between locations through an in-transit staging state." />}
         actions={
           <div className="flex items-center gap-2">
             <ButtonLink
@@ -40,7 +41,7 @@ export default async function TransfersPage({ searchParams }: TransfersPageProps
               className="gap-1.5 bg-gradient-to-r from-[#0B5D4B] to-[#073B35] font-semibold text-white shadow-sm shadow-[#0B5D4B]/20 hover:brightness-110"
             >
               <Plus className="size-4 text-emerald-200" />
-              New Transit Transfer
+              <T k="action.newTransitTransfer" fallback="New Transit Transfer" />
             </ButtonLink>
             <ButtonLink
               href="/admin/inventory/operations/internal-transfers/new"
@@ -48,7 +49,7 @@ export default async function TransfersPage({ searchParams }: TransfersPageProps
               className="gap-1.5 font-semibold text-foreground"
             >
               <ArrowLeftRight className="size-3.5 text-blue-600" />
-              Instant 1-Step Transfer
+              <T k="action.instantTransfer" fallback="Instant 1-Step Transfer" />
             </ButtonLink>
           </div>
         }
@@ -70,18 +71,18 @@ function TransferList({ transfers }: { transfers: TransferListRow[] }) {
         <table className="w-full min-w-[1120px] text-left text-sm">
           <thead>
             <tr className="border-b border-border/80 bg-muted/40 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-              <th className="px-4 py-3.5">Transfer No</th>
-              <th className="px-4 py-3.5">Status</th>
-              <th className="px-4 py-3.5">Owner</th>
-              <th className="px-4 py-3.5">Date</th>
-              <th className="px-4 py-3.5">From</th>
-              <th className="px-4 py-3.5">Transit</th>
-              <th className="px-4 py-3.5">To</th>
-              <th className="px-4 py-3.5 text-right">Lines</th>
-              <th className="px-4 py-3.5 text-right">Requested</th>
-              <th className="px-4 py-3.5 text-right">Dispatched</th>
-              <th className="px-4 py-3.5 text-right">Received</th>
-              <th className="px-4 py-3.5 text-right">Actions</th>
+              <th className="px-4 py-3.5"><T k="table.transferNo" fallback="Transfer No" /></th>
+              <th className="px-4 py-3.5"><T k="table.status" fallback="Status" /></th>
+              <th className="px-4 py-3.5"><T k="table.owner" fallback="Owner" /></th>
+              <th className="px-4 py-3.5"><T k="table.date" fallback="Date" /></th>
+              <th className="px-4 py-3.5"><T k="field.from" fallback="From" /></th>
+              <th className="px-4 py-3.5"><T k="field.transit" fallback="Transit" /></th>
+              <th className="px-4 py-3.5"><T k="field.to" fallback="To" /></th>
+              <th className="px-4 py-3.5 text-right"><T k="table.lines" fallback="Lines" /></th>
+              <th className="px-4 py-3.5 text-right"><T k="table.requested" fallback="Requested" /></th>
+              <th className="px-4 py-3.5 text-right"><T k="table.dispatched" fallback="Dispatched" /></th>
+              <th className="px-4 py-3.5 text-right"><T k="table.received" fallback="Received" /></th>
+              <th className="px-4 py-3.5 text-right"><T k="action.actions" fallback="Actions" /></th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border/60">
@@ -124,7 +125,7 @@ function TransferList({ transfers }: { transfers: TransferListRow[] }) {
                     className="h-8 gap-1 px-2.5 text-xs font-semibold"
                   >
                     <Eye className="size-3" />
-                    Details
+                    <T k="action.details" fallback="Details" />
                   </ButtonLink>
                 </td>
               </tr>
@@ -135,9 +136,11 @@ function TransferList({ transfers }: { transfers: TransferListRow[] }) {
                   <div className="mx-auto flex size-12 items-center justify-center rounded-2xl bg-muted/60 text-muted-foreground mb-3">
                     <ArrowLeftRight className="size-6" />
                   </div>
-                  <p className="font-bold text-sm text-foreground">No transit transfers found</p>
+                  <p className="font-bold text-sm text-foreground">
+                    <T k="inventory.noTransfersFound" fallback="No transit transfers found" />
+                  </p>
                   <p className="mt-1 text-xs text-muted-foreground max-w-sm mx-auto">
-                    Multi-stage transfers between locations will appear here once initiated.
+                    <T k="inventory.noTransfersHint" fallback="Multi-stage transfers between locations will appear here once initiated." />
                   </p>
                 </td>
               </tr>

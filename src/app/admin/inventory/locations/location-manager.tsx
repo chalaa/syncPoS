@@ -76,7 +76,7 @@ function LocationForm({
       <DialogHeader>
         <DialogTitle>{title}</DialogTitle>
         <DialogDescription>
-          Manage stock locations used by opening stock, transfers, counts, and sales.
+          {t("inventory.manageLocationsDesc")}
         </DialogDescription>
       </DialogHeader>
 
@@ -84,13 +84,13 @@ function LocationForm({
       {record ? <input type="hidden" name="id" value={record.id} /> : null}
 
       <label className="flex flex-col gap-1 text-sm font-medium">
-        Name
+        {t("field.name", "Name")}
         <input name="name" required defaultValue={record?.name} className={inputClass} />
       </label>
       {record ? <input type="hidden" name="code" value={record.code} /> : null}
 
       <label className="flex flex-col gap-1 text-sm font-medium">
-        Type
+        {t("field.type", "Type")}
         <select
           name="locationType"
           required
@@ -106,7 +106,7 @@ function LocationForm({
       </label>
 
       <label className="flex flex-col gap-1 text-sm font-medium">
-        Address / notes
+        {t("field.addressNotes", "Address / notes")}
         <textarea
           name="addressText"
           defaultValue={record?.addressText ?? ""}
@@ -115,10 +115,10 @@ function LocationForm({
       </label>
 
       <div className="grid gap-2 text-sm font-medium">
-        Approvers
+        {t("field.approvers", "Approvers")}
         <div className="max-h-44 overflow-y-auto rounded-md border border-input bg-background p-2">
           {users.length === 0 ? (
-            <p className="px-2 py-3 text-sm text-muted-foreground">No active users found.</p>
+            <p className="px-2 py-3 text-sm text-muted-foreground">{t("inventory.noUsers", "No active users found.")}</p>
           ) : (
             <div className="grid gap-1">
               {users.map((user) => (
@@ -149,7 +149,7 @@ function LocationForm({
             defaultChecked={record?.offlineSalesEnabled ?? false}
             className="size-4 rounded border-input"
           />
-          Offline sales
+          {t("field.offlineSales", "Offline sales")}
         </label>
         <label className="flex items-center gap-2 text-sm font-medium">
           <input
@@ -158,7 +158,7 @@ function LocationForm({
             defaultChecked={record?.allowNegativeStock ?? false}
             className="size-4 rounded border-input"
           />
-          Negative stock
+          {t("field.allowNegativeStock", "Negative stock")}
         </label>
         <label className="flex items-center gap-2 text-sm font-medium">
           <input
@@ -167,7 +167,7 @@ function LocationForm({
             defaultChecked={record?.isActive ?? true}
             className="size-4 rounded border-input"
           />
-          Active
+          {t("field.active", "Active")}
         </label>
       </div>
 
@@ -228,18 +228,18 @@ export function LocationManager({
   return (
     <PageShell>
       <PageHeader
-        eyebrow="Inventory"
-        title="Warehouse Locations"
+        eyebrow={t("nav.inventory", "Inventory")}
+        title={t("header.title.Warehouse Locations", "Warehouse Locations")}
         actions={
           <LocationDialog
-            label="New location"
+            label={t("action.newLocation", "New location")}
             action={createStockLocation}
             users={users}
             returnPath={returnPath}
           >
             <Button size="sm">
               <PlusIcon className="size-4" data-icon="inline-start" />
-              New location
+              {t("action.newLocation", "New location")}
             </Button>
           </LocationDialog>
         }
@@ -252,7 +252,7 @@ export function LocationManager({
         <div className="flex flex-col gap-3 border-b border-border p-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0 flex-1 sm:max-w-md">
             <TableSearchInput
-              placeholder="Search code or name..."
+              placeholder={t("inventory.searchLocation", "Search code or name...")}
               defaultValue={query}
               paramName="q"
             />
@@ -260,21 +260,21 @@ export function LocationManager({
           <div className="flex flex-wrap items-center gap-3">
             <TableFilterSelect
               paramName="type"
-              label="Type"
+              label={t("field.type", "Type")}
               options={stockLocationTypeOptions.map((t) => ({
                 value: t,
                 label: formatStockLocationType(t),
               }))}
-              allLabel="All Types"
+              allLabel={t("inventory.allTypes", "All Types")}
             />
             <TableFilterSelect
               paramName="status"
-              label="Status"
+              label={t("field.status", "Status")}
               options={[
-                { value: "active", label: "Active" },
-                { value: "inactive", label: "Inactive" },
+                { value: "active", label: t("status.active", "Active") },
+                { value: "inactive", label: t("status.inactive", "Inactive") },
               ]}
-              allLabel="All Statuses"
+              allLabel={t("inventory.allStatuses", "All Statuses")}
             />
           </div>
         </div>
@@ -286,9 +286,9 @@ export function LocationManager({
                 <th className="px-4 py-3">{t("field.code")}</th>
                 <th className="px-4 py-3">{t("product.location")}</th>
                 <th className="px-4 py-3">{t("field.type")}</th>
-                <th className="px-4 py-3">Offline</th>
-                <th className="px-4 py-3">Negative</th>
-                <th className="px-4 py-3">Approvers</th>
+                <th className="px-4 py-3">{t("field.offline", "Offline")}</th>
+                <th className="px-4 py-3">{t("field.negative", "Negative")}</th>
+                <th className="px-4 py-3">{t("field.approvers", "Approvers")}</th>
                 <th className="px-4 py-3">{t("field.status")}</th>
                 <th className="px-4 py-3 text-right">{t("action.actions")}</th>
               </tr>
@@ -305,14 +305,14 @@ export function LocationManager({
                   <td className="px-4 py-3">
                     <div className="font-medium text-foreground">{record.name}</div>
                     <div className="text-xs text-muted-foreground">
-                      {record.addressText || "No address specified"}
+                      {record.addressText || t("common.noDescription")}
                     </div>
                   </td>
                   <td className="px-4 py-3 capitalize text-foreground">
                     {formatStockLocationType(record.locationType)}
                   </td>
-                  <td className="px-4 py-3">{record.offlineSalesEnabled ? "Yes" : "No"}</td>
-                  <td className="px-4 py-3">{record.allowNegativeStock ? "Yes" : "No"}</td>
+                  <td className="px-4 py-3">{record.offlineSalesEnabled ? t("common.yes") : t("common.no")}</td>
+                  <td className="px-4 py-3">{record.allowNegativeStock ? t("common.yes") : t("common.no")}</td>
                   <td className="px-4 py-3">
                     {record.approverNames.length > 0 ? (
                       <div className="flex max-w-64 flex-wrap gap-1">
@@ -323,7 +323,7 @@ export function LocationManager({
                         ))}
                       </div>
                     ) : (
-                      <span className="text-muted-foreground">None</span>
+                      <span className="text-muted-foreground">{t("status.none")}</span>
                     )}
                   </td>
                   <td className="px-4 py-3">
@@ -334,7 +334,7 @@ export function LocationManager({
                       {!showDeleted ? (
                         <>
                           <LocationDialog
-                            label={`Edit ${record.name}`}
+                            label={`${t("action.edit")} ${record.name}`}
                             action={updateStockLocation}
                             record={record}
                             users={users}
@@ -342,7 +342,7 @@ export function LocationManager({
                           >
                             <Button variant="outline" size="sm" className="h-7 text-xs">
                               <EditIcon className="size-3.5" data-icon="inline-start" />
-                              Edit
+                              {t("action.edit", "Edit")}
                             </Button>
                           </LocationDialog>
                           <DeleteConfirmationDialog
@@ -357,7 +357,7 @@ export function LocationManager({
                           <input type="hidden" name="returnPath" value={returnPath} />
                           <Button variant="outline" size="sm" className="h-7 text-xs">
                             <RotateCcwIcon className="size-3.5" data-icon="inline-start" />
-                            Restore
+                            {t("action.restore", "Restore")}
                           </Button>
                         </form>
                       )}
@@ -368,7 +368,7 @@ export function LocationManager({
               {records.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="px-4 py-10 text-center text-muted-foreground">
-                    No locations found.
+                    {t("inventory.noLocations", "No locations found.")}
                   </td>
                 </tr>
               ) : null}

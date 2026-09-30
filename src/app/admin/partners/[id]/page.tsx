@@ -173,123 +173,62 @@ export default async function PartnerDetailPage({ params }: PartnerDetailPagePro
 
       <PartnerSmartButtons partner={partner} />
 
-      {/* Mobile View: Compact Financial Micro-Metric Bar (sm:hidden) */}
-      <div className="-mx-4 mb-4 flex gap-2 overflow-x-auto px-4 py-1 no-scrollbar touch-pan-x snap-x snap-mandatory sm:hidden">
-        {/* Customer Unpaid */}
-        <div className="flex shrink-0 snap-start items-center gap-2 rounded-lg border border-amber-500/30 bg-card px-2.5 py-1.5 shadow-2xs">
-          <div className="flex size-6 shrink-0 items-center justify-center rounded-md bg-amber-500/10 text-amber-600">
-            <DollarSign className="size-3.5" />
-          </div>
-          <div className="min-w-0">
-            <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground"><T k="Unpaid Receivables" /></div>
-            <div className="font-mono text-xs font-bold text-foreground">
-              {money(partner.financial.receivableResidualMinor, partner.currencyCode)}
-            </div>
-          </div>
-        </div>
-
-        {/* Available Credit */}
-        <div className="flex shrink-0 snap-start items-center gap-2 rounded-lg border border-emerald-500/30 bg-card px-2.5 py-1.5 shadow-2xs">
-          <div className="flex size-6 shrink-0 items-center justify-center rounded-md bg-emerald-500/10 text-emerald-600">
-            <CreditCard className="size-3.5" />
-          </div>
-          <div className="min-w-0">
-            <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground"><T k="Credit Line" /></div>
-            <div className="font-mono text-xs font-bold text-foreground">
-              {money(partner.financial.remainingCreditMinor, partner.currencyCode)}
-            </div>
-          </div>
-        </div>
-
-        {/* Supplier Unpaid */}
-        <div className="flex shrink-0 snap-start items-center gap-2 rounded-lg border border-rose-500/30 bg-card px-2.5 py-1.5 shadow-2xs">
-          <div className="flex size-6 shrink-0 items-center justify-center rounded-md bg-rose-500/10 text-rose-600">
-            <Banknote className="size-3.5" />
-          </div>
-          <div className="min-w-0">
-            <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground"><T k="Unpaid Payables" /></div>
-            <div className="font-mono text-xs font-bold text-foreground">
-              {money(partner.financial.payableResidualMinor, partner.currencyCode)}
-            </div>
-          </div>
-        </div>
-
-        {/* Net Exposure */}
-        <div className="flex shrink-0 snap-start items-center gap-2 rounded-lg border border-border bg-card px-2.5 py-1.5 shadow-2xs">
-          <div className="flex size-6 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
-            <Briefcase className="size-3.5" />
-          </div>
-          <div className="min-w-0">
-            <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground"><T k="Net Position" /></div>
-            <div
-              className={`font-mono text-xs font-bold ${
-                partner.financial.netBalanceMinor >= 0
-                  ? "text-emerald-700 dark:text-emerald-400"
-                  : "text-rose-600 dark:text-rose-400"
-              }`}
-            >
-              {money(partner.financial.netBalanceMinor, partner.currencyCode)}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Desktop/Tablet Financial KPI Summary Cards (hidden on mobile) */}
-      <section className="hidden mb-6 sm:grid sm:grid-cols-2 lg:grid-cols-4 sm:gap-4">
-        <div className="rounded-xl border border-border border-l-4 border-l-amber-500 bg-card p-4 shadow-xs transition-all hover:shadow-sm">
-          <div className="flex items-center justify-between text-muted-foreground">
-            <span className="text-xs font-semibold uppercase tracking-wider">
+      {/* Financial KPI Summary Cards */}
+      <section className="mb-6 grid grid-cols-2 gap-2 sm:grid-cols-2 lg:grid-cols-4 sm:gap-4">
+        <div className="rounded-xl border border-border border-l-4 border-l-amber-500 bg-card p-3 sm:p-4 shadow-xs transition-all hover:shadow-sm">
+          <div className="flex items-center justify-between gap-1 text-muted-foreground">
+            <span className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider truncate">
               <T k="Customer unpaid" />
             </span>
-            <DollarSign className="size-4 text-amber-500" />
+            <DollarSign className="size-3.5 sm:size-4 shrink-0 text-amber-500" />
           </div>
-          <div className="mt-2 text-2xl font-bold tracking-tight text-foreground">
+          <div className="mt-1.5 sm:mt-2 text-base sm:text-2xl font-bold tracking-tight text-foreground truncate">
             {money(partner.financial.receivableResidualMinor, partner.currencyCode)}
           </div>
-          <p className="mt-1 text-xs text-muted-foreground"><T k="Outstanding receivables" /></p>
+          <p className="mt-0.5 sm:mt-1 text-[10px] sm:text-xs text-muted-foreground truncate"><T k="Outstanding receivables" /></p>
         </div>
 
-        <div className="rounded-xl border border-border border-l-4 border-l-emerald-600 bg-card p-4 shadow-xs transition-all hover:shadow-sm">
-          <div className="flex items-center justify-between text-muted-foreground">
-            <span className="text-xs font-semibold uppercase tracking-wider">
+        <div className="rounded-xl border border-border border-l-4 border-l-emerald-600 bg-card p-3 sm:p-4 shadow-xs transition-all hover:shadow-sm">
+          <div className="flex items-center justify-between gap-1 text-muted-foreground">
+            <span className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider truncate">
               <T k="Available credit" />
             </span>
-            <CreditCard className="size-4 text-emerald-600" />
+            <CreditCard className="size-3.5 sm:size-4 shrink-0 text-emerald-600" />
           </div>
-          <div className="mt-2 text-2xl font-bold tracking-tight text-foreground">
+          <div className="mt-1.5 sm:mt-2 text-base sm:text-2xl font-bold tracking-tight text-foreground truncate">
             {money(partner.financial.remainingCreditMinor, partner.currencyCode)}
           </div>
-          <p className="mt-1 text-xs text-muted-foreground"><T k="Remaining credit line" /></p>
+          <p className="mt-0.5 sm:mt-1 text-[10px] sm:text-xs text-muted-foreground truncate"><T k="Remaining credit line" /></p>
         </div>
 
-        <div className="rounded-xl border border-border border-l-4 border-l-rose-500 bg-card p-4 shadow-xs transition-all hover:shadow-sm">
-          <div className="flex items-center justify-between text-muted-foreground">
-            <span className="text-xs font-semibold uppercase tracking-wider">
+        <div className="rounded-xl border border-border border-l-4 border-l-rose-500 bg-card p-3 sm:p-4 shadow-xs transition-all hover:shadow-sm">
+          <div className="flex items-center justify-between gap-1 text-muted-foreground">
+            <span className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider truncate">
               <T k="Supplier unpaid" />
             </span>
-            <Banknote className="size-4 text-rose-500" />
+            <Banknote className="size-3.5 sm:size-4 shrink-0 text-rose-500" />
           </div>
-          <div className="mt-2 text-2xl font-bold tracking-tight text-foreground">
+          <div className="mt-1.5 sm:mt-2 text-base sm:text-2xl font-bold tracking-tight text-foreground truncate">
             {money(partner.financial.payableResidualMinor, partner.currencyCode)}
           </div>
-          <p className="mt-1 text-xs text-muted-foreground"><T k="Outstanding payables" /></p>
+          <p className="mt-0.5 sm:mt-1 text-[10px] sm:text-xs text-muted-foreground truncate"><T k="Outstanding payables" /></p>
         </div>
 
         <div
-          className={`rounded-xl border border-border border-l-4 bg-card p-4 shadow-xs transition-all hover:shadow-sm ${
+          className={`rounded-xl border border-border border-l-4 bg-card p-3 sm:p-4 shadow-xs transition-all hover:shadow-sm ${
             partner.financial.netBalanceMinor >= 0
               ? "border-l-emerald-600"
               : "border-l-rose-500"
           }`}
         >
-          <div className="flex items-center justify-between text-muted-foreground">
-            <span className="text-xs font-semibold uppercase tracking-wider">
+          <div className="flex items-center justify-between gap-1 text-muted-foreground">
+            <span className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider truncate">
               <T k="Net balance" />
             </span>
-            <Briefcase className="size-4 text-muted-foreground" />
+            <Briefcase className="size-3.5 sm:size-4 shrink-0 text-muted-foreground" />
           </div>
           <div
-            className={`mt-2 text-2xl font-bold tracking-tight ${
+            className={`mt-1.5 sm:mt-2 text-base sm:text-2xl font-bold tracking-tight truncate ${
               partner.financial.netBalanceMinor >= 0
                 ? "text-emerald-700 dark:text-emerald-400"
                 : "text-rose-600 dark:text-rose-400"
@@ -297,7 +236,7 @@ export default async function PartnerDetailPage({ params }: PartnerDetailPagePro
           >
             {money(partner.financial.netBalanceMinor, partner.currencyCode)}
           </div>
-          <p className="mt-1 text-xs text-muted-foreground"><T k="Receivable minus payable" /></p>
+          <p className="mt-0.5 sm:mt-1 text-[10px] sm:text-xs text-muted-foreground truncate"><T k="Receivable minus payable" /></p>
         </div>
       </section>
 

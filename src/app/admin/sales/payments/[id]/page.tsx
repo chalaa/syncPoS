@@ -7,6 +7,7 @@ import { PaymentFormDialog } from "@/components/app/payment-form-dialog";
 import { Alert } from "@/components/ui/alert";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
+import { T } from "@/components/ui/t";
 import { requirePermission } from "@/server/auth/session";
 import { displayPaymentMoney, getActivePaymentAccounts, getPaymentDetail } from "@/server/payments/payments";
 
@@ -41,11 +42,11 @@ export default async function CustomerPaymentPage({ params, searchParams }: Cust
   return (
     <PageShell>
       <PageHeader
-        eyebrow="Sales / Customer Payment"
+        eyebrow={<T k="header.eyebrow.Sales / Customer Payment">Sales / Customer Payment</T>}
         title={payment.paymentNo}
         actions={
           <div className="flex flex-wrap gap-2">
-            <ButtonLink href="/admin/sales?view=payments" variant="outline">Back to payments</ButtonLink>
+            <ButtonLink href="/admin/sales?view=payments" variant="outline"><T k="action.backToPayments">Back to payments</T></ButtonLink>
             {payment.status === "draft" ? (
               <PaymentFormDialog
                 title="Edit Customer Payment"
@@ -69,13 +70,13 @@ export default async function CustomerPaymentPage({ params, searchParams }: Cust
             {payment.status === "draft" ? (
               <form action={postCustomerPayment}>
                 <input type="hidden" name="paymentId" value={payment.id} />
-                <Button>Post Payment</Button>
+                <Button><T k="action.postPayment">Post Payment</T></Button>
               </form>
             ) : null}
             {payment.status !== "cancelled" ? (
               <form action={cancelCustomerPayment}>
                 <input type="hidden" name="paymentId" value={payment.id} />
-                <Button variant="danger">Cancel</Button>
+                <Button variant="danger"><T k="action.cancel">Cancel</T></Button>
               </form>
             ) : null}
           </div>
@@ -94,34 +95,34 @@ export default async function CustomerPaymentPage({ params, searchParams }: Cust
             <span className="block text-base font-semibold">
               {payment.allocations.find((allocation) => allocation.salesOrderId === salesOrderId)?.salesOrderNo ?? "Sales Order"}
             </span>
-            <span className="text-muted-foreground">Sales Order</span>
+            <span className="text-muted-foreground"><T k="sales.order">Sales Order</T></span>
           </Link>
         </div>
       ) : null}
 
       <section className="rounded-lg border border-border bg-card p-5">
         <div className="mb-5 grid gap-4 md:grid-cols-4">
-          <Info label="Status" value={statusLabel(payment.status)} />
-          <Info label="Type" value={statusLabel(payment.paymentType)} />
-          <Info label="Customer" value={payment.partnerName ?? "-"} />
-          <Info label="Amount" value={displayPaymentMoney(payment.amountMinor, payment.currencyCode)} />
-          <Info label="Payment Date" value={payment.paymentDate} />
-          <Info label="Method" value={payment.paymentMethodName} />
-          <Info label="Account" value={payment.paymentAccountName} />
-          <Info label="Reference" value={payment.reference ?? "-"} />
-          <Info label="Verification Policy" value="Advisory; unverified lines can still post" />
-          <Info label="Posted At" value={payment.postedAt ?? "-"} />
-          <Info label="Cancelled At" value={payment.cancelledAt ?? "-"} />
-          <Info label="Notes" value={payment.notes ?? "-"} />
+          <Info label="Status" labelKey="field.status" value={statusLabel(payment.status)} />
+          <Info label="Type" labelKey="field.type" value={statusLabel(payment.paymentType)} />
+          <Info label="Customer" labelKey="field.customer" value={payment.partnerName ?? "-"} />
+          <Info label="Amount" labelKey="sales.form.amount" value={displayPaymentMoney(payment.amountMinor, payment.currencyCode)} />
+          <Info label="Payment Date" labelKey="field.paymentDate" value={payment.paymentDate} />
+          <Info label="Method" labelKey="field.method" value={payment.paymentMethodName} />
+          <Info label="Account" labelKey="field.account" value={payment.paymentAccountName} />
+          <Info label="Reference" labelKey="sales.form.reference" value={payment.reference ?? "-"} />
+          <Info label="Verification Policy" labelKey="field.verificationPolicy" value="Advisory; unverified lines can still post" />
+          <Info label="Posted At" labelKey="field.postedAt" value={payment.postedAt ?? "-"} />
+          <Info label="Cancelled At" labelKey="field.cancelledAt" value={payment.cancelledAt ?? "-"} />
+          <Info label="Notes" labelKey="sales.form.notes" value={payment.notes ?? "-"} />
           <div>
-            <p className="text-xs font-medium uppercase text-muted-foreground">Related Document</p>
+            <p className="text-xs font-medium uppercase text-muted-foreground"><T k="field.relatedDocument">Related Document</T></p>
             {customerInvoiceId ? (
               <Link href={`/admin/sales/invoices/${customerInvoiceId}`} className="mt-1 block text-sm font-medium text-primary underline-offset-4 hover:underline">
-                Open customer invoice
+                <T k="field.openCustomerInvoice">Open customer invoice</T>
               </Link>
             ) : salesOrderId ? (
               <Link href={`/admin/sales/${salesOrderId}`} className="mt-1 block text-sm font-medium text-primary underline-offset-4 hover:underline">
-                Open sales order
+                <T k="field.openSalesOrder">Open sales order</T>
               </Link>
             ) : (
               <p className="mt-1 text-sm font-medium">-</p>
@@ -133,13 +134,13 @@ export default async function CustomerPaymentPage({ params, searchParams }: Cust
           <table className="w-full min-w-[760px] text-left text-sm">
             <thead className="text-xs uppercase text-muted-foreground">
               <tr className="border-b border-border">
-                <th className="px-3 py-2">Method</th>
-                <th className="px-3 py-2">Account</th>
-                <th className="px-3 py-2">Reference</th>
-                <th className="px-3 py-2">Note</th>
-                <th className="px-3 py-2">Verification</th>
-                <th className="px-3 py-2 text-right">Verified Amount</th>
-                <th className="px-3 py-2 text-right">Amount</th>
+                <th className="px-3 py-2"><T k="field.method">Method</T></th>
+                <th className="px-3 py-2"><T k="field.account">Account</T></th>
+                <th className="px-3 py-2"><T k="sales.form.reference">Reference</T></th>
+                <th className="px-3 py-2"><T k="sales.form.notes">Note</T></th>
+                <th className="px-3 py-2"><T k="field.verification">Verification</T></th>
+                <th className="px-3 py-2 text-right"><T k="field.verifiedAmount">Verified Amount</T></th>
+                <th className="px-3 py-2 text-right"><T k="sales.form.amount">Amount</T></th>
               </tr>
             </thead>
             <tbody>
@@ -156,7 +157,7 @@ export default async function CustomerPaymentPage({ params, searchParams }: Cust
                         <form action={verifyPaymentLine}>
                           <input type="hidden" name="paymentLineId" value={line.id} />
                           <input type="hidden" name="returnPath" value={`/admin/sales/payments/${payment.id}`} />
-                          <Button size="sm" variant="outline">Verify</Button>
+                          <Button size="sm" variant="outline"><T k="action.verify">Verify</T></Button>
                         </form>
                       ) : null}
                     </div>
@@ -177,8 +178,8 @@ export default async function CustomerPaymentPage({ params, searchParams }: Cust
           <table className="w-full min-w-[720px] text-left text-sm">
             <thead className="text-xs uppercase text-muted-foreground">
               <tr className="border-b border-border">
-                <th className="px-3 py-2">Document</th>
-                <th className="px-3 py-2 text-right">Allocated</th>
+                <th className="px-3 py-2"><T k="field.document">Document</T></th>
+                <th className="px-3 py-2 text-right"><T k="field.allocated">Allocated</T></th>
               </tr>
             </thead>
             <tbody>
@@ -208,10 +209,10 @@ export default async function CustomerPaymentPage({ params, searchParams }: Cust
   );
 }
 
-function Info({ label, value }: { label: string; value: string }) {
+function Info({ label, labelKey, value }: { label: string; labelKey?: string; value: string }) {
   return (
     <div>
-      <p className="text-xs font-medium uppercase text-muted-foreground">{label}</p>
+      <p className="text-xs font-medium uppercase text-muted-foreground"><T k={labelKey ?? label}>{label}</T></p>
       <p className="mt-1 text-sm font-medium capitalize">{value}</p>
     </div>
   );

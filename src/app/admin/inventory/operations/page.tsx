@@ -10,6 +10,7 @@ import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
 import { TablePagination } from "@/components/ui/table-pagination";
+import { T } from "@/components/ui/t";
 import { paginateRows } from "@/lib/pagination";
 import { requirePermission } from "@/server/auth/session";
 import {
@@ -24,6 +25,7 @@ type InventoryOperationsPageProps = {
   searchParams: Promise<{
     view?: string;
     q?: string;
+    status?: string;
     notice?: string;
     error?: string;
     selectedId?: string;
@@ -38,9 +40,10 @@ export default async function InventoryOperationsPage({ searchParams }: Inventor
   const params = await searchParams;
   const view = parseInventoryOperationView(params.view);
   const query = params.q ?? "";
+  const status = params.status ?? "";
 
   const [rows, formOptions] = await Promise.all([
-    getInventoryOperationList({ view, query }),
+    getInventoryOperationList({ view, query, status }),
     getInventoryAdjustmentFormOptions(),
   ]);
   const operationPage = paginateRows(rows, params);
@@ -50,9 +53,14 @@ export default async function InventoryOperationsPage({ searchParams }: Inventor
   return (
     <PageShell>
       <PageHeader
-        eyebrow="Inventory Workspace"
-        title="Operations Ledger & History"
-        description="Chronological record of receipts, dispatches, internal transfers, adjustments, and write-offs."
+        eyebrow={<T k="header.eyebrow.inventoryWorkspace" fallback="Inventory Workspace" />}
+        title={<T k="header.title.operationsLedger" fallback="Operations Ledger & History" />}
+        description={
+          <T
+            k="header.description.operationsLedger"
+            fallback="Chronological record of receipts, dispatches, internal transfers, adjustments, and write-offs."
+          />
+        }
         actions={
           <div className="flex flex-wrap items-center gap-2">
             <NewInventoryOperationModal
@@ -65,7 +73,7 @@ export default async function InventoryOperationsPage({ searchParams }: Inventor
               trigger={
                 <Button className="gap-1.5 bg-gradient-to-r from-[#0B5D4B] to-[#073B35] font-semibold text-white shadow-sm shadow-[#0B5D4B]/20 hover:brightness-110">
                   <ArrowLeftRight className="size-3.5 text-emerald-200" />
-                  New Transfer
+                  <T k="action.newTransfer" fallback="New Transfer" />
                 </Button>
               }
             />
@@ -80,7 +88,7 @@ export default async function InventoryOperationsPage({ searchParams }: Inventor
               trigger={
                 <Button variant="outline" className="gap-1.5 font-semibold text-foreground">
                   <Sliders className="size-3.5 text-amber-600" />
-                  New Adjustment
+                  <T k="action.stockAdjustment" fallback="Stock Adjustment" />
                 </Button>
               }
             />
@@ -95,7 +103,7 @@ export default async function InventoryOperationsPage({ searchParams }: Inventor
               trigger={
                 <Button variant="outline" className="gap-1.5 font-semibold text-muted-foreground hover:text-destructive hover:bg-destructive/10">
                   <Trash2 className="size-3.5 text-destructive" />
-                  New Scrap
+                  <T k="action.scrap" fallback="Scrap" />
                 </Button>
               }
             />

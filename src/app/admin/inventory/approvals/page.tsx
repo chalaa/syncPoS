@@ -4,6 +4,7 @@ import { approveStockOutRequest, rejectStockOutRequest } from "@/app/admin/inven
 import { Button } from "@/components/ui/button";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
 import { TablePagination } from "@/components/ui/table-pagination";
+import { T } from "@/components/ui/t";
 import { paginateRows } from "@/lib/pagination";
 import { requirePermission } from "@/server/auth/session";
 import { getDefaultCompany } from "@/server/catalog/products";
@@ -44,7 +45,10 @@ export default async function InventoryApprovalsPage({ searchParams }: Inventory
 
   return (
     <PageShell>
-      <PageHeader eyebrow="Inventory" title="Stock-Out Approvals" />
+      <PageHeader
+        eyebrow={<T k="header.eyebrow.inventoryWorkspace" fallback="Inventory Workspace" />}
+        title={<T k="header.title.stockOutApprovals" fallback="Stock-Out Approvals" />}
+      />
 
       <div className="grid gap-4">
         {params.notice ? (
@@ -60,13 +64,19 @@ export default async function InventoryApprovalsPage({ searchParams }: Inventory
 
         <div className="flex flex-wrap gap-2">
           <Button asChild variant={status === "pending" ? "default" : "secondary"}>
-            <Link href="/admin/inventory/approvals">Pending</Link>
+            <Link href="/admin/inventory/approvals">
+              <T k="inventory.pending" fallback="Pending" />
+            </Link>
           </Button>
           <Button asChild variant={status === "approved" ? "default" : "secondary"}>
-            <Link href="/admin/inventory/approvals?status=approved">Approved</Link>
+            <Link href="/admin/inventory/approvals?status=approved">
+              <T k="inventory.approved" fallback="Approved" />
+            </Link>
           </Button>
           <Button asChild variant={status === "rejected" ? "default" : "secondary"}>
-            <Link href="/admin/inventory/approvals?status=rejected">Rejected</Link>
+            <Link href="/admin/inventory/approvals?status=rejected">
+              <T k="inventory.rejected" fallback="Rejected" />
+            </Link>
           </Button>
         </div>
 
@@ -74,19 +84,19 @@ export default async function InventoryApprovalsPage({ searchParams }: Inventory
           <table className="w-full min-w-[980px] border-collapse text-sm">
             <thead>
               <tr className="border-b border-border bg-muted/40 text-left text-xs font-semibold uppercase text-muted-foreground">
-                <th className="px-4 py-3">Request</th>
-                <th className="px-4 py-3">Location</th>
-                <th className="px-4 py-3">Requested By</th>
-                <th className="px-4 py-3">Requested At</th>
-                <th className="px-4 py-3">Reason</th>
-                <th className="w-80 px-4 py-3 text-right">Decision</th>
+                <th className="px-4 py-3"><T k="table.request" fallback="Request" /></th>
+                <th className="px-4 py-3"><T k="table.location" fallback="Location" /></th>
+                <th className="px-4 py-3"><T k="table.requestedBy" fallback="Requested By" /></th>
+                <th className="px-4 py-3"><T k="table.requestedAt" fallback="Requested At" /></th>
+                <th className="px-4 py-3"><T k="table.reason" fallback="Reason" /></th>
+                <th className="w-80 px-4 py-3 text-right"><T k="table.decision" fallback="Decision" /></th>
               </tr>
             </thead>
             <tbody>
               {approvalPage.rows.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
-                    No stock-out approval requests found.
+                    <T k="inventory.noApprovalsFound" fallback="No stock-out approval requests found." />
                   </td>
                 </tr>
               ) : (
@@ -99,7 +109,7 @@ export default async function InventoryApprovalsPage({ searchParams }: Inventory
                         <div className="font-medium capitalize">{row.sourceType.replace(/_/g, " ")}</div>
                         {href ? (
                           <Link href={href} className="text-xs text-primary underline-offset-4 hover:underline">
-                            {row.sourceNo ?? "Open document"}
+                            {row.sourceNo ?? <T k="inventory.openDocument" fallback="Open document" />}
                           </Link>
                         ) : (
                           <div className="text-xs text-muted-foreground">{row.sourceNo ?? "-"}</div>
@@ -118,12 +128,12 @@ export default async function InventoryApprovalsPage({ searchParams }: Inventory
                             <form action={approveStockOutRequest} className="flex gap-2">
                               <input type="hidden" name="approvalId" value={row.id} />
                               <input name="notes" className="h-9 min-w-0 flex-1 rounded-md border border-input bg-background px-3 text-sm" placeholder="Note" />
-                              <Button type="submit" size="sm">Approve</Button>
+                              <Button type="submit" size="sm"><T k="action.approve" fallback="Approve" /></Button>
                             </form>
                             <form action={rejectStockOutRequest} className="flex justify-end gap-2">
                               <input type="hidden" name="approvalId" value={row.id} />
                               <input name="notes" className="h-9 min-w-0 flex-1 rounded-md border border-input bg-background px-3 text-sm" placeholder="Reason" />
-                              <Button type="submit" variant="destructive" size="sm">Reject</Button>
+                              <Button type="submit" variant="destructive" size="sm"><T k="action.reject" fallback="Reject" /></Button>
                             </form>
                           </div>
                         ) : (

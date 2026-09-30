@@ -158,12 +158,18 @@ export async function getInventoryOperationFormOptions(): Promise<InventoryOpera
   };
 }
 
+import { getSelectedShopId } from "@/server/locations/shop-options";
+
 export async function getInventoryOperationList(params: {
   view?: InventoryOperationView;
   query?: string;
+  status?: string;
+  locationId?: string;
 }): Promise<InventoryOperationListRow[]> {
   const company = await getDefaultCompany();
+  const locationId = params.locationId ?? await getSelectedShopId();
   const query = params.query?.trim() ?? "";
+  const status = params.status ?? "";
   const view = params.view ?? "all";
   const rows = await db.execute<InventoryOperationListRow>(sql`
     select
@@ -186,6 +192,8 @@ export async function getInventoryOperationList(params: {
     left join stock_movement_lines sml on sml.stock_movement_id = sm.id and sml.deleted_at is null
     where sm.company_id = ${company.id}
       and sm.deleted_at is null
+      and (${locationId}::uuid is null or sm.from_location_id = ${locationId}::uuid or sm.to_location_id = ${locationId}::uuid)
+      and (${status} = '' or sm.status = ${status})
       and (${query} = '' or sm.movement_no ilike ${`%${query}%`} or sm.source_no ilike ${`%${query}%`} or sm.notes ilike ${`%${query}%`})
       and (${view} = 'all'
         or (${view} = 'receipts' and sm.movement_type = 'purchase_receipt')
@@ -311,9 +319,12 @@ export async function getStockByLocation(params: {
   status?: StockStatusOption;
   asOfDate?: Date;
 }): Promise<StockByLocationRow[]> {
+  const effectiveLocationId = params.locationId ?? (await getSelectedShopId()) ?? undefined;
+
   if (params.asOfDate) {
     return getStockByLocationAsOf({
       ...params,
+      locationId: effectiveLocationId,
       asOfDate: params.asOfDate,
     });
   }
@@ -329,7 +340,7 @@ export async function getStockByLocation(params: {
         ilike(productLots.lotNo, `%${query}%`),
       )
     : undefined;
-  const locationFilter = params.locationId ? eq(stockBalances.locationId, params.locationId) : undefined;
+  const locationFilter = effectiveLocationId ? eq(stockBalances.locationId, effectiveLocationId) : undefined;
   const filters = [
     eq(stockBalances.companyId, company.id),
     isNull(stockBalances.deletedAt),

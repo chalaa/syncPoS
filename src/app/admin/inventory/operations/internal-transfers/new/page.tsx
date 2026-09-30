@@ -3,6 +3,7 @@ import { InventoryInternalTransferForm } from "@/app/admin/inventory/operations/
 import { Alert } from "@/components/ui/alert";
 import { ButtonLink } from "@/components/ui/button";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
+import { T } from "@/components/ui/t";
 import { requirePermission } from "@/server/auth/session";
 import { getInventoryAdjustmentFormOptions } from "@/server/inventory/stock";
 
@@ -20,12 +21,20 @@ export default async function NewInternalTransferPage({ searchParams }: NewInter
   return (
     <PageShell>
       <PageHeader
-        eyebrow="Inventory / Internal Transfer"
-        title="New Internal Transfer"
-        actions={<ButtonLink href="/admin/inventory/operations?view=transfers" variant="outline">Back to transfers</ButtonLink>}
+        eyebrow={<T k="inventory.transferEyebrow" fallback="Inventory / Internal Transfer" />}
+        title={<T k="inventory.newTransferModal" fallback="New Internal Transfer" />}
+        actions={
+          <ButtonLink href="/admin/inventory/operations?view=transfers" variant="outline">
+            <T k="action.backToTransfers" fallback="Back to transfers" />
+          </ButtonLink>
+        }
       />
 
-      {query.error ? <Alert kind="error">{query.error}</Alert> : null}
+      {query.error ? (
+        <Alert kind="error">
+          <T k={query.error} fallback={query.error} />
+        </Alert>
+      ) : null}
 
       <InventoryInternalTransferForm action={createInternalTransferOperation} owners={options.owners} locations={options.locations} products={options.products} balances={options.balances} />
     </PageShell>

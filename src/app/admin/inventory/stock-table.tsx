@@ -23,6 +23,7 @@ import { StatusBadge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { TableSearchInput } from "@/components/ui/table-search-input";
 import { cn } from "@/lib/utils";
+import { useTranslation } from "@/lib/i18n/use-translation";
 import {
   displayMoneyMinor,
   displayQuantity,
@@ -33,12 +34,12 @@ import {
 } from "@/server/inventory/stock-types";
 import { StockProductDrawer } from "./stock-product-drawer";
 
-const STATUS_PILLS: { key: StockStatusOption; label: string; icon: React.ElementType }[] = [
-  { key: "all", label: "All Items", icon: Boxes },
-  { key: "in_stock", label: "In Stock", icon: CheckCircle2 },
-  { key: "low_stock", label: "Low Stock (≤5)", icon: AlertTriangle },
-  { key: "out_of_stock", label: "Out of Stock", icon: XCircle },
-  { key: "reserved", label: "Reserved", icon: Layers },
+const STATUS_PILLS: { key: StockStatusOption; labelKey: string; defaultLabel: string; icon: React.ElementType }[] = [
+  { key: "all", labelKey: "inventory.allItems", defaultLabel: "All Items", icon: Boxes },
+  { key: "in_stock", labelKey: "inventory.inStock", defaultLabel: "In Stock", icon: CheckCircle2 },
+  { key: "low_stock", labelKey: "inventory.lowStock", defaultLabel: "Low Stock (≤5)", icon: AlertTriangle },
+  { key: "out_of_stock", labelKey: "inventory.outOfStock", defaultLabel: "Out of Stock", icon: XCircle },
+  { key: "reserved", labelKey: "inventory.reserved", defaultLabel: "Reserved", icon: Layers },
 ];
 
 export function StockFilters({
@@ -54,6 +55,7 @@ export function StockFilters({
   asOfDate: string;
   locations: StockFilterOption[];
 }) {
+  const { t } = useTranslation();
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -94,7 +96,7 @@ export function StockFilters({
               )}
             >
               <Icon className={cn("size-3.5", isSelected ? "text-emerald-200" : "text-muted-foreground")} />
-              {pill.label}
+              {t(pill.labelKey, pill.defaultLabel)}
             </button>
           );
         })}
@@ -106,7 +108,7 @@ export function StockFilters({
             className="inline-flex items-center gap-1 rounded-xl px-2.5 py-1.5 text-xs font-medium text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors ml-auto cursor-pointer"
           >
             <RotateCcw className="size-3" />
-            Reset
+            {t("inventory.reset", "Reset")}
           </button>
         )}
       </div>
@@ -115,20 +117,20 @@ export function StockFilters({
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 items-end">
         {/* Search */}
         <div className="flex flex-col gap-1 text-xs font-semibold text-muted-foreground">
-          <span>Search Product / Serial</span>
-          <TableSearchInput defaultValue={query} placeholder="Item code, SKU, serial, name..." />
+          <span>{t("field.search", "Search Product / Serial")}</span>
+          <TableSearchInput defaultValue={query} placeholder={t("inventory.searchPlaceholder", "Item code, SKU, serial, name...")} />
         </div>
 
         {/* Location Select */}
         <label className="flex flex-col gap-1 text-xs font-semibold text-muted-foreground">
-          <span>Location</span>
+          <span>{t("field.location", "Location")}</span>
           <select
             name="locationId"
             defaultValue={locationId}
             onChange={(e) => updateParam("locationId", e.target.value)}
             className="h-10 rounded-xl border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring transition-colors"
           >
-            <option value="">All Locations</option>
+            <option value="">{t("inventory.allLocations", "All Locations")}</option>
             {locations.map((loc) => (
               <option key={loc.id} value={loc.id}>
                 {loc.code} · {loc.name}
@@ -139,7 +141,7 @@ export function StockFilters({
 
         {/* As of Date */}
         <label className="flex flex-col gap-1 text-xs font-semibold text-muted-foreground">
-          <span>As Of Date (Historical)</span>
+          <span>{t("inventory.asOfDate", "As Of Date (Historical)")}</span>
           <input
             name="asOfDate"
             type="date"
@@ -160,6 +162,7 @@ export function StockByLocationTable({
   rows: StockByLocationRow[];
   formOptions?: InventoryOperationFormOptions & { balances: any[] };
 }) {
+  const { t } = useTranslation();
   const [selectedRow, setSelectedRow] = useState<StockByLocationRow | null>(null);
 
   return (
@@ -168,17 +171,17 @@ export function StockByLocationTable({
         <table className="w-full min-w-[1120px] text-left text-sm">
           <thead>
             <tr className="border-b border-border/80 bg-muted/40 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-              <th className="px-4 py-3.5">Status</th>
-              <th className="px-4 py-3.5">Product & SKU</th>
-              <th className="px-4 py-3.5">Location</th>
-              <th className="px-4 py-3.5">Owner</th>
-              <th className="px-4 py-3.5">Tracking</th>
-              <th className="px-4 py-3.5 text-right">On Hand</th>
-              <th className="px-4 py-3.5 text-right">Reserved</th>
-              <th className="px-4 py-3.5 text-right">Available</th>
-              <th className="px-4 py-3.5 text-right">Avg Cost</th>
-              <th className="px-4 py-3.5 text-right">Valuation</th>
-              <th className="px-4 py-3.5 text-right">Actions</th>
+              <th className="px-4 py-3.5">{t("field.status", "Status")}</th>
+              <th className="px-4 py-3.5">{t("sales.col.product", "Product & SKU")}</th>
+              <th className="px-4 py-3.5">{t("field.location", "Location")}</th>
+              <th className="px-4 py-3.5">{t("field.stockOwner", "Owner")}</th>
+              <th className="px-4 py-3.5">{t("field.trackingMode", "Tracking")}</th>
+              <th className="px-4 py-3.5 text-right">{t("inventory.onHand", "On Hand")}</th>
+              <th className="px-4 py-3.5 text-right">{t("inventory.reserved", "Reserved")}</th>
+              <th className="px-4 py-3.5 text-right">{t("inventory.available", "Available")}</th>
+              <th className="px-4 py-3.5 text-right">{t("inventory.avgCost", "Avg Cost")}</th>
+              <th className="px-4 py-3.5 text-right">{t("inventory.valuation", "Valuation")}</th>
+              <th className="px-4 py-3.5 text-right">{t("action.actions", "Actions")}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border/60">
@@ -208,10 +211,10 @@ export function StockByLocationTable({
                               ? "bg-amber-500 ring-amber-500/20"
                               : "bg-emerald-500 ring-emerald-500/20",
                         )}
-                        title={isOut ? "Out of Stock" : isLow ? "Low Stock" : "In Stock"}
+                        title={isOut ? t("inventory.outOfStock", "Out of Stock") : isLow ? t("inventory.lowStock", "Low Stock") : t("inventory.inStock", "In Stock")}
                       />
                       <span className="text-xs font-semibold text-muted-foreground">
-                        {isOut ? "Out" : isLow ? "Low" : "OK"}
+                        {isOut ? t("kpi.out", "Out") : isLow ? t("kpi.low", "Low") : "OK"}
                       </span>
                     </div>
                   </td>
@@ -304,12 +307,12 @@ export function StockByLocationTable({
                         className="h-8 gap-1 px-2 text-xs font-semibold text-muted-foreground hover:text-foreground"
                       >
                         <Eye className="size-3.5" />
-                        Inspect
+                        {t("inventory.inspect", "Inspect")}
                       </Button>
                       <Button asChild variant="outline" size="sm" className="h-8 px-2.5 text-xs font-semibold">
                         <Link href={`/admin/inventory/stock-card?productId=${row.productId}`}>
                           <FileSpreadsheet className="size-3.5 mr-1 text-emerald-600" />
-                          Ledger
+                          {t("inventory.ledger", "Ledger")}
                         </Link>
                       </Button>
                     </div>
@@ -324,9 +327,9 @@ export function StockByLocationTable({
                   <div className="mx-auto flex size-12 items-center justify-center rounded-2xl bg-muted/60 text-muted-foreground mb-3">
                     <Boxes className="size-6" />
                   </div>
-                  <p className="font-bold text-sm text-foreground">No stock balance records found</p>
+                  <p className="font-bold text-sm text-foreground">{t("inventory.noStockRecords", "No stock balance records found")}</p>
                   <p className="mt-1 text-xs text-muted-foreground max-w-sm mx-auto">
-                    No active balances match your search criteria. Try selecting another location or clearing active filters.
+                    {t("inventory.noStockHint", "No active balances match your search criteria. Try selecting another location or clearing active filters.")}
                   </p>
                 </td>
               </tr>

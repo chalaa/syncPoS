@@ -25,12 +25,16 @@ import { ManyToOneCreateSelect } from "@/components/ui/many-to-one-create-select
 import { Notebook } from "@/components/ui/notebook";
 import { ProductSelect, type ProductSelectOption } from "@/app/admin/products/product-select";
 import { RelatedModelSelect } from "@/components/ui/related-model-select";
+import { useTranslation } from "@/lib/i18n/use-translation";
 import { useFormValidation, type FormValidationResult } from "@/hooks/use-form-validation";
 import { cn } from "@/lib/utils";
 import { createCustomerFromSales } from "@/app/admin/sales/actions";
+import { RestoreDraftBanner } from "@/components/ui/restore-draft-banner";
 import type { OwnerOption } from "@/server/owners/types";
 import type { SalesAvailableStockOption, SalesFormOption, SalesOrderDetail, SalesTaxOption } from "@/server/sales/types";
 import { useAppStore } from "@/stores/app-store";
+
+const STORAGE_KEY = "syncpos_draft_sales_order";
 
 const inputClass =
   "h-10 rounded-lg border border-input bg-background px-3 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0B5D4B]/30 focus-visible:border-[#0B5D4B]";
@@ -125,27 +129,27 @@ function fieldKey(field: string, key: string) {
   return `${field}:${key}`;
 }
 
-function validateSalesOrderForm(values: SalesFormValues): FormValidationResult {
+function validateSalesOrderForm(values: SalesFormValues, t: (key: string, fallback?: string) => string): FormValidationResult {
   const fieldErrors: Record<string, string> = {};
 
   if (!values.customerId) {
-    fieldErrors.customerId = "Select a customer.";
+    fieldErrors.customerId = t("sales.error.selectCustomer", "Select a customer.");
   }
 
   if (!values.ownerId) {
-    fieldErrors.ownerId = "Select an owner.";
+    fieldErrors.ownerId = t("sales.error.selectOwner", "Select an owner.");
   }
 
   if (!values.sourceLocationId) {
-    fieldErrors.sourceLocationId = "Select the source warehouse/location.";
+    fieldErrors.sourceLocationId = t("sales.error.selectSourceLocation", "Select the source warehouse/location.");
   }
 
   if (!values.orderDate) {
-    fieldErrors.orderDate = "Select an order date.";
+    fieldErrors.orderDate = t("sales.error.selectOrderDate", "Select an order date.");
   }
 
   if (values.paymentTerm === "credit" && !values.validUntil) {
-    fieldErrors.validUntil = "Select the payment due date.";
+    fieldErrors.validUntil = t("sales.error.selectPaymentDueDate", "Select the payment due date.");
   }
 
   const activeLines = values.lines.filter(
@@ -154,42 +158,42 @@ function validateSalesOrderForm(values: SalesFormValues): FormValidationResult {
 
   activeLines.forEach((line) => {
     if (!line.productId) {
-      fieldErrors[fieldKey("productId", line.key)] = "Select a product.";
+      fieldErrors[fieldKey("productId", line.key)] = t("sales.error.selectProduct", "Select a product.");
     }
 
     const ownerId = line.ownerId || values.ownerId;
     if (!ownerId) {
-      fieldErrors[fieldKey("ownerId", line.key)] = "Select an owner.";
+      fieldErrors[fieldKey("ownerId", line.key)] = t("sales.error.selectOwner", "Select an owner.");
     }
 
     const locationId = line.sourceLocationId || values.sourceLocationId;
     if (!locationId) {
-      fieldErrors[fieldKey("sourceLocationId", line.key)] = "Select a source location.";
+      fieldErrors[fieldKey("sourceLocationId", line.key)] = t("sales.error.selectSourceLocation", "Select a source location.");
     }
 
     const quantity = Number(line.quantity);
     if (!Number.isFinite(quantity) || quantity <= 0) {
-      fieldErrors[fieldKey("quantity", line.key)] = "Enter a quantity greater than zero.";
+      fieldErrors[fieldKey("quantity", line.key)] = t("sales.error.enterQuantity", "Enter a quantity greater than zero.");
     } else if (line.productId && ownerId && locationId) {
       const available = values.availableQuantityByDomain.get(`${locationId}:${ownerId}:${line.productId}`) ?? 0;
       if (quantity > available) {
-        fieldErrors[fieldKey("quantity", line.key)] = `Only ${available.toFixed(6)} available for this owner and location.`;
+        fieldErrors[fieldKey("quantity", line.key)] = `${available.toFixed(6)} ${t("sales.error.onlyAvailable", "available for this owner and location.")}`;
       }
     }
 
     const unitPrice = Number(line.unitPrice);
     if (!Number.isFinite(unitPrice) || unitPrice < 0) {
-      fieldErrors[fieldKey("unitPrice", line.key)] = "Enter a valid unit price.";
+      fieldErrors[fieldKey("unitPrice", line.key)] = t("sales.error.enterUnitPrice", "Enter a valid unit price.");
     }
 
     const discount = Number(line.discount);
     if (!Number.isFinite(discount) || discount < 0) {
-      fieldErrors[fieldKey("discount", line.key)] = "Enter a valid discount.";
+      fieldErrors[fieldKey("discount", line.key)] = t("sales.error.enterDiscount", "Enter a valid discount.");
     }
   });
 
   return {
-    formErrors: activeLines.length === 0 ? ["Add at least one sales order line."] : [],
+    formErrors: activeLines.length === 0 ? [t("sales.error.addOneLine", "Add at least one sales order line.")] : [],
     fieldErrors,
   };
 }
@@ -238,6 +242,7 @@ export const SalesOrderForm = forwardRef<SalesOrderFormHandle, SalesOrderFormPro
     onCancel,
     confirmationBlockedReason,
   }, ref) {
+  const { t } = useTranslation();
   const [isPending, startTransition] = useTransition();
   const [step, setStep] = useState<1 | 2>(1);
   const [submitIntent, setSubmitIntent] = useState<"draft" | "confirm">("confirm");
@@ -247,6 +252,53 @@ export const SalesOrderForm = forwardRef<SalesOrderFormHandle, SalesOrderFormPro
   const [customerId, setCustomerId] = useState(order?.customerId ?? "");
   const [fsNumber, setFsNumber] = useState(order?.fsNumber ?? "");
   const [paymentTerm, setPaymentTerm] = useState<"cash" | "credit">(order?.paymentTerm ?? "cash");
+
+  const [hasDraft, setHasDraft] = useState(false);
+
+  useEffect(() => {
+    if (order) return;
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (
+          parsed &&
+          (parsed.customerId || parsed.fsNumber || (Array.isArray(parsed.lines) && parsed.lines.some((l: any) => l.productId || l.quantity !== "1" || l.unitPrice !== "0")))
+        ) {
+          setHasDraft(true);
+        }
+      }
+    } catch {}
+  }, [order]);
+
+  function handleRestoreDraft() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return;
+      const draft = JSON.parse(raw);
+      if (draft.customerId !== undefined) setCustomerId(draft.customerId);
+      if (draft.fsNumber !== undefined) setFsNumber(draft.fsNumber);
+      if (draft.paymentTerm) setPaymentTerm(draft.paymentTerm);
+      if (draft.sourceLocationId) setSourceLocationId(draft.sourceLocationId);
+      if (draft.headerOwnerId) setHeaderOwnerId(draft.headerOwnerId);
+      if (draft.orderDate) setOrderDate(draft.orderDate);
+      if (draft.validUntil) setValidUntil(draft.validUntil);
+      if (Array.isArray(draft.lines) && draft.lines.length > 0) {
+        setLines(draft.lines);
+        setEditingLineKeys(new Set(draft.lines.filter((l: any) => !l.productId).map((l: any) => l.key)));
+        setSavedLineKeys(new Set(draft.lines.filter((l: any) => l.productId).map((l: any) => l.key)));
+      }
+      setHasDraft(false);
+    } catch {
+      localStorage.removeItem(STORAGE_KEY);
+      setHasDraft(false);
+    }
+  }
+
+  function handleDiscardDraft() {
+    localStorage.removeItem(STORAGE_KEY);
+    setHasDraft(false);
+  }
 
   const selectedLocationId = useAppStore((state) => state.selectedLocationId);
   const setSelectedLocationId = useAppStore((state) => state.setSelectedLocationId);
@@ -409,7 +461,9 @@ export const SalesOrderForm = forwardRef<SalesOrderFormHandle, SalesOrderFormPro
     [customerId, headerOwnerId, effectiveSourceLocationId, paymentTerm, orderDate, validUntil, lines, availableQuantityByDomain],
   );
 
-  const { formErrors, fieldErrors, isValid } = useFormValidation(validationValues, validateSalesOrderForm);
+  const validate = useCallback((vals: SalesFormValues) => validateSalesOrderForm(vals, t), [t]);
+
+  const { formErrors, fieldErrors, isValid } = useFormValidation(validationValues, validate);
 
   const taxById = useMemo(() => new Map(taxes.map((tax) => [tax.id, tax])), [taxes]);
   const productById = useMemo(() => new Map(productOptions.map((product) => [product.id, product])), [productOptions]);
@@ -510,6 +564,10 @@ export const SalesOrderForm = forwardRef<SalesOrderFormHandle, SalesOrderFormPro
   }
 
   function addLine() {
+    if (lines.some((l) => !l.productId)) {
+      return;
+    }
+
     const line = newLine(headerOwnerId, effectiveSourceLocationId);
 
     setSavedLineKeys((prev) => {
@@ -585,6 +643,24 @@ export const SalesOrderForm = forwardRef<SalesOrderFormHandle, SalesOrderFormPro
     return hasSubmitted ? fieldErrors[key] : undefined;
   }
 
+  useEffect(() => {
+    if (order) return;
+    const hasData = customerId || fsNumber || lines.some((l) => l.productId || l.quantity !== "1" || l.unitPrice !== "0");
+    if (hasData) {
+      const draft = {
+        customerId,
+        fsNumber,
+        paymentTerm,
+        sourceLocationId,
+        headerOwnerId,
+        orderDate,
+        validUntil,
+        lines,
+      };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(draft));
+    }
+  }, [order, customerId, fsNumber, paymentTerm, sourceLocationId, headerOwnerId, orderDate, validUntil, lines]);
+
   function submitWithIntent(intent: "draft" | "confirm") {
     setSubmitIntent(intent);
     setHasSubmitted(true);
@@ -603,6 +679,8 @@ export const SalesOrderForm = forwardRef<SalesOrderFormHandle, SalesOrderFormPro
 
         if (result?.error) {
           setServerError(result.error);
+        } else {
+          localStorage.removeItem(STORAGE_KEY);
         }
       });
     }
@@ -625,7 +703,7 @@ export const SalesOrderForm = forwardRef<SalesOrderFormHandle, SalesOrderFormPro
     submitWithIntent(submitIntent);
   }
 
-  // Expose saveDraft so the parent modal can trigger it from the close-confirmation dialog.
+  // Expose saveDraft so the parent modal can trigger it if needed.
   useImperativeHandle(ref, () => ({
     saveDraft: () => submitWithIntent("draft"),
   }));
@@ -636,6 +714,11 @@ export const SalesOrderForm = forwardRef<SalesOrderFormHandle, SalesOrderFormPro
       onSubmit={handleSubmit}
       className={cn("grid gap-5", isModal ? "p-0" : "rounded-xl border border-border bg-card p-6 shadow-xs")}
     >
+      <RestoreDraftBanner
+        hasDraft={hasDraft}
+        onRestore={handleRestoreDraft}
+        onDiscard={handleDiscardDraft}
+      />
       {order ? <input type="hidden" name="salesOrderId" value={order.id} /> : null}
       <input
         type="hidden"
@@ -646,7 +729,7 @@ export const SalesOrderForm = forwardRef<SalesOrderFormHandle, SalesOrderFormPro
 
       {error || serverError ? (
         <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-3.5 text-sm text-destructive flex items-center gap-2">
-          <span className="font-semibold">Error:</span> {serverError ?? error}
+          <span className="font-semibold">{t("label.error", "Error:")}</span> {serverError ?? error}
         </div>
       ) : null}
 
@@ -679,7 +762,7 @@ export const SalesOrderForm = forwardRef<SalesOrderFormHandle, SalesOrderFormPro
             >
               {step === 2 ? <Check className="size-3" /> : "1"}
             </span>
-            <span>1. Quotation Details & Lines</span>
+            <span>{t("sales.form.step1", "1. Quotation Details & Lines")}</span>
           </button>
 
           <div className="h-0.5 w-6 bg-border sm:w-10" />
@@ -708,14 +791,14 @@ export const SalesOrderForm = forwardRef<SalesOrderFormHandle, SalesOrderFormPro
             >
               2
             </span>
-            <span>2. Review & Confirm</span>
+            <span>{t("sales.form.step2", "2. Review & Confirm")}</span>
           </button>
         </div>
 
         <div className="hidden sm:flex items-center gap-2 text-xs text-muted-foreground">
-          <span className="font-mono font-medium">Step {step} of 2</span>
+          <span className="font-mono font-medium">{t("sales.form.stepOf", "Step")} {step} {t("sales.form.of2", "of 2")}</span>
           <span className="text-[11px] font-medium text-[#0B5D4B] dark:text-emerald-400">
-            {step === 1 ? "Drafting quotation" : "Ready for confirmation"}
+            {step === 1 ? t("sales.form.draftingQuotation", "Drafting quotation") : t("sales.form.readyForConfirmation", "Ready for confirmation")}
           </span>
         </div>
       </div>
@@ -731,21 +814,21 @@ export const SalesOrderForm = forwardRef<SalesOrderFormHandle, SalesOrderFormPro
                 <div className="flex size-6 items-center justify-center rounded-md bg-[#0B5D4B]/10 text-[#0B5D4B] dark:bg-emerald-950 dark:text-emerald-300">
                   <Users className="size-3.5" />
                 </div>
-                <span>Customer & Fulfillment</span>
+                <span>{t("sales.form.customerFulfillment", "Customer & Fulfillment")}</span>
               </div>
-              <span className="text-[11px] font-medium text-muted-foreground">Client & Source</span>
+              <span className="text-[11px] font-medium text-muted-foreground">{t("sales.form.clientSource", "Client & Source")}</span>
             </div>
 
             <div className="grid gap-3.5 sm:grid-cols-2">
               <div className="sm:col-span-2">
                 <ManyToOneCreateSelect
                   name="customerId"
-                  label="Customer"
+                  label={t("sales.col.customer", "Customer")}
                   options={customers}
                   value={customerId}
                   defaultValue={customerId}
-                  placeholder="Search or add customer..."
-                  entityLabel="Customer"
+                  placeholder={t("sales.form.searchCustomer", "Search or add customer...")}
+                  entityLabel={t("sales.col.customer", "Customer")}
                   onCreate={createCustomerFromSales}
                   onValueChange={setCustomerId}
                   error={showFieldError("customerId")}
@@ -755,12 +838,12 @@ export const SalesOrderForm = forwardRef<SalesOrderFormHandle, SalesOrderFormPro
               <div className="relative z-20">
                 <RelatedModelSelect
                   name="sourceLocationId"
-                  label="Source Warehouse / Location"
+                  label={t("field.sourceWarehouse", "Source Warehouse / Location")}
                   options={locations}
                   value={effectiveSourceLocationId}
                   onValueChange={changeSourceLocation}
-                  placeholder="Select source location..."
-                  emptyLabel="No locations found."
+                  placeholder={t("sales.form.selectSourceLocation", "Select source location...")}
+                  emptyLabel={t("sales.form.noLocationsFound", "No locations found.")}
                   error={showFieldError("sourceLocationId")}
                 />
               </div>
@@ -769,12 +852,12 @@ export const SalesOrderForm = forwardRef<SalesOrderFormHandle, SalesOrderFormPro
 
               <div className="sm:col-span-2">
                 <label className="flex flex-col gap-1 text-sm font-medium">
-                  <span>FS Number (Fiscal Slip)</span>
+                  <span>{t("field.fsNumber", "FS Number (Fiscal Slip)")}</span>
                   <input
                     name="fsNumber"
                     value={fsNumber}
                     onChange={(event) => setFsNumber(event.target.value)}
-                    placeholder="Optional fiscal slip number..."
+                    placeholder={t("sales.form.optionalFsNumber", "Optional fiscal slip number...")}
                     className={inputClass}
                   />
                 </label>
@@ -789,28 +872,28 @@ export const SalesOrderForm = forwardRef<SalesOrderFormHandle, SalesOrderFormPro
                 <div className="flex size-6 items-center justify-center rounded-md bg-[#D9A441]/15 text-[#D9A441] dark:bg-amber-950 dark:text-amber-300">
                   <Wallet className="size-3.5" />
                 </div>
-                <span>Commercial Terms & Schedule</span>
+                <span>{t("sales.form.commercialTermsSchedule", "Commercial Terms & Schedule")}</span>
               </div>
-              <span className="text-[11px] font-medium text-muted-foreground">Terms & Inventory</span>
+              <span className="text-[11px] font-medium text-muted-foreground">{t("sales.form.termsInventory", "Terms & Inventory")}</span>
             </div>
 
             <div className="grid gap-3.5 sm:grid-cols-2">
               <div className="relative z-20">
                 <RelatedModelSelect
                   name="ownerId"
-                  label="Sales Owner"
+                  label={t("field.salesOwner", "Sales Owner")}
                   options={owners}
                   value={headerOwnerId}
                   onValueChange={changeHeaderOwner}
                   required={owners.length > 0}
-                  placeholder="Select sales owner..."
-                  emptyLabel="No owners found."
+                  placeholder={t("sales.form.selectSalesOwner", "Select sales owner...")}
+                  emptyLabel={t("sales.form.noOwnersFound", "No owners found.")}
                   error={showFieldError("ownerId")}
                 />
               </div>
 
               <div className="flex flex-col gap-1 text-sm font-medium">
-                <span>Payment Term</span>
+                <span>{t("sales.form.paymentTerm", "Payment Term")}</span>
                 <input type="hidden" name="paymentTerm" value={paymentTerm} />
                 <div className="grid grid-cols-2 gap-1 rounded-lg border border-input bg-muted/40 p-1">
                   <button
@@ -824,7 +907,7 @@ export const SalesOrderForm = forwardRef<SalesOrderFormHandle, SalesOrderFormPro
                     )}
                   >
                     <Coins className="size-3.5 text-[#D9A441]" />
-                    <span>Cash</span>
+                    <span>{t("sales.form.cash", "Cash")}</span>
                   </button>
                   <button
                     type="button"
@@ -837,14 +920,14 @@ export const SalesOrderForm = forwardRef<SalesOrderFormHandle, SalesOrderFormPro
                     )}
                   >
                     <Calendar className="size-3.5 text-[#0B5D4B]" />
-                    <span>Credit</span>
+                    <span>{t("sales.form.credit", "Credit")}</span>
                   </button>
                 </div>
               </div>
 
               <div>
                 <label className="flex flex-col gap-1 text-sm font-medium">
-                  <span>Order Date</span>
+                  <span>{t("sales.col.orderDate", "Order Date")}</span>
                   <input
                     name="orderDate"
                     type="date"
@@ -859,7 +942,7 @@ export const SalesOrderForm = forwardRef<SalesOrderFormHandle, SalesOrderFormPro
               {paymentTerm === "credit" ? (
                 <div>
                   <label className="flex flex-col gap-1 text-sm font-medium">
-                    <span>Last Payment Date</span>
+                    <span>{t("field.lastPaymentDate", "Last Payment Date")}</span>
                     <input
                       name="validUntil"
                       type="date"
@@ -882,8 +965,8 @@ export const SalesOrderForm = forwardRef<SalesOrderFormHandle, SalesOrderFormPro
                     className="size-4 rounded border-input text-[#0B5D4B] focus:ring-[#0B5D4B]"
                   />
                   <div className="flex flex-col">
-                    <span className="font-semibold text-foreground">Reserve Stock on Confirmation</span>
-                    <span className="text-[11px] text-muted-foreground">Automatically lock available inventory for this order upon approval.</span>
+                    <span className="font-semibold text-foreground">{t("sales.form.reserveStockOnConfirm", "Reserve Stock on Confirmation")}</span>
+                    <span className="text-[11px] text-muted-foreground">{t("sales.form.reserveStockHint", "Automatically lock available inventory for this order upon approval.")}</span>
                   </div>
                 </label>
               </div>
@@ -901,7 +984,7 @@ export const SalesOrderForm = forwardRef<SalesOrderFormHandle, SalesOrderFormPro
                 label: (
                   <span className="flex items-center gap-2">
                     <Package className="size-4 text-[#0B5D4B]" />
-                    <span>Order Items</span>
+                    <span>{t("sales.form.orderItems", "Order Items")}</span>
                     <span className="inline-flex items-center justify-center rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-bold text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
                       {lines.length}
                     </span>
@@ -952,7 +1035,7 @@ export const SalesOrderForm = forwardRef<SalesOrderFormHandle, SalesOrderFormPro
                                 <div className="min-w-0 flex-1">
                                   <div className="flex items-center gap-2 flex-wrap">
                                     <h4 className="text-xs font-bold text-foreground truncate">
-                                      {product ? product.name : <span className="text-muted-foreground italic">No product selected</span>}
+                                      {product ? product.name : <span className="text-muted-foreground italic">{t("sales.form.noProductSelected", "No product selected")}</span>}
                                     </h4>
                                     {product?.code ? (
                                       <span className="rounded bg-muted/60 px-1.5 py-0.5 font-mono text-[9px] text-muted-foreground">
@@ -962,17 +1045,17 @@ export const SalesOrderForm = forwardRef<SalesOrderFormHandle, SalesOrderFormPro
                                   </div>
 
                                   <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground mt-0.5 font-mono">
-                                    <span>Qty: <strong className="text-foreground">{line.quantity || "1"}</strong></span>
+                                    <span>{t("sales.col.quantity", "Qty")}: <strong className="text-foreground">{line.quantity || "1"}</strong></span>
                                     <span>•</span>
-                                    <span>Price: <strong className="text-foreground">ETB {money(Number(line.unitPrice) || 0)}</strong></span>
+                                    <span>{t("sales.col.price", "Price")}: <strong className="text-foreground">ETB {money(Number(line.unitPrice) || 0)}</strong></span>
                                     {Number(line.discount) > 0 ? (
                                       <>
                                         <span>•</span>
-                                        <span>Disc: <strong className="text-amber-600 dark:text-amber-400">ETB {money(Number(line.discount))}</strong></span>
+                                        <span>{t("sales.col.discount", "Disc")}: <strong className="text-amber-600 dark:text-amber-400">ETB {money(Number(line.discount))}</strong></span>
                                       </>
                                     ) : null}
                                     <span>•</span>
-                                    <span>Total: <strong className="text-[#0B5D4B] dark:text-emerald-400 font-bold">ETB {money(lineTotals[index]?.total ?? 0)}</strong></span>
+                                    <span>{t("sales.form.total", "Total:")} <strong className="text-[#0B5D4B] dark:text-emerald-400 font-bold">ETB {money(lineTotals[index]?.total ?? 0)}</strong></span>
                                   </div>
                                 </div>
                               </div>
@@ -987,7 +1070,7 @@ export const SalesOrderForm = forwardRef<SalesOrderFormHandle, SalesOrderFormPro
                                         : "bg-amber-50 border-amber-200 text-amber-800 dark:bg-amber-950/40 dark:border-amber-800/40 dark:text-amber-300",
                                     )}
                                   >
-                                    <span className="text-[9px] uppercase font-sans font-bold text-muted-foreground">Avail:</span>
+                                    <span className="text-[9px] uppercase font-sans font-bold text-muted-foreground">{t("sales.form.avail", "Avail:")}</span>
                                     <span>{availableStock.toFixed(2)}</span>
                                   </div>
                                 ) : null}
@@ -998,10 +1081,10 @@ export const SalesOrderForm = forwardRef<SalesOrderFormHandle, SalesOrderFormPro
                                   size="icon"
                                   onClick={() => toggleEditLine(line.key)}
                                   className="size-7 text-[#0B5D4B] hover:bg-emerald-500/10 hover:text-[#0B5D4B] active:scale-95 transition-all"
-                                  title="Edit this product line"
+                                  title={t("sales.form.editThisLine", "Edit this product line")}
                                 >
                                   <Pencil className="size-3.5" />
-                                  <span className="sr-only">Edit item</span>
+                                  <span className="sr-only">{t("sales.form.editItem", "Edit item")}</span>
                                 </Button>
 
                                 <Button
@@ -1011,10 +1094,10 @@ export const SalesOrderForm = forwardRef<SalesOrderFormHandle, SalesOrderFormPro
                                   disabled={lines.length === 1}
                                   onClick={() => removeLine(line.key)}
                                   className="size-7 text-muted-foreground/60 hover:bg-destructive/10 hover:text-destructive active:scale-95 disabled:opacity-20 transition-all"
-                                  title="Remove item"
+                                  title={t("sales.form.removeItem", "Remove item")}
                                 >
                                   <Trash2Icon className="size-3.5" />
-                                  <span className="sr-only">Remove item</span>
+                                  <span className="sr-only">{t("sales.form.removeItem", "Remove item")}</span>
                                 </Button>
                               </div>
                             </div>
@@ -1045,13 +1128,14 @@ export const SalesOrderForm = forwardRef<SalesOrderFormHandle, SalesOrderFormPro
                                     brands={productBrands}
                                     units={productUnits}
                                     taxes={taxes}
+                                    allowCreate={false}
                                     onValueChange={(productId) => updateLineProduct(line.key, productId)}
                                     onOptionsChange={setProductOptions}
-                                    placeholder="Search product by name, SKU, or brand..."
+                                    placeholder={t("sales.form.searchProductPlaceholder", "Search product by name, SKU, or brand...")}
                                     emptyLabel={
                                       (line.ownerId || headerOwnerId) && (line.sourceLocationId || effectiveSourceLocationId)
-                                        ? "No products with available stock."
-                                        : "Select owner and source location first."
+                                        ? t("sales.form.noProductsAvailable", "No products with available stock.")
+                                        : t("sales.form.selectOwnerLocationFirst", "Select owner and source location first.")
                                     }
                                     inputClassName="h-10 rounded-lg text-sm font-medium w-full"
                                     error={showFieldError(fieldKey("productId", line.key))}
@@ -1082,7 +1166,7 @@ export const SalesOrderForm = forwardRef<SalesOrderFormHandle, SalesOrderFormPro
                                           : "bg-amber-50 border-amber-200 text-amber-800 dark:bg-amber-950/40 dark:border-amber-800/40 dark:text-amber-300",
                                       )}
                                     >
-                                      <span className="text-[10px] uppercase font-sans font-bold text-muted-foreground">Avail:</span>
+                                      <span className="text-[10px] uppercase font-sans font-bold text-muted-foreground">{t("sales.form.avail", "Avail:")}</span>
                                       <span>{availableStock !== null ? availableStock.toFixed(2) : "0"}</span>
                                     </div>
 
@@ -1095,7 +1179,7 @@ export const SalesOrderForm = forwardRef<SalesOrderFormHandle, SalesOrderFormPro
                                         className="h-8 gap-1.5 text-xs font-bold bg-[#0B5D4B] text-white hover:bg-[#073B35] shadow-xs px-3 rounded-lg transition-all"
                                       >
                                         <Check className="size-3.5" />
-                                        Update
+                                        {t("action.update", "Update")}
                                       </Button>
                                     ) : null}
                                   </>
@@ -1108,10 +1192,10 @@ export const SalesOrderForm = forwardRef<SalesOrderFormHandle, SalesOrderFormPro
                                   disabled={lines.length === 1}
                                   onClick={() => removeLine(line.key)}
                                   className="size-8 text-muted-foreground/60 transition-colors hover:bg-destructive/10 hover:text-destructive active:scale-95 disabled:opacity-20 shrink-0"
-                                  title="Remove this item"
+                                  title={t("sales.form.removeItem", "Remove item")}
                                 >
                                   <Trash2Icon className="size-4" />
-                                  <span className="sr-only">Remove item</span>
+                                  <span className="sr-only">{t("sales.form.removeItem", "Remove item")}</span>
                                 </Button>
                               </div>
                             </div>
@@ -1126,9 +1210,9 @@ export const SalesOrderForm = forwardRef<SalesOrderFormHandle, SalesOrderFormPro
                               {/* Quantity */}
                               <div className="flex flex-col gap-1.5">
                                 <label className="text-xs font-semibold text-foreground flex items-center justify-between">
-                                  <span>Quantity</span>
+                                  <span>{t("sales.col.quantity", "Quantity")}</span>
                                   <span className="text-[10px] text-muted-foreground font-normal">
-                                    {line.productId && availableStock !== null ? `Max: ${availableStock.toFixed(2)}` : "Units to sell"}
+                                    {line.productId && availableStock !== null ? `${t("sales.form.max", "Max:")} ${availableStock.toFixed(2)}` : t("sales.form.unitsToSell", "Units to sell")}
                                   </span>
                                 </label>
                                 <input
@@ -1154,8 +1238,8 @@ export const SalesOrderForm = forwardRef<SalesOrderFormHandle, SalesOrderFormPro
                               {/* Unit Price */}
                               <div className="flex flex-col gap-1.5">
                                 <label className="text-xs font-semibold text-foreground flex items-center justify-between">
-                                  <span>Unit Price</span>
-                                  <span className="text-[10px] text-muted-foreground font-normal">In Ethiopian Birr</span>
+                                  <span>{t("sales.form.unitPrice", "Unit Price")}</span>
+                                  <span className="text-[10px] text-muted-foreground font-normal">{t("sales.form.inEthiopianBirr", "In Ethiopian Birr")}</span>
                                 </label>
                                 <div className="relative flex items-center">
                                   <span className="pointer-events-none absolute left-3 text-xs font-bold text-muted-foreground">
@@ -1185,8 +1269,8 @@ export const SalesOrderForm = forwardRef<SalesOrderFormHandle, SalesOrderFormPro
                               {/* Discount */}
                               <div className="flex flex-col gap-1.5 col-span-2 sm:col-span-1">
                                 <label className="text-xs font-semibold text-foreground flex items-center justify-between">
-                                  <span>Discount</span>
-                                  <span className="text-[10px] text-muted-foreground font-normal">Per line (ETB)</span>
+                                  <span>{t("sales.form.discount", "Discount")}</span>
+                                  <span className="text-[10px] text-muted-foreground font-normal">{t("sales.form.perLineEtb", "Per line (ETB)")}</span>
                                 </label>
                                 <div className="relative flex items-center">
                                   <span className="pointer-events-none absolute left-3 text-xs font-bold text-muted-foreground">
@@ -1219,9 +1303,9 @@ export const SalesOrderForm = forwardRef<SalesOrderFormHandle, SalesOrderFormPro
                                   <label className="text-xs font-semibold text-foreground flex items-center justify-between">
                                     <span className="flex items-center gap-1">
                                       <Tag className="size-3 text-[#0B5D4B]" />
-                                      <span>Taxes</span>
+                                      <span>{t("sales.form.taxes", "Taxes")}</span>
                                     </span>
-                                    <span className="text-[10px] text-muted-foreground font-normal">Click to toggle</span>
+                                    <span className="text-[10px] text-muted-foreground font-normal">{t("sales.form.clickToToggle", "Click to toggle")}</span>
                                   </label>
                                   <div className="flex flex-wrap gap-1.5 min-h-[40px] items-center p-1 rounded-lg border border-input bg-background">
                                     {taxes.map((tax) => {
@@ -1256,13 +1340,13 @@ export const SalesOrderForm = forwardRef<SalesOrderFormHandle, SalesOrderFormPro
 
                               {/* Line Financial Total Summary */}
                               <div className="flex flex-col items-end justify-center rounded-lg bg-muted/40 border border-border/50 p-2.5 h-[62px] col-span-2 sm:col-span-1">
-                                <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Line Total</span>
+                                <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{t("sales.form.lineTotal", "Line Total")}</span>
                                 <span className="font-mono text-base font-extrabold text-[#0B5D4B] dark:text-emerald-400">
                                   ETB {money(lineTotals[index]?.total ?? 0)}
                                 </span>
                                 {taxes.length > 0 && (lineTotals[index]?.taxAmount ?? 0) > 0 ? (
                                   <span className="text-[10px] text-muted-foreground font-mono">
-                                    Untaxed: ETB {money(lineTotals[index]?.subtotal ?? 0)}
+                                    {t("sales.form.untaxed", "Untaxed:")} ETB {money(lineTotals[index]?.subtotal ?? 0)}
                                   </span>
                                 ) : null}
                               </div>
@@ -1272,23 +1356,23 @@ export const SalesOrderForm = forwardRef<SalesOrderFormHandle, SalesOrderFormPro
                             <div className="mt-3 flex flex-wrap items-center justify-between gap-2 pt-2.5 text-xs text-muted-foreground border-t border-border/50">
                               <div className="flex flex-wrap items-center gap-3">
                                 <div className="flex items-center gap-1.5">
-                                  <span>Location:</span>
+                                  <span>{t("field.sourceLocation", "Location:")}</span>
                                   <span className="font-semibold text-foreground">
-                                    {sourceLocation?.name ?? "Default Location"}
+                                    {sourceLocation?.name ?? t("sales.form.defaultLocation", "Default Location")}
                                   </span>
                                 </div>
                                 <span className="text-border">•</span>
                                 <div className="flex items-center gap-1.5">
-                                  <span>Owner:</span>
+                                  <span>{t("field.stockOwner", "Owner:")}</span>
                                   <span className="font-semibold text-foreground">
-                                    {owner?.name ?? "Order Owner"}
+                                    {owner?.name ?? t("sales.form.orderOwner", "Order Owner")}
                                   </span>
                                 </div>
                                 {line.productId ? (
                                   <>
                                     <span className="text-border">•</span>
                                     <div className="flex items-center gap-1.5">
-                                      <span>Stock Available:</span>
+                                      <span>{t("sales.form.stockAvailable", "Stock Available:")}</span>
                                       <span
                                         className={cn(
                                           "font-mono font-bold",
@@ -1297,7 +1381,7 @@ export const SalesOrderForm = forwardRef<SalesOrderFormHandle, SalesOrderFormPro
                                             : "text-amber-600 dark:text-amber-400",
                                         )}
                                       >
-                                        {availableStock !== null ? `${availableStock.toFixed(2)} units` : "—"}
+                                        {availableStock !== null ? `${availableStock.toFixed(2)} ${t("unit.units", "units")}` : "—"}
                                       </span>
                                     </div>
                                   </>
@@ -1306,28 +1390,28 @@ export const SalesOrderForm = forwardRef<SalesOrderFormHandle, SalesOrderFormPro
 
                               <details className="text-right">
                                 <summary className="cursor-pointer text-[#0B5D4B] hover:underline font-medium list-none">
-                                  Assign different location / owner
+                                  {t("sales.form.assignDifferent", "Assign different location / owner")}
                                 </summary>
                                 <div className="mt-2.5 flex flex-wrap gap-2 text-left justify-end">
                                   <div className="w-56">
-                                    <span className="block text-[11px] font-medium text-muted-foreground mb-1">Source Location</span>
+                                    <span className="block text-[11px] font-medium text-muted-foreground mb-1">{t("field.sourceLocation", "Source Location")}</span>
                                     <RelatedModelSelect
                                       value={line.sourceLocationId || effectiveSourceLocationId}
                                       options={locations}
                                       onValueChange={(locationId) => changeLineSourceLocation(line, locationId)}
-                                      placeholder="Select location"
-                                      emptyLabel="No locations found."
+                                      placeholder={t("sales.form.selectLocation", "Select location")}
+                                      emptyLabel={t("sales.form.noLocationsFound", "No locations found.")}
                                       inputClassName="h-8 text-xs"
                                     />
                                   </div>
                                   <div className="w-56">
-                                    <span className="block text-[11px] font-medium text-muted-foreground mb-1">Stock Owner</span>
+                                    <span className="block text-[11px] font-medium text-muted-foreground mb-1">{t("field.stockOwner", "Stock Owner")}</span>
                                     <RelatedModelSelect
                                       value={line.ownerId || headerOwnerId}
                                       options={ownerOptionsForLine(line)}
                                       onValueChange={(ownerId) => changeLineOwner(line, ownerId)}
-                                      placeholder="Select owner"
-                                      emptyLabel="No owners found."
+                                      placeholder={t("sales.form.selectOwner", "Select owner")}
+                                      emptyLabel={t("sales.form.noOwnersFound", "No owners found.")}
                                       inputClassName="h-8 text-xs"
                                     />
                                   </div>
@@ -1344,27 +1428,28 @@ export const SalesOrderForm = forwardRef<SalesOrderFormHandle, SalesOrderFormPro
                       <Button
                         type="button"
                         variant="outline"
+                        disabled={lines.some((l) => !l.productId)}
                         onClick={addLine}
-                        className="w-full sm:w-auto gap-2 border-dashed border-[#0B5D4B]/50 bg-emerald-500/5 text-[#0B5D4B] font-semibold hover:bg-emerald-500/10 hover:border-[#0B5D4B] transition-all py-2.5 px-5 rounded-xl text-xs"
+                        className="w-full sm:w-auto gap-2 border-dashed border-[#0B5D4B]/50 bg-emerald-500/5 text-[#0B5D4B] font-semibold hover:bg-emerald-500/10 hover:border-[#0B5D4B] transition-all py-2.5 px-5 rounded-xl text-xs disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         <PlusIcon className="size-4" />
-                        + Add Product
+                        {t("action.addProduct", "+ Add Product")}
                       </Button>
 
                       {/* Financial Grand Summary Card */}
                       <div className="w-full sm:w-80 rounded-xl border border-border/80 bg-gradient-to-b from-card to-muted/20 p-4 text-xs shadow-xs">
                         <div className="flex justify-between items-center py-1 text-muted-foreground">
-                          <span>Untaxed Subtotal</span>
+                          <span>{t("sales.form.untaxedSubtotal", "Untaxed Subtotal")}</span>
                           <span className="font-mono font-medium text-foreground">ETB {money(totals.subtotal)}</span>
                         </div>
                         <div className="flex justify-between items-center py-1 text-muted-foreground">
-                          <span>Applicable Taxes</span>
+                          <span>{t("sales.form.applicableTaxes", "Applicable Taxes")}</span>
                           <span className="font-mono font-medium text-foreground">ETB {money(totals.taxAmount)}</span>
                         </div>
                         <div className="mt-2.5 flex justify-between items-baseline border-t border-border/80 pt-2.5">
                           <div>
-                            <span className="text-sm font-bold text-foreground">Total Quotation Value</span>
-                            <p className="text-[10px] text-muted-foreground">Ethiopian Birr (ETB)</p>
+                            <span className="text-sm font-bold text-foreground">{t("sales.form.totalQuotationValue", "Total Quotation Value")}</span>
+                            <p className="text-[10px] text-muted-foreground">{t("sales.form.ethiopianBirrEtb", "Ethiopian Birr (ETB)")}</p>
                           </div>
                           <span className="font-mono text-lg font-extrabold text-[#0B5D4B] dark:text-emerald-400">
                             ETB {money(totals.total)}
@@ -1380,7 +1465,7 @@ export const SalesOrderForm = forwardRef<SalesOrderFormHandle, SalesOrderFormPro
                 label: (
                   <span className="flex items-center gap-2">
                     <FileText className="size-4 text-muted-foreground" />
-                    <span>Terms & Notes</span>
+                    <span>{t("sales.form.termsAndNotes", "Terms & Notes")}</span>
                     {order?.notes ? <span className="size-1.5 rounded-full bg-[#0B5D4B]" /> : null}
                   </span>
                 ),
@@ -1389,14 +1474,14 @@ export const SalesOrderForm = forwardRef<SalesOrderFormHandle, SalesOrderFormPro
                     <label className="flex flex-col gap-1.5 text-xs font-medium text-foreground">
                       <span className="flex items-center gap-1.5">
                         <FileText className="size-3.5 text-[#0B5D4B]" />
-                        <span>Commercial Terms & Internal Notes</span>
+                        <span>{t("sales.form.commercialTermsAndNotes", "Commercial Terms & Internal Notes")}</span>
                       </span>
                       <textarea
                         name="notes"
                         value={notes}
                         onChange={(event) => setNotes(event.target.value)}
                         rows={4}
-                        placeholder="Specify warranty terms, shipping conditions, or internal notes for sales fulfillment..."
+                        placeholder={t("sales.form.notesPlaceholder", "Specify warranty terms, shipping conditions, or internal notes for sales fulfillment...")}
                         className="rounded-xl border border-input bg-background/80 p-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0B5D4B]/30 resize-y leading-relaxed"
                       />
                     </label>
@@ -1417,14 +1502,14 @@ export const SalesOrderForm = forwardRef<SalesOrderFormHandle, SalesOrderFormPro
               <ShieldCheck className="size-5 text-emerald-200" />
             </div>
             <div>
-              <h3 className="text-sm font-bold text-foreground tracking-tight">Review & Confirmation</h3>
+              <h3 className="text-sm font-bold text-foreground tracking-tight">{t("sales.form.reviewAndConfirmation", "Review & Confirmation")}</h3>
               <p className="text-xs text-muted-foreground">
-                Confirm customer details, source warehouse, inventory reservation, and line totals before executing order confirmation.
+                {t("sales.form.reviewHint", "Confirm customer details, source warehouse, inventory reservation, and line totals before executing order confirmation.")}
               </p>
             </div>
           </div>
           <span className="hidden sm:inline-flex rounded-full bg-[#D9A441]/15 px-2.5 py-1 text-[11px] font-bold text-[#D9A441] border border-[#D9A441]/30">
-            Final Approval
+            {t("sales.form.finalApproval", "Final Approval")}
           </span>
         </div>
 
@@ -1435,33 +1520,33 @@ export const SalesOrderForm = forwardRef<SalesOrderFormHandle, SalesOrderFormPro
             <div className="flex items-center justify-between pb-2 border-b border-border/60">
               <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">
                 <Users className="size-3.5 text-[#0B5D4B]" />
-                <span>Customer & Logistics</span>
+                <span>{t("sales.form.customerLogistics", "Customer & Logistics")}</span>
               </div>
-              <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">Fulfillment</span>
+              <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">{t("sales.form.fulfillment", "Fulfillment")}</span>
             </div>
             <div className="grid grid-cols-2 gap-3 text-xs">
               <div>
-                <span className="text-muted-foreground text-[11px]">Customer</span>
+                <span className="text-muted-foreground text-[11px]">{t("sales.col.customer", "Customer")}</span>
                 <p className="font-semibold text-foreground text-sm mt-0.5">
                   {customers.find((c) => c.id === customerId)?.name || "—"}
                 </p>
               </div>
               <div>
-                <span className="text-muted-foreground text-[11px]">Source Warehouse</span>
+                <span className="text-muted-foreground text-[11px]">{t("sales.col.sourceWarehouse", "Source Warehouse")}</span>
                 <p className="font-semibold text-foreground text-sm mt-0.5">
                   {locations.find((l) => l.id === effectiveSourceLocationId)?.name || "—"}
                 </p>
               </div>
               <div>
-                <span className="text-muted-foreground text-[11px]">FS Number</span>
+                <span className="text-muted-foreground text-[11px]">{t("field.fsNumber", "FS Number")}</span>
                 <p className="font-mono font-semibold text-foreground mt-0.5">
                   {fsNumber || "—"}
                 </p>
               </div>
               <div>
-                <span className="text-muted-foreground text-[11px]">Inventory Policy</span>
+                <span className="text-muted-foreground text-[11px]">{t("sales.form.inventoryPolicy", "Inventory Policy")}</span>
                 <p className="font-semibold text-foreground mt-0.5">
-                  {reserveOnConfirm ? "Reserve stock on confirm" : "No reservation"}
+                  {reserveOnConfirm ? t("sales.form.reserveStockOnConfirmLabel", "Reserve stock on confirm") : t("sales.form.noReservation", "No reservation")}
                 </p>
               </div>
             </div>
@@ -1472,7 +1557,7 @@ export const SalesOrderForm = forwardRef<SalesOrderFormHandle, SalesOrderFormPro
             <div className="flex items-center justify-between pb-2 border-b border-border/60">
               <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">
                 <Wallet className="size-3.5 text-[#D9A441]" />
-                <span>Commercial Terms</span>
+                <span>{t("sales.form.commercialTerms", "Commercial Terms")}</span>
               </div>
               <span
                 className={cn(
@@ -1482,26 +1567,26 @@ export const SalesOrderForm = forwardRef<SalesOrderFormHandle, SalesOrderFormPro
                     : "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
                 )}
               >
-                {paymentTerm}
+                {paymentTerm === "cash" ? t("sales.form.cash", "Cash") : t("sales.form.credit", "Credit")}
               </span>
             </div>
             <div className="grid grid-cols-3 gap-2 text-xs">
               <div>
-                <span className="text-muted-foreground text-[11px]">Sales Owner</span>
+                <span className="text-muted-foreground text-[11px]">{t("field.salesOwner", "Sales Owner")}</span>
                 <p className="font-semibold text-foreground mt-0.5">
                   {owners.find((o) => o.id === headerOwnerId)?.name || "—"}
                 </p>
               </div>
               <div>
-                <span className="text-muted-foreground text-[11px]">Order Date</span>
+                <span className="text-muted-foreground text-[11px]">{t("sales.col.orderDate", "Order Date")}</span>
                 <p className="font-mono font-semibold text-foreground mt-0.5">
                   {orderDate || "—"}
                 </p>
               </div>
               <div>
-                <span className="text-muted-foreground text-[11px]">Payment Due</span>
+                <span className="text-muted-foreground text-[11px]">{t("sales.form.paymentDue", "Payment Due")}</span>
                 <p className="font-mono font-semibold text-foreground mt-0.5">
-                  {paymentTerm === "credit" ? (validUntil || "—") : "Immediate Cash"}
+                  {paymentTerm === "credit" ? (validUntil || "—") : t("sales.form.immediateCash", "Immediate Cash")}
                 </p>
               </div>
             </div>
@@ -1513,9 +1598,9 @@ export const SalesOrderForm = forwardRef<SalesOrderFormHandle, SalesOrderFormPro
           <div className="flex items-center justify-between border-b border-border/70 bg-muted/30 px-4 py-3">
             <div className="flex items-center gap-2">
               <Package className="size-4 text-[#0B5D4B]" />
-              <span className="text-xs font-bold uppercase tracking-wider text-foreground">Order Lines Breakdown</span>
+              <span className="text-xs font-bold uppercase tracking-wider text-foreground">{t("sales.form.orderLinesBreakdown", "Order Lines Breakdown")}</span>
               <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[11px] font-bold text-[#0B5D4B] dark:text-emerald-300">
-                {lines.length} {lines.length === 1 ? "Line" : "Lines"}
+                {lines.length} {lines.length === 1 ? t("sales.form.line", "Line") : t("sales.form.lines", "Lines")}
               </span>
             </div>
           </div>
@@ -1525,14 +1610,14 @@ export const SalesOrderForm = forwardRef<SalesOrderFormHandle, SalesOrderFormPro
               <thead className="border-b border-border/60 bg-muted/20 text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">
                 <tr>
                   <th className="py-2.5 px-4 w-12 text-center">#</th>
-                  <th className="py-2.5 px-4">Product</th>
-                  <th className="py-2.5 px-4">Source Location</th>
-                  <th className="py-2.5 px-4">Owner</th>
-                  <th className="py-2.5 px-4 text-right">Quantity</th>
-                  <th className="py-2.5 px-4 text-right">Unit Price (ETB)</th>
-                  <th className="py-2.5 px-4 text-right">Discount (ETB)</th>
-                  {taxes.length > 0 ? <th className="py-2.5 px-4">Taxes</th> : null}
-                  <th className="py-2.5 px-4 text-right font-bold text-foreground">Line Total (ETB)</th>
+                  <th className="py-2.5 px-4">{t("delivery.product", "Product")}</th>
+                  <th className="py-2.5 px-4">{t("sales.col.sourceWarehouse", "Source Location")}</th>
+                  <th className="py-2.5 px-4">{t("sales.col.owner", "Owner")}</th>
+                  <th className="py-2.5 px-4 text-right">{t("sales.col.quantity", "Quantity")}</th>
+                  <th className="py-2.5 px-4 text-right">{t("sales.form.unitPriceEtb", "Unit Price (ETB)")}</th>
+                  <th className="py-2.5 px-4 text-right">{t("sales.form.discountEtb", "Discount (ETB)")}</th>
+                  {taxes.length > 0 ? <th className="py-2.5 px-4">{t("sales.form.taxes", "Taxes")}</th> : null}
+                  <th className="py-2.5 px-4 text-right font-bold text-foreground">{t("sales.form.lineTotalEtb", "Line Total (ETB)")}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/40 font-medium">
@@ -1548,7 +1633,7 @@ export const SalesOrderForm = forwardRef<SalesOrderFormHandle, SalesOrderFormPro
                         {String(index + 1).padStart(2, "0")}
                       </td>
                       <td className="py-3 px-4">
-                        <div className="font-semibold text-foreground">{product?.name || "Unspecified Product"}</div>
+                        <div className="font-semibold text-foreground">{product?.name || t("sales.form.unspecifiedProduct", "Unspecified Product")}</div>
                         {product?.code ? (
                           <span className="inline-block rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground mt-0.5">
                             SKU: {product.code}
@@ -1556,10 +1641,10 @@ export const SalesOrderForm = forwardRef<SalesOrderFormHandle, SalesOrderFormPro
                         ) : null}
                       </td>
                       <td className="py-3 px-4 text-muted-foreground">
-                        {lineLocation?.name || "Default Location"}
+                        {lineLocation?.name || t("sales.form.defaultLocation", "Default Location")}
                       </td>
                       <td className="py-3 px-4 text-muted-foreground">
-                        {lineOwner?.name || "Order Owner"}
+                        {lineOwner?.name || t("sales.form.orderOwner", "Order Owner")}
                       </td>
                       <td className="py-3 px-4 text-right font-mono font-semibold text-foreground">
                         {line.quantity}
@@ -1573,7 +1658,7 @@ export const SalesOrderForm = forwardRef<SalesOrderFormHandle, SalesOrderFormPro
                       {taxes.length > 0 ? (
                         <td className="py-3 px-4">
                           {selectedTaxes.length === 0 ? (
-                            <span className="text-muted-foreground text-[11px]">None</span>
+                            <span className="text-muted-foreground text-[11px]">{t("sales.form.none", "None")}</span>
                           ) : (
                             <div className="flex flex-wrap gap-1">
                               {selectedTaxes.map((tax) => (
@@ -1604,7 +1689,7 @@ export const SalesOrderForm = forwardRef<SalesOrderFormHandle, SalesOrderFormPro
           <div className="rounded-xl border border-border/80 bg-muted/20 p-4 text-xs">
             <div className="flex items-center gap-2 font-bold uppercase tracking-wider text-muted-foreground text-[11px] mb-1.5">
               <FileText className="size-3.5 text-[#0B5D4B]" />
-              <span>Terms of Sale & Internal Notes</span>
+              <span>{t("sales.form.termsOfSaleNotes", "Terms of Sale & Internal Notes")}</span>
             </div>
             <p className="text-foreground whitespace-pre-wrap leading-relaxed">{notes}</p>
           </div>
@@ -1614,19 +1699,19 @@ export const SalesOrderForm = forwardRef<SalesOrderFormHandle, SalesOrderFormPro
         <div className="flex justify-end">
           <div className="w-full sm:w-80 rounded-xl border border-border/80 bg-gradient-to-b from-card to-muted/20 p-4 text-xs shadow-xs">
             <div className="flex justify-between items-center py-1 text-muted-foreground">
-              <span>{totals.taxAmount > 0 ? "Untaxed Subtotal" : "Subtotal"}</span>
+              <span>{totals.taxAmount > 0 ? t("sales.form.untaxedSubtotal", "Untaxed Subtotal") : t("sales.form.subtotal", "Subtotal")}</span>
               <span className="font-mono font-medium text-foreground">ETB {money(totals.subtotal)}</span>
             </div>
             {totals.taxAmount > 0 ? (
               <div className="flex justify-between items-center py-1 text-muted-foreground">
-                <span>Applicable Taxes</span>
+                <span>{t("sales.form.applicableTaxes", "Applicable Taxes")}</span>
                 <span className="font-mono font-medium text-foreground">ETB {money(totals.taxAmount)}</span>
               </div>
             ) : null}
             <div className="mt-2.5 flex justify-between items-baseline border-t border-border/80 pt-2.5">
               <div>
-                <span className="text-sm font-bold text-foreground">Total Order Value</span>
-                <p className="text-[10px] text-muted-foreground">Ethiopian Birr (ETB)</p>
+                <span className="text-sm font-bold text-foreground">{t("sales.form.totalOrderValue", "Total Order Value")}</span>
+                <p className="text-[10px] text-muted-foreground">{t("sales.form.ethiopianBirrEtb", "Ethiopian Birr (ETB)")}</p>
               </div>
               <span className="font-mono text-xl font-extrabold text-[#0B5D4B] dark:text-emerald-400">
                 ETB {money(totals.total)}
@@ -1639,66 +1724,68 @@ export const SalesOrderForm = forwardRef<SalesOrderFormHandle, SalesOrderFormPro
       {/* Action Footer (Sticky inside modal or pinned bottom) */}
       <div
         className={cn(
-          "flex items-center gap-4",
+          "flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 sm:gap-4",
           isModal
-            ? "sticky bottom-0 z-10 -mx-6 -mb-5 border-t border-border/80 bg-card/95 px-6 py-3.5 backdrop-blur-md justify-between shadow-lg mt-4"
-            : "justify-between mt-4 pt-4 border-t border-border"
+            ? "sticky bottom-0 z-10 -mx-6 -mb-5 border-t border-border/80 bg-card/95 px-4 sm:px-6 py-3.5 backdrop-blur-md shadow-lg mt-4"
+            : "mt-4 pt-4 border-t border-border"
         )}
       >
         {step === 1 ? (
           <>
-            <div className="flex items-center gap-3 text-xs">
+            <div className="flex items-center justify-between sm:justify-start gap-3 text-xs w-full sm:w-auto">
               {isModal ? (
                 <div className="flex items-center gap-1.5 rounded-lg border border-border/60 bg-muted/40 px-2.5 py-1">
-                  <Package className="size-3.5 text-[#0B5D4B]" />
-                  <span className="font-medium text-muted-foreground">
+                  <Package className="size-3.5 text-[#0B5D4B] shrink-0" />
+                  <span className="font-medium text-muted-foreground whitespace-nowrap">
                     {lines.filter((l) => l.productId).length} / {lines.length}{" "}
-                    {lines.length === 1 ? "Item specified" : "Items specified"}
+                    {lines.length === 1 ? t("sales.form.itemSpecified", "Item specified") : t("sales.form.itemsSpecified", "Items specified")}
                   </span>
                 </div>
               ) : null}
               <div className="hidden sm:flex items-baseline gap-1.5 text-muted-foreground">
-                <span>Total Value:</span>
+                <span>{t("sales.form.totalValue", "Total Value:")}</span>
                 <strong className="font-mono text-base font-extrabold text-[#0B5D4B] dark:text-emerald-400">
                   ETB {money(totals.total)}
                 </strong>
               </div>
             </div>
 
-            <div className="flex items-center gap-2.5">
-              {isModal && onCancel ? (
+            <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center gap-2 sm:gap-2.5 w-full sm:w-auto">
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                {isModal && onCancel ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={onCancel}
+                    disabled={isPending}
+                    className="flex-1 sm:flex-initial px-3 sm:px-4 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted/80 whitespace-nowrap justify-center"
+                  >
+                    {t("action.cancel", "Cancel")}
+                  </Button>
+                ) : null}
+
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={onCancel}
+                  onClick={() => submitWithIntent("draft")}
                   disabled={isPending}
-                  className="px-4 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted/80"
+                  className="flex-1 sm:flex-initial px-3 sm:px-4 text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-muted/80 border-border whitespace-nowrap justify-center"
                 >
-                  Cancel
+                  {t("action.saveDraftQuotation", "Save as Draft Quotation")}
                 </Button>
-              ) : null}
-
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => submitWithIntent("draft")}
-                disabled={isPending}
-                className="px-4 text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-muted/80 border-border"
-              >
-                Save as Draft Quotation
-              </Button>
+              </div>
 
               <Button
                 type="button"
                 onClick={handleContinueToStep2}
                 disabled={isPending}
                 className={cn(
-                  "gap-2 font-semibold text-white shadow-md shadow-[#0B5D4B]/20 transition-all hover:brightness-110 active:scale-[0.99] px-6 text-xs",
+                  "w-full sm:w-auto gap-2 font-semibold text-white shadow-md shadow-[#0B5D4B]/20 transition-all hover:brightness-110 active:scale-[0.99] px-4 sm:px-6 text-xs whitespace-nowrap justify-center",
                   "bg-gradient-to-r from-[#0B5D4B] via-[#073B35] to-[#0B5D4B]"
                 )}
               >
-                <span>Continue to Confirmation</span>
-                <ArrowRight className="size-3.5 text-emerald-200" />
+                <span>{t("action.continueToConfirmation", "Continue to Confirmation")}</span>
+                <ArrowRight className="size-3.5 text-emerald-200 shrink-0" />
               </Button>
             </div>
           </>
@@ -1710,22 +1797,22 @@ export const SalesOrderForm = forwardRef<SalesOrderFormHandle, SalesOrderFormPro
                 variant="outline"
                 onClick={() => setStep(1)}
                 disabled={isPending}
-                className="gap-1.5 px-4 text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-muted/80"
+                className="w-full sm:w-auto justify-center gap-1.5 px-4 text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-muted/80 whitespace-nowrap"
               >
-                <ArrowLeft className="size-3.5" />
-                <span>Back to Edit</span>
+                <ArrowLeft className="size-3.5 shrink-0" />
+                <span>{t("action.backToEdit", "Back to Edit")}</span>
               </Button>
             </div>
 
-            <div className="flex items-center gap-2.5">
+            <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center gap-2 sm:gap-2.5 w-full sm:w-auto">
               <Button
                 type="button"
                 variant="outline"
                 onClick={() => submitWithIntent("draft")}
                 disabled={isPending}
-                className="px-4 text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-muted/80 border-border"
+                className="w-full sm:w-auto px-4 text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-muted/80 border-border whitespace-nowrap justify-center"
               >
-                {submitLabel || "Save as Draft Quotation"}
+                {t(submitLabel, submitLabel)}
               </Button>
 
               <Button
@@ -1734,19 +1821,19 @@ export const SalesOrderForm = forwardRef<SalesOrderFormHandle, SalesOrderFormPro
                 disabled={isPending || Boolean(confirmationBlockedReason)}
                 title={confirmationBlockedReason}
                 className={cn(
-                  "gap-2 font-bold text-white shadow-lg shadow-[#0B5D4B]/25 transition-all hover:brightness-110 active:scale-[0.99] px-7 py-2 text-xs",
+                  "w-full sm:w-auto gap-2 font-bold text-white shadow-lg shadow-[#0B5D4B]/25 transition-all hover:brightness-110 active:scale-[0.99] px-6 py-2 text-xs justify-center whitespace-nowrap",
                   "bg-gradient-to-r from-[#0B5D4B] via-[#073B35] to-[#0B5D4B]"
                 )}
               >
                 {isPending ? (
                   <>
-                    <Loader2 className="size-4 animate-spin" />
-                    <span>Confirming Order...</span>
+                    <Loader2 className="size-4 animate-spin shrink-0" />
+                    <span>{t("action.confirmingOrder", "Confirming Order...")}</span>
                   </>
                 ) : (
                   <>
-                    <CheckCircle2 className="size-4 text-emerald-200" />
-                    <span>{confirmationBlockedReason ? "Awaiting Approval" : "Confirm Sales Order"}</span>
+                    <CheckCircle2 className="size-4 text-emerald-200 shrink-0" />
+                    <span>{confirmationBlockedReason ? t("action.awaitingApproval", "Awaiting Approval") : t("action.confirmSalesOrder", "Confirm Sales Order")}</span>
                   </>
                 )}
               </Button>

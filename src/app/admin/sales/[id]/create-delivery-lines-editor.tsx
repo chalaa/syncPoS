@@ -5,6 +5,7 @@ import { type FormEvent, useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { DialogClose, DialogFooter } from "@/components/ui/dialog";
+import { useTranslation } from "@/lib/i18n/use-translation";
 import type { DeliveryLotOption, DeliverySerialOption, SalesOrderDetail } from "@/server/sales/types";
 
 type DeliveryDraftRow = {
@@ -64,6 +65,7 @@ export function CreateDeliveryLinesEditor({
   action: (formData: FormData) => void | Promise<void>;
   order: SalesOrderDetail;
 }) {
+  const { t } = useTranslation();
   const [rows, setRows] = useState<DeliveryDraftRow[]>(() =>
     order.lines
       .map(createRow)
@@ -167,15 +169,15 @@ export function CreateDeliveryLinesEditor({
 
       <div className="grid gap-4 md:grid-cols-3">
         <div>
-          <p className="text-xs font-medium uppercase text-muted-foreground">Customer</p>
+          <p className="text-xs font-medium uppercase text-muted-foreground">{t("delivery.customer", "Customer")}</p>
           <p className="mt-1 text-sm font-medium">{order.customerName}</p>
         </div>
         <div>
-          <p className="text-xs font-medium uppercase text-muted-foreground">Source Location</p>
-          <p className="mt-1 text-sm font-medium">{order.sourceLocationId ? "Configured" : "Missing"}</p>
+          <p className="text-xs font-medium uppercase text-muted-foreground">{t("delivery.sourceLocation", "Source Location")}</p>
+          <p className="mt-1 text-sm font-medium">{order.sourceLocationId ? t("delivery.configured", "Configured") : t("delivery.missing", "Missing")}</p>
         </div>
         <div>
-          <p className="text-xs font-medium uppercase text-muted-foreground">Deliverable Lines</p>
+          <p className="text-xs font-medium uppercase text-muted-foreground">{t("delivery.deliverableLines", "Deliverable Lines")}</p>
           <p className="mt-1 text-sm font-medium">{rows.length}</p>
         </div>
       </div>
@@ -190,12 +192,12 @@ export function CreateDeliveryLinesEditor({
         <table className="w-full min-w-[1060px] text-left text-sm">
           <thead className="text-xs uppercase text-muted-foreground">
             <tr className="border-b border-border">
-              <th className="px-2 py-2">Product</th>
-              <th className="px-2 py-2 text-right">Remaining</th>
-              <th className="w-32 px-2 py-2 text-right">Deliver</th>
-              <th className="w-44 px-2 py-2">Serial Number</th>
-              <th className="w-44 px-2 py-2">Lot Number</th>
-              <th className="w-28 px-2 py-2 text-right">Actions</th>
+              <th className="px-2 py-2">{t("delivery.product", "Product")}</th>
+              <th className="px-2 py-2 text-right">{t("delivery.remaining", "Remaining")}</th>
+              <th className="w-32 px-2 py-2 text-right">{t("delivery.deliver", "Deliver")}</th>
+              <th className="w-44 px-2 py-2">{t("delivery.serialNumber", "Serial Number")}</th>
+              <th className="w-44 px-2 py-2">{t("delivery.lotNumber", "Lot Number")}</th>
+              <th className="w-28 px-2 py-2 text-right">{t("action.actions", "Actions")}</th>
             </tr>
           </thead>
           <tbody>
@@ -241,7 +243,7 @@ export function CreateDeliveryLinesEditor({
                         className={`${inputClass} w-full`}
                         onChange={(event) => updateRow(row.key, { serialNo: event.target.value })}
                       >
-                        <option value="">Select serial</option>
+                        <option value="">{t("delivery.selectSerial", "Select serial")}</option>
                         {serialOptions.map((option) => (
                           <option key={option.id} value={option.serialNo}>
                             {optionLabel(option.serialNo, option.quantityAvailable)}
@@ -264,7 +266,7 @@ export function CreateDeliveryLinesEditor({
                         className={`${inputClass} w-full`}
                         onChange={(event) => updateRow(row.key, { lotNo: event.target.value })}
                       >
-                        <option value="">Select lot</option>
+                        <option value="">{t("delivery.selectLot", "Select lot")}</option>
                         {lotOptions.map((option) => (
                           <option key={option.id} value={option.lotNo}>
                             {optionLabel(option.lotNo, option.quantityAvailable)}
@@ -301,10 +303,10 @@ export function CreateDeliveryLinesEditor({
 
       <DialogFooter>
         <DialogClose asChild>
-          <Button type="button" variant="outline">Cancel</Button>
+          <Button type="button" variant="outline">{t("action.cancel", "Cancel")}</Button>
         </DialogClose>
         <Button type="submit" disabled={validationErrors.length > 0}>
-          Create Draft Delivery
+          {t("action.createDraftDelivery", "Create Draft Delivery")}
         </Button>
       </DialogFooter>
     </form>

@@ -25,6 +25,8 @@ type ProductsPageProps = {
     productId?: string;
     category?: string;
     brand?: string;
+    unit?: string;
+    trackingMode?: string;
     status?: string;
     page?: string;
     pageSize?: string;
@@ -41,16 +43,24 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
   const query = params.q ?? "";
   const categoryId = params.category ?? "";
   const brandId = params.brand ?? "";
+  const unitId = params.unit ?? "";
+  const trackingMode = params.trackingMode ?? "";
   const status = params.status ?? "";
 
   const [products, formOptions, initialProductDetail] = await Promise.all([
-    getProductList({ query, showDeleted, categoryId, brandId, status }),
+    getProductList({ query, showDeleted, categoryId, brandId, unitId, trackingMode, status }),
     getCatalogFormOptions(),
     params.productId ? getProductDetail(params.productId) : Promise.resolve(null),
   ]);
 
   const categoryOptions = formOptions.categories.map((c) => ({ value: c.id, label: c.name }));
   const brandOptions = formOptions.brands.map((b) => ({ value: b.id, label: b.name }));
+  const unitOptions = formOptions.units.map((u) => ({ value: u.id, label: `${u.name} (${u.code})` }));
+  const trackingModeOptions = [
+    { value: "none", label: "No Tracking" },
+    { value: "serial", label: "Serial Number" },
+    { value: "lot", label: "Lot Number" },
+  ];
   const statusOptions = [
     { value: "active", label: "Active" },
     { value: "inactive", label: "Inactive" },
@@ -105,6 +115,18 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
               label="Brand"
               options={brandOptions}
               allLabel="All Brands"
+            />
+            <TableFilterSelect
+              paramName="unit"
+              label="Unit"
+              options={unitOptions}
+              allLabel="All Units"
+            />
+            <TableFilterSelect
+              paramName="trackingMode"
+              label="Tracking"
+              options={trackingModeOptions}
+              allLabel="All Tracking"
             />
             <TableFilterSelect
               paramName="status"

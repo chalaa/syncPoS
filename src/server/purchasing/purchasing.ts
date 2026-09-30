@@ -49,6 +49,8 @@ import type {
   PurchaseVendorBillListRow,
 } from "@/server/purchasing/types";
 
+import { getSelectedShopId } from "@/server/locations/shop-options";
+
 export function displayPurchaseMoney(value: number, currencyCode: string) {
   return `${currencyCode} ${minorToDisplay(value)}`;
 }
@@ -170,14 +172,17 @@ export async function getPurchaseOrderList(params?: {
   query?: string;
   status?: string;
   paymentTerm?: string;
+  locationId?: string;
 }): Promise<PurchaseOrderListRow[]> {
   const company = await getDefaultCompany();
+  const locationId = params?.locationId ?? await getSelectedShopId();
   const query = params?.query?.trim();
   const statusFilter = params?.status ? sql`and po.status = ${params.status}` : sql``;
   const paymentTermFilter = params?.paymentTerm ? sql`and po.payment_term = ${params.paymentTerm}` : sql``;
   const searchFilter = query
     ? sql`and (po.order_no ilike ${`%${query}%`} or p.display_name ilike ${`%${query}%`} or po.vendor_reference ilike ${`%${query}%`})`
     : sql``;
+  const locationFilter = locationId ? sql`and po.deliver_to_location_id = ${locationId}::uuid` : sql``;
 
   const rows = await db.execute<PurchaseOrderListRow>(sql`
     select
@@ -216,6 +221,7 @@ export async function getPurchaseOrderList(params?: {
     ) pay on true
     where po.company_id = ${company.id}
       and po.deleted_at is null
+      ${locationFilter}
       ${statusFilter}
       ${paymentTermFilter}
       ${searchFilter}
@@ -231,8 +237,10 @@ export async function getPurchaseOrderList(params?: {
   }));
 }
 
-export async function getPurchaseReceiptList(purchaseOrderId?: string): Promise<PurchaseReceiptListRow[]> {
+export async function getPurchaseReceiptList(purchaseOrderId?: string, overrideLocationId?: string): Promise<PurchaseReceiptListRow[]> {
   const company = await getDefaultCompany();
+  const locationId = overrideLocationId ?? await getSelectedShopId();
+  const locationFilter = locationId ? sql`and (gr.location_id = ${locationId}::uuid or po.deliver_to_location_id = ${locationId}::uuid)` : sql``;
 
   const rows = await db.execute<PurchaseReceiptListRow>(sql`
     select
@@ -256,6 +264,7 @@ export async function getPurchaseReceiptList(purchaseOrderId?: string): Promise<
     left join goods_receipt_lines grl on grl.goods_receipt_id = gr.id and grl.deleted_at is null
     where gr.company_id = ${company.id}
       and gr.deleted_at is null
+      ${locationFilter}
       and (${purchaseOrderId ?? null}::uuid is null or gr.purchase_order_id = ${purchaseOrderId ?? null}::uuid)
     group by gr.id, po.id, p.display_name, l.code
     order by gr.receipt_date desc
@@ -265,11 +274,13 @@ export async function getPurchaseReceiptList(purchaseOrderId?: string): Promise<
 }
 
 export async function getPurchaseVendorBillList(
-  params: string | { purchaseOrderId?: string; supplierId?: string } = {},
+  params: string | { purchaseOrderId?: string; supplierId?: string; locationId?: string } = {},
 ): Promise<PurchaseVendorBillListRow[]> {
   const company = await getDefaultCompany();
   const purchaseOrderId = typeof params === "string" ? params : params.purchaseOrderId;
   const supplierId = typeof params === "string" ? undefined : params.supplierId;
+  const locationId = (typeof params === "object" ? params.locationId : undefined) ?? await getSelectedShopId();
+  const locationFilter = locationId ? sql`and po.deliver_to_location_id = ${locationId}::uuid` : sql``;
 
   const rows = await db.execute<PurchaseVendorBillListRow>(sql`
     select
@@ -308,6 +319,7 @@ export async function getPurchaseVendorBillList(
     left join payments pay on pay.id = pa.payment_id and pay.deleted_at is null
     where vb.company_id = ${company.id}
       and vb.deleted_at is null
+      ${locationFilter}
       and (${purchaseOrderId ?? null}::uuid is null or vb.purchase_order_id = ${purchaseOrderId ?? null}::uuid)
       and (${supplierId ?? null}::uuid is null or vb.supplier_id = ${supplierId ?? null}::uuid)
     group by vb.id, po.id, partner.display_name
@@ -336,6 +348,7 @@ export async function getPurchaseVendorBillList(
     left join purchase_orders po on po.id = sbp.purchase_order_id
     where sbp.company_id = ${company.id}
       and sbp.deleted_at is null
+      ${locationFilter}
       and (${purchaseOrderId ?? null}::uuid is null or sbp.purchase_order_id = ${purchaseOrderId ?? null}::uuid)
       and (${supplierId ?? null}::uuid is null or sbp.supplier_id = ${supplierId ?? null}::uuid)
     order by "billDate" desc

@@ -15,3 +15,15 @@ export function majorToMinor(value: string) {
 export function normalizeCode(value: string) {
   return value.trim().toUpperCase().replace(/\s+/g, "-");
 }
+
+export function displaySalesMoney(value: number, currencyCode: string) {
+  return `${currencyCode} ${minorToDisplay(value)}`;
+}
+
+export function displayReturnMoney(value: number, currencyCode: string) {
+  return `${currencyCode} ${minorToDisplay(value)}`;
+}
+
+export function displayPaymentMoney(value: number, currencyCode: string) {
+  return `${currencyCode} ${minorToDisplay(value)}`;
+}

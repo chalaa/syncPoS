@@ -33,6 +33,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
+import { useTranslation } from "@/lib/i18n/use-translation";
 import { displayMoneyMinor, displayQuantity, type InventoryOperationDetail } from "@/server/inventory/stock-types";
 
 function sourceHref(operation: {
@@ -76,6 +77,7 @@ export function OperationDetailModal({
   onClose: () => void;
   returnPath?: string;
 }) {
+  const { t } = useTranslation();
   const [operation, setOperation] = useState<InventoryOperationDetail | null>(null);
   const [loading, setLoading] = useState(false);
   const [isPending, startTransition] = useTransition();
@@ -116,7 +118,7 @@ export function OperationDetailModal({
             <div className="space-y-0.5">
               <div className="flex items-center gap-2">
                 <DialogTitle className="text-lg font-bold tracking-tight text-foreground font-mono">
-                  {operation?.movementNo ?? "Loading..."}
+                  {operation?.movementNo ?? t("inventory.loading", "Loading...")}
                 </DialogTitle>
                 {operation?.movementType && (
                   <span className="rounded-full bg-muted px-2.5 py-0.5 text-[11px] font-semibold text-foreground capitalize border border-border/60">
@@ -128,7 +130,7 @@ export function OperationDetailModal({
               <DialogDescription className="text-xs text-muted-foreground">
                 {operation?.movementDate
                   ? `Recorded on ${new Date(operation.movementDate).toLocaleDateString()}`
-                  : "Retrieving operation record..."}
+                  : t("inventory.retrievingRecord", "Retrieving operation record...")}
               </DialogDescription>
             </div>
           </div>
@@ -138,7 +140,7 @@ export function OperationDetailModal({
               <Button asChild size="sm" variant="ghost" className="h-8 gap-1 px-2.5 text-xs text-muted-foreground">
                 <Link href={`/admin/inventory/operations/${operation.id}`}>
                   <ExternalLink className="size-3.5" />
-                  Full Page
+                  {t("inventory.fullPage", "Full Page")}
                 </Link>
               </Button>
             )}
@@ -162,37 +164,37 @@ export function OperationDetailModal({
             </div>
           ) : !operation ? (
             <div className="py-12 text-center text-sm text-muted-foreground">
-              Could not find operation details.
+              {t("inventory.couldNotFindDetails", "Could not find operation details.")}
             </div>
           ) : (
             <>
               {/* Summary Metric Strip */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <div className="rounded-xl border border-border/70 bg-muted/20 p-3.5 space-y-1">
-                  <span className="text-[11px] font-medium text-muted-foreground">Origin</span>
+                  <span className="text-[11px] font-medium text-muted-foreground">{t("table.origin", "Origin")}</span>
                   <div className="flex items-center gap-1.5 text-xs font-bold text-foreground">
                     <MapPin className="size-3.5 text-muted-foreground" />
-                    {operation.fromLocationCode ?? "External / Direct"}
+                    {operation.fromLocationCode ?? t("inventory.externalDirect", "External / Direct")}
                   </div>
                 </div>
 
                 <div className="rounded-xl border border-border/70 bg-muted/20 p-3.5 space-y-1">
-                  <span className="text-[11px] font-medium text-muted-foreground">Destination</span>
+                  <span className="text-[11px] font-medium text-muted-foreground">{t("table.destination", "Destination")}</span>
                   <div className="flex items-center gap-1.5 text-xs font-bold text-foreground">
                     <MapPin className="size-3.5 text-muted-foreground" />
-                    {operation.toLocationCode ?? "Customer / Scrapped"}
+                    {operation.toLocationCode ?? t("inventory.customerScrapped", "Customer / Scrapped")}
                   </div>
                 </div>
 
                 <div className="rounded-xl border border-border/70 bg-muted/20 p-3.5 space-y-1">
-                  <span className="text-[11px] font-medium text-muted-foreground">Total Quantity</span>
+                  <span className="text-[11px] font-medium text-muted-foreground">{t("table.totalQty", "Total Quantity")}</span>
                   <div className="font-mono text-sm font-bold text-foreground">
-                    {displayQuantity(operation.totalQuantity)} units
+                    {displayQuantity(operation.totalQuantity)} {t("kpi.units", "units")}
                   </div>
                 </div>
 
                 <div className="rounded-xl border border-border/70 bg-emerald-500/5 dark:bg-emerald-950/20 border-emerald-500/20 p-3.5 space-y-1">
-                  <span className="text-[11px] font-medium text-emerald-700 dark:text-emerald-400">Total Valuation</span>
+                  <span className="text-[11px] font-medium text-emerald-700 dark:text-emerald-400">{t("table.valuation", "Total Valuation")}</span>
                   <div className="font-mono text-sm font-extrabold text-foreground">
                     {operation.currencyCode ? displayMoneyMinor(operation.totalCostMinor, operation.currencyCode) : "—"}
                   </div>
@@ -202,13 +204,13 @@ export function OperationDetailModal({
               {/* Source Document Reference */}
               {operation.sourceNo && (
                 <div className="flex items-center justify-between rounded-xl border border-border/60 bg-muted/30 px-4 py-2.5 text-xs">
-                  <span className="text-muted-foreground font-medium">Source Document: <strong className="text-foreground font-semibold">{operation.sourceNo}</strong> ({operation.sourceType ?? "custom"})</span>
+                  <span className="text-muted-foreground font-medium">{t("inventory.sourceDocument", "Source Document")}: <strong className="text-foreground font-semibold">{operation.sourceNo}</strong> ({operation.sourceType ?? "custom"})</span>
                   {sourceHref(operation) && (
                     <Link
                       href={sourceHref(operation)!}
                       className="inline-flex items-center gap-1 font-semibold text-[#0B5D4B] dark:text-emerald-400 hover:underline"
                     >
-                      Open Document
+                      {t("inventory.openDocument", "Open Document")}
                       <ExternalLink className="size-3" />
                     </Link>
                   )}
@@ -218,19 +220,19 @@ export function OperationDetailModal({
               {/* Lines Table */}
               <div className="overflow-hidden rounded-xl border border-border/80 bg-card shadow-xs">
                 <div className="border-b border-border/80 bg-muted/40 px-4 py-2.5 text-xs font-semibold text-foreground">
-                  Movement Lines ({operation.lines.length})
+                  {t("inventory.movementLines", "Movement Lines")} ({operation.lines.length})
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-xs">
                     <thead className="border-b border-border/80 bg-muted/20 font-semibold text-muted-foreground">
                       <tr>
                         <th className="px-4 py-2.5">#</th>
-                        <th className="px-4 py-2.5">Product</th>
-                        <th className="px-4 py-2.5">Owner</th>
-                        <th className="px-4 py-2.5">From</th>
-                        <th className="px-4 py-2.5">To</th>
-                        <th className="px-4 py-2.5 text-right">Quantity</th>
-                        <th className="px-4 py-2.5 text-right">Total Cost</th>
+                        <th className="px-4 py-2.5">{t("table.product", "Product")}</th>
+                        <th className="px-4 py-2.5">{t("table.owner", "Owner")}</th>
+                        <th className="px-4 py-2.5">{t("table.origin", "From")}</th>
+                        <th className="px-4 py-2.5">{t("table.destination", "To")}</th>
+                        <th className="px-4 py-2.5 text-right">{t("table.qty", "Quantity")}</th>
+                        <th className="px-4 py-2.5 text-right">{t("table.unitCost", "Total Cost")}</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border/60">
@@ -272,7 +274,7 @@ export function OperationDetailModal({
               {/* Notes */}
               {operation.notes && (
                 <div className="rounded-xl border border-border/60 bg-muted/20 p-3.5 space-y-1">
-                  <span className="text-[11px] font-semibold text-muted-foreground">Notes & Instructions</span>
+                  <span className="text-[11px] font-semibold text-muted-foreground">{t("inventory.notesAndInstructions", "Notes & Instructions")}</span>
                   <p className="text-xs text-foreground whitespace-pre-wrap">{operation.notes}</p>
                 </div>
               )}
@@ -295,14 +297,14 @@ export function OperationDetailModal({
                       className="w-full sm:w-auto bg-gradient-to-r from-[#0B5D4B] to-[#073B35] font-semibold text-white shadow-sm shadow-[#0B5D4B]/20 hover:brightness-110 justify-center"
                     >
                       <CheckCircle2 className="size-3.5 mr-1" />
-                      Post Operation
+                      {t("action.postOperation", "Post Operation")}
                     </Button>
                   </form>
                   <form action={cancelInventoryOperation} className="flex-1 sm:flex-none">
                     <input type="hidden" name="movementId" value={operation.id} />
                     {returnPath && <input type="hidden" name="returnPath" value={returnPath} />}
                     <Button type="submit" size="sm" variant="danger" className="w-full sm:w-auto justify-center">
-                      Cancel Operation
+                      {t("action.cancelOperation", "Cancel Operation")}
                     </Button>
                   </form>
                 </>
@@ -310,7 +312,7 @@ export function OperationDetailModal({
             </div>
 
             <Button onClick={onClose} variant="outline" size="sm" className="font-semibold w-full sm:w-auto">
-              Close
+              {t("action.close", "Close")}
             </Button>
           </div>
         )}

@@ -8,11 +8,12 @@ type DetailStatCardProps = {
   count?: number | string | null;
   label: string;
   translationKey?: string;
+  labelKey?: string;
 };
 
-export function DetailStatCard({ href, count, label, translationKey }: DetailStatCardProps) {
+export function DetailStatCard({ href, count, label, translationKey, labelKey }: DetailStatCardProps) {
   const { t } = useTranslation();
-  const translatedLabel = t(translationKey || label, label);
+  const translatedLabel = t(translationKey || labelKey || label, label);
 
   return (
     <Link

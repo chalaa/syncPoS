@@ -78,7 +78,7 @@ export default async function ReportsPage() {
         description="Monitor real-time ledger records, cash movements, sales velocities, and stock valuations."
       />
 
-      <section className="-mx-4 mb-6 flex gap-2.5 overflow-x-auto px-4 pb-2 pt-0.5 no-scrollbar snap-x snap-mandatory sm:mx-0 sm:grid sm:grid-cols-2 sm:px-0 sm:pb-0 md:grid-cols-2 xl:grid-cols-3">
+      <section className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
         {reports.map((report) => {
           const Icon = report.icon;
 
@@ -86,7 +86,7 @@ export default async function ReportsPage() {
             <Link
               key={report.href}
               href={report.href}
-              className={`group flex w-[78vw] min-w-[220px] max-w-[280px] shrink-0 snap-start flex-col justify-between rounded-xl border border-border bg-card p-4 shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/50 hover:shadow-md sm:w-auto sm:min-w-0 sm:max-w-none sm:p-5 ${report.accent} border-l-4`}
+              className={`group flex flex-col justify-between rounded-xl border border-border bg-card p-4 shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/50 hover:shadow-md sm:p-5 ${report.accent} border-l-4`}
             >
               <div>
                 <div className="flex items-center justify-between">

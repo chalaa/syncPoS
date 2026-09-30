@@ -4,6 +4,7 @@ import { PlusIcon, Trash2Icon } from "lucide-react";
 import { type FormEvent, type ReactNode, useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { useTranslation } from "@/lib/i18n/use-translation";
 import type { DeliveryDetail, DeliveryLotOption, DeliverySerialOption } from "@/server/sales/types";
 
 type DeliveryRow = {
@@ -55,6 +56,7 @@ export function DeliveryOperationsForm({
   submitDisabled?: boolean;
   children?: ReactNode;
 }) {
+  const { t } = useTranslation();
   const { serialOptions, lotOptions } = delivery;
   const [rows, setRows] = useState<DeliveryRow[]>(() =>
     delivery.lines.map((line) => ({
@@ -115,7 +117,7 @@ export function DeliveryOperationsForm({
     const serials = new Set<string>();
 
     if (positiveRows.length === 0) {
-      errors.push("At least one delivery quantity is required.");
+      errors.push(t("delivery.error.atLeastOne", "At least one delivery quantity is required."));
     }
 
     for (const row of positiveRows) {
@@ -125,7 +127,7 @@ export function DeliveryOperationsForm({
       const remaining = Math.max(ordered - alreadyDelivered, 0);
 
       if (!Number.isFinite(quantity) || quantity <= 0) {
-        errors.push(`${row.sku} has an invalid delivery quantity.`);
+        errors.push(`${row.sku} ${t("delivery.error.invalidQuantity", "has an invalid delivery quantity.")}`);
         continue;
       }
 
@@ -136,24 +138,24 @@ export function DeliveryOperationsForm({
 
       if (row.trackingMode === "serial") {
         if (quantity !== 1) {
-          errors.push(`${row.sku} serial rows must have quantity 1.`);
+          errors.push(`${row.sku} ${t("delivery.error.serialQtyOne", "serial rows must have quantity 1.")}`);
         }
 
         if (!row.serialNo.trim()) {
-          errors.push(`${row.sku} requires a serial selection.`);
+          errors.push(`${row.sku} ${t("delivery.error.serialRequired", "requires a serial selection.")}`);
         } else if (serials.has(row.serialNo.trim())) {
-          errors.push(`Serial ${row.serialNo.trim()} is duplicated in this delivery.`);
+          errors.push(`${t("delivery.serialNumber", "Serial")} ${row.serialNo.trim()} ${t("delivery.error.serialDuplicated", "is duplicated in this delivery.")}`);
         }
 
         serials.add(row.serialNo.trim());
       }
 
       if (row.trackingMode === "lot" && !row.lotNo.trim()) {
-        errors.push(`${row.sku} requires a lot selection.`);
+        errors.push(`${row.sku} ${t("delivery.error.lotRequired", "requires a lot selection.")}`);
       }
 
       if (quantity > remaining) {
-        errors.push(`${row.sku} delivery quantity cannot exceed remaining quantity ${remaining}.`);
+        errors.push(`${row.sku} ${t("delivery.error.exceedRemaining", "delivery quantity cannot exceed remaining quantity")} ${remaining}.`);
       }
     }
 
@@ -165,12 +167,12 @@ export function DeliveryOperationsForm({
       );
 
       if (row && quantity > remaining) {
-        errors.push(`${row.sku} total split quantity cannot exceed remaining quantity ${remaining}.`);
+        errors.push(`${row.sku} ${t("delivery.error.totalExceedRemaining", "total split quantity cannot exceed remaining quantity")} ${remaining}.`);
       }
     }
 
     return [...new Set(errors)];
-  }, [isDraft, rows]);
+  }, [isDraft, rows, t]);
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     if (validationErrors.length > 0) {
@@ -190,13 +192,13 @@ export function DeliveryOperationsForm({
         <table className="w-full min-w-[1160px] text-left text-sm">
           <thead className="text-xs uppercase text-muted-foreground">
             <tr className="border-b border-border">
-              <th className="px-2 py-2">Product</th>
-              <th className="px-2 py-2 text-right">Ordered</th>
-              <th className="px-2 py-2 text-right">Already Delivered</th>
-              <th className="px-2 py-2 text-right">Deliver</th>
-              <th className="px-2 py-2">Serial</th>
-              <th className="px-2 py-2">Lot</th>
-              <th className="w-28 px-2 py-2 text-right">Actions</th>
+              <th className="px-2 py-2">{t("delivery.product", "Product")}</th>
+              <th className="px-2 py-2 text-right">{t("delivery.ordered", "Ordered")}</th>
+              <th className="px-2 py-2 text-right">{t("delivery.alreadyDelivered", "Already Delivered")}</th>
+              <th className="px-2 py-2 text-right">{t("delivery.deliver", "Deliver")}</th>
+              <th className="px-2 py-2">{t("delivery.serialNumber", "Serial")}</th>
+              <th className="px-2 py-2">{t("delivery.lotNumber", "Lot")}</th>
+              <th className="w-28 px-2 py-2 text-right">{t("delivery.actions", "Actions")}</th>
             </tr>
           </thead>
           <tbody>
@@ -244,7 +246,7 @@ export function DeliveryOperationsForm({
                         className={inputClass()}
                         onChange={(event) => updateRow(row.key, { serialNo: event.target.value })}
                       >
-                        <option value="">Select serial</option>
+                        <option value="">{t("delivery.selectSerial", "Select serial")}</option>
                         {serialOptions.map((option) => (
                           <option key={option.id} value={option.serialNo}>
                             {optionLabel(option.serialNo, option.quantityAvailable)}
@@ -268,7 +270,7 @@ export function DeliveryOperationsForm({
                         className={inputClass()}
                         onChange={(event) => updateRow(row.key, { lotNo: event.target.value })}
                       >
-                        <option value="">Select lot</option>
+                        <option value="">{t("delivery.selectLot", "Select lot")}</option>
                         {lotOptions.map((option) => (
                           <option key={option.id} value={option.lotNo}>
                             {optionLabel(option.lotNo, option.quantityAvailable)}
@@ -310,7 +312,7 @@ export function DeliveryOperationsForm({
       {isDraft ? (
         <div className="mt-5 flex justify-end">
           <Button type="submit" disabled={submitDisabled || validationErrors.length > 0}>
-            {submitLabel}
+            {t(submitLabel, submitLabel)}
           </Button>
         </div>
       ) : null}

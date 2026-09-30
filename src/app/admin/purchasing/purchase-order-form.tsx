@@ -31,8 +31,11 @@ import { useFormValidation, type FormValidationResult } from "@/hooks/use-form-v
 import { useTranslation } from "@/lib/i18n/use-translation";
 import { cn } from "@/lib/utils";
 import { createSupplierFromPurchasing } from "@/app/admin/purchasing/actions";
+import { RestoreDraftBanner } from "@/components/ui/restore-draft-banner";
 import type { PurchaseFormOption, PurchaseOrderDetail, PurchaseTaxOption } from "@/server/purchasing/types";
 import type { OwnerOption } from "@/server/owners/types";
+
+const STORAGE_KEY = "syncpos_draft_purchase_order";
 
 const inputClass = "h-10 rounded-lg border border-input bg-background px-3 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0B5D4B]/30 focus-visible:border-[#0B5D4B]";
 
@@ -218,6 +221,53 @@ export const PurchaseOrderForm = forwardRef<PurchaseOrderFormHandle, PurchaseOrd
   const [supplierId, setSupplierId] = useState(order?.supplierId ?? "");
   const [paymentTerm, setPaymentTerm] = useState<"cash" | "credit">(order?.paymentTerm ?? "cash");
 
+  const [hasDraft, setHasDraft] = useState(false);
+
+  useEffect(() => {
+    if (order) return;
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (
+          parsed &&
+          (parsed.supplierId || (Array.isArray(parsed.lines) && parsed.lines.some((l: any) => l.productId || l.quantity !== "1" || l.unitCost !== "0")))
+        ) {
+          setHasDraft(true);
+        }
+      }
+    } catch {}
+  }, [order]);
+
+  function handleRestoreDraft() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return;
+      const draft = JSON.parse(raw);
+      if (draft.supplierId !== undefined) setSupplierId(draft.supplierId);
+      if (draft.deliverToLocationId) setDeliverToLocationId(draft.deliverToLocationId);
+      if (draft.headerOwnerId) setHeaderOwnerId(draft.headerOwnerId);
+      if (draft.paymentTerm) setPaymentTerm(draft.paymentTerm);
+      if (draft.orderDate) setOrderDate(draft.orderDate);
+      if (draft.paymentDueDate) setPaymentDueDate(draft.paymentDueDate);
+      if (draft.notes !== undefined) setNotes(draft.notes);
+      if (Array.isArray(draft.lines) && draft.lines.length > 0) {
+        setLines(draft.lines);
+        setEditingLineKeys(new Set(draft.lines.filter((l: any) => !l.productId).map((l: any) => l.key)));
+        setSavedLineKeys(new Set(draft.lines.filter((l: any) => l.productId).map((l: any) => l.key)));
+      }
+      setHasDraft(false);
+    } catch {
+      localStorage.removeItem(STORAGE_KEY);
+      setHasDraft(false);
+    }
+  }
+
+  function handleDiscardDraft() {
+    localStorage.removeItem(STORAGE_KEY);
+    setHasDraft(false);
+  }
+
   const selectedLocationId = useAppStore((state) => state.selectedLocationId);
   const defaultDeliverToLocationId = useMemo(() => {
     if (order?.deliverToLocationId) return order.deliverToLocationId;
@@ -394,6 +444,10 @@ export const PurchaseOrderForm = forwardRef<PurchaseOrderFormHandle, PurchaseOrd
   }
 
   function addLine() {
+    if (lines.some((l) => !l.productId)) {
+      return;
+    }
+
     const line = newLine(headerOwnerId);
 
     setSavedLineKeys((prev) => {
@@ -423,6 +477,24 @@ export const PurchaseOrderForm = forwardRef<PurchaseOrderFormHandle, PurchaseOrd
     return hasSubmitted ? fieldErrors[key] : undefined;
   }
 
+  useEffect(() => {
+    if (order) return;
+    const hasData = supplierId || notes || lines.some((l) => l.productId || l.quantity !== "1" || l.unitCost !== "0");
+    if (hasData) {
+      const draft = {
+        supplierId,
+        deliverToLocationId,
+        headerOwnerId,
+        paymentTerm,
+        orderDate,
+        paymentDueDate,
+        notes,
+        lines,
+      };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(draft));
+    }
+  }, [order, supplierId, deliverToLocationId, headerOwnerId, paymentTerm, orderDate, paymentDueDate, notes, lines]);
+
   function submitWithIntent(intent: "draft" | "confirm") {
     setSubmitIntent(intent);
     setHasSubmitted(true);
@@ -441,6 +513,8 @@ export const PurchaseOrderForm = forwardRef<PurchaseOrderFormHandle, PurchaseOrd
 
         if (result?.error) {
           setServerError(result.error);
+        } else {
+          localStorage.removeItem(STORAGE_KEY);
         }
       });
     }
@@ -462,7 +536,7 @@ export const PurchaseOrderForm = forwardRef<PurchaseOrderFormHandle, PurchaseOrd
     }
     submitWithIntent(submitIntent);
   }
-  // Expose saveDraft so the parent modal can call it from the close-confirmation dialog.
+  // Expose saveDraft so the parent modal can call it if needed.
   useImperativeHandle(ref, () => ({
     saveDraft: () => submitWithIntent("draft"),
   }));
@@ -473,6 +547,12 @@ export const PurchaseOrderForm = forwardRef<PurchaseOrderFormHandle, PurchaseOrd
       onSubmit={handleSubmit}
       className={cn("grid gap-5", isModal ? "p-0" : "rounded-xl border border-border bg-card p-6 shadow-xs")}
     >
+      <RestoreDraftBanner
+        hasDraft={hasDraft}
+        onRestore={handleRestoreDraft}
+        onDiscard={handleDiscardDraft}
+      />
+
       {order ? <input type="hidden" name="purchaseOrderId" value={order.id} /> : null}
       <input type="hidden" name="returnPath" value={isModal ? "/admin/purchasing" : "/admin/purchasing/new"} />
       <input type="hidden" name="intent" value={submitIntent} />
@@ -1020,8 +1100,9 @@ export const PurchaseOrderForm = forwardRef<PurchaseOrderFormHandle, PurchaseOrd
                     <Button
                       type="button"
                       variant="outline"
+                      disabled={lines.some((l) => !l.productId)}
                       onClick={addLine}
-                      className="w-full sm:w-auto gap-2 border-dashed border-[#0B5D4B]/50 bg-emerald-500/5 text-[#0B5D4B] font-semibold hover:bg-emerald-500/10 hover:border-[#0B5D4B] transition-all py-2.5 px-5 rounded-xl text-xs"
+                      className="w-full sm:w-auto gap-2 border-dashed border-[#0B5D4B]/50 bg-emerald-500/5 text-[#0B5D4B] font-semibold hover:bg-emerald-500/10 hover:border-[#0B5D4B] transition-all py-2.5 px-5 rounded-xl text-xs disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <PlusIcon className="size-4" />
                       {t("purchasing.addProduct", "+ Add Product")}
@@ -1300,19 +1381,19 @@ export const PurchaseOrderForm = forwardRef<PurchaseOrderFormHandle, PurchaseOrd
       {/* Action Footer (Sticky inside modal or pinned bottom) */}
       <div
         className={cn(
-          "flex items-center gap-4",
+          "flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 sm:gap-4",
           isModal
-            ? "sticky bottom-0 z-10 -mx-6 -mb-5 border-t border-border/80 bg-card/95 px-6 py-3.5 backdrop-blur-md justify-between shadow-lg mt-4"
-            : "justify-between mt-4 pt-4 border-t border-border"
+            ? "sticky bottom-0 z-10 -mx-6 -mb-5 border-t border-border/80 bg-card/95 px-4 sm:px-6 py-3.5 backdrop-blur-md shadow-lg mt-4"
+            : "mt-4 pt-4 border-t border-border"
         )}
       >
         {step === 1 ? (
           <>
-            <div className="flex items-center gap-3 text-xs">
+            <div className="flex items-center justify-between sm:justify-start gap-3 text-xs w-full sm:w-auto">
               {isModal ? (
                 <div className="flex items-center gap-1.5 rounded-lg border border-border/60 bg-muted/40 px-2.5 py-1">
-                  <Package className="size-3.5 text-[#0B5D4B]" />
-                  <span className="font-medium text-muted-foreground">
+                  <Package className="size-3.5 text-[#0B5D4B] shrink-0" />
+                  <span className="font-medium text-muted-foreground whitespace-nowrap">
                     {lines.filter((l) => l.productId).length} / {lines.length} {lines.length === 1 ? t("purchasing.itemSpecified", "Item specified") : t("purchasing.itemsSpecified", "Items specified")}
                   </span>
                 </div>
@@ -1325,40 +1406,42 @@ export const PurchaseOrderForm = forwardRef<PurchaseOrderFormHandle, PurchaseOrd
               </div>
             </div>
 
-            <div className="flex items-center gap-2.5">
-              {isModal && onCancel ? (
+            <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center gap-2 sm:gap-2.5 w-full sm:w-auto">
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                {isModal && onCancel ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={onCancel}
+                    disabled={isPending}
+                    className="flex-1 sm:flex-initial px-3 sm:px-4 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted/80 whitespace-nowrap justify-center"
+                  >
+                    {t("action.cancel")}
+                  </Button>
+                ) : null}
+
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={onCancel}
+                  onClick={() => submitWithIntent("draft")}
                   disabled={isPending}
-                  className="px-4 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted/80"
+                  className="flex-1 sm:flex-initial px-3 sm:px-4 text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-muted/80 border-border whitespace-nowrap justify-center"
                 >
-                  {t("action.cancel")}
+                  {t("purchasing.saveAsDraftRfq", "Save as Draft RFQ")}
                 </Button>
-              ) : null}
-
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => submitWithIntent("draft")}
-                disabled={isPending}
-                className="px-4 text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-muted/80 border-border"
-              >
-                {t("purchasing.saveAsDraftRfq", "Save as Draft RFQ")}
-              </Button>
+              </div>
 
               <Button
                 type="button"
                 onClick={handleContinueToStep2}
                 disabled={isPending}
                 className={cn(
-                  "gap-2 font-semibold text-white shadow-md shadow-[#0B5D4B]/20 transition-all hover:brightness-110 active:scale-[0.99] px-6 text-xs",
+                  "w-full sm:w-auto gap-2 font-semibold text-white shadow-md shadow-[#0B5D4B]/20 transition-all hover:brightness-110 active:scale-[0.99] px-4 sm:px-6 text-xs whitespace-nowrap justify-center",
                   "bg-gradient-to-r from-[#0B5D4B] via-[#073B35] to-[#0B5D4B]"
                 )}
               >
                 <span>{t("purchasing.continueToConfirmation", "Continue to Confirmation")}</span>
-                <ArrowRight className="size-3.5 text-emerald-200" />
+                <ArrowRight className="size-3.5 text-emerald-200 shrink-0" />
               </Button>
             </div>
           </>
@@ -1370,20 +1453,20 @@ export const PurchaseOrderForm = forwardRef<PurchaseOrderFormHandle, PurchaseOrd
                 variant="outline"
                 onClick={() => setStep(1)}
                 disabled={isPending}
-                className="gap-1.5 px-4 text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-muted/80"
+                className="w-full sm:w-auto justify-center gap-1.5 px-4 text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-muted/80 whitespace-nowrap"
               >
-                <ArrowLeft className="size-3.5" />
+                <ArrowLeft className="size-3.5 shrink-0" />
                 <span>{t("purchasing.backToEdit", "Back to Edit")}</span>
               </Button>
             </div>
 
-            <div className="flex items-center gap-2.5">
+            <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center gap-2 sm:gap-2.5 w-full sm:w-auto">
               <Button
                 type="button"
                 variant="outline"
                 onClick={() => submitWithIntent("draft")}
                 disabled={isPending}
-                className="px-4 text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-muted/80 border-border"
+                className="w-full sm:w-auto px-4 text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-muted/80 border-border whitespace-nowrap justify-center"
               >
                 {t("purchasing.saveAsDraftRfq", "Save as Draft RFQ")}
               </Button>
@@ -1393,18 +1476,18 @@ export const PurchaseOrderForm = forwardRef<PurchaseOrderFormHandle, PurchaseOrd
                 onClick={() => submitWithIntent("confirm")}
                 disabled={isPending}
                 className={cn(
-                  "gap-2 font-bold text-white shadow-lg shadow-[#0B5D4B]/25 transition-all hover:brightness-110 active:scale-[0.99] px-7 py-2 text-xs",
+                  "w-full sm:w-auto gap-2 font-bold text-white shadow-lg shadow-[#0B5D4B]/25 transition-all hover:brightness-110 active:scale-[0.99] px-6 py-2 text-xs justify-center whitespace-nowrap",
                   "bg-gradient-to-r from-[#0B5D4B] via-[#073B35] to-[#0B5D4B]"
                 )}
               >
                 {isPending ? (
                   <>
-                    <Loader2 className="size-4 animate-spin" />
+                    <Loader2 className="size-4 animate-spin shrink-0" />
                     <span>{t("purchasing.confirmingOrder", "Confirming Order...")}</span>
                   </>
                 ) : (
                   <>
-                    <CheckCircle2 className="size-4 text-emerald-200" />
+                    <CheckCircle2 className="size-4 text-emerald-200 shrink-0" />
                     <span>{t("purchasing.confirmPurchaseOrder", "Confirm Purchase Order")}</span>
                   </>
                 )}

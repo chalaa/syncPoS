@@ -5,6 +5,7 @@ export type ReportFilters = {
   status?: string;
   paymentType?: "inbound" | "outbound";
   paymentAccountId?: string;
+  locationId?: string;
 };
 
 export type DashboardMetric = {

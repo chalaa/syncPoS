@@ -11,6 +11,7 @@ import { Alert } from "@/components/ui/alert";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { Notebook } from "@/components/ui/notebook";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
+import { T } from "@/components/ui/t";
 import { requirePermission } from "@/server/auth/session";
 import { getTransferDetail } from "@/server/transfers/transfers";
 import type { TransferDetail, TransferDetailLine } from "@/server/transfers/types";
@@ -33,16 +34,18 @@ function remaining(line: TransferDetailLine) {
 function Actions({ transfer }: { transfer: TransferDetail }) {
   return (
     <div className="flex flex-wrap gap-2">
-      <ButtonLink href="/admin/inventory/transfers" variant="outline">Back to transfers</ButtonLink>
+      <ButtonLink href="/admin/inventory/transfers" variant="outline">
+        <T k="action.backToTransfers" fallback="Back to transfers" />
+      </ButtonLink>
       {transfer.status === "draft" ? (
         <>
           <form action={approveTransfer}>
             <input type="hidden" name="transferId" value={transfer.id} />
-            <Button type="submit">Approve</Button>
+            <Button type="submit"><T k="action.approve" fallback="Approve" /></Button>
           </form>
           <form action={cancelTransfer}>
             <input type="hidden" name="transferId" value={transfer.id} />
-            <Button type="submit" variant="danger">Cancel</Button>
+            <Button type="submit" variant="danger"><T k="action.cancel" fallback="Cancel" /></Button>
           </form>
         </>
       ) : null}
@@ -50,11 +53,11 @@ function Actions({ transfer }: { transfer: TransferDetail }) {
         <>
           <form action={dispatchTransfer}>
             <input type="hidden" name="transferId" value={transfer.id} />
-            <Button type="submit">Dispatch</Button>
+            <Button type="submit"><T k="action.dispatch" fallback="Dispatch" /></Button>
           </form>
           <form action={cancelTransfer}>
             <input type="hidden" name="transferId" value={transfer.id} />
-            <Button type="submit" variant="danger">Cancel</Button>
+            <Button type="submit" variant="danger"><T k="action.cancel" fallback="Cancel" /></Button>
           </form>
         </>
       ) : null}
@@ -62,7 +65,7 @@ function Actions({ transfer }: { transfer: TransferDetail }) {
   );
 }
 
-function Metric({ label: metricLabel, value }: { label: string; value: string }) {
+function Metric({ label: metricLabel, value }: { label: React.ReactNode; value: string }) {
   return (
     <div className="min-w-32 rounded-md border border-border bg-card px-4 py-3">
       <div className="text-xs font-medium uppercase text-muted-foreground">{metricLabel}</div>
@@ -74,20 +77,20 @@ function Metric({ label: metricLabel, value }: { label: string; value: string })
 function DetailGrid({ transfer }: { transfer: TransferDetail }) {
   return (
     <div className="grid gap-3 rounded-lg border border-border bg-card p-4 text-sm md:grid-cols-3">
-      <Field label="From" value={transfer.fromLocationCode} />
-      <Field label="Transit" value={transfer.transitLocationCode} />
-      <Field label="To" value={transfer.toLocationCode} />
-      <Field label="Owner" value={transfer.ownerName ?? "-"} />
-      <Field label="Transfer Date" value={transfer.transferDate} />
-      <Field label="Approved" value={transfer.approvedAt ?? "-"} />
-      <Field label="Dispatched" value={transfer.dispatchedAt ?? "-"} />
-      <Field label="Received" value={transfer.receivedAt ?? "-"} />
-      <Field label="Notes" value={transfer.notes ?? "-"} className="md:col-span-2" />
+      <Field label={<T k="field.from" fallback="From" />} value={transfer.fromLocationCode} />
+      <Field label={<T k="field.transit" fallback="Transit" />} value={transfer.transitLocationCode} />
+      <Field label={<T k="field.to" fallback="To" />} value={transfer.toLocationCode} />
+      <Field label={<T k="table.owner" fallback="Owner" />} value={transfer.ownerName ?? "-"} />
+      <Field label={<T k="table.date" fallback="Transfer Date" />} value={transfer.transferDate} />
+      <Field label={<T k="inventory.approved" fallback="Approved" />} value={transfer.approvedAt ?? "-"} />
+      <Field label={<T k="table.dispatched" fallback="Dispatched" />} value={transfer.dispatchedAt ?? "-"} />
+      <Field label={<T k="table.received" fallback="Received" />} value={transfer.receivedAt ?? "-"} />
+      <Field label={<T k="inventory.notes" fallback="Notes" />} value={transfer.notes ?? "-"} className="md:col-span-2" />
     </div>
   );
 }
 
-function Field({ label: fieldLabel, value, className }: { label: string; value: string; className?: string }) {
+function Field({ label: fieldLabel, value, className }: { label: React.ReactNode; value: string; className?: string }) {
   return (
     <div className={className}>
       <div className="text-xs font-medium uppercase text-muted-foreground">{fieldLabel}</div>
@@ -101,12 +104,12 @@ function SmartButtons({ transfer }: { transfer: TransferDetail }) {
     <div className="mb-5 flex flex-wrap gap-2">
       {transfer.dispatchMovementId ? (
         <ButtonLink href={`/admin/inventory/operations/${transfer.dispatchMovementId}`} variant="secondary">
-          Dispatch Movement
+          <T k="inventory.dispatchMovement" fallback="Dispatch Movement" />
         </ButtonLink>
       ) : null}
       {transfer.receiptMovementId ? (
         <ButtonLink href={`/admin/inventory/operations/${transfer.receiptMovementId}`} variant="secondary">
-          Receipt Movement
+          <T k="inventory.receiptMovement" fallback="Receipt Movement" />
         </ButtonLink>
       ) : null}
     </div>
@@ -119,15 +122,15 @@ function LinesTable({ lines }: { lines: TransferDetailLine[] }) {
       <table className="w-full min-w-[1040px] text-left text-sm">
         <thead className="text-xs uppercase text-muted-foreground">
           <tr className="border-b border-border">
-            <th className="px-3 py-2">Product</th>
-            <th className="px-3 py-2">Owner</th>
-            <th className="px-3 py-2">Tracking</th>
-            <th className="px-3 py-2">Serial / Lot</th>
-            <th className="px-3 py-2 text-right">Requested</th>
-            <th className="px-3 py-2 text-right">Dispatched</th>
-            <th className="px-3 py-2 text-right">Received</th>
-            <th className="px-3 py-2 text-right">Remaining</th>
-            <th className="px-3 py-2">Discrepancy</th>
+            <th className="px-3 py-2"><T k="table.product" fallback="Product" /></th>
+            <th className="px-3 py-2"><T k="table.owner" fallback="Owner" /></th>
+            <th className="px-3 py-2"><T k="field.trackingMode" fallback="Tracking" /></th>
+            <th className="px-3 py-2"><T k="table.serial" fallback="Serial / Lot" /></th>
+            <th className="px-3 py-2 text-right"><T k="table.requested" fallback="Requested" /></th>
+            <th className="px-3 py-2 text-right"><T k="table.dispatched" fallback="Dispatched" /></th>
+            <th className="px-3 py-2 text-right"><T k="table.received" fallback="Received" /></th>
+            <th className="px-3 py-2 text-right"><T k="table.remaining" fallback="Remaining" /></th>
+            <th className="px-3 py-2"><T k="table.discrepancy" fallback="Discrepancy" /></th>
           </tr>
         </thead>
         <tbody>
@@ -157,7 +160,7 @@ function ReceiptForm({ transfer }: { transfer: TransferDetail }) {
   const receivableLines = transfer.lines.filter((line) => remaining(line) > 0);
 
   if (receivableLines.length === 0) {
-    return <p className="text-sm text-muted-foreground">No remaining dispatched quantity to receive.</p>;
+    return <p className="text-sm text-muted-foreground"><T k="inventory.noRemainingToReceive" fallback="No remaining dispatched quantity to receive." /></p>;
   }
 
   return (
@@ -167,11 +170,11 @@ function ReceiptForm({ transfer }: { transfer: TransferDetail }) {
         <table className="w-full min-w-[920px] text-left text-sm">
           <thead className="text-xs uppercase text-muted-foreground">
             <tr className="border-b border-border">
-              <th className="px-3 py-2">Product</th>
-              <th className="px-3 py-2">Serial / Lot</th>
-              <th className="px-3 py-2 text-right">Remaining</th>
-              <th className="px-3 py-2 text-right">Receive Now</th>
-              <th className="px-3 py-2">Discrepancy</th>
+              <th className="px-3 py-2"><T k="table.product" fallback="Product" /></th>
+              <th className="px-3 py-2"><T k="table.serial" fallback="Serial / Lot" /></th>
+              <th className="px-3 py-2 text-right"><T k="table.remaining" fallback="Remaining" /></th>
+              <th className="px-3 py-2 text-right"><T k="table.receiveNow" fallback="Receive Now" /></th>
+              <th className="px-3 py-2"><T k="table.discrepancy" fallback="Discrepancy" /></th>
             </tr>
           </thead>
           <tbody>
@@ -201,10 +204,10 @@ function ReceiptForm({ transfer }: { transfer: TransferDetail }) {
                     defaultValue="none"
                     className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus:border-primary"
                   >
-                    <option value="none">None</option>
-                    <option value="shortage">Shortage</option>
-                    <option value="overage">Overage</option>
-                    <option value="damaged">Damaged</option>
+                    <option value="none"><T k="discrepancy.none" fallback="None" /></option>
+                    <option value="shortage"><T k="discrepancy.shortage" fallback="Shortage" /></option>
+                    <option value="overage"><T k="discrepancy.overage" fallback="Overage" /></option>
+                    <option value="damaged"><T k="discrepancy.damaged" fallback="Damaged" /></option>
                   </select>
                 </td>
               </tr>
@@ -213,7 +216,7 @@ function ReceiptForm({ transfer }: { transfer: TransferDetail }) {
         </table>
       </div>
       <div className="mt-4 flex justify-end">
-        <Button type="submit">Post Receipt</Button>
+        <Button type="submit"><T k="action.postReceipt" fallback="Post Receipt" /></Button>
       </div>
     </form>
   );
@@ -232,7 +235,7 @@ export default async function TransferDetailPage({ params, searchParams }: Trans
   return (
     <PageShell>
       <PageHeader
-        eyebrow="Inventory Transfer"
+        eyebrow={<T k="header.eyebrow.inventoryTransfer" fallback="Inventory Transfer" />}
         title={transfer.transferNo}
         actions={<Actions transfer={transfer} />}
       />
@@ -248,10 +251,10 @@ export default async function TransferDetailPage({ params, searchParams }: Trans
           <span className="rounded-md border border-border bg-muted px-2 py-1 text-sm">{transfer.fromLocationCode} to {transfer.toLocationCode}</span>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Metric label="Lines" value={String(transfer.lineCount)} />
-          <Metric label="Requested" value={transfer.quantityRequested} />
-          <Metric label="Dispatched" value={transfer.quantityDispatched} />
-          <Metric label="Received" value={transfer.quantityReceived} />
+          <Metric label={<T k="table.lines" fallback="Lines" />} value={String(transfer.lineCount)} />
+          <Metric label={<T k="table.requested" fallback="Requested" />} value={transfer.quantityRequested} />
+          <Metric label={<T k="table.dispatched" fallback="Dispatched" />} value={transfer.quantityDispatched} />
+          <Metric label={<T k="table.received" fallback="Received" />} value={transfer.quantityReceived} />
         </div>
       </div>
 
@@ -263,30 +266,30 @@ export default async function TransferDetailPage({ params, searchParams }: Trans
         items={[
           {
             value: "lines",
-            label: "Operations",
+            label: <T k="header.eyebrow.Operations" fallback="Operations" />,
             content: <LinesTable lines={transfer.lines} />,
           },
           {
             value: "receipt",
-            label: "Receipt",
+            label: <T k="inventory.receipts" fallback="Receipt" />,
             content:
               transfer.status === "dispatched" || transfer.status === "partially_received" ? (
                 <ReceiptForm transfer={transfer} />
               ) : (
-                <p className="text-sm text-muted-foreground">Dispatch the transfer before receiving stock.</p>
+                <p className="text-sm text-muted-foreground"><T k="inventory.dispatchBeforeReceiving" fallback="Dispatch the transfer before receiving stock." /></p>
               ),
           },
           {
             value: "notes",
-            label: "Notes",
-            content: <p className="whitespace-pre-wrap text-sm text-muted-foreground">{transfer.notes ?? "No notes."}</p>,
+            label: <T k="inventory.notes" fallback="Notes" />,
+            content: <p className="whitespace-pre-wrap text-sm text-muted-foreground">{transfer.notes ?? <T k="inventory.noNotes" fallback="No notes." />}</p>,
           },
         ]}
       />
 
       <div className="mt-5 text-sm text-muted-foreground">
         <Link href="/admin/inventory/transfers" className="font-medium text-primary underline-offset-4 hover:underline">
-          Back to transfer list
+          <T k="action.backToTransferList" fallback="Back to transfer list" />
         </Link>
       </div>
     </PageShell>

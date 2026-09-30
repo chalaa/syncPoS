@@ -188,46 +188,8 @@ export function ReportSummaryCards({ summary }: { summary: ReportSummary }) {
   const { t } = useTranslation();
   return (
     <>
-      {/* Mobile View: Compact Micro-Metric Bar (sm:hidden) */}
-      <div className="-mx-4 mb-3 flex gap-2 overflow-x-auto px-4 py-1 no-scrollbar touch-pan-x snap-x snap-mandatory sm:hidden">
-        <div className="flex shrink-0 snap-start items-center gap-2 rounded-lg border border-border bg-card px-2.5 py-1.5 shadow-2xs">
-          <div className="min-w-0">
-            <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{t("report.records", "Records")}</div>
-            <div className="font-mono text-xs font-bold text-foreground">{summary.count}</div>
-          </div>
-        </div>
-        <div className="flex shrink-0 snap-start items-center gap-2 rounded-lg border border-primary/30 bg-card px-2.5 py-1.5 shadow-2xs">
-          <div className="min-w-0">
-            <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{t("report.grossTotal", "Gross Total")}</div>
-            <div className="font-mono text-xs font-bold text-primary">
-              {displayReportMoney(summary.totalMinor, summary.currencyCode)}
-            </div>
-          </div>
-        </div>
-        {summary.paidMinor !== undefined ? (
-          <div className="flex shrink-0 snap-start items-center gap-2 rounded-lg border border-emerald-500/30 bg-card px-2.5 py-1.5 shadow-2xs">
-            <div className="min-w-0">
-              <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{t("report.settledPaid", "Settled / Paid")}</div>
-              <div className="font-mono text-xs font-bold text-emerald-700 dark:text-emerald-400">
-                {displayReportMoney(summary.paidMinor, summary.currencyCode)}
-              </div>
-            </div>
-          </div>
-        ) : null}
-        {summary.residualMinor !== undefined ? (
-          <div className="flex shrink-0 snap-start items-center gap-2 rounded-lg border border-amber-500/30 bg-card px-2.5 py-1.5 shadow-2xs">
-            <div className="min-w-0">
-              <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{t("Residual")}</div>
-              <div className="font-mono text-xs font-bold text-amber-700 dark:text-amber-400">
-                {displayReportMoney(summary.residualMinor, summary.currencyCode)}
-              </div>
-            </div>
-          </div>
-        ) : null}
-      </div>
-
-      {/* Desktop/Tablet Summary Cards (hidden on mobile) */}
-      <div className="hidden mb-6 sm:grid sm:grid-cols-2 md:grid-cols-4 sm:gap-3">
+      {/* Responsive Summary Cards Grid */}
+      <div className="mb-6 grid grid-cols-2 gap-2 sm:grid-cols-2 md:grid-cols-4 sm:gap-3">
         <SummaryCard label={t("report.totalRecords", "Total Records")} value={String(summary.count)} border="border-l-slate-400" />
         <SummaryCard
           label={t("report.grossTotal", "Gross Total")}
@@ -269,9 +231,9 @@ export function SummaryCard({
 }) {
   const { t } = useTranslation();
   return (
-    <article className={`flex w-[68vw] min-w-[190px] max-w-[240px] shrink-0 snap-start flex-col justify-between rounded-xl border border-border bg-card p-3 shadow-xs transition-all hover:shadow-sm sm:w-auto sm:min-w-0 sm:max-w-none sm:p-4 ${border} border-l-4`}>
-      <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground truncate sm:text-xs">{t(label, label)}</p>
-      <p className={`mt-1 font-mono text-lg tracking-tight sm:text-xl ${highlight}`}>{value}</p>
+    <article className={`flex flex-col justify-between rounded-xl border border-border bg-card p-3 shadow-xs transition-all hover:shadow-sm sm:p-4 ${border} border-l-4`}>
+      <p className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-muted-foreground truncate">{t(label, label)}</p>
+      <p className={`mt-1 font-mono text-sm sm:text-xl tracking-tight truncate ${highlight}`}>{value}</p>
     </article>
   );
 }

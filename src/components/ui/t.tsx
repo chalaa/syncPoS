@@ -7,9 +7,10 @@ import { useTranslation } from "@/lib/i18n/use-translation";
  * without converting the whole tree to a client component. `k` doubles
  * as the translation key (direct-lookup pattern used across the app).
  */
-export function T({ k, fallback }: { k: string; fallback?: string }) {
+export function T({ k, fallback, children }: { k: string; fallback?: string; children?: React.ReactNode }) {
   const { t } = useTranslation();
-  return <>{t(k, fallback ?? k)}</>;
+  const defaultText = typeof children === "string" ? children : fallback;
+  return <>{t(k, defaultText ?? k)}</>;
 }
 
 export function useT(k: string, fallback?: string) {

@@ -8,6 +8,7 @@ import { Button, ButtonLink } from "@/components/ui/button";
 import { Notebook } from "@/components/ui/notebook";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
 import { DetailStatCard } from "@/components/ui/detail-stat-card";
+import { T } from "@/components/ui/t";
 import { requirePermission } from "@/server/auth/session";
 import { displayReturnMoney, getCustomerReturnDetail } from "@/server/returns/returns";
 import type { ReturnDetailLine } from "@/server/returns/types";
@@ -36,15 +37,15 @@ export default async function CustomerReturnPage({ params, searchParams }: Custo
   return (
     <PageShell>
       <PageHeader
-        eyebrow="Sales / Customer Return"
+        eyebrow={<T k="header.eyebrow.Sales / Customer Return">Sales / Customer Return</T>}
         title={record.returnNo}
         actions={
           <div className="flex flex-wrap gap-2">
-            <ButtonLink href="/admin/sales?view=returns" variant="outline">Back to returns</ButtonLink>
+            <ButtonLink href="/admin/sales?view=returns" variant="outline"><T k="action.backToReturns">Back to returns</T></ButtonLink>
             {record.status === "draft" ? (
               <form action={postCustomerReturn}>
                 <input type="hidden" name="id" value={record.id} />
-                <Button>Post Return Receipt</Button>
+                <Button><T k="action.postReturnReceipt">Post Return Receipt</T></Button>
               </form>
             ) : null}
           </div>
@@ -60,6 +61,7 @@ export default async function CustomerReturnPage({ params, searchParams }: Custo
             href={`/admin/sales/${record.salesOrderId}`}
             count={record.orderNo}
             label="Sales Order"
+            labelKey="sales.order"
           />
           {record.stockMovementId ? (
             <Link
@@ -69,7 +71,7 @@ export default async function CustomerReturnPage({ params, searchParams }: Custo
               <span className="text-lg font-bold tracking-tight text-foreground transition-colors group-hover:text-primary">
                 1
               </span>
-              <span className="text-xs font-medium text-muted-foreground">Return Receipt</span>
+              <span className="text-xs font-medium text-muted-foreground"><T k="field.returnReceipt">Return Receipt</T></span>
             </Link>
           ) : null}
         </div>
@@ -78,16 +80,16 @@ export default async function CustomerReturnPage({ params, searchParams }: Custo
 
       <section className="rounded-lg border border-border bg-card p-5">
         <div className="mb-5 grid gap-4 md:grid-cols-4">
-          <Info label="Customer" value={record.customerName} />
+          <Info label="Customer" labelKey="field.customer" value={record.customerName} />
           <div>
-            <p className="text-xs font-medium uppercase text-muted-foreground">Status</p>
+            <p className="text-xs font-medium uppercase text-muted-foreground"><T k="field.status">Status</T></p>
             <div className="mt-1">
               <StatusBadge status={record.status} size="sm" />
             </div>
           </div>
-          <Info label="Return Date" value={record.returnDate} />
-          <Info label="Destination" value={record.destinationLocationCode} />
-          <Info label="Refund Amount" value={displayReturnMoney(record.refundAmountMinor, record.currencyCode)} />
+          <Info label="Return Date" labelKey="field.returnDate" value={record.returnDate} />
+          <Info label="Destination" labelKey="field.destinationLocation" value={record.destinationLocationCode} />
+          <Info label="Refund Amount" labelKey="field.refundAmount" value={displayReturnMoney(record.refundAmountMinor, record.currencyCode)} />
         </div>
 
         <ReturnLines lines={record.lines} />
@@ -97,8 +99,8 @@ export default async function CustomerReturnPage({ params, searchParams }: Custo
           items={[
             {
               value: "other",
-              label: "Other Information",
-              content: <p className="text-sm text-muted-foreground">{record.notes || "No notes"}</p>,
+              label: <T k="field.otherInformation">Other Information</T>,
+              content: <p className="text-sm text-muted-foreground">{record.notes || <T k="field.noNotes">No notes</T>}</p>,
             },
           ]}
         />
@@ -113,11 +115,11 @@ function ReturnLines({ lines }: { lines: ReturnDetailLine[] }) {
       <table className="w-full min-w-[860px] text-left text-sm">
         <thead className="text-xs uppercase text-muted-foreground">
           <tr className="border-b border-border">
-            <th className="px-3 py-2">Product</th>
-            <th className="px-3 py-2 text-right">Quantity</th>
-            <th className="px-3 py-2">Condition</th>
-            <th className="px-3 py-2">Tracking</th>
-            <th className="px-3 py-2 text-right">Refund</th>
+            <th className="px-3 py-2"><T k="sales.col.product">Product</T></th>
+            <th className="px-3 py-2 text-right"><T k="sales.form.qty">Quantity</T></th>
+            <th className="px-3 py-2"><T k="field.condition">Condition</T></th>
+            <th className="px-3 py-2"><T k="field.trackingMode">Tracking</T></th>
+            <th className="px-3 py-2 text-right"><T k="field.refund">Refund</T></th>
           </tr>
         </thead>
         <tbody>
@@ -139,10 +141,10 @@ function ReturnLines({ lines }: { lines: ReturnDetailLine[] }) {
   );
 }
 
-function Info({ label: name, value }: { label: string; value: string }) {
+function Info({ label: name, labelKey, value }: { label: string; labelKey?: string; value: string }) {
   return (
     <div>
-      <p className="text-xs font-medium uppercase text-muted-foreground">{name}</p>
+      <p className="text-xs font-medium uppercase text-muted-foreground"><T k={labelKey ?? name}>{name}</T></p>
       <p className="mt-1 text-sm font-medium capitalize">{value}</p>
     </div>
   );

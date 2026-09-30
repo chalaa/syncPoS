@@ -18,6 +18,8 @@ import type {
   ExpenseListRow,
 } from "@/server/expenses/types";
 
+import { getSelectedShopId } from "@/server/locations/shop-options";
+
 export function displayExpenseMoney(value: number, currencyCode: string) {
   return `${currencyCode} ${minorToDisplay(value)}`;
 }
@@ -59,12 +61,15 @@ export async function getExpenseList(params: {
   canSeeAll?: boolean;
   categoryId?: string;
   paymentStatus?: string;
+  locationId?: string;
 }): Promise<ExpenseListRow[]> {
   const company = await getDefaultCompany();
+  const locationId = params.locationId ?? await getSelectedShopId();
   const query = params.query?.trim();
   const statusFilter = params.showCancelled ? undefined : sql`e.status <> 'cancelled'`;
   const categoryFilter = params.categoryId ? sql`e.category_id = ${params.categoryId}` : undefined;
   const paymentStatusFilter = params.paymentStatus ? sql`e.payment_status = ${params.paymentStatus}` : undefined;
+  const locationFilter = locationId ? sql`e.location_id = ${locationId}::uuid` : undefined;
 
   const searchFilter = query
     ? sql`(e.expense_no ilike ${`%${query}%`} or e.description ilike ${`%${query}%`} or ec.name ilike ${`%${query}%`})`
@@ -116,6 +121,7 @@ export async function getExpenseList(params: {
     where e.company_id = ${company.id}
       and e.deleted_at is null
       ${ownerFilter}
+      ${locationFilter ? sql`and ${locationFilter}` : sql``}
       ${statusFilter ? sql`and ${statusFilter}` : sql``}
       ${categoryFilter ? sql`and ${categoryFilter}` : sql``}
       ${paymentStatusFilter ? sql`and ${paymentStatusFilter}` : sql``}

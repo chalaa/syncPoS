@@ -22,6 +22,7 @@ import { Button } from "@/components/ui/button";
 import { TableFilterSelect } from "@/components/ui/table-filter-select";
 import { TableSearchInput } from "@/components/ui/table-search-input";
 import { cn } from "@/lib/utils";
+import { useTranslation } from "@/lib/i18n/use-translation";
 import {
   displayMoneyMinor,
   displayQuantity,
@@ -31,23 +32,24 @@ import {
   type InventoryOperationView,
 } from "@/server/inventory/stock-types";
 
-const viewTabs: { key: InventoryOperationView; label: string; icon: React.ElementType }[] = [
-  { key: "all", label: "All Operations", icon: Boxes },
-  { key: "receipts", label: "Receipts", icon: ArrowDownLeft },
-  { key: "deliveries", label: "Deliveries", icon: ArrowUpRight },
-  { key: "transfers", label: "Internal Transfers", icon: ArrowLeftRight },
-  { key: "adjustments", label: "Adjustments", icon: Sliders },
-  { key: "scrap", label: "Scrap & Waste", icon: PackageMinus },
-  { key: "returns", label: "Returns", icon: RotateCcw },
+const viewTabs: { key: InventoryOperationView; labelKey: string; defaultLabel: string; icon: React.ElementType }[] = [
+  { key: "all", labelKey: "inventory.allOperations", defaultLabel: "All Operations", icon: Boxes },
+  { key: "receipts", labelKey: "inventory.receipts", defaultLabel: "Receipts", icon: ArrowDownLeft },
+  { key: "deliveries", labelKey: "inventory.deliveries", defaultLabel: "Deliveries", icon: ArrowUpRight },
+  { key: "transfers", labelKey: "inventory.internalTransfers", defaultLabel: "Internal Transfers", icon: ArrowLeftRight },
+  { key: "adjustments", labelKey: "inventory.adjustments", defaultLabel: "Adjustments", icon: Sliders },
+  { key: "scrap", labelKey: "inventory.scrapAndWaste", defaultLabel: "Scrap & Waste", icon: PackageMinus },
+  { key: "returns", labelKey: "inventory.returns", defaultLabel: "Returns", icon: RotateCcw },
 ];
 
 function MovementTypeBadge({ type }: { type: string }) {
+  const { t } = useTranslation();
   const normalized = type.toLowerCase();
   if (normalized.includes("receipt") || normalized.includes("in")) {
     return (
       <span className="inline-flex items-center gap-1 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-xs font-semibold text-emerald-700 dark:text-emerald-300">
         <ArrowDownLeft className="size-3" />
-        Receipt
+        {t("inventory.receipts", "Receipt")}
       </span>
     );
   }
@@ -55,7 +57,7 @@ function MovementTypeBadge({ type }: { type: string }) {
     return (
       <span className="inline-flex items-center gap-1 rounded-md border border-blue-500/30 bg-blue-500/10 px-2 py-0.5 text-xs font-semibold text-blue-700 dark:text-blue-300">
         <ArrowUpRight className="size-3" />
-        Delivery
+        {t("inventory.deliveries", "Delivery")}
       </span>
     );
   }
@@ -63,7 +65,7 @@ function MovementTypeBadge({ type }: { type: string }) {
     return (
       <span className="inline-flex items-center gap-1 rounded-md border border-indigo-500/30 bg-indigo-500/10 px-2 py-0.5 text-xs font-semibold text-indigo-700 dark:text-indigo-300">
         <ArrowLeftRight className="size-3" />
-        Transfer
+        {t("inventory.internalTransfers", "Transfer")}
       </span>
     );
   }
@@ -71,7 +73,7 @@ function MovementTypeBadge({ type }: { type: string }) {
     return (
       <span className="inline-flex items-center gap-1 rounded-md border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-xs font-semibold text-amber-700 dark:text-amber-300">
         <Sliders className="size-3" />
-        Adjustment
+        {t("inventory.adjustments", "Adjustment")}
       </span>
     );
   }
@@ -79,7 +81,7 @@ function MovementTypeBadge({ type }: { type: string }) {
     return (
       <span className="inline-flex items-center gap-1 rounded-md border border-rose-500/30 bg-rose-500/10 px-2 py-0.5 text-xs font-semibold text-rose-700 dark:text-rose-300">
         <Trash2 className="size-3" />
-        Scrap
+        {t("inventory.scrapAndWaste", "Scrap")}
       </span>
     );
   }
@@ -105,6 +107,7 @@ export function OperationsTableClient({
   formOptions,
   initialSelectedId,
 }: OperationsTableClientProps) {
+  const { t } = useTranslation();
   const [selectedOperationId, setSelectedOperationId] = useState<string | null>(initialSelectedId ?? null);
 
   return (
@@ -131,7 +134,7 @@ export function OperationsTableClient({
                   )}
                 >
                   <Icon className={cn("size-3.5", isSelected ? "text-emerald-200" : "text-muted-foreground")} />
-                  {tab.label}
+                  {t(tab.labelKey, tab.defaultLabel)}
                 </Link>
               );
             })}
@@ -141,20 +144,31 @@ export function OperationsTableClient({
             <div className="min-w-0 flex-1 sm:max-w-md">
               <TableSearchInput
                 defaultValue={query}
-                placeholder="Search movement number, source document reference, or notes..."
+                placeholder={t("inventory.searchOperationsPlaceholder", "Search movement number, source document reference, or notes...")}
               />
             </div>
-            <TableFilterSelect
-              paramName="status"
-              label="Status"
-              options={[
-                { value: "draft", label: "Draft" },
-                { value: "confirmed", label: "Confirmed" },
-                { value: "done", label: "Done" },
-                { value: "cancelled", label: "Cancelled" },
-              ]}
-              allLabel="All Statuses"
-            />
+            <div className="flex flex-wrap items-center gap-3">
+              <TableFilterSelect
+                paramName="locationId"
+                label={t("status.warehouse", "Warehouse")}
+                options={formOptions.locations.map((loc) => ({
+                  value: loc.id,
+                  label: `${loc.code} - ${loc.name}`,
+                }))}
+                allLabel={t("action.allLocations", "All Locations")}
+              />
+              <TableFilterSelect
+                paramName="status"
+                label={t("table.status", "Status")}
+                options={[
+                  { value: "draft", label: t("inventory.draft", "Draft") },
+                  { value: "confirmed", label: t("inventory.confirmed", "Confirmed") },
+                  { value: "done", label: t("inventory.done", "Done") },
+                  { value: "cancelled", label: t("inventory.cancelled", "Cancelled") },
+                ]}
+                allLabel={t("action.allStatuses", "All Statuses")}
+              />
+            </div>
           </div>
         </div>
 
@@ -163,16 +177,16 @@ export function OperationsTableClient({
           <table className="w-full text-left text-sm">
             <thead className="border-b border-border/80 bg-muted/30 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               <tr>
-                <th className="px-4 py-3.5">Movement No</th>
-                <th className="px-4 py-3.5">Type</th>
-                <th className="px-4 py-3.5">Status</th>
-                <th className="px-4 py-3.5">Date</th>
-                <th className="px-4 py-3.5">Origin</th>
-                <th className="px-4 py-3.5">Destination</th>
-                <th className="px-4 py-3.5 text-right">Lines</th>
-                <th className="px-4 py-3.5 text-right">Total Qty</th>
-                <th className="px-4 py-3.5 text-right">Valuation</th>
-                <th className="px-4 py-3.5 text-right">Actions</th>
+                <th className="px-4 py-3.5">{t("table.movementNo", "Movement No")}</th>
+                <th className="px-4 py-3.5">{t("table.type", "Type")}</th>
+                <th className="px-4 py-3.5">{t("table.status", "Status")}</th>
+                <th className="px-4 py-3.5">{t("table.date", "Date")}</th>
+                <th className="px-4 py-3.5">{t("table.origin", "Origin")}</th>
+                <th className="px-4 py-3.5">{t("table.destination", "Destination")}</th>
+                <th className="px-4 py-3.5 text-right">{t("table.lines", "Lines")}</th>
+                <th className="px-4 py-3.5 text-right">{t("table.totalQty", "Total Qty")}</th>
+                <th className="px-4 py-3.5 text-right">{t("table.valuation", "Valuation")}</th>
+                <th className="px-4 py-3.5 text-right">{t("table.actions", "Actions")}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border/60">
@@ -225,7 +239,7 @@ export function OperationsTableClient({
                       className="h-8 gap-1 px-2.5 text-xs font-semibold"
                     >
                       <Eye className="size-3" />
-                      View
+                      {t("action.view", "View")}
                     </Button>
                   </td>
                 </tr>
@@ -236,9 +250,9 @@ export function OperationsTableClient({
                     <div className="mx-auto flex size-12 items-center justify-center rounded-2xl bg-muted/60 text-muted-foreground mb-3">
                       <Boxes className="size-6" />
                     </div>
-                    <p className="font-bold text-sm text-foreground">No operations recorded</p>
+                    <p className="font-bold text-sm text-foreground">{t("inventory.noOperationsRecorded", "No operations recorded")}</p>
                     <p className="mt-1 text-xs text-muted-foreground max-w-sm mx-auto">
-                      No inventory movements found for this view. Use the actions above to record a transfer, adjustment, or scrap.
+                      {t("inventory.noOperationsFound", "No inventory movements found for this view. Use the actions above to record a transfer, adjustment, or scrap.")}
                     </p>
                   </td>
                 </tr>

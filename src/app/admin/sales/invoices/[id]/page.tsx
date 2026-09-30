@@ -9,6 +9,7 @@ import { Button, ButtonLink } from "@/components/ui/button";
 import { Notebook } from "@/components/ui/notebook";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
 import { DetailStatCard } from "@/components/ui/detail-stat-card";
+import { T } from "@/components/ui/t";
 import { requirePermission } from "@/server/auth/session";
 import { getActivePaymentAccounts } from "@/server/payments/payments";
 import { displaySalesMoney, getCustomerInvoiceDetail } from "@/server/sales/sales";
@@ -43,15 +44,15 @@ export default async function CustomerInvoicePage({ params, searchParams }: Cust
   return (
     <PageShell>
       <PageHeader
-        eyebrow="Sales / Customer Invoice"
+        eyebrow={<T k="header.eyebrow.Sales / Customer Invoice">Sales / Customer Invoice</T>}
         title={invoice.invoiceNo}
         actions={
           <div className="flex flex-wrap gap-2">
-            <ButtonLink href="/admin/sales?view=invoices" variant="outline">Back to invoices</ButtonLink>
+            <ButtonLink href="/admin/sales?view=invoices" variant="outline"><T k="action.backToInvoices">Back to invoices</T></ButtonLink>
             {invoice.status === "draft" ? (
               <form action={postCustomerInvoice}>
                 <input type="hidden" name="customerInvoiceId" value={invoice.id} />
-                <Button>Post Invoice</Button>
+                <Button><T k="action.postInvoice">Post Invoice</T></Button>
               </form>
             ) : null}
             {canRegisterPayment ? (
@@ -81,6 +82,7 @@ export default async function CustomerInvoicePage({ params, searchParams }: Cust
             href={`/admin/sales/${invoice.salesOrderId}`}
             count={invoice.orderNo}
             label="Sales Order"
+            labelKey="sales.order"
           />
         ) : null}
         {invoice.deliveryId ? (
@@ -88,48 +90,50 @@ export default async function CustomerInvoicePage({ params, searchParams }: Cust
             href={`/admin/sales/deliveries/${invoice.deliveryId}`}
             count={invoice.deliveryNo}
             label="Deliveries"
+            labelKey="sales.tab.deliveries"
           />
         ) : null}
         <DetailStatCard
           href={`/admin/sales?view=payments&customerInvoiceId=${invoice.id}`}
           count={invoice.paymentCount}
           label="Payments"
+          labelKey="sales.tab.payments"
         />
       </div>
 
       <section className="overflow-hidden rounded-lg border border-border bg-card p-6 shadow-xs">
         <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <Info label="Customer" value={invoice.customerName} />
+          <Info label="Customer" labelKey="field.customer" value={invoice.customerName} />
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Status</p>
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground"><T k="field.status">Status</T></p>
             <div className="mt-1">
               <StatusBadge status={invoice.status} />
             </div>
           </div>
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Payment Status</p>
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground"><T k="field.paymentStatus">Payment Status</T></p>
             <div className="mt-1">
               <StatusBadge status={invoice.paymentStatus} />
             </div>
           </div>
-          <Info label="Invoice Date" value={invoice.invoiceDate} />
-          <Info label="Due Date" value={invoice.dueDate ?? "—"} />
+          <Info label="Invoice Date" labelKey="field.invoiceDate" value={invoice.invoiceDate} />
+          <Info label="Due Date" labelKey="field.dueDate" value={invoice.dueDate ?? "—"} />
           {invoice.taxAmountMinor > 0 ? (
             <>
-              <Info label="Untaxed" value={displaySalesMoney(invoice.untaxedAmountMinor, invoice.currencyCode)} />
-              <Info label="Tax" value={displaySalesMoney(invoice.taxAmountMinor, invoice.currencyCode)} />
+              <Info label="Untaxed" labelKey="field.untaxed" value={displaySalesMoney(invoice.untaxedAmountMinor, invoice.currencyCode)} />
+              <Info label="Tax" labelKey="sales.form.taxes" value={displaySalesMoney(invoice.taxAmountMinor, invoice.currencyCode)} />
             </>
           ) : (
-            <Info label="Subtotal" value={displaySalesMoney(invoice.untaxedAmountMinor, invoice.currencyCode)} />
+            <Info label="Subtotal" labelKey="field.subtotal" value={displaySalesMoney(invoice.untaxedAmountMinor, invoice.currencyCode)} />
           )}
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Total Amount</p>
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground"><T k="field.totalAmount">Total Amount</T></p>
             <p className="mt-1 font-mono text-base font-bold text-foreground">
               {displaySalesMoney(invoice.totalMinor, invoice.currencyCode)}
             </p>
           </div>
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Residual Due</p>
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground"><T k="field.residualDue">Residual Due</T></p>
             <p className={`mt-1 font-mono text-base font-bold ${invoice.residualAmountMinor > 0 ? "text-destructive" : "text-primary"}`}>
               {displaySalesMoney(invoice.residualAmountMinor, invoice.currencyCode)}
             </p>
@@ -144,19 +148,19 @@ export default async function CustomerInvoicePage({ params, searchParams }: Cust
               items={[
                 {
                   value: "invoice-lines",
-                  label: "Invoice Lines",
+                  label: <T k="field.invoiceLines">Invoice Lines</T>,
                   content: (
                     <div className="overflow-x-auto">
                       <table className="w-full min-w-[940px] text-left text-sm">
                         <thead className="text-xs uppercase text-muted-foreground">
                           <tr className="border-b border-border">
-                            <th className="px-2 py-2">Product</th>
-                            <th className="px-2 py-2">Description</th>
-                            <th className="px-2 py-2 text-right">Quantity</th>
-                            <th className="px-2 py-2 text-right">Unit Price</th>
-                            <th className="px-2 py-2 text-right">Discount</th>
-                            {hasTaxInLines ? <th className="px-2 py-2">Taxes</th> : null}
-                            <th className="px-2 py-2 text-right">Total</th>
+                            <th className="px-2 py-2"><T k="sales.col.product">Product</T></th>
+                            <th className="px-2 py-2"><T k="field.description">Description</T></th>
+                            <th className="px-2 py-2 text-right"><T k="sales.form.qty">Quantity</T></th>
+                            <th className="px-2 py-2 text-right"><T k="sales.form.unitPrice">Unit Price</T></th>
+                            <th className="px-2 py-2 text-right"><T k="field.discount">Discount</T></th>
+                            {hasTaxInLines ? <th className="px-2 py-2"><T k="sales.form.taxes">Taxes</T></th> : null}
+                            <th className="px-2 py-2 text-right"><T k="sales.form.total">Total</T></th>
                           </tr>
                         </thead>
                         <tbody>
@@ -181,8 +185,8 @@ export default async function CustomerInvoicePage({ params, searchParams }: Cust
                 },
                 {
                   value: "other-information",
-                  label: "Other Information",
-                  content: <p className="text-sm text-muted-foreground">{invoice.notes || "No notes"}</p>,
+                  label: <T k="field.otherInformation">Other Information</T>,
+                  content: <p className="text-sm text-muted-foreground">{invoice.notes || <T k="field.noNotes">No notes</T>}</p>,
                 },
               ]}
             />
@@ -194,10 +198,10 @@ export default async function CustomerInvoicePage({ params, searchParams }: Cust
   );
 }
 
-function Info({ label, value }: { label: string; value: string }) {
+function Info({ label, labelKey, value }: { label: string; labelKey?: string; value: string }) {
   return (
     <div>
-      <p className="text-xs font-medium uppercase text-muted-foreground">{label}</p>
+      <p className="text-xs font-medium uppercase text-muted-foreground"><T k={labelKey ?? label}>{label}</T></p>
       <p className="mt-1 text-sm font-medium capitalize">{value}</p>
     </div>
   );

@@ -31,6 +31,7 @@ import {
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import type { InventoryOperationFormOptions } from "@/server/inventory/stock-types";
+import { useTranslation } from "@/lib/i18n/use-translation";
 
 export type OperationModalType = "transfer" | "adjustment" | "scrap";
 
@@ -64,27 +65,36 @@ export type NewInventoryOperationModalProps = {
 
 const OPERATION_CONFIG = {
   transfer: {
+    labelKey: "inventory.internalTransfer",
     label: "Internal Transfer",
     icon: ArrowLeftRight,
     color: "from-blue-600 to-indigo-700",
     badgeColor: "bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-500/20",
+    titleKey: "inventory.newTransferModal",
     title: "New Internal Transfer",
+    descKey: "inventory.transferDesc",
     description: "Transfer available inventory between warehouse locations and storage areas.",
   },
   adjustment: {
+    labelKey: "inventory.stockAdjustment",
     label: "Stock Adjustment",
     icon: Sliders,
     color: "from-[#0B5D4B] to-[#073B35]",
     badgeColor: "bg-emerald-500/10 text-[#0B5D4B] dark:text-emerald-300 border-[#0B5D4B]/20",
+    titleKey: "inventory.newAdjustmentModal",
     title: "New Inventory Adjustment",
+    descKey: "inventory.adjustmentDesc",
     description: "Reconcile system balance with physical count to correct discrepancies.",
   },
   scrap: {
+    labelKey: "inventory.scrapWriteOff",
     label: "Scrap & Write-off",
     icon: Trash2,
     color: "from-rose-600 to-rose-800",
     badgeColor: "bg-rose-500/10 text-rose-700 dark:text-rose-300 border-rose-500/20",
+    titleKey: "inventory.newScrapModal",
     title: "New Scrap Operation",
+    descKey: "inventory.scrapDesc",
     description: "Decommission damaged, expired, or obsolete stock from the warehouse.",
   },
 };
@@ -103,6 +113,7 @@ export function NewInventoryOperationModal({
   initialLocationId,
   initialOwnerId,
 }: NewInventoryOperationModalProps) {
+  const { t } = useTranslation();
   const [internalOpen, setInternalOpen] = useState(false);
   const [activeType, setActiveType] = useState<OperationModalType>(defaultType);
 
@@ -137,7 +148,7 @@ export function NewInventoryOperationModal({
         <DialogTrigger asChild>
           <Button className="gap-2 bg-gradient-to-r from-[#0B5D4B] to-[#073B35] font-semibold text-white shadow-md shadow-[#0B5D4B]/20 transition-all hover:brightness-110 active:scale-[0.99]">
             <Plus className="size-4 text-emerald-200" />
-            New Operation
+            {t("inventory.newOperation", "New Operation")}
           </Button>
         </DialogTrigger>
       ) : null}
@@ -164,7 +175,7 @@ export function NewInventoryOperationModal({
             <div className="space-y-0.5">
               <div className="flex items-center gap-2">
                 <DialogTitle className="text-lg font-bold tracking-tight text-foreground">
-                  {currentConfig.title}
+                  {t(currentConfig.titleKey, currentConfig.title)}
                 </DialogTitle>
                 <span
                   className={cn(
@@ -172,11 +183,11 @@ export function NewInventoryOperationModal({
                     currentConfig.badgeColor,
                   )}
                 >
-                  {currentConfig.label}
+                  {t(currentConfig.labelKey, currentConfig.label)}
                 </span>
               </div>
               <DialogDescription className="text-xs text-muted-foreground">
-                {currentConfig.description}
+                {t(currentConfig.descKey, currentConfig.description)}
               </DialogDescription>
             </div>
           </div>
@@ -195,7 +206,7 @@ export function NewInventoryOperationModal({
         <div className="flex items-center justify-between border-b border-border/70 bg-muted/20 px-4 sm:px-6 py-3 backdrop-blur-md overflow-x-auto no-scrollbar">
           <div className="flex items-center gap-2">
             <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider shrink-0">
-              Operation Mode:
+              {t("inventory.operationMode", "Operation Mode:")}
             </span>
             <div className="flex items-center gap-1 rounded-xl border border-border/70 bg-card p-1 shadow-2xs shrink-0">
               {(["transfer", "adjustment", "scrap"] as const).map((type) => {
@@ -216,7 +227,7 @@ export function NewInventoryOperationModal({
                     )}
                   >
                     <TabIcon className="size-3.5" />
-                    {cfg.label}
+                    {t(cfg.labelKey, cfg.label)}
                   </button>
                 );
               })}

@@ -49,6 +49,8 @@ type PurchasingPageProps = {
     q?: string;
     status?: string;
     paymentTerm?: string;
+    locationId?: string;
+    costType?: string;
     page?: string;
     pageSize?: string;
   }>;
@@ -73,22 +75,55 @@ export default async function PurchasingPage({ searchParams }: PurchasingPagePro
   const query = params.q ?? "";
   const status = params.status ?? "";
   const paymentTerm = params.paymentTerm ?? "";
+  const locationId = params.locationId ?? "";
+  const costType = params.costType ?? "";
 
-  const allOrders = await getPurchaseOrderList({ query, status, paymentTerm });
+  const formOptions = await getPurchaseFormOptions();
+  const allOrders = await getPurchaseOrderList({ query, status, paymentTerm, locationId: locationId || undefined });
 
   if (view === "receipts") {
-    const receipts = await getPurchaseReceiptList(params.purchaseOrderId);
+    let receipts = await getPurchaseReceiptList(params.purchaseOrderId, locationId || undefined);
+    if (query) {
+      const q = query.toLowerCase();
+      receipts = receipts.filter(
+        (r) =>
+          r.receiptNo.toLowerCase().includes(q) ||
+          (r.orderNo && r.orderNo.toLowerCase().includes(q)) ||
+          r.supplierName.toLowerCase().includes(q) ||
+          (r.supplierInvoiceNo && r.supplierInvoiceNo.toLowerCase().includes(q))
+      );
+    }
+    if (status) {
+      receipts = receipts.filter((r) => r.status === status);
+    }
     const page = paginateRows(receipts, params);
 
     return (
       <PurchasingLayout currentView={view} title="Receipts" orders={allOrders} notice={params.notice} error={params.error} pagination={page.pagination}>
-        <ReceiptList receipts={page.rows} />
+        <ReceiptList receipts={page.rows} locations={formOptions.locations} />
       </PurchasingLayout>
     );
   }
 
   if (view === "landed-costs") {
-    const landedCosts = await getPurchaseLandedCostList(params.purchaseOrderId);
+    let landedCosts = await getPurchaseLandedCostList(params.purchaseOrderId);
+    if (query) {
+      const q = query.toLowerCase();
+      landedCosts = landedCosts.filter(
+        (c) =>
+          c.costNo.toLowerCase().includes(q) ||
+          (c.orderNo && c.orderNo.toLowerCase().includes(q)) ||
+          (c.receiptNo && c.receiptNo.toLowerCase().includes(q)) ||
+          (c.vendorName && c.vendorName.toLowerCase().includes(q)) ||
+          c.costType.toLowerCase().includes(q)
+      );
+    }
+    if (status) {
+      landedCosts = landedCosts.filter((c) => c.status === status);
+    }
+    if (costType) {
+      landedCosts = landedCosts.filter((c) => c.costType === costType);
+    }
     const page = paginateRows(landedCosts, params);
 
     return (
@@ -107,11 +142,24 @@ export default async function PurchasingPage({ searchParams }: PurchasingPagePro
   }
 
   if (view === "payments") {
-    const payments = await getPaymentList({
+    let payments = await getPaymentList({
       paymentType: "outbound",
       purchaseOrderId: params.purchaseOrderId,
       vendorBillId: params.vendorBillId,
     });
+    if (query) {
+      const q = query.toLowerCase();
+      payments = payments.filter(
+        (p) =>
+          p.paymentNo.toLowerCase().includes(q) ||
+          (p.partnerName && p.partnerName.toLowerCase().includes(q)) ||
+          (p.reference && p.reference.toLowerCase().includes(q)) ||
+          p.paymentAccountName.toLowerCase().includes(q)
+      );
+    }
+    if (status) {
+      payments = payments.filter((p) => p.status === status);
+    }
     const page = paginateRows(payments, params);
 
     return (
@@ -122,7 +170,19 @@ export default async function PurchasingPage({ searchParams }: PurchasingPagePro
   }
 
   if (view === "returns") {
-    const returns = await getSupplierReturnList(params.purchaseOrderId);
+    let returns = await getSupplierReturnList(params.purchaseOrderId);
+    if (query) {
+      const q = query.toLowerCase();
+      returns = returns.filter(
+        (r) =>
+          r.returnNo.toLowerCase().includes(q) ||
+          r.receiptNo.toLowerCase().includes(q) ||
+          r.supplierName.toLowerCase().includes(q)
+      );
+    }
+    if (status) {
+      returns = returns.filter((r) => r.status === status);
+    }
     const page = paginateRows(returns, params);
 
     return (
@@ -140,7 +200,6 @@ export default async function PurchasingPage({ searchParams }: PurchasingPagePro
     );
   }
 
-  const formOptions = await getPurchaseFormOptions();
   const orderPage = paginateRows(allOrders, params);
 
   return (
@@ -221,8 +280,22 @@ function PurchasingLayout({
 }
 
 function SupplierReturnList({ returns }: { returns: SupplierReturnListRow[] }) {
+  const statusOptions = [
+    { value: "draft", label: "status.draft" },
+    { value: "posted", label: "status.posted" },
+    { value: "cancelled", label: "status.cancelled" },
+  ];
+
   return (
     <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-xs">
+      <div className="flex flex-col gap-3 border-b border-border bg-muted/20 p-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0 flex-1 sm:max-w-md">
+          <TableSearchInput placeholder="Search return #, receipt ref, or supplier..." />
+        </div>
+        <div className="flex flex-wrap items-center gap-3">
+          <TableFilterSelect paramName="status" label="Status" options={statusOptions} allLabel="All Statuses" />
+        </div>
+      </div>
       <div className="overflow-x-auto">
         <table className="w-full min-w-[900px] text-left text-sm">
           <thead>
@@ -275,8 +348,32 @@ function SupplierReturnList({ returns }: { returns: SupplierReturnListRow[] }) {
 }
 
 function LandedCostList({ landedCosts }: { landedCosts: PurchaseLandedCostListRow[] }) {
+  const statusOptions = [
+    { value: "draft", label: "status.draft" },
+    { value: "posted", label: "status.posted" },
+    { value: "cancelled", label: "status.cancelled" },
+  ];
+
+  const costTypeOptions = [
+    { value: "freight", label: "Freight" },
+    { value: "customs", label: "Customs" },
+    { value: "insurance", label: "Insurance" },
+    { value: "duty", label: "Duty" },
+    { value: "handling", label: "Handling" },
+    { value: "other", label: "Other" },
+  ];
+
   return (
     <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-xs">
+      <div className="flex flex-col gap-3 border-b border-border bg-muted/20 p-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0 flex-1 sm:max-w-md">
+          <TableSearchInput placeholder="Search cost #, PO ref, receipt #, or vendor..." />
+        </div>
+        <div className="flex flex-wrap items-center gap-3">
+          <TableFilterSelect paramName="status" label="Status" options={statusOptions} allLabel="All Statuses" />
+          <TableFilterSelect paramName="costType" label="Cost Type" options={costTypeOptions} allLabel="All Types" />
+        </div>
+      </div>
       <div className="overflow-x-auto">
         <table className="w-full min-w-[1040px] text-left text-sm">
           <thead>
@@ -338,7 +435,13 @@ function LandedCostList({ landedCosts }: { landedCosts: PurchaseLandedCostListRo
   );
 }
 
-function PurchaseOrderList({ orders }: { orders: PurchaseOrderListRow[] }) {
+function PurchaseOrderList({
+  orders,
+  locations,
+}: {
+  orders: PurchaseOrderListRow[];
+  locations?: { id: string; code: string; name: string }[];
+}) {
   const statusOptions = [
     { value: "draft", label: "status.draft" },
     { value: "confirmed", label: "status.confirmed" },
@@ -351,6 +454,11 @@ function PurchaseOrderList({ orders }: { orders: PurchaseOrderListRow[] }) {
     { value: "cash", label: "status.cash" },
     { value: "credit", label: "status.credit" },
   ];
+
+  const locationOptions = (locations ?? []).map((loc) => ({
+    value: loc.id,
+    label: `${loc.name} (${loc.code})`,
+  }));
 
   return (
     <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-xs">
@@ -373,6 +481,14 @@ function PurchaseOrderList({ orders }: { orders: PurchaseOrderListRow[] }) {
             options={paymentTermOptions}
             allLabel="All Terms"
           />
+          {locationOptions.length > 0 ? (
+            <TableFilterSelect
+              paramName="locationId"
+              label="status.warehouse"
+              options={locationOptions}
+              allLabel="All Warehouses"
+            />
+          ) : null}
         </div>
       </div>
       <div className="overflow-x-auto">
@@ -470,9 +586,37 @@ function PurchaseOrderList({ orders }: { orders: PurchaseOrderListRow[] }) {
   );
 }
 
-function ReceiptList({ receipts }: { receipts: PurchaseReceiptListRow[] }) {
+function ReceiptList({
+  receipts,
+  locations,
+}: {
+  receipts: PurchaseReceiptListRow[];
+  locations?: { id: string; code: string; name: string }[];
+}) {
+  const statusOptions = [
+    { value: "draft", label: "status.draft" },
+    { value: "posted", label: "status.posted" },
+    { value: "cancelled", label: "status.cancelled" },
+  ];
+
+  const locationOptions = (locations ?? []).map((loc) => ({
+    value: loc.id,
+    label: `${loc.name} (${loc.code})`,
+  }));
+
   return (
     <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-xs">
+      <div className="flex flex-col gap-3 border-b border-border bg-muted/20 p-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0 flex-1 sm:max-w-md">
+          <TableSearchInput placeholder="Search receipt #, PO ref, supplier, or invoice..." />
+        </div>
+        <div className="flex flex-wrap items-center gap-3">
+          <TableFilterSelect paramName="status" label="Status" options={statusOptions} allLabel="All Statuses" />
+          {locationOptions.length > 0 ? (
+            <TableFilterSelect paramName="locationId" label="status.warehouse" options={locationOptions} allLabel="All Warehouses" />
+          ) : null}
+        </div>
+      </div>
       <div className="overflow-x-auto">
         <table className="w-full min-w-[980px] text-left text-sm">
           <thead>
@@ -538,8 +682,22 @@ function ReceiptList({ receipts }: { receipts: PurchaseReceiptListRow[] }) {
 }
 
 function PaymentList({ payments }: { payments: PaymentListRow[] }) {
+  const statusOptions = [
+    { value: "draft", label: "status.draft" },
+    { value: "posted", label: "status.posted" },
+    { value: "cancelled", label: "status.cancelled" },
+  ];
+
   return (
     <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-xs">
+      <div className="flex flex-col gap-3 border-b border-border bg-muted/20 p-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0 flex-1 sm:max-w-md">
+          <TableSearchInput placeholder="Search payment #, supplier, or reference..." />
+        </div>
+        <div className="flex flex-wrap items-center gap-3">
+          <TableFilterSelect paramName="status" label="Status" options={statusOptions} allLabel="All Statuses" />
+        </div>
+      </div>
       <div className="overflow-x-auto">
         <table className="w-full min-w-[1040px] text-left text-sm">
           <thead>

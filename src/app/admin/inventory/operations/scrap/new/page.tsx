@@ -3,6 +3,7 @@ import { InventoryScrapForm } from "@/app/admin/inventory/operations/adjustment-
 import { Alert } from "@/components/ui/alert";
 import { ButtonLink } from "@/components/ui/button";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
+import { T } from "@/components/ui/t";
 import { requirePermission } from "@/server/auth/session";
 import { getInventoryAdjustmentFormOptions } from "@/server/inventory/stock";
 
@@ -20,12 +21,20 @@ export default async function NewScrapPage({ searchParams }: NewScrapPageProps) 
   return (
     <PageShell>
       <PageHeader
-        eyebrow="Inventory / Scrap"
-        title="New Scrap"
-        actions={<ButtonLink href="/admin/inventory/operations?view=scrap" variant="outline">Back to scrap</ButtonLink>}
+        eyebrow={<T k="inventory.scrapEyebrow" fallback="Inventory / Scrap" />}
+        title={<T k="inventory.newScrapModal" fallback="New Scrap Operation" />}
+        actions={
+          <ButtonLink href="/admin/inventory/operations?view=scrap" variant="outline">
+            <T k="inventory.backToScrap" fallback="Back to scrap" />
+          </ButtonLink>
+        }
       />
 
-      {query.error ? <Alert kind="error">{query.error}</Alert> : null}
+      {query.error ? (
+        <Alert kind="error">
+          <T k={query.error} fallback={query.error} />
+        </Alert>
+      ) : null}
 
       <InventoryScrapForm action={createScrapOperation} owners={options.owners} locations={options.locations} products={options.products} balances={options.balances} />
     </PageShell>

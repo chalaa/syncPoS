@@ -30,6 +30,7 @@ type ProductSelectProps = {
   emptyLabel?: string;
   inputClassName?: string;
   error?: string;
+  allowCreate?: boolean;
   onValueChange?: (value: string) => void;
   onOptionsChange?: (options: ProductSelectOption[]) => void;
 };
@@ -46,6 +47,7 @@ export function ProductSelect({
   emptyLabel = "No products found.",
   inputClassName,
   error,
+  allowCreate = true,
   onValueChange,
   onOptionsChange,
 }: ProductSelectProps) {
@@ -119,11 +121,15 @@ export function ProductSelect({
             emptyLabel={emptyLabel}
             inputClassName={inputClassName}
             error={error}
-            createLabel={t("Add Product...")}
-            onCreateAndEdit={(query) => {
-              setInitialName(query);
-              setIsDialogOpen(true);
-            }}
+            createLabel={allowCreate ? t("Add Product...") : undefined}
+            onCreateAndEdit={
+              allowCreate
+                ? (query) => {
+                    setInitialName(query);
+                    setIsDialogOpen(true);
+                  }
+                : undefined
+            }
             editHrefFor={(productId) => `/admin/products/${productId}/edit`}
           />
         </div>
@@ -143,23 +149,25 @@ export function ProductSelect({
           </Button>
         ) : null}
 
-        <Button
-          type="button"
-          variant="outline"
-          size="icon"
-          onClick={() => {
-            setInitialName("");
-            setIsDialogOpen(true);
-          }}
-          className="size-9 sm:size-10 shrink-0 rounded-lg border-border/80 text-muted-foreground transition-all hover:border-[#0B5D4B]/40 hover:bg-emerald-500/10 hover:text-[#0B5D4B] dark:hover:text-emerald-300 active:scale-95"
-          title={t("Add new product")}
-        >
-          <PackagePlus className="size-4" />
-          <span className="sr-only">{t("Add Product")}</span>
-        </Button>
+        {allowCreate ? (
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            onClick={() => {
+              setInitialName("");
+              setIsDialogOpen(true);
+            }}
+            className="size-9 sm:size-10 shrink-0 rounded-lg border-border/80 text-muted-foreground transition-all hover:border-[#0B5D4B]/40 hover:bg-emerald-500/10 hover:text-[#0B5D4B] dark:hover:text-emerald-300 active:scale-95"
+            title={t("Add new product")}
+          >
+            <PackagePlus className="size-4" />
+            <span className="sr-only">{t("Add Product")}</span>
+          </Button>
+        ) : null}
       </div>
 
-      {isDialogOpen ? (
+      {allowCreate && isDialogOpen ? (
         <NewProductModal
           key={`${isDialogOpen}-${initialName}`}
           open={isDialogOpen}

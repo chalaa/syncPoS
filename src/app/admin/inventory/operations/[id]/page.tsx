@@ -11,6 +11,7 @@ import { Alert } from "@/components/ui/alert";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { Notebook } from "@/components/ui/notebook";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
+import { T } from "@/components/ui/t";
 import { requirePermission } from "@/server/auth/session";
 import { getDefaultCompany } from "@/server/catalog/products";
 import { getStockOutApprovalState } from "@/server/inventory/stock-approvals";
@@ -121,22 +122,26 @@ export default async function InventoryOperationDetailPage({ params, searchParam
       ? approvalState.pendingApprovalIds.length > 0 && approvalState.canApprove
         ? {
             action: approveAndPostInventoryOperation,
+            labelKey: "action.approveAndPost",
             label: "Approve & Post",
             disabled: false,
           }
         : approvalState.pendingApprovalIds.length > 0
           ? {
               action: requestInventoryOperationApproval,
+              labelKey: "status.approvalPending",
               label: "Approval Pending",
               disabled: true,
             }
           : {
               action: requestInventoryOperationApproval,
+              labelKey: "action.requestApproval",
               label: "Request Approval",
               disabled: false,
             }
       : {
           action: postInventoryOperation,
+          labelKey: "action.post",
           label: "Post",
           disabled: false,
         };
@@ -144,11 +149,13 @@ export default async function InventoryOperationDetailPage({ params, searchParam
   return (
     <PageShell>
       <PageHeader
-        eyebrow="Inventory Operation"
+        eyebrow={<T k="inventory.operationEyebrow" fallback="Inventory Operation" />}
         title={operation.movementNo}
         actions={
           <div className="flex flex-wrap gap-2">
-            <ButtonLink href="/admin/inventory/operations" variant="outline">Back to operations</ButtonLink>
+            <ButtonLink href="/admin/inventory/operations" variant="outline">
+              <T k="inventory.backToOperations" fallback="Back to operations" />
+            </ButtonLink>
             {operation.status === "draft" ? (
               <>
                 <form action={postAction.action}>
@@ -156,11 +163,15 @@ export default async function InventoryOperationDetailPage({ params, searchParam
                   {approvalState?.pendingApprovalIds.map((approvalId) => (
                     <input key={approvalId} type="hidden" name="approvalIds" value={approvalId} />
                   ))}
-                  <Button type="submit" disabled={postAction.disabled}>{postAction.label}</Button>
+                  <Button type="submit" disabled={postAction.disabled}>
+                    <T k={postAction.labelKey} fallback={postAction.label} />
+                  </Button>
                 </form>
                 <form action={cancelInventoryOperation}>
                   <input type="hidden" name="movementId" value={operation.id} />
-                  <Button type="submit" variant="danger">Cancel</Button>
+                  <Button type="submit" variant="danger">
+                    <T k="action.cancel" fallback="Cancel" />
+                  </Button>
                 </form>
               </>
             ) : null}
@@ -168,8 +179,16 @@ export default async function InventoryOperationDetailPage({ params, searchParam
         }
       />
 
-      {query.notice ? <Alert kind="success">{query.notice}</Alert> : null}
-      {query.error ? <Alert kind="error">{query.error}</Alert> : null}
+      {query.notice ? (
+        <Alert kind="success">
+          <T k={query.notice} fallback={query.notice} />
+        </Alert>
+      ) : null}
+      {query.error ? (
+        <Alert kind="error">
+          <T k={query.error} fallback={query.error} />
+        </Alert>
+      ) : null}
 
       <div className="mb-5 flex flex-wrap items-start justify-between gap-4">
         <div className="grid gap-2 text-sm">
@@ -178,24 +197,24 @@ export default async function InventoryOperationDetailPage({ params, searchParam
             <span className="rounded-md border border-border bg-muted px-2 py-1 capitalize">{operation.status}</span>
           </div>
           <div className="text-muted-foreground">
-            Source {operation.sourceNo ?? operation.sourceType ?? "-"} / Date {operation.movementDate.toLocaleDateString()}
+            <T k="inventory.source" fallback="Source" /> {operation.sourceNo ?? operation.sourceType ?? "-"} / <T k="inventory.date" fallback="Date" /> {operation.movementDate.toLocaleDateString()}
           </div>
           {sourceHref(operation) ? (
             <Link href={sourceHref(operation) ?? "#"} className="w-fit text-sm font-medium text-primary underline-offset-4 hover:underline">
-              Open source document
+              <T k="inventory.openSourceDocument" fallback="Open source document" />
             </Link>
           ) : null}
           {operation.status === "posted" ? (
             <div className="text-xs text-muted-foreground">
-              Posted operations are locked. Create an explicit reversal operation for corrections.
+              <T k="inventory.postedLockedNotice" fallback="Posted operations are locked. Create an explicit reversal operation for corrections." />
             </div>
           ) : null}
         </div>
         <div className="flex flex-wrap gap-2">
-          <Metric label="Lines" value={String(operation.lineCount)} />
-          <Metric label="Quantity" value={displayQuantity(operation.totalQuantity)} />
+          <Metric label={<T k="inventory.lines" fallback="Lines" />} value={String(operation.lineCount)} />
+          <Metric label={<T k="inventory.quantity" fallback="Quantity" />} value={displayQuantity(operation.totalQuantity)} />
           <Metric
-            label="Value"
+            label={<T k="inventory.value" fallback="Value" />}
             value={operation.currencyCode ? displayMoneyMinor(operation.totalCostMinor, operation.currencyCode) : "-"}
           />
         </div>
@@ -212,13 +231,13 @@ export default async function InventoryOperationDetailPage({ params, searchParam
                 <table className="w-full min-w-[980px] text-left text-sm">
                   <thead className="text-xs uppercase text-muted-foreground">
                     <tr className="border-b border-border">
-                      <th className="px-3 py-2">Product</th>
-                      <th className="px-3 py-2">Owner</th>
-                      <th className="px-3 py-2">From</th>
-                      <th className="px-3 py-2">To</th>
-                      <th className="px-3 py-2">Tracking</th>
-                      <th className="px-3 py-2 text-right">Quantity</th>
-                      <th className="px-3 py-2 text-right">Value</th>
+                      <th className="px-3 py-2"><T k="table.product" fallback="Product" /></th>
+                      <th className="px-3 py-2"><T k="table.owner" fallback="Owner" /></th>
+                      <th className="px-3 py-2"><T k="table.origin" fallback="From" /></th>
+                      <th className="px-3 py-2"><T k="table.destination" fallback="To" /></th>
+                      <th className="px-3 py-2"><T k="table.tracking" fallback="Tracking" /></th>
+                      <th className="px-3 py-2 text-right"><T k="table.qty" fallback="Quantity" /></th>
+                      <th className="px-3 py-2 text-right"><T k="table.valuation" fallback="Value" /></th>
                     </tr>
                   </thead>
                   <tbody>
@@ -241,7 +260,7 @@ export default async function InventoryOperationDetailPage({ params, searchParam
                     {operation.lines.length === 0 ? (
                       <tr>
                         <td colSpan={7} className="px-3 py-8 text-center text-muted-foreground">
-                          No movement lines found.
+                          <T k="inventory.noMovementLines" fallback="No movement lines found." />
                         </td>
                       </tr>
                     ) : null}
@@ -255,10 +274,10 @@ export default async function InventoryOperationDetailPage({ params, searchParam
             label: "Other Information",
             content: (
               <div className="grid gap-3 text-sm md:grid-cols-2">
-                <Info label="Source Type" value={operation.sourceType ?? "-"} />
-                <Info label="Source Number" value={operation.sourceNo ?? "-"} />
-                <Info label="Posted At" value={operation.postedAt?.toLocaleString() ?? "-"} />
-                <Info label="Notes" value={operation.notes ?? "-"} />
+                <Info label={<T k="inventory.sourceType" fallback="Source Type" />} value={operation.sourceType ?? "-"} />
+                <Info label={<T k="inventory.sourceNumber" fallback="Source Number" />} value={operation.sourceNo ?? "-"} />
+                <Info label={<T k="inventory.postedAt" fallback="Posted At" />} value={operation.postedAt?.toLocaleString() ?? "-"} />
+                <Info label={<T k="common.notes" fallback="Notes" />} value={operation.notes ?? "-"} />
               </div>
             ),
           },
@@ -268,7 +287,7 @@ export default async function InventoryOperationDetailPage({ params, searchParam
   );
 }
 
-function Metric({ label, value }: { label: string; value: string }) {
+function Metric({ label, value }: { label: React.ReactNode; value: string }) {
   return (
     <div className="rounded-md border border-border bg-card px-4 py-3 text-sm">
       <span className="block text-lg font-semibold">{value}</span>
@@ -277,7 +296,7 @@ function Metric({ label, value }: { label: string; value: string }) {
   );
 }
 
-function Info({ label, value }: { label: string; value: string }) {
+function Info({ label, value }: { label: React.ReactNode; value: string }) {
   return (
     <div className="grid gap-1 border-b border-border/70 pb-2">
       <span className="text-xs font-medium uppercase text-muted-foreground">{label}</span>

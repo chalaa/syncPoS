@@ -24,6 +24,7 @@ import {
 import { Notebook } from "@/components/ui/notebook";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
 import { DetailStatCard } from "@/components/ui/detail-stat-card";
+import { T } from "@/components/ui/t";
 import { requirePermission } from "@/server/auth/session";
 import { getActivePaymentAccounts } from "@/server/payments/payments";
 import { getSalesLineApprovalSummary } from "@/server/sales/line-approvals";
@@ -77,13 +78,13 @@ function CreateDeliveryDialog({
   return (
     <Dialog>
       <DialogTrigger asChild>
-        <Button>Create Delivery</Button>
+        <Button><T k="action.createDelivery">Create Delivery</T></Button>
       </DialogTrigger>
       <DialogContent className="max-w-5xl">
         <DialogHeader>
-          <DialogTitle>Create Delivery</DialogTitle>
+          <DialogTitle><T k="modal.createDelivery.title">Create Delivery</T></DialogTitle>
           <DialogDescription>
-            Create a draft delivery for {order.orderNo}.
+            <T k="modal.createDelivery.desc">Create a draft delivery for</T> {order.orderNo}.
           </DialogDescription>
         </DialogHeader>
         <CreateDeliveryLinesEditor action={createDeliveryFromSalesOrder} order={order} />
@@ -136,7 +137,7 @@ export default async function SalesOrderDetailPage({ params, searchParams }: Sal
       <PageHeader
         eyebrow="Sales"
         title={order.orderNo}
-        actions={<ButtonLink href="/admin/sales" variant="outline">Back to sales</ButtonLink>}
+        actions={<ButtonLink href="/admin/sales" variant="outline"><T k="action.backToSales">Back to sales</T></ButtonLink>}
       />
 
       {query.notice ? <Alert kind="success">{query.notice}</Alert> : null}
@@ -189,7 +190,7 @@ export default async function SalesOrderDetailPage({ params, searchParams }: Sal
           ) : null}
           {canCreateReturn ? (
             <ButtonLink href={`/admin/sales/returns/new?salesOrderId=${order.id}`} variant="outline">
-              Add Return
+              <T k="action.addReturn">Add Return</T>
             </ButtonLink>
           ) : null}
         </div>
@@ -201,7 +202,7 @@ export default async function SalesOrderDetailPage({ params, searchParams }: Sal
             <section className="rounded-lg border border-border bg-card p-4">
               <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <h2 className="text-sm font-semibold">Line approvals</h2>
+                  <h2 className="text-sm font-semibold"><T k="field.lineApprovals">Line approvals</T></h2>
                   <p className="text-xs text-muted-foreground">
                     {approvedApprovalCount} of {lineApprovals.length} required lines approved
                   </p>
@@ -216,12 +217,12 @@ export default async function SalesOrderDetailPage({ params, searchParams }: Sal
                 <table className="w-full min-w-[720px] text-left text-sm">
                   <thead className="border-b border-border text-xs uppercase text-muted-foreground">
                     <tr>
-                      <th className="px-2 py-2">Line</th>
-                      <th className="px-2 py-2">Product</th>
-                      <th className="px-2 py-2">Location</th>
-                      <th className="px-2 py-2">Status</th>
+                      <th className="px-2 py-2"><T k="sales.form.line">Line</T></th>
+                      <th className="px-2 py-2"><T k="delivery.product">Product</T></th>
+                      <th className="px-2 py-2"><T k="field.sourceLocation">Location</T></th>
+                      <th className="px-2 py-2"><T k="sales.col.status">Status</T></th>
                       <th className="px-2 py-2">Decision</th>
-                      <th className="px-2 py-2 text-right">Action</th>
+                      <th className="px-2 py-2 text-right"><T k="delivery.actions">Action</T></th>
                     </tr>
                   </thead>
                   <tbody>
@@ -292,23 +293,23 @@ export default async function SalesOrderDetailPage({ params, searchParams }: Sal
       ) : (
         <section className="rounded-lg border border-border bg-card p-5">
           <div className="mb-5 grid gap-4 md:grid-cols-4">
-            <Info label="Customer" value={order.customerName} />
-            <Info label="Owner" value={order.ownerName ?? "-"} />
-            <Info label="Reference" value={order.customerReference ?? "-"} />
-            <Info label="FS Number" value={order.fsNumber ?? "-"} />
-            <Info label="Payment Term" value={statusLabel(order.paymentTerm)} />
-            <Info label="Order Date" value={order.orderDate} />
+            <Info label="Customer" labelKey="field.customer" value={order.customerName} />
+            <Info label="Owner" labelKey="field.stockOwner" value={order.ownerName ?? "-"} />
+            <Info label="Reference" labelKey="sales.col.reference" value={order.customerReference ?? "-"} />
+            <Info label="FS Number" labelKey="field.fsNumber" value={order.fsNumber ?? "-"} />
+            <Info label="Payment Term" labelKey="sales.form.paymentTerm" value={order.paymentTerm === "cash" ? "Cash" : "Credit"} />
+            <Info label="Order Date" labelKey="sales.col.orderDate" value={order.orderDate} />
             {order.paymentTerm === "credit" ? (
-              <Info label="Last Payment Date" value={order.validUntil ?? "-"} />
+              <Info label="Last Payment Date" labelKey="field.lastPaymentDate" value={order.validUntil ?? "-"} />
             ) : null}
-            <Info label="Subtotal" value={displaySalesMoney(order.subtotalMinor, order.currencyCode)} />
+            <Info label="Subtotal" labelKey="sales.form.subtotal" value={displaySalesMoney(order.subtotalMinor, order.currencyCode)} />
             {order.taxAmountMinor > 0 ? (
-              <Info label="Tax" value={displaySalesMoney(order.taxAmountMinor, order.currencyCode)} />
+              <Info label="Tax" labelKey="sales.form.taxes" value={displaySalesMoney(order.taxAmountMinor, order.currencyCode)} />
             ) : null}
-            <Info label="Total" value={displaySalesMoney(order.totalMinor, order.currencyCode)} />
-            <Info label="Paid" value={displaySalesMoney(order.paidMinor, order.currencyCode)} />
-            <Info label="Unpaid" value={displaySalesMoney(order.residualAmountMinor, order.currencyCode)} />
-            <Info label="Reserve Policy" value={order.reserveOnConfirm ? "Reserve on confirm" : "No reservation"} />
+            <Info label="Total" labelKey="sales.form.total" value={displaySalesMoney(order.totalMinor, order.currencyCode)} />
+            <Info label="Paid" labelKey="field.paid" value={displaySalesMoney(order.paidMinor, order.currencyCode)} />
+            <Info label="Unpaid" labelKey="field.unpaid" value={displaySalesMoney(order.residualAmountMinor, order.currencyCode)} />
+            <Info label="Reserve Policy" labelKey="field.reservePolicy" value={order.reserveOnConfirm ? "Reserve on confirm" : "No reservation"} />
           </div>
 
           {(() => {
@@ -319,20 +320,20 @@ export default async function SalesOrderDetailPage({ params, searchParams }: Sal
                 items={[
                   {
                     value: "order-lines",
-                    label: "Order Lines",
+                    label: <T k="field.orderLines">Order Lines</T>,
                     content: (
                       <div className="overflow-x-auto">
                         <table className="w-full min-w-[980px] text-left text-sm">
                           <thead className="text-xs uppercase text-muted-foreground">
                             <tr className="border-b border-border">
-                              <th className="px-2 py-2">Product</th>
-                              <th className="px-2 py-2 text-right">Ordered</th>
-                              <th className="px-2 py-2 text-right">Reserved</th>
-                              <th className="px-2 py-2 text-right">Delivered</th>
-                              <th className="px-2 py-2 text-right">Invoiced</th>
-                              <th className="px-2 py-2 text-right">Unit Price</th>
-                              {hasTaxInLines ? <th className="px-2 py-2 text-right">Tax</th> : null}
-                              <th className="px-2 py-2 text-right">Total</th>
+                              <th className="px-2 py-2"><T k="delivery.product">Product</T></th>
+                              <th className="px-2 py-2 text-right"><T k="delivery.ordered">Ordered</T></th>
+                              <th className="px-2 py-2 text-right"><T k="kpi.reserved">Reserved</T></th>
+                              <th className="px-2 py-2 text-right"><T k="sales.col.delivered">Delivered</T></th>
+                              <th className="px-2 py-2 text-right"><T k="sales.tab.invoices">Invoiced</T></th>
+                              <th className="px-2 py-2 text-right"><T k="sales.form.unitPrice">Unit Price</T></th>
+                              {hasTaxInLines ? <th className="px-2 py-2 text-right"><T k="sales.form.taxes">Tax</T></th> : null}
+                              <th className="px-2 py-2 text-right"><T k="sales.form.total">Total</T></th>
                             </tr>
                           </thead>
                           <tbody>
@@ -362,8 +363,8 @@ export default async function SalesOrderDetailPage({ params, searchParams }: Sal
                   },
                   {
                     value: "other-information",
-                    label: "Other Information",
-                    content: <p className="text-sm text-muted-foreground">{order.notes || "No notes"}</p>,
+                    label: <T k="field.otherInformation">Other Information</T>,
+                    content: <p className="text-sm text-muted-foreground">{order.notes || <T k="field.noNotes">No notes</T>}</p>,
                   },
                 ]}
               />
@@ -375,10 +376,10 @@ export default async function SalesOrderDetailPage({ params, searchParams }: Sal
   );
 }
 
-function Info({ label, value }: { label: string; value: string }) {
+function Info({ label, labelKey, value }: { label: string; labelKey?: string; value: string }) {
   return (
     <div>
-      <p className="text-xs font-medium uppercase text-muted-foreground">{label}</p>
+      <p className="text-xs font-medium uppercase text-muted-foreground"><T k={labelKey ?? label}>{label}</T></p>
       <p className="mt-1 text-sm font-medium">{value}</p>
     </div>
   );

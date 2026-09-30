@@ -158,11 +158,16 @@ export async function requireStockOutApproval(tx: DbTransaction, params: Approva
   }
 }
 
-export async function getStockOutApprovalRows(companyId: string, status = "pending") {
+import { getSelectedShopId } from "@/server/locations/shop-options";
+
+export async function getStockOutApprovalRows(companyId: string, status = "pending", overrideLocationId?: string) {
+  const locationId = overrideLocationId ?? await getSelectedShopId();
   const statusFilter =
     status === "approved" || status === "rejected" || status === "cancelled"
       ? eq(stockOutApprovals.status, status)
       : eq(stockOutApprovals.status, "pending");
+
+  const locationFilter = locationId ? eq(stockOutApprovals.sourceLocationId, locationId) : undefined;
 
   return db
     .select({
@@ -186,7 +191,7 @@ export async function getStockOutApprovalRows(companyId: string, status = "pendi
     .from(stockOutApprovals)
     .innerJoin(locations, eq(stockOutApprovals.sourceLocationId, locations.id))
     .leftJoin(users, eq(stockOutApprovals.requestedBy, users.id))
-    .where(and(eq(stockOutApprovals.companyId, companyId), statusFilter))
+    .where(and(eq(stockOutApprovals.companyId, companyId), statusFilter, locationFilter))
     .orderBy(asc(stockOutApprovals.requestedAt));
 }
 

@@ -21,6 +21,7 @@ import Link from "next/link";
 import { NewInventoryOperationModal } from "@/app/admin/inventory/operations/new-operation-modal";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { useTranslation } from "@/lib/i18n/use-translation";
 import {
   displayMoneyMinor,
   displayQuantity,
@@ -37,6 +38,8 @@ export function StockProductDrawer({
   onClose: () => void;
   formOptions?: InventoryOperationFormOptions & { balances: any[] };
 }) {
+  const { t } = useTranslation();
+
   if (!row) return null;
 
   const onHand = Number(row.quantityOnHand);
@@ -76,7 +79,7 @@ export function StockProductDrawer({
             type="button"
             onClick={onClose}
             className="rounded-lg p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-            aria-label="Close panel"
+            aria-label={t("action.closePanel")}
           >
             <X className="size-5" />
           </button>
@@ -89,7 +92,7 @@ export function StockProductDrawer({
             <div className="flex items-center justify-between text-xs">
               <span className="flex items-center gap-1.5 font-medium text-muted-foreground">
                 <MapPin className="size-3.5 text-primary" />
-                Storage Location
+                {t("field.storageLocation")}
               </span>
               <span className="font-semibold text-foreground">
                 {row.locationCode} · {row.locationName}
@@ -98,17 +101,17 @@ export function StockProductDrawer({
             <div className="flex items-center justify-between text-xs border-t border-border/50 pt-2.5">
               <span className="flex items-center gap-1.5 font-medium text-muted-foreground">
                 <User className="size-3.5 text-primary" />
-                Stock Owner
+                {t("field.stockOwner")}
               </span>
               <span className="font-semibold text-foreground">
-                {row.ownerName || "Internal / Default"}
+                {row.ownerName || t("inventory.internalDefault")}
               </span>
             </div>
             {(row.serialNo || row.lotNo) && (
               <div className="flex items-center justify-between text-xs border-t border-border/50 pt-2.5">
                 <span className="flex items-center gap-1.5 font-medium text-muted-foreground">
                   <Layers className="size-3.5 text-primary" />
-                  {row.serialNo ? "Serial Number" : "Lot Number"}
+                  {row.serialNo ? t("field.serialNumber") : t("field.lotNumber")}
                 </span>
                 <span className="font-mono font-bold text-foreground">
                   {row.serialNo || row.lotNo}
@@ -120,23 +123,23 @@ export function StockProductDrawer({
           {/* Quantities Grid */}
           <div>
             <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2.5">
-              Inventory Balance Breakdown
+              {t("inventory.balanceBreakdown")}
             </h3>
             <div className="grid grid-cols-3 gap-2.5">
               <div className="rounded-xl border border-border/80 bg-background p-3 text-center">
-                <span className="text-[11px] font-medium text-muted-foreground">On Hand</span>
+                <span className="text-[11px] font-medium text-muted-foreground">{t("inventory.onHand")}</span>
                 <p className="font-mono text-lg font-extrabold text-foreground mt-0.5">
                   {displayQuantity(row.quantityOnHand)}
                 </p>
               </div>
               <div className="rounded-xl border border-border/80 bg-background p-3 text-center">
-                <span className="text-[11px] font-medium text-muted-foreground">Reserved</span>
+                <span className="text-[11px] font-medium text-muted-foreground">{t("inventory.reserved")}</span>
                 <p className="font-mono text-lg font-extrabold text-amber-600 dark:text-amber-400 mt-0.5">
                   {displayQuantity(row.quantityReserved)}
                 </p>
               </div>
               <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-3 text-center">
-                <span className="text-[11px] font-medium text-emerald-700 dark:text-emerald-300">Available</span>
+                <span className="text-[11px] font-medium text-emerald-700 dark:text-emerald-300">{t("inventory.available")}</span>
                 <p className="font-mono text-lg font-extrabold text-emerald-600 dark:text-emerald-400 mt-0.5">
                   {displayQuantity(row.quantityAvailable)}
                 </p>
@@ -147,17 +150,17 @@ export function StockProductDrawer({
           {/* Valuation Card */}
           <div>
             <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2.5">
-              Cost & Valuation
+              {t("inventory.costValuation")}
             </h3>
             <div className="rounded-xl border border-border/80 bg-background p-4 space-y-2.5">
               <div className="flex items-center justify-between text-xs">
-                <span className="text-muted-foreground">Average Unit Cost</span>
+                <span className="text-muted-foreground">{t("inventory.avgUnitCost")}</span>
                 <span className="font-mono font-bold text-foreground">
                   {displayMoneyMinor(row.averageCostMinor, row.currencyCode)}
                 </span>
               </div>
               <div className="flex items-center justify-between text-xs border-t border-border/60 pt-2.5">
-                <span className="font-semibold text-foreground">Total Location Valuation</span>
+                <span className="font-semibold text-foreground">{t("inventory.totalLocationValuation")}</span>
                 <span className="font-mono text-sm font-extrabold text-primary">
                   {displayMoneyMinor(totalValuationMinor, row.currencyCode)}
                 </span>
@@ -169,7 +172,7 @@ export function StockProductDrawer({
           <div className="flex items-center gap-2 text-xs text-muted-foreground rounded-lg bg-muted/40 p-3">
             <Clock className="size-3.5 shrink-0" />
             <span>
-              Last activity recorded on{" "}
+              {t("inventory.lastActivityRecordedOn")}{" "}
               <strong className="text-foreground">
                 {row.lastMovementAt ? row.lastMovementAt.toLocaleDateString() : "N/A"}
               </strong>
@@ -179,13 +182,13 @@ export function StockProductDrawer({
           {/* Quick Actions Links */}
           <div className="pt-2 space-y-2">
             <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2.5">
-              Quick Operations
+              {t("inventory.quickOperations")}
             </h3>
 
             <Button asChild variant="outline" className="w-full justify-start gap-2.5 h-10 font-semibold">
               <Link href={`/admin/inventory/stock-card?productId=${row.productId}`}>
                 <FileSpreadsheet className="size-4 text-emerald-600" />
-                View Full Stock Card Ledger
+                {t("inventory.viewFullStockCard")}
                 <ExternalLink className="size-3.5 ml-auto text-muted-foreground" />
               </Link>
             </Button>
@@ -205,7 +208,7 @@ export function StockProductDrawer({
                   trigger={
                     <Button variant="outline" className="w-full justify-start gap-2.5 h-10 font-semibold cursor-pointer">
                       <ArrowLeftRight className="size-4 text-blue-600" />
-                      Transfer This Item to Another Location
+                      {t("inventory.transferItemToLocation")}
                     </Button>
                   }
                 />
@@ -223,7 +226,7 @@ export function StockProductDrawer({
                   trigger={
                     <Button variant="outline" className="w-full justify-start gap-2.5 h-10 font-semibold cursor-pointer">
                       <Sliders className="size-4 text-amber-600" />
-                      Perform Physical Count Adjustment
+                      {t("inventory.performPhysicalCount")}
                     </Button>
                   }
                 />
@@ -241,7 +244,7 @@ export function StockProductDrawer({
                   trigger={
                     <Button variant="outline" className="w-full justify-start gap-2.5 h-10 font-semibold hover:text-destructive hover:bg-destructive/10 cursor-pointer">
                       <Trash2 className="size-4 text-destructive" />
-                      Scrap or Write-off Damaged Units
+                      {t("inventory.scrapDamagedUnits")}
                     </Button>
                   }
                 />
@@ -251,21 +254,21 @@ export function StockProductDrawer({
                 <Button asChild variant="outline" className="w-full justify-start gap-2.5 h-10 font-semibold">
                   <Link href={`/admin/inventory/operations/internal-transfers/new`}>
                     <ArrowLeftRight className="size-4 text-blue-600" />
-                    Transfer This Item to Another Location
+                    {t("inventory.transferItemToLocation")}
                   </Link>
                 </Button>
 
                 <Button asChild variant="outline" className="w-full justify-start gap-2.5 h-10 font-semibold">
                   <Link href={`/admin/inventory/operations/adjustments/new`}>
                     <Sliders className="size-4 text-amber-600" />
-                    Perform Physical Count Adjustment
+                    {t("inventory.performPhysicalCount")}
                   </Link>
                 </Button>
 
                 <Button asChild variant="outline" className="w-full justify-start gap-2.5 h-10 font-semibold hover:text-destructive hover:bg-destructive/10">
                   <Link href={`/admin/inventory/operations/scrap/new`}>
                     <Trash2 className="size-4 text-destructive" />
-                    Scrap or Write-off Damaged Units
+                    {t("inventory.scrapDamagedUnits")}
                   </Link>
                 </Button>
               </>
@@ -276,7 +279,7 @@ export function StockProductDrawer({
         {/* Footer */}
         <div className="border-t border-border/80 bg-background/90 p-4">
           <Button onClick={onClose} variant="outline" className="w-full font-semibold">
-            Close Panel
+            {t("action.closePanel")}
           </Button>
         </div>
       </div>

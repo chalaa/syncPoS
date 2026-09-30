@@ -49,7 +49,6 @@ export function NewPurchaseOrderModal({
 }: NewPurchaseOrderModalProps) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(initialOpen);
-  const [confirmClose, setConfirmClose] = useState(false);
   const formRef = useRef<PurchaseOrderFormHandle>(null);
 
   useEffect(() => {
@@ -57,21 +56,6 @@ export function NewPurchaseOrderModal({
       setOpen(true);
     }
   }, [initialOpen]);
-
-  useEffect(() => {
-    if (!open) return;
-
-    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
-      event.preventDefault();
-      event.returnValue = "";
-      return "";
-    };
-
-    window.addEventListener("beforeunload", handleBeforeUnload);
-    return () => {
-      window.removeEventListener("beforeunload", handleBeforeUnload);
-    };
-  }, [open]);
 
   /** Remove ?new= from the URL without navigation */
   function cleanUrl() {
@@ -82,24 +66,8 @@ export function NewPurchaseOrderModal({
     }
   }
 
-  /** Directly close without saving */
-  function closeImmediately() {
-    setOpen(false);
-    setConfirmClose(false);
-    cleanUrl();
-  }
-
-  /** Close attempt — show confirmation first */
+  /** Directly close without confirmation dialog */
   function handleCloseRequest() {
-    setConfirmClose(true);
-  }
-
-  /** Confirmation: save draft then close */
-  function handleSaveDraftAndClose() {
-    formRef.current?.saveDraft();
-    setConfirmClose(false);
-    // The form's server action will close the modal on success via router.refresh + form reset.
-    // We close immediately here since saveDraft navigates away on success anyway.
     setOpen(false);
     cleanUrl();
   }
@@ -113,95 +81,75 @@ export function NewPurchaseOrderModal({
   }
 
   return (
-    <>
-      <Dialog open={open} onOpenChange={handleOpenChange}>
-        <DialogTrigger asChild>
-          {trigger ?? (
-            <Button className="gap-2 bg-gradient-to-r from-[#0B5D4B] to-[#073B35] font-semibold text-white shadow-md shadow-[#0B5D4B]/20 transition-all hover:brightness-110 active:scale-[0.99]">
-              <PlusIcon className="size-4 text-emerald-200" />
-              {t("purchasing.newRfq", "New RFQ")}
-            </Button>
-          )}
-        </DialogTrigger>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogTrigger asChild>
+        {trigger ?? (
+          <Button className="gap-2 bg-gradient-to-r from-[#0B5D4B] to-[#073B35] font-semibold text-white shadow-md shadow-[#0B5D4B]/20 transition-all hover:brightness-110 active:scale-[0.99]">
+            <PlusIcon className="size-4 text-emerald-200" />
+            {t("purchasing.newRfq", "New RFQ")}
+          </Button>
+        )}
+      </DialogTrigger>
 
-        <DialogContent
-          className="fixed left-1/2 top-1/2 z-50 -translate-x-1/2 -translate-y-1/2 w-[calc(100%-1rem)] sm:w-full max-w-6xl max-h-[92vh] sm:max-h-[90vh] p-0 gap-0 flex flex-col rounded-2xl border border-border/80 bg-card shadow-2xl overflow-y-auto outline-none"
-          showCloseButton={false}
-          onPointerDownOutside={(event) => {
-            event.preventDefault();
-            handleCloseRequest();
-          }}
-          onInteractOutside={(event) => {
-            event.preventDefault();
-            handleCloseRequest();
-          }}
-          onEscapeKeyDown={(event) => {
-            event.preventDefault();
-            handleCloseRequest();
-          }}
-        >
-          {/* Top Brand Accent Line */}
-          <div className="h-1.5 w-full bg-gradient-to-r from-[#0B5D4B] via-[#073B35] to-[#D9A441]" />
+      <DialogContent
+        className="fixed left-1/2 top-1/2 z-50 -translate-x-1/2 -translate-y-1/2 w-[calc(100%-1rem)] sm:w-full max-w-6xl max-h-[92vh] sm:max-h-[90vh] p-0 gap-0 flex flex-col rounded-2xl border border-border/80 bg-card shadow-2xl overflow-y-auto outline-none"
+        showCloseButton={false}
+        onPointerDownOutside={() => handleCloseRequest()}
+        onInteractOutside={() => handleCloseRequest()}
+        onEscapeKeyDown={() => handleCloseRequest()}
+      >
+        {/* Top Brand Accent Line */}
+        <div className="h-1.5 w-full bg-gradient-to-r from-[#0B5D4B] via-[#073B35] to-[#D9A441]" />
 
-          {/* Modal Header */}
-          <DialogHeader className="border-b border-border/70 bg-background/95 px-4 sm:px-6 py-4 backdrop-blur-md flex flex-row items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#0B5D4B] to-[#073B35] text-white shadow-md shadow-[#0B5D4B]/25 ring-1 ring-white/20">
-                <FileText className="h-5 w-5 text-emerald-200" />
-              </div>
-              <div className="space-y-0.5">
-                <div className="flex items-center gap-2">
-                  <DialogTitle className="text-lg font-bold tracking-tight text-foreground">
-                    {t("purchasing.newRfqTitle", "New Request for Quotation")}
-                  </DialogTitle>
-                  <span className="rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-[11px] font-semibold text-[#0B5D4B] dark:text-emerald-300 border border-[#0B5D4B]/20">
-                    {t("purchasing.draftRfq", "Draft RFQ")}
-                  </span>
-                </div>
-                <DialogDescription className="text-xs text-muted-foreground">
-                  {t("purchasing.newRfqDesc", "Prepare specifications, sourcing details, and order lines to send to vendors.")}
-                </DialogDescription>
-              </div>
+        {/* Modal Header */}
+        <DialogHeader className="border-b border-border/70 bg-background/95 px-4 sm:px-6 py-4 backdrop-blur-md flex flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#0B5D4B] to-[#073B35] text-white shadow-md shadow-[#0B5D4B]/25 ring-1 ring-white/20">
+              <FileText className="h-5 w-5 text-emerald-200" />
             </div>
-            <button
-              type="button"
-              onClick={handleCloseRequest}
-              className="rounded-lg p-1.5 sm:p-2 bg-red-500 text-white hover:bg-red-600 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/50 shadow-2xs"
-              aria-label={t("action.close", "Close")}
-            >
-              <X className="size-4 sm:size-4.5" />
-            </button>
-          </DialogHeader>
-
-          {/* Modal Body */}
-          <div className="px-4 sm:px-6 py-4 sm:py-5">
-            <PurchaseOrderForm
-              ref={formRef}
-              action={createPurchaseOrder}
-              suppliers={suppliers}
-              owners={owners}
-              products={products}
-              productCategories={productCategories}
-              productBrands={productBrands}
-              productUnits={productUnits}
-              locations={locations}
-              taxes={taxes}
-              defaultDate={defaultDate}
-              isModal={true}
-              onCancel={handleCloseRequest}
-            />
+            <div className="space-y-0.5">
+              <div className="flex items-center gap-2">
+                <DialogTitle className="text-lg font-bold tracking-tight text-foreground">
+                  {t("purchasing.newRfqTitle", "New Request for Quotation")}
+                </DialogTitle>
+                <span className="rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-[11px] font-semibold text-[#0B5D4B] dark:text-emerald-300 border border-[#0B5D4B]/20">
+                  {t("purchasing.draftRfq", "Draft RFQ")}
+                </span>
+              </div>
+              <DialogDescription className="text-xs text-muted-foreground">
+                {t("purchasing.newRfqDesc", "Prepare specifications, sourcing details, and order lines to send to vendors.")}
+              </DialogDescription>
+            </div>
           </div>
-        </DialogContent>
-      </Dialog>
+          <button
+            type="button"
+            onClick={handleCloseRequest}
+            className="rounded-lg p-1.5 sm:p-2 bg-red-500 text-white hover:bg-red-600 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/50 shadow-2xs"
+            aria-label={t("action.close", "Close")}
+          >
+            <X className="size-4 sm:size-4.5" />
+          </button>
+        </DialogHeader>
 
-      {/* Close confirmation overlay */}
-      <CloseConfirmDialog
-        open={confirmClose}
-        onOpenChange={setConfirmClose}
-        draftLabel={t("purchasing.saveAsDraftRfq", "Save as Draft RFQ")}
-        onSaveDraft={handleSaveDraftAndClose}
-        onDiscard={closeImmediately}
-      />
-    </>
+        {/* Modal Body */}
+        <div className="px-4 sm:px-6 py-4 sm:py-5">
+          <PurchaseOrderForm
+            ref={formRef}
+            action={createPurchaseOrder}
+            suppliers={suppliers}
+            owners={owners}
+            products={products}
+            productCategories={productCategories}
+            productBrands={productBrands}
+            productUnits={productUnits}
+            locations={locations}
+            taxes={taxes}
+            defaultDate={defaultDate}
+            isModal={true}
+            onCancel={handleCloseRequest}
+          />
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }

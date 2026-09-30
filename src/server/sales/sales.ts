@@ -41,6 +41,8 @@ import type {
   SalesTaxOption,
 } from "@/server/sales/types";
 
+import { getSelectedShopId } from "@/server/locations/shop-options";
+
 export function displaySalesMoney(value: number, currencyCode: string) {
   return `${currencyCode} ${minorToDisplay(value)}`;
 }
@@ -172,14 +174,17 @@ export async function getSalesOrderList(params?: {
   query?: string;
   status?: string;
   paymentTerm?: string;
+  locationId?: string;
 }): Promise<SalesOrderListRow[]> {
   const company = await getDefaultCompany();
+  const locationId = params?.locationId ?? await getSelectedShopId();
   const query = params?.query?.trim();
   const statusFilter = params?.status ? sql`and so.status = ${params.status}` : sql``;
   const paymentTermFilter = params?.paymentTerm ? sql`and so.payment_term = ${params.paymentTerm}` : sql``;
   const searchFilter = query
     ? sql`and (so.order_no ilike ${`%${query}%`} or customer.display_name ilike ${`%${query}%`} or so.customer_reference ilike ${`%${query}%`} or so.fs_number ilike ${`%${query}%`})`
     : sql``;
+  const locationFilter = locationId ? sql`and so.source_location_id = ${locationId}::uuid` : sql``;
 
   const rows = await db.execute<SalesOrderListRow>(sql`
     select
@@ -220,6 +225,7 @@ export async function getSalesOrderList(params?: {
     ) pay on true
     where so.company_id = ${company.id}
       and so.deleted_at is null
+      ${locationFilter}
       ${statusFilter}
       ${paymentTermFilter}
       ${searchFilter}
@@ -237,9 +243,12 @@ export async function getSalesOrderList(params?: {
 
 export async function getDeliveryList(params: {
   salesOrderId?: string;
+  locationId?: string;
 } = {}): Promise<DeliveryListRow[]> {
   const company = await getDefaultCompany();
+  const locationId = params.locationId ?? await getSelectedShopId();
   const salesOrderFilter = params.salesOrderId ? sql`and d.sales_order_id = ${params.salesOrderId}` : sql``;
+  const locationFilter = locationId ? sql`and d.source_location_id = ${locationId}::uuid` : sql``;
 
   return db.execute<DeliveryListRow>(sql`
     select
@@ -262,6 +271,7 @@ export async function getDeliveryList(params: {
     left join delivery_lines dl on dl.delivery_id = d.id and dl.deleted_at is null
     where d.company_id = ${company.id}
       and d.deleted_at is null
+      ${locationFilter}
       ${salesOrderFilter}
     group by d.id, so.id, customer.id, loc.id
     order by d.delivery_date desc
@@ -388,12 +398,15 @@ export async function getCustomerInvoiceList(params: {
   deliveryId?: string;
   customerInvoiceId?: string;
   customerId?: string;
+  locationId?: string;
 } = {}): Promise<CustomerInvoiceListRow[]> {
   const company = await getDefaultCompany();
+  const locationId = params.locationId ?? await getSelectedShopId();
   const salesOrderFilter = params.salesOrderId ? sql`and ci.sales_order_id = ${params.salesOrderId}` : sql``;
   const deliveryFilter = params.deliveryId ? sql`and ci.delivery_id = ${params.deliveryId}` : sql``;
   const invoiceFilter = params.customerInvoiceId ? sql`and ci.id = ${params.customerInvoiceId}` : sql``;
   const customerFilter = params.customerId ? sql`and ci.customer_id = ${params.customerId}` : sql``;
+  const locationFilter = locationId ? sql`and (so.source_location_id = ${locationId}::uuid or d.source_location_id = ${locationId}::uuid)` : sql``;
 
   return db.execute<CustomerInvoiceListRow>(sql`
     select
@@ -456,6 +469,7 @@ export async function getCustomerInvoiceList(params: {
     left join products pr on pr.id = cil.product_id
     where ci.company_id = ${company.id}
       and ci.deleted_at is null
+      ${locationFilter}
       ${salesOrderFilter}
       ${deliveryFilter}
       ${invoiceFilter}

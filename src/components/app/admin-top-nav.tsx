@@ -2,7 +2,7 @@
 
 import { ChevronDownIcon, LogOutIcon, MenuIcon } from "lucide-react";
 import Link from "next/link";
-import { usePathname, useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState, type MouseEvent, type ReactNode } from "react";
 
 import { logout } from "@/app/login/actions";
@@ -85,6 +85,7 @@ export function AdminShell({
   shopLocations: ShopOption[];
   children: ReactNode;
 }) {
+  const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const adminNavOpen = useAppStore((state) => state.adminNavOpen);
@@ -166,7 +167,6 @@ export function AdminShell({
         if (stored && shopLocations.some((shop) => shop.id === stored)) {
           activeId = stored;
           setSelectedLocationId(stored);
-          return;
         }
       } catch {}
     }
@@ -176,13 +176,25 @@ export function AdminShell({
     if (!selectedShopIsAvailable) {
       const defaultId = shopLocations[0]?.id ?? null;
       setSelectedLocationId(defaultId);
+      activeId = defaultId;
       if (typeof window !== "undefined" && defaultId) {
         try {
           localStorage.setItem("syncpos-selected-location", defaultId);
         } catch {}
       }
     }
-  }, [isHydrated, selectedLocationId, setSelectedLocationId, shopLocations]);
+
+    if (typeof window !== "undefined" && activeId) {
+      const currentCookie = document.cookie
+        .split("; ")
+        .find((row) => row.startsWith("syncpos-selected-location="))
+        ?.split("=")[1];
+      if (currentCookie !== activeId) {
+        document.cookie = `syncpos-selected-location=${activeId}; path=/; max-age=31536000`;
+        router.refresh();
+      }
+    }
+  }, [isHydrated, selectedLocationId, setSelectedLocationId, shopLocations, router]);
 
   function closeMobileSubmenu(event: MouseEvent<HTMLAnchorElement>) {
     event.currentTarget.closest("details")?.removeAttribute("open");
@@ -480,6 +492,7 @@ function ShopSelector({
   selectedLocationId: string | null;
   onChange: (locationId: string | null) => void;
 }) {
+  const router = useRouter();
   const { t } = useTranslation();
 
   if (locations.length === 0) {
@@ -493,10 +506,13 @@ function ShopSelector({
       try {
         if (nextId) {
           localStorage.setItem("syncpos-selected-location", nextId);
+          document.cookie = `syncpos-selected-location=${nextId}; path=/; max-age=31536000`;
         } else {
           localStorage.removeItem("syncpos-selected-location");
+          document.cookie = "syncpos-selected-location=; path=/; max-age=0";
         }
       } catch {}
+      router.refresh();
     }
   }
 

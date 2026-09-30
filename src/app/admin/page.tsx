@@ -47,36 +47,8 @@ export default async function AdminDashboardPage() {
         </div>
       </div>
 
-      {/* Mobile View: Compact Micro-Metric Bar (sm:hidden) */}
-      <div className="-mx-4 mb-4 flex gap-2 overflow-x-auto px-4 py-1 no-scrollbar touch-pan-x snap-x snap-mandatory sm:hidden">
-        {report.metrics.map((metric) => {
-          const toneDot =
-            metric.tone === "success"
-              ? "bg-primary"
-              : metric.tone === "warning"
-                ? "bg-gold"
-                : metric.tone === "danger"
-                  ? "bg-destructive"
-                  : "bg-muted-foreground";
-
-          return (
-            <Link
-              key={metric.label}
-              href={metric.href}
-              className="flex shrink-0 snap-start items-center gap-2 rounded-lg border border-border bg-card px-2.5 py-1.5 shadow-2xs active:bg-secondary/50"
-            >
-              <span className={`size-2 shrink-0 rounded-full ${toneDot}`} />
-              <div className="min-w-0">
-                <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{metric.label}</div>
-                <div className="font-mono text-xs font-bold text-foreground">{metric.value}</div>
-              </div>
-            </Link>
-          );
-        })}
-      </div>
-
-      {/* Desktop/Tablet KPI Metrics Grid (hidden on mobile) */}
-      <section className="hidden mb-6 sm:grid sm:grid-cols-2 lg:grid-cols-3 sm:gap-3">
+      {/* KPI Metrics Grid */}
+      <section className="mb-6 grid grid-cols-2 gap-2 sm:grid-cols-2 lg:grid-cols-3 sm:gap-3">
         {report.metrics.map((metric) => {
           const toneBorder =
             metric.tone === "success"
@@ -100,18 +72,18 @@ export default async function AdminDashboardPage() {
             <Link
               key={metric.label}
               href={metric.href}
-              className={`group relative flex flex-col justify-between rounded-xl border border-border ${toneBorder} border-t-3 bg-card p-4 shadow-xs transition-all duration-150 hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md`}
+              className={`group relative flex flex-col justify-between rounded-xl border border-border ${toneBorder} border-t-3 bg-card p-3 sm:p-4 shadow-xs transition-all duration-150 hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md`}
             >
-              <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center justify-between gap-1.5">
                 <div className="flex items-center gap-1.5 truncate">
                   <span className={`size-2 shrink-0 rounded-full ${toneDot}`} />
-                  <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground truncate">
+                  <p className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-muted-foreground truncate">
                     {metric.label}
                   </p>
                 </div>
-                <ArrowUpRight className="size-4 shrink-0 text-muted-foreground opacity-0 transition-all duration-150 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:text-primary group-hover:opacity-100" />
+                <ArrowUpRight className="size-3.5 sm:size-4 shrink-0 text-muted-foreground opacity-0 transition-all duration-150 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:text-primary group-hover:opacity-100" />
               </div>
-              <p className="mt-2 text-2xl font-bold tracking-tight text-foreground transition-colors group-hover:text-primary">
+              <p className="mt-1.5 sm:mt-2 text-base sm:text-2xl font-bold tracking-tight text-foreground transition-colors group-hover:text-primary truncate">
                 {metric.value}
               </p>
             </Link>
