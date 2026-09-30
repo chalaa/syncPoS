@@ -181,6 +181,8 @@ export async function getDashboardReport(overrideLocationId?: string | null): Pr
           union all
           select ci.total_minor as total
           from customer_invoices ci
+          left join sales_orders so on so.id = ci.sales_order_id
+          left join deliveries d on d.id = ci.delivery_id
           where ci.company_id = ${company.id}
             and ci.deleted_at is null
             and ci.status <> 'cancelled'
@@ -217,6 +219,8 @@ export async function getDashboardReport(overrideLocationId?: string | null): Pr
               and p.status = 'posted'
           ), 0), 0) as unpaid
           from customer_invoices ci
+          left join sales_orders so on so.id = ci.sales_order_id
+          left join deliveries d on d.id = ci.delivery_id
           where ci.company_id = ${company.id}
             and ci.deleted_at is null
             and ci.status <> 'cancelled'
@@ -237,6 +241,8 @@ export async function getDashboardReport(overrideLocationId?: string | null): Pr
           union all
           select vb.total_minor as total
           from vendor_bills vb
+          left join purchase_orders po on po.id = vb.purchase_order_id
+          left join goods_receipts gr on gr.id = vb.goods_receipt_id
           where vb.company_id = ${company.id}
             and vb.deleted_at is null
             and vb.status <> 'cancelled'
@@ -273,6 +279,8 @@ export async function getDashboardReport(overrideLocationId?: string | null): Pr
               and p.status = 'posted'
           ), 0), 0) as unpaid
           from vendor_bills vb
+          left join purchase_orders po on po.id = vb.purchase_order_id
+          left join goods_receipts gr on gr.id = vb.goods_receipt_id
           where vb.company_id = ${company.id}
             and vb.deleted_at is null
             and vb.status <> 'cancelled'
