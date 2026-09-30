@@ -339,6 +339,8 @@ export const users = pgTable(
       onUpdate: "cascade",
     }),
     username: varchar("username", { length: 80 }).notNull(),
+    phone: varchar("phone", { length: 40 }),
+    normalizedPhone: varchar("normalized_phone", { length: 40 }),
     email: varchar("email", { length: 160 }),
     normalizedEmail: varchar("normalized_email", { length: 160 }),
     passwordHash: text("password_hash").notNull(),
@@ -363,6 +365,9 @@ export const users = pgTable(
     uniqueIndex("users_normalized_email_active_uidx")
       .on(table.companyId, table.normalizedEmail)
       .where(sql`${table.normalizedEmail} is not null and ${table.deletedAt} is null`),
+    uniqueIndex("users_normalized_phone_active_uidx")
+      .on(table.companyId, table.normalizedPhone)
+      .where(sql`${table.normalizedPhone} is not null and ${table.deletedAt} is null`),
     index("users_company_status_idx").on(table.companyId, table.status),
   ],
 );

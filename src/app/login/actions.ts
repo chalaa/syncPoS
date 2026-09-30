@@ -1,12 +1,13 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, isNull, or } from "drizzle-orm";
 
 import { createSession, destroySession } from "@/server/auth/session";
 import { verifyPassword } from "@/server/auth/password";
 import { db } from "@/server/db/client";
-import { companies, users } from "@/server/db/schema";
+import { companies, employees, users } from "@/server/db/schema";
+import { normalizePhoneNumber } from "@/lib/phone-utils";
 
 const maxLoginAttempts = 5;
 const lockDurationMs = 15 * 60 * 1000;
@@ -18,8 +19,14 @@ function formValue(formData: FormData, key: string) {
 }
 
 export async function login(formData: FormData) {
-  const username = formValue(formData, "username");
+  const phoneInput = formValue(formData, "phone") || formValue(formData, "username");
   const password = formValue(formData, "password");
+
+  if (!phoneInput || !password) {
+    redirect("/login?error=Phone number and password are required.");
+  }
+
+  const normalizedInput = normalizePhoneNumber(phoneInput);
 
   const [user] = await db
     .select({
@@ -31,12 +38,19 @@ export async function login(formData: FormData) {
     })
     .from(users)
     .innerJoin(companies, eq(users.companyId, companies.id))
+    .leftJoin(employees, eq(users.employeeId, employees.id))
     .where(
       and(
         eq(companies.code, "SYNC"),
-        eq(users.username, username),
         eq(users.status, "active"),
         isNull(users.deletedAt),
+        or(
+          eq(users.phone, phoneInput),
+          eq(users.normalizedPhone, normalizedInput),
+          eq(employees.phone, phoneInput),
+          eq(users.username, phoneInput),
+          eq(users.username, normalizedInput)
+        ),
       ),
     )
     .limit(1);
@@ -58,7 +72,7 @@ export async function login(formData: FormData) {
         .where(eq(users.id, user.id));
     }
 
-    redirect("/login?error=Invalid username or password");
+    redirect("/login?error=Invalid phone number or password");
   }
 
   await db

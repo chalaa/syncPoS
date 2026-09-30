@@ -1,6 +1,7 @@
 export type IamUserRow = {
   id: string;
   username: string;
+  phone: string | null;
   email: string | null;
   employeeId: string | null;
   employeeName: string | null;

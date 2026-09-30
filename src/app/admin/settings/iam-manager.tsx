@@ -85,12 +85,16 @@ function UserForm({
           <input name="username" required defaultValue={user?.username} className={inputClass} />
         </label>
         <label className="flex flex-col gap-1 text-sm font-medium">
-          {t("field.email", "Email")}
-          <input name="email" type="email" defaultValue={user?.email ?? ""} className={inputClass} />
+          {t("Phone Number", "Phone Number")}
+          <input name="phone" type="tel" placeholder="e.g. 0911223344" defaultValue={user?.phone ?? ""} className={inputClass} />
         </label>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-4 sm:grid-cols-3">
+        <label className="flex flex-col gap-1 text-sm font-medium">
+          {t("field.email", "Email")}
+          <input name="email" type="email" defaultValue={user?.email ?? ""} className={inputClass} />
+        </label>
         <label className="flex flex-col gap-1 text-sm font-medium">
           {t("Employee", "Employee")}
           <select name="employeeId" defaultValue={user?.employeeId ?? ""} className={inputClass}>
@@ -514,7 +518,7 @@ export function IamManager({
               <tr key={user.id} className="border-t border-border transition-colors hover:bg-secondary/30">
                 <td className="px-4 py-3">
                   <div className="font-semibold text-foreground">{user.username}</div>
-                  <div className="text-xs text-muted-foreground">{user.email ?? "-"}</div>
+                  <div className="text-xs font-mono text-primary">{user.phone ? user.phone : (user.email ?? "-")}</div>
                 </td>
                 <td className="px-4 py-3 font-medium text-foreground">{user.employeeName ?? "-"}</td>
                 <td className="px-4 py-3">

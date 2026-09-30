@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ArrowLeft, Lock, ShieldCheck, User } from "lucide-react";
+import { ArrowLeft, Lock, Phone, ShieldCheck } from "lucide-react";
 
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -70,19 +70,20 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
 
           <form action={login} className="space-y-4">
             <div>
-              <label htmlFor="username" className="block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Username
+              <label htmlFor="phone" className="block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Phone Number
               </label>
               <div className="relative mt-1.5">
                 <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-muted-foreground">
-                  <User className="size-4" />
+                  <Phone className="size-4" />
                 </div>
                 <input
-                  id="username"
-                  name="username"
+                  id="phone"
+                  name="phone"
+                  type="tel"
                   required
-                  autoComplete="username"
-                  placeholder="e.g. admin"
+                  autoComplete="tel"
+                  placeholder="e.g. 0911223344 or +251..."
                   className="h-11 w-full rounded-md border border-input bg-background pl-9.5 pr-3 text-sm font-medium text-foreground transition-all placeholder:text-muted-foreground/60 focus:border-ring focus:ring-2 focus:ring-ring/20"
                 />
               </div>

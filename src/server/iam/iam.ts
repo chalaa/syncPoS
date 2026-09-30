@@ -21,6 +21,7 @@ export async function getIamUserList(): Promise<IamUserRow[]> {
     select
       u.id as "id",
       u.username as "username",
+      coalesce(u.phone, e.phone) as "phone",
       u.email as "email",
       u.employee_id as "employeeId",
       e.full_name as "employeeName",

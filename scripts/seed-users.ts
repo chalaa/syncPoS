@@ -30,12 +30,13 @@ async function main() {
     console.log("Found roles:", Array.from(roleByCode.keys()));
 
     const usersToCreate = [
-      { username: "mesud", email: "mesud@syncpos.local", roleCode: "owner" },
-      { username: "aisha", email: "aisha@syncpos.local", roleCode: "owner" },
-      { username: "abdulkadir", email: "abdulkadir@syncpos.local", roleCode: "owner" },
-      { username: "beti", email: "beti@syncpos.local", roleCode: "accountant" },
-      { username: "yadu", email: "yadu@syncpos.local", roleCode: "accountant" },
-      { username: "mukerem", email: "mukerem@syncpos.local", roleCode: "inventory_manager" },
+      { username: "admin", phone: "0900000000", email: "admin@syncpos.local", roleCode: "owner" },
+      { username: "mesud", phone: "0911111111", email: "mesud@syncpos.local", roleCode: "owner" },
+      { username: "aisha", phone: "0922222222", email: "aisha@syncpos.local", roleCode: "owner" },
+      { username: "abdulkadir", phone: "0933333333", email: "abdulkadir@syncpos.local", roleCode: "owner" },
+      { username: "beti", phone: "0944444444", email: "beti@syncpos.local", roleCode: "accountant" },
+      { username: "yadu", phone: "0955555555", email: "yadu@syncpos.local", roleCode: "accountant" },
+      { username: "mukerem", phone: "0966666666", email: "mukerem@syncpos.local", roleCode: "inventory_manager" },
     ];
 
     for (const u of usersToCreate) {
@@ -45,11 +46,12 @@ async function main() {
         continue;
       }
 
-      const passwordHash = hashPassword(`${u.username}123456`);
+      const password = u.username === "admin" ? "admin123" : `${u.username}123456`;
+      const passwordHash = hashPassword(password);
 
       // Check if user already exists
       const existing = await sql`
-        SELECT id FROM users WHERE company_id = ${company.id} AND username = ${u.username} AND deleted_at IS NULL
+        SELECT id FROM users WHERE company_id = ${company.id} AND (username = ${u.username} OR phone = ${u.phone}) AND deleted_at IS NULL
       `;
 
       let userId: string;
@@ -58,21 +60,21 @@ async function main() {
         userId = existing[0].id;
         await sql`
           UPDATE users
-          SET password_hash = ${passwordHash}, password_changed_at = now()
+          SET phone = ${u.phone}, normalized_phone = ${u.phone}, password_hash = ${passwordHash}, password_changed_at = now()
           WHERE id = ${userId}
         `;
-        console.log(`Updated password for ${u.username} (${u.username}123456)`);
+        console.log(`Updated phone (${u.phone}) and password for ${u.username} (${password})`);
       } else {
         const [inserted] = await sql`
           INSERT INTO users (
-            id, company_id, username, email, normalized_email, password_hash, email_verified, failed_login_attempts, password_changed_at, status
+            id, company_id, username, phone, normalized_phone, email, normalized_email, password_hash, email_verified, failed_login_attempts, password_changed_at, status
           ) VALUES (
-            gen_random_uuid(), ${company.id}, ${u.username}, ${u.email}, ${u.email.toLowerCase()}, ${passwordHash}, true, 0, now(), 'active'
+            gen_random_uuid(), ${company.id}, ${u.username}, ${u.phone}, ${u.phone}, ${u.email}, ${u.email.toLowerCase()}, ${passwordHash}, true, 0, now(), 'active'
           )
           RETURNING id
         `;
         userId = inserted.id;
-        console.log(`Created user ${u.username} with password ${u.username}123456 (ID: ${userId})`);
+        console.log(`Created user ${u.username} with phone ${u.phone} and password ${password} (ID: ${userId})`);
       }
 
       // Assign role if not assigned
@@ -91,7 +93,7 @@ async function main() {
       }
     }
 
-    console.log("\nAll users and role assignments processed successfully!");
+    console.log("\nAll users and phone number assignments processed successfully!");
   } catch (err) {
     console.error("Error creating users:", err);
   } finally {

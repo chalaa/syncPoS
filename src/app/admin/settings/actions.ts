@@ -9,6 +9,7 @@ import { requirePermission } from "@/server/auth/session";
 import { hashPassword } from "@/server/auth/password";
 import { uniqueViolationMessage } from "@/server/catalog/products";
 import { db } from "@/server/db/client";
+import { normalizePhoneNumber } from "@/lib/phone-utils";
 import { generateCompanyCode } from "@/server/db/code-generator";
 import {
   authSessions,
@@ -25,6 +26,7 @@ const userStatusSchema = z.enum(["active", "disabled", "locked"]);
 const userSchema = z.object({
   id: z.string().uuid().optional(),
   username: z.string().trim().min(3).max(80),
+  phone: z.string().trim().optional().or(z.literal("")),
   email: z.string().trim().email().optional().or(z.literal("")),
   employeeId: z.string().uuid().optional().or(z.literal("")),
   password: z.string().min(8).max(160).optional().or(z.literal("")),
@@ -75,6 +77,7 @@ function userPayload(formData: FormData) {
   return {
     id: formValue(formData, "id") || undefined,
     username: formValue(formData, "username"),
+    phone: formValue(formData, "phone"),
     email: formValue(formData, "email"),
     employeeId: formValue(formData, "employeeId"),
     password: formValue(formData, "password"),
@@ -170,6 +173,8 @@ export async function createUser(formData: FormData) {
         .values({
           companyId: currentUser.companyId,
           username: parsed.data.username,
+          phone: parsed.data.phone || null,
+          normalizedPhone: normalizePhoneNumber(parsed.data.phone || "") || null,
           email: parsed.data.email || null,
           normalizedEmail: normalizeEmail(parsed.data.email || undefined),
           employeeId: parsed.data.employeeId || null,
@@ -221,6 +226,8 @@ export async function updateUser(formData: FormData) {
     await db.transaction(async (tx) => {
       const updateValues: Partial<typeof users.$inferInsert> = {
         username: parsed.data.username,
+        phone: parsed.data.phone || null,
+        normalizedPhone: normalizePhoneNumber(parsed.data.phone || "") || null,
         email: parsed.data.email || null,
         normalizedEmail: normalizeEmail(parsed.data.email || undefined),
         employeeId: parsed.data.employeeId || null,
