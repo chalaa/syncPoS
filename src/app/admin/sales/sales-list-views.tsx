@@ -106,6 +106,16 @@ export function CustomerInvoiceList({ invoices }: { invoices: CustomerInvoiceLis
             ]}
             allLabel="All Statuses"
           />
+          <TableFilterSelect
+            paramName="paymentStatus"
+            label="Payment"
+            options={[
+              { value: "fully_paid", label: t("purchasing.fullyPaid", "Fully Paid") },
+              { value: "partially_paid", label: t("purchasing.partiallyPaid", "Partially Paid") },
+              { value: "not_paid", label: t("status.unpaid", "Not Paid") },
+            ]}
+            allLabel="All Payments"
+          />
         </div>
       </div>
       <div className="overflow-x-auto">
@@ -400,6 +410,16 @@ export function SalesOrderList({
             label="Term"
             options={paymentTermOptions}
             allLabel="All Terms"
+          />
+          <TableFilterSelect
+            paramName="paymentStatus"
+            label="Payment"
+            options={[
+              { value: "fully_paid", label: t("purchasing.fullyPaid", "Fully Paid") },
+              { value: "partially_paid", label: t("purchasing.partiallyPaid", "Partially Paid") },
+              { value: "not_paid", label: t("status.unpaid", "Not Paid") },
+            ]}
+            allLabel="All Payments"
           />
         </div>
       </div>

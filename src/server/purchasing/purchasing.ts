@@ -173,6 +173,7 @@ export async function getPurchaseOrderList(params?: {
   status?: string;
   paymentTerm?: string;
   locationId?: string;
+  paymentStatus?: string;
 }): Promise<PurchaseOrderListRow[]> {
   const company = await getDefaultCompany();
   const locationId = params?.locationId ?? await getSelectedShopId();
@@ -183,6 +184,16 @@ export async function getPurchaseOrderList(params?: {
     ? sql`and (po.order_no ilike ${`%${query}%`} or p.display_name ilike ${`%${query}%`} or po.vendor_reference ilike ${`%${query}%`})`
     : sql``;
   const locationFilter = locationId ? sql`and po.deliver_to_location_id = ${locationId}::uuid` : sql``;
+
+  const paymentStatus = params?.paymentStatus;
+  const paymentStatusFilter =
+    paymentStatus === "fully_paid" || paymentStatus === "paid"
+      ? sql`and (po.total_minor <= 0 or coalesce(pay.paid_minor, 0) >= po.total_minor)`
+      : paymentStatus === "not_paid" || paymentStatus === "unpaid"
+      ? sql`and (coalesce(pay.paid_minor, 0) <= 0 and po.total_minor > 0)`
+      : paymentStatus === "partially_paid" || paymentStatus === "partial"
+      ? sql`and (coalesce(pay.paid_minor, 0) > 0 and po.total_minor - coalesce(pay.paid_minor, 0) > 0)`
+      : sql``;
 
   const rows = await db.execute<PurchaseOrderListRow>(sql`
     select
@@ -224,6 +235,7 @@ export async function getPurchaseOrderList(params?: {
       ${locationFilter}
       ${statusFilter}
       ${paymentTermFilter}
+      ${paymentStatusFilter}
       ${searchFilter}
     group by po.id, p.display_name, own.name, l.code, pay.paid_minor
     order by po.created_at desc

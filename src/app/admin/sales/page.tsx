@@ -41,6 +41,7 @@ type SalesPageProps = {
     q?: string;
     status?: string;
     paymentTerm?: string;
+    paymentStatus?: string;
     page?: string;
     pageSize?: string;
   }>;
@@ -66,8 +67,9 @@ export default async function SalesPage({ searchParams }: SalesPageProps) {
   const query = params.q ?? "";
   const status = params.status ?? "";
   const paymentTerm = params.paymentTerm ?? "";
+  const paymentStatus = params.paymentStatus ?? "";
 
-  const allOrders = await getSalesOrderList({ query, status, paymentTerm });
+  const allOrders = await getSalesOrderList({ query, status, paymentTerm, paymentStatus });
 
   if (view === "deliveries") {
     const deliveries = await getDeliveryList({ salesOrderId: params.salesOrderId });
@@ -85,6 +87,7 @@ export default async function SalesPage({ searchParams }: SalesPageProps) {
       salesOrderId: params.salesOrderId,
       customerInvoiceId: params.customerInvoiceId,
       customerId: params.partnerId,
+      paymentStatus: params.paymentStatus,
     });
     const page = paginateRows(invoices, params);
 

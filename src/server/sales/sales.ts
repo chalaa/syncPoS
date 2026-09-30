@@ -175,6 +175,7 @@ export async function getSalesOrderList(params?: {
   status?: string;
   paymentTerm?: string;
   locationId?: string;
+  paymentStatus?: string;
 }): Promise<SalesOrderListRow[]> {
   const company = await getDefaultCompany();
   const locationId = params?.locationId ?? await getSelectedShopId();
@@ -185,6 +186,16 @@ export async function getSalesOrderList(params?: {
     ? sql`and (so.order_no ilike ${`%${query}%`} or customer.display_name ilike ${`%${query}%`} or so.customer_reference ilike ${`%${query}%`} or so.fs_number ilike ${`%${query}%`})`
     : sql``;
   const locationFilter = locationId ? sql`and so.source_location_id = ${locationId}::uuid` : sql``;
+
+  const paymentStatus = params?.paymentStatus;
+  const paymentStatusFilter =
+    paymentStatus === "fully_paid" || paymentStatus === "paid"
+      ? sql`and (so.total_minor <= 0 or coalesce(pay.paid_minor, 0) >= so.total_minor)`
+      : paymentStatus === "not_paid" || paymentStatus === "unpaid"
+      ? sql`and (coalesce(pay.paid_minor, 0) <= 0 and so.total_minor > 0)`
+      : paymentStatus === "partially_paid" || paymentStatus === "partial"
+      ? sql`and (coalesce(pay.paid_minor, 0) > 0 and so.total_minor - coalesce(pay.paid_minor, 0) > 0)`
+      : sql``;
 
   const rows = await db.execute<SalesOrderListRow>(sql`
     select
@@ -228,6 +239,7 @@ export async function getSalesOrderList(params?: {
       ${locationFilter}
       ${statusFilter}
       ${paymentTermFilter}
+      ${paymentStatusFilter}
       ${searchFilter}
     group by so.id, customer.id, own.name, loc.id, pay.paid_minor
     order by so.created_at desc
@@ -399,6 +411,7 @@ export async function getCustomerInvoiceList(params: {
   customerInvoiceId?: string;
   customerId?: string;
   locationId?: string;
+  paymentStatus?: string;
 } = {}): Promise<CustomerInvoiceListRow[]> {
   const company = await getDefaultCompany();
   const locationId = params.locationId ?? await getSelectedShopId();
@@ -407,6 +420,16 @@ export async function getCustomerInvoiceList(params: {
   const invoiceFilter = params.customerInvoiceId ? sql`and ci.id = ${params.customerInvoiceId}` : sql``;
   const customerFilter = params.customerId ? sql`and ci.customer_id = ${params.customerId}` : sql``;
   const locationFilter = locationId ? sql`and (so.source_location_id = ${locationId}::uuid or d.source_location_id = ${locationId}::uuid)` : sql``;
+
+  const paymentStatus = params.paymentStatus;
+  const paymentStatusFilter =
+    paymentStatus === "fully_paid" || paymentStatus === "paid"
+      ? sql`and (ci.total_minor <= 0 or (ci.total_minor - coalesce((select sum(pa.amount_minor) from payment_allocations pa inner join payments p on p.id = pa.payment_id where pa.customer_invoice_id = ci.id and pa.deleted_at is null and p.deleted_at is null and p.status = 'posted'), 0)) <= 0)`
+      : paymentStatus === "not_paid" || paymentStatus === "unpaid"
+      ? sql`and (ci.total_minor > 0 and coalesce((select sum(pa.amount_minor) from payment_allocations pa inner join payments p on p.id = pa.payment_id where pa.customer_invoice_id = ci.id and pa.deleted_at is null and p.deleted_at is null and p.status = 'posted'), 0) <= 0)`
+      : paymentStatus === "partially_paid" || paymentStatus === "partial"
+      ? sql`and (coalesce((select sum(pa.amount_minor) from payment_allocations pa inner join payments p on p.id = pa.payment_id where pa.customer_invoice_id = ci.id and pa.deleted_at is null and p.deleted_at is null and p.status = 'posted'), 0) > 0 and (ci.total_minor - coalesce((select sum(pa.amount_minor) from payment_allocations pa inner join payments p on p.id = pa.payment_id where pa.customer_invoice_id = ci.id and pa.deleted_at is null and p.deleted_at is null and p.status = 'posted'), 0)) > 0)`
+      : sql``;
 
   return db.execute<CustomerInvoiceListRow>(sql`
     select
@@ -474,6 +497,7 @@ export async function getCustomerInvoiceList(params: {
       ${deliveryFilter}
       ${invoiceFilter}
       ${customerFilter}
+      ${paymentStatusFilter}
     group by ci.id, so.id, d.id, customer.id
     order by ci.invoice_date desc, ci.invoice_no desc
   `);

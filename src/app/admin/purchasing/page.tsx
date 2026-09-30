@@ -49,6 +49,7 @@ type PurchasingPageProps = {
     q?: string;
     status?: string;
     paymentTerm?: string;
+    paymentStatus?: string;
     locationId?: string;
     costType?: string;
     page?: string;
@@ -75,11 +76,12 @@ export default async function PurchasingPage({ searchParams }: PurchasingPagePro
   const query = params.q ?? "";
   const status = params.status ?? "";
   const paymentTerm = params.paymentTerm ?? "";
+  const paymentStatus = params.paymentStatus ?? "";
   const locationId = params.locationId ?? "";
   const costType = params.costType ?? "";
 
   const formOptions = await getPurchaseFormOptions();
-  const allOrders = await getPurchaseOrderList({ query, status, paymentTerm, locationId: locationId || undefined });
+  const allOrders = await getPurchaseOrderList({ query, status, paymentTerm, locationId: locationId || undefined, paymentStatus });
 
   if (view === "receipts") {
     let receipts = await getPurchaseReceiptList(params.purchaseOrderId, locationId || undefined);
@@ -480,6 +482,16 @@ function PurchaseOrderList({
             label="purchasing.term"
             options={paymentTermOptions}
             allLabel="All Terms"
+          />
+          <TableFilterSelect
+            paramName="paymentStatus"
+            label="purchasing.paymentSettlement"
+            options={[
+              { value: "fully_paid", label: "purchasing.fullyPaid" },
+              { value: "partially_paid", label: "purchasing.partiallyPaid" },
+              { value: "not_paid", label: "status.unpaid" },
+            ]}
+            allLabel="All Payments"
           />
           {locationOptions.length > 0 ? (
             <TableFilterSelect
