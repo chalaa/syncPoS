@@ -58,16 +58,7 @@ export default async function AdminDashboardPage() {
         }
       />
 
-      {/* Welcome & Context Banner */}
-      <div className="mb-5 flex flex-col justify-between gap-2 rounded-lg border border-border border-l-4 border-l-primary bg-card px-5 py-4 text-sm shadow-xs sm:flex-row sm:items-center">
-        <div className="text-muted-foreground">
-          Signed in as <span className="font-semibold text-foreground">{user.username}</span>.
-          {" "}Real-time figures calculated from posted documents and payment ledgers.
-        </div>
-        <div className="text-xs text-muted-foreground">
-          Base Currency: <span className="font-semibold text-primary">{report.paymentAccounts[0]?.currencyCode ?? "ETB"}</span>
-        </div>
-      </div>
+
 
       {/* Quick Action Cards Bar */}
       <div className="mb-6 rounded-2xl border border-border/80 bg-card p-4 shadow-2xs">
