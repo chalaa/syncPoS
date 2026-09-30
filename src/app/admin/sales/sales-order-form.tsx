@@ -254,6 +254,7 @@ export const SalesOrderForm = forwardRef<SalesOrderFormHandle, SalesOrderFormPro
   const [paymentTerm, setPaymentTerm] = useState<"cash" | "credit">(order?.paymentTerm ?? "cash");
 
   const [hasDraft, setHasDraft] = useState(false);
+  const [isSubmittedOrFinished, setIsSubmittedOrFinished] = useState(false);
 
   useEffect(() => {
     if (order) return;
@@ -644,7 +645,7 @@ export const SalesOrderForm = forwardRef<SalesOrderFormHandle, SalesOrderFormPro
   }
 
   useEffect(() => {
-    if (order) return;
+    if (order || isSubmittedOrFinished) return;
     const hasData = customerId || fsNumber || lines.some((l) => l.productId || l.quantity !== "1" || l.unitPrice !== "0");
     if (hasData) {
       const draft = {
@@ -659,7 +660,7 @@ export const SalesOrderForm = forwardRef<SalesOrderFormHandle, SalesOrderFormPro
       };
       localStorage.setItem(STORAGE_KEY, JSON.stringify(draft));
     }
-  }, [order, customerId, fsNumber, paymentTerm, sourceLocationId, headerOwnerId, orderDate, validUntil, lines]);
+  }, [order, isSubmittedOrFinished, customerId, fsNumber, paymentTerm, sourceLocationId, headerOwnerId, orderDate, validUntil, lines]);
 
   function submitWithIntent(intent: "draft" | "confirm") {
     setSubmitIntent(intent);
@@ -672,6 +673,9 @@ export const SalesOrderForm = forwardRef<SalesOrderFormHandle, SalesOrderFormPro
     }
 
     if (formRef.current) {
+      setIsSubmittedOrFinished(true);
+      localStorage.removeItem(STORAGE_KEY);
+      setHasDraft(false);
       const formData = new FormData(formRef.current);
       formData.set("intent", intent);
       startTransition(async () => {
@@ -679,8 +683,10 @@ export const SalesOrderForm = forwardRef<SalesOrderFormHandle, SalesOrderFormPro
 
         if (result?.error) {
           setServerError(result.error);
+          setIsSubmittedOrFinished(false);
         } else {
           localStorage.removeItem(STORAGE_KEY);
+          setHasDraft(false);
         }
       });
     }

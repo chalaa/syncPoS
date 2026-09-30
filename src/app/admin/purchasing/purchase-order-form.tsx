@@ -222,6 +222,7 @@ export const PurchaseOrderForm = forwardRef<PurchaseOrderFormHandle, PurchaseOrd
   const [paymentTerm, setPaymentTerm] = useState<"cash" | "credit">(order?.paymentTerm ?? "cash");
 
   const [hasDraft, setHasDraft] = useState(false);
+  const [isSubmittedOrFinished, setIsSubmittedOrFinished] = useState(false);
 
   useEffect(() => {
     if (order) return;
@@ -478,7 +479,7 @@ export const PurchaseOrderForm = forwardRef<PurchaseOrderFormHandle, PurchaseOrd
   }
 
   useEffect(() => {
-    if (order) return;
+    if (order || isSubmittedOrFinished) return;
     const hasData = supplierId || notes || lines.some((l) => l.productId || l.quantity !== "1" || l.unitCost !== "0");
     if (hasData) {
       const draft = {
@@ -493,7 +494,7 @@ export const PurchaseOrderForm = forwardRef<PurchaseOrderFormHandle, PurchaseOrd
       };
       localStorage.setItem(STORAGE_KEY, JSON.stringify(draft));
     }
-  }, [order, supplierId, deliverToLocationId, headerOwnerId, paymentTerm, orderDate, paymentDueDate, notes, lines]);
+  }, [order, isSubmittedOrFinished, supplierId, deliverToLocationId, headerOwnerId, paymentTerm, orderDate, paymentDueDate, notes, lines]);
 
   function submitWithIntent(intent: "draft" | "confirm") {
     setSubmitIntent(intent);
@@ -506,6 +507,9 @@ export const PurchaseOrderForm = forwardRef<PurchaseOrderFormHandle, PurchaseOrd
     }
 
     if (formRef.current) {
+      setIsSubmittedOrFinished(true);
+      localStorage.removeItem(STORAGE_KEY);
+      setHasDraft(false);
       const formData = new FormData(formRef.current);
       formData.set("intent", intent);
       startTransition(async () => {
@@ -513,8 +517,10 @@ export const PurchaseOrderForm = forwardRef<PurchaseOrderFormHandle, PurchaseOrd
 
         if (result?.error) {
           setServerError(result.error);
+          setIsSubmittedOrFinished(false);
         } else {
           localStorage.removeItem(STORAGE_KEY);
+          setHasDraft(false);
         }
       });
     }

@@ -658,6 +658,7 @@ export function InventoryAdjustmentForm({
 
   const ADJUSTMENT_STORAGE_KEY = "syncpos_draft_inventory_adjustment";
   const [hasDraft, setHasDraft] = useState(false);
+  const [isSubmittedOrFinished, setIsSubmittedOrFinished] = useState(false);
 
   useEffect(() => {
     try {
@@ -691,10 +692,11 @@ export function InventoryAdjustmentForm({
   }
 
   useEffect(() => {
+    if (isSubmittedOrFinished) return;
     if (ownerId || locationId) {
       localStorage.setItem(ADJUSTMENT_STORAGE_KEY, JSON.stringify({ ownerId, locationId }));
     }
-  }, [ownerId, locationId]);
+  }, [ownerId, locationId, isSubmittedOrFinished]);
 
   function handleLocationChange(nextLocId: string) {
     setLocationId(nextLocId);
@@ -707,8 +709,15 @@ export function InventoryAdjustmentForm({
   }
 
   async function handleFormAction(formData: FormData) {
+    setIsSubmittedOrFinished(true);
     localStorage.removeItem(ADJUSTMENT_STORAGE_KEY);
-    await action(formData);
+    setHasDraft(false);
+    try {
+      await action(formData);
+    } catch (err) {
+      setIsSubmittedOrFinished(false);
+      throw err;
+    }
   }
 
   return (
@@ -1174,6 +1183,7 @@ export function InventoryScrapForm({
 
   const SCRAP_STORAGE_KEY = "syncpos_draft_inventory_scrap";
   const [hasDraft, setHasDraft] = useState(false);
+  const [isSubmittedOrFinished, setIsSubmittedOrFinished] = useState(false);
 
   useEffect(() => {
     try {
@@ -1207,10 +1217,11 @@ export function InventoryScrapForm({
   }
 
   useEffect(() => {
+    if (isSubmittedOrFinished) return;
     if (ownerId || locationId) {
       localStorage.setItem(SCRAP_STORAGE_KEY, JSON.stringify({ ownerId, locationId }));
     }
-  }, [ownerId, locationId]);
+  }, [ownerId, locationId, isSubmittedOrFinished]);
 
   function handleLocationChange(nextLocId: string) {
     setLocationId(nextLocId);
@@ -1223,8 +1234,15 @@ export function InventoryScrapForm({
   }
 
   async function handleFormAction(formData: FormData) {
+    setIsSubmittedOrFinished(true);
     localStorage.removeItem(SCRAP_STORAGE_KEY);
-    await action(formData);
+    setHasDraft(false);
+    try {
+      await action(formData);
+    } catch (err) {
+      setIsSubmittedOrFinished(false);
+      throw err;
+    }
   }
 
   return (
@@ -1831,6 +1849,7 @@ export function InventoryInternalTransferForm({
 
   const TRANSFER_STORAGE_KEY = "syncpos_draft_inventory_transfer";
   const [hasDraft, setHasDraft] = useState(false);
+  const [isSubmittedOrFinished, setIsSubmittedOrFinished] = useState(false);
 
   useEffect(() => {
     try {
@@ -1865,14 +1884,22 @@ export function InventoryInternalTransferForm({
   }
 
   useEffect(() => {
+    if (isSubmittedOrFinished) return;
     if (ownerId || fromLocationId || toLocationId) {
       localStorage.setItem(TRANSFER_STORAGE_KEY, JSON.stringify({ ownerId, fromLocationId, toLocationId }));
     }
-  }, [ownerId, fromLocationId, toLocationId]);
+  }, [ownerId, fromLocationId, toLocationId, isSubmittedOrFinished]);
 
   async function handleFormAction(formData: FormData) {
+    setIsSubmittedOrFinished(true);
     localStorage.removeItem(TRANSFER_STORAGE_KEY);
-    await action(formData);
+    setHasDraft(false);
+    try {
+      await action(formData);
+    } catch (err) {
+      setIsSubmittedOrFinished(false);
+      throw err;
+    }
   }
 
   return (
