@@ -330,7 +330,8 @@ export function ProductForm({
                       type="number"
                       min="0"
                       step="0.01"
-                      defaultValue={product ? minorToDisplay(product.listPriceMinor) : "0.00"}
+                      defaultValue={product ? minorToDisplay(product.listPriceMinor) : ""}
+                      placeholder="0.00"
                       className={inputClass}
                     />
                   </label>
@@ -361,7 +362,8 @@ export function ProductForm({
                       type="number"
                       min="0"
                       step="0.01"
-                      defaultValue={product ? minorToDisplay(product.standardCostMinor) : "0.00"}
+                      defaultValue={product ? minorToDisplay(product.standardCostMinor) : ""}
+                      placeholder="0.00"
                       className={inputClass}
                     />
                   </label>

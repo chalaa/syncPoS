@@ -178,8 +178,8 @@ export function NewProductModal({
   );
   const [model, setModel] = useState(initialModel);
   const [trackingMode, setTrackingMode] = useState<TrackingModeOption>("none");
-  const [listPrice, setListPrice] = useState("0.00");
-  const [standardCost, setStandardCost] = useState("0.00");
+  const [listPrice, setListPrice] = useState("");
+  const [standardCost, setStandardCost] = useState("");
   const [unitId, setUnitId] = useState(units[0]?.id ?? "");
   const [customSku, setCustomSku] = useState("");
   const [description, setDescription] = useState("");
@@ -310,8 +310,8 @@ export function NewProductModal({
     setCountry("");
     setModel("");
     setTrackingMode("none");
-    setListPrice("0.00");
-    setStandardCost("0.00");
+    setListPrice("");
+    setStandardCost("");
     setUnitId(units[0]?.id ?? "");
     setCustomSku("");
     setDescription("");
