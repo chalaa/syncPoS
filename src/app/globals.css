@@ -92,6 +92,22 @@ body {
   overflow-x: hidden;
 }
 
+/* PWA Touch & Safe Area Support for Desktops, Tablets & Mobile Notch screens */
+@supports (padding-top: env(safe-area-inset-top)) {
+  body {
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+}
+
+@media (display-mode: standalone) {
+  body {
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
 input,
 select,
 textarea,
@@ -148,4 +164,3 @@ table tbody tr:hover {
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
-
