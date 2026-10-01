@@ -5,6 +5,8 @@ import { useTransition } from "react";
 
 import { useTranslation } from "@/lib/i18n/use-translation";
 
+import { cn } from "@/lib/utils";
+
 export type FilterOption = {
   value: string;
   label: string;
@@ -35,7 +37,6 @@ export function TableFilterSelect({
 
   const currentValue = searchParams.get(paramName) ?? defaultValue;
 
-  const displayLabel = label ? t(`field.${label.toLowerCase()}`, t(label, label)) : undefined;
   const displayAllLabel = t(`action.all${paramName.charAt(0).toUpperCase() + paramName.slice(1)}s`, t(allLabel, allLabel));
 
   function handleChange(newValue: string) {
@@ -53,12 +54,11 @@ export function TableFilterSelect({
   }
 
   return (
-    <label className={`flex items-center gap-2 text-xs font-medium text-muted-foreground ${className}`}>
-      {displayLabel ? <span className="shrink-0">{displayLabel}:</span> : null}
+    <label className={cn("inline-flex items-center text-xs font-medium text-muted-foreground w-full sm:w-auto", className)}>
       <select
         value={currentValue}
         onChange={(e) => handleChange(e.target.value)}
-        className="h-9 rounded-md border border-input bg-background px-2.5 text-xs text-foreground outline-none focus-visible:ring-1 focus-visible:ring-ring"
+        className="h-9 w-full sm:w-auto min-w-[120px] rounded-md border border-input bg-background px-2.5 text-xs text-foreground outline-none focus-visible:ring-1 focus-visible:ring-ring transition-colors cursor-pointer"
       >
         <option value="">{displayAllLabel}</option>
         {options.map((opt) => (

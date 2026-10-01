@@ -7,6 +7,7 @@ import { Badge, StatusBadge } from "@/components/ui/badge";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { ClickableTableRow } from "@/components/ui/clickable-table-row";
 import { DeleteConfirmationDialog } from "@/components/ui/delete-confirmation-dialog";
+import { TableFilterBar } from "@/components/ui/table-filter-bar";
 import { TableFilterSelect } from "@/components/ui/table-filter-select";
 import { TableSearchInput } from "@/components/ui/table-search-input";
 import { TablePagination } from "@/components/ui/table-pagination";
@@ -91,28 +92,23 @@ export default async function PartnersPage({ searchParams }: PartnersPageProps) 
 
       <div className="grid gap-5">
         <section className="rounded-xl border border-border bg-card shadow-xs">
-          <div className="flex flex-col gap-3 border-b border-border p-4 sm:flex-row sm:items-center sm:justify-between">
-            <div className="min-w-0 flex-1 sm:max-w-md">
-              <TableSearchInput
-                defaultValue={query}
-                placeholder="Search code, name, legal name, TIN..."
-              />
-            </div>
-            <div className="flex flex-wrap items-center gap-3">
-              <TableFilterSelect
-                paramName="status"
-                label="Status"
-                options={statusOptions}
-                allLabel="All Statuses"
-              />
-              <TableFilterSelect
-                paramName="paymentTerm"
-                label="Payment Term"
-                options={paymentTermOptions}
-                allLabel="All Terms"
-              />
-            </div>
-          </div>
+          <TableFilterBar
+            searchPlaceholder="Search code, name, legal name, TIN..."
+            filterParamNames={["status", "paymentTerm"]}
+          >
+            <TableFilterSelect
+              paramName="status"
+              label="Status"
+              options={statusOptions}
+              allLabel="All Statuses"
+            />
+            <TableFilterSelect
+              paramName="paymentTerm"
+              label="Payment Term"
+              options={paymentTermOptions}
+              allLabel="All Terms"
+            />
+          </TableFilterBar>
 
           <div className="flex gap-2 border-b border-border px-4 py-2.5 text-sm">
             <Link

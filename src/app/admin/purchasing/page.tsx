@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 
+import { TableFilterBar } from "@/components/ui/table-filter-bar";
 import { TableFilterSelect } from "@/components/ui/table-filter-select";
 import { TableSearchInput } from "@/components/ui/table-search-input";
 import { TablePagination } from "@/components/ui/table-pagination";
@@ -293,14 +294,12 @@ function SupplierReturnList({ returns }: { returns: SupplierReturnListRow[] }) {
 
   return (
     <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-xs">
-      <div className="flex flex-col gap-3 border-b border-border bg-muted/20 p-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="min-w-0 flex-1 sm:max-w-md">
-          <TableSearchInput placeholder="Search return #, receipt ref, or supplier..." />
-        </div>
-        <div className="flex flex-wrap items-center gap-3">
-          <TableFilterSelect paramName="status" label="Status" options={statusOptions} allLabel="All Statuses" />
-        </div>
-      </div>
+      <TableFilterBar
+        searchPlaceholder="Search return #, receipt ref, or supplier..."
+        filterParamNames={["status"]}
+      >
+        <TableFilterSelect paramName="status" label="Status" options={statusOptions} allLabel="All Statuses" />
+      </TableFilterBar>
       <div className="overflow-x-auto">
         <table className="w-full min-w-[900px] text-left text-sm">
           <thead>
@@ -370,15 +369,13 @@ function LandedCostList({ landedCosts }: { landedCosts: PurchaseLandedCostListRo
 
   return (
     <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-xs">
-      <div className="flex flex-col gap-3 border-b border-border bg-muted/20 p-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="min-w-0 flex-1 sm:max-w-md">
-          <TableSearchInput placeholder="Search cost #, PO ref, receipt #, or vendor..." />
-        </div>
-        <div className="flex flex-wrap items-center gap-3">
-          <TableFilterSelect paramName="status" label="Status" options={statusOptions} allLabel="All Statuses" />
-          <TableFilterSelect paramName="costType" label="Cost Type" options={costTypeOptions} allLabel="All Types" />
-        </div>
-      </div>
+      <TableFilterBar
+        searchPlaceholder="Search cost #, PO ref, receipt #, or vendor..."
+        filterParamNames={["status", "costType"]}
+      >
+        <TableFilterSelect paramName="status" label="Status" options={statusOptions} allLabel="All Statuses" />
+        <TableFilterSelect paramName="costType" label="Cost Type" options={costTypeOptions} allLabel="All Types" />
+      </TableFilterBar>
       <div className="overflow-x-auto">
         <table className="w-full min-w-[1040px] text-left text-sm">
           <thead>
@@ -467,45 +464,41 @@ function PurchaseOrderList({
 
   return (
     <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-xs">
-      <div className="flex flex-col gap-3 border-b border-border bg-muted/20 p-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="min-w-0 flex-1 sm:max-w-md">
-          <TableSearchInput
-            placeholder="Search order #, supplier name, or ref..."
-          />
-        </div>
-        <div className="flex flex-wrap items-center gap-3">
+      <TableFilterBar
+        searchPlaceholder="Search order #, supplier name, or ref..."
+        filterParamNames={["status", "paymentTerm", "paymentStatus", "locationId"]}
+      >
+        <TableFilterSelect
+          paramName="status"
+          label="Status"
+          options={statusOptions}
+          allLabel="All Statuses"
+        />
+        <TableFilterSelect
+          paramName="paymentTerm"
+          label="purchasing.term"
+          options={paymentTermOptions}
+          allLabel="All Terms"
+        />
+        <TableFilterSelect
+          paramName="paymentStatus"
+          label="purchasing.paymentSettlement"
+          options={[
+            { value: "fully_paid", label: "purchasing.fullyPaid" },
+            { value: "partially_paid", label: "purchasing.partiallyPaid" },
+            { value: "not_paid", label: "status.unpaid" },
+          ]}
+          allLabel="All Payments"
+        />
+        {locationOptions.length > 0 ? (
           <TableFilterSelect
-            paramName="status"
-            label="Status"
-            options={statusOptions}
-            allLabel="All Statuses"
+            paramName="locationId"
+            label="status.warehouse"
+            options={locationOptions}
+            allLabel="All Warehouses"
           />
-          <TableFilterSelect
-            paramName="paymentTerm"
-            label="purchasing.term"
-            options={paymentTermOptions}
-            allLabel="All Terms"
-          />
-          <TableFilterSelect
-            paramName="paymentStatus"
-            label="purchasing.paymentSettlement"
-            options={[
-              { value: "fully_paid", label: "purchasing.fullyPaid" },
-              { value: "partially_paid", label: "purchasing.partiallyPaid" },
-              { value: "not_paid", label: "status.unpaid" },
-            ]}
-            allLabel="All Payments"
-          />
-          {locationOptions.length > 0 ? (
-            <TableFilterSelect
-              paramName="locationId"
-              label="status.warehouse"
-              options={locationOptions}
-              allLabel="All Warehouses"
-            />
-          ) : null}
-        </div>
-      </div>
+        ) : null}
+      </TableFilterBar>
       <div className="overflow-x-auto">
         <table className="w-full min-w-[1080px] text-left text-sm">
           <thead>
@@ -621,17 +614,15 @@ function ReceiptList({
 
   return (
     <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-xs">
-      <div className="flex flex-col gap-3 border-b border-border bg-muted/20 p-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="min-w-0 flex-1 sm:max-w-md">
-          <TableSearchInput placeholder="Search receipt #, PO ref, supplier, or invoice..." />
-        </div>
-        <div className="flex flex-wrap items-center gap-3">
-          <TableFilterSelect paramName="status" label="Status" options={statusOptions} allLabel="All Statuses" />
-          {locationOptions.length > 0 ? (
-            <TableFilterSelect paramName="locationId" label="status.warehouse" options={locationOptions} allLabel="All Warehouses" />
-          ) : null}
-        </div>
-      </div>
+      <TableFilterBar
+        searchPlaceholder="Search receipt #, PO ref, supplier, or invoice..."
+        filterParamNames={["status", "locationId"]}
+      >
+        <TableFilterSelect paramName="status" label="Status" options={statusOptions} allLabel="All Statuses" />
+        {locationOptions.length > 0 ? (
+          <TableFilterSelect paramName="locationId" label="status.warehouse" options={locationOptions} allLabel="All Warehouses" />
+        ) : null}
+      </TableFilterBar>
       <div className="overflow-x-auto">
         <table className="w-full min-w-[980px] text-left text-sm">
           <thead>
@@ -705,14 +696,12 @@ function PaymentList({ payments }: { payments: PaymentListRow[] }) {
 
   return (
     <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-xs">
-      <div className="flex flex-col gap-3 border-b border-border bg-muted/20 p-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="min-w-0 flex-1 sm:max-w-md">
-          <TableSearchInput placeholder="Search payment #, supplier, or reference..." />
-        </div>
-        <div className="flex flex-wrap items-center gap-3">
-          <TableFilterSelect paramName="status" label="Status" options={statusOptions} allLabel="All Statuses" />
-        </div>
-      </div>
+      <TableFilterBar
+        searchPlaceholder="Search payment #, supplier, or reference..."
+        filterParamNames={["status"]}
+      >
+        <TableFilterSelect paramName="status" label="Status" options={statusOptions} allLabel="All Statuses" />
+      </TableFilterBar>
       <div className="overflow-x-auto">
         <table className="w-full min-w-[1040px] text-left text-sm">
           <thead>

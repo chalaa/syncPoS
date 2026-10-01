@@ -493,6 +493,8 @@ function ShopSelector({
   onChange: (locationId: string | null) => void;
 }) {
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const { t } = useTranslation();
 
   if (locations.length === 0) {
@@ -512,7 +514,18 @@ function ShopSelector({
           document.cookie = "syncpos-selected-location=; path=/; max-age=0";
         }
       } catch {}
-      router.refresh();
+
+      const params = new URLSearchParams(searchParams.toString());
+      if (params.has("locationId") || pathname.startsWith("/admin/inventory")) {
+        if (nextId) {
+          params.set("locationId", nextId);
+        } else {
+          params.delete("locationId");
+        }
+        router.push(`${pathname}?${params.toString()}`);
+      } else {
+        router.refresh();
+      }
     }
   }
 
@@ -523,7 +536,7 @@ function ShopSelector({
         aria-label={t("shop.defaultSelect")}
         value={selectedLocationId ?? locations[0]?.id ?? ""}
         onChange={(event) => handleSelect(event.target.value)}
-        className="h-9 w-28 rounded-md border border-input bg-background px-2 text-xs text-foreground sm:w-40 lg:w-48"
+        className="h-9 w-28 rounded-md border border-input bg-background px-2 text-xs text-foreground sm:w-40 lg:w-48 cursor-pointer"
       >
         {locations.map((location) => (
           <option key={location.id} value={location.id}>

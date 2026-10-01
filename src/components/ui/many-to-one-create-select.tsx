@@ -1,6 +1,6 @@
 "use client";
 
-import { PlusIcon, SearchIcon, UserPlus } from "lucide-react";
+import { SearchIcon, UserPlus } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 
 import { createPortal } from "react-dom";
@@ -376,39 +376,24 @@ export function ManyToOneCreateSelect({
           </p>
         ) : null}
 
-        {trimmedQuery ? (
-          <div className="border-t border-border pt-1">
-            <button
-              type="button"
-              onPointerDown={(event) => {
-                event.preventDefault();
-                createCustomer({ displayName: trimmedQuery });
-              }}
-              onClick={() => createCustomer({ displayName: trimmedQuery })}
-              disabled={isPending}
-              className="flex w-full items-center gap-2 rounded px-3 py-2 text-left text-sm text-foreground transition-colors hover:bg-secondary/80 disabled:opacity-60 font-medium"
-            >
-              <PlusIcon className="size-4 text-[#0B5D4B]" />
-              {isPending ? t("manyToOne.creating", "Creating...") : `${t("manyToOne.quickCreate", "Quick Create")} "${trimmedQuery}"`}
-            </button>
-            <button
-              type="button"
-              onPointerDown={(event) => {
-                event.preventDefault();
-                setIsOpen(false);
-                setIsDialogOpen(true);
-              }}
-              onClick={() => {
-                setIsOpen(false);
-                setIsDialogOpen(true);
-              }}
-              className="flex w-full items-center gap-2 rounded px-3 py-2 text-left text-sm text-foreground transition-colors hover:bg-secondary/80 font-medium"
-            >
-              <PlusIcon className="size-4 text-[#0B5D4B]" />
-              {t("manyToOne.createAndEdit", "Create & Edit")} ({tEntityLabel})...
-            </button>
-          </div>
-        ) : null}
+        <div className="border-t border-border pt-1">
+          <button
+            type="button"
+            onPointerDown={(event) => {
+              event.preventDefault();
+              setIsOpen(false);
+              setIsDialogOpen(true);
+            }}
+            onClick={() => {
+              setIsOpen(false);
+              setIsDialogOpen(true);
+            }}
+            className="flex w-full items-center gap-2 rounded px-3 py-2 text-left text-sm text-foreground transition-colors hover:bg-secondary/80 font-medium"
+          >
+            <UserPlus className="size-4 text-[#0B5D4B]" />
+            {t("manyToOne.addEntity", "Add")} {tEntityLabel}
+          </button>
+        </div>
       </div>
 
       {!openUpward ? resizeHandle : null}

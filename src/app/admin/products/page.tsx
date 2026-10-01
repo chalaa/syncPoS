@@ -1,4 +1,5 @@
 import { Alert } from "@/components/ui/alert";
+import { TableFilterBar } from "@/components/ui/table-filter-bar";
 import { TableFilterSelect } from "@/components/ui/table-filter-select";
 import { TableSearchInput } from "@/components/ui/table-search-input";
 import { TablePagination } from "@/components/ui/table-pagination";
@@ -96,46 +97,41 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
       {params.error ? <Alert kind="error">{params.error}</Alert> : null}
 
       <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-xs">
-        <div className="flex flex-col gap-3 border-b border-border bg-muted/20 p-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="min-w-0 flex-1 sm:max-w-md">
-            <TableSearchInput
-              defaultValue={query}
-              placeholder="Search item code, SKU, product name, or model..."
-            />
-          </div>
-          <div className="flex flex-wrap items-center gap-3">
-            <TableFilterSelect
-              paramName="category"
-              label="Category"
-              options={categoryOptions}
-              allLabel="All Categories"
-            />
-            <TableFilterSelect
-              paramName="brand"
-              label="Brand"
-              options={brandOptions}
-              allLabel="All Brands"
-            />
-            <TableFilterSelect
-              paramName="unit"
-              label="Unit"
-              options={unitOptions}
-              allLabel="All Units"
-            />
-            <TableFilterSelect
-              paramName="trackingMode"
-              label="Tracking"
-              options={trackingModeOptions}
-              allLabel="All Tracking"
-            />
-            <TableFilterSelect
-              paramName="status"
-              label="Status"
-              options={statusOptions}
-              allLabel="All Statuses"
-            />
-          </div>
-        </div>
+        <TableFilterBar
+          searchPlaceholder="Search item code, SKU, product name, or model..."
+          filterParamNames={["category", "brand", "unit", "trackingMode", "status"]}
+        >
+          <TableFilterSelect
+            paramName="category"
+            label="Category"
+            options={categoryOptions}
+            allLabel="All Categories"
+          />
+          <TableFilterSelect
+            paramName="brand"
+            label="Brand"
+            options={brandOptions}
+            allLabel="All Brands"
+          />
+          <TableFilterSelect
+            paramName="unit"
+            label="Unit"
+            options={unitOptions}
+            allLabel="All Units"
+          />
+          <TableFilterSelect
+            paramName="trackingMode"
+            label="Tracking"
+            options={trackingModeOptions}
+            allLabel="All Tracking"
+          />
+          <TableFilterSelect
+            paramName="status"
+            label="Status"
+            options={statusOptions}
+            allLabel="All Statuses"
+          />
+        </TableFilterBar>
 
         <ProductListTable
           products={productPage.rows}
