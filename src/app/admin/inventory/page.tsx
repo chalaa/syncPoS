@@ -7,6 +7,7 @@ import { TablePagination } from "@/components/ui/table-pagination";
 import { T } from "@/components/ui/t";
 import { paginateRows } from "@/lib/pagination";
 import { requirePermission, getUserPermissionCodes } from "@/server/auth/session";
+import { getSelectedShopId } from "@/server/locations/shop-options";
 import { PERMISSIONS, userHasPermission } from "@/server/iam/permissions";
 import { StockByLocationTable, StockFilters } from "@/app/admin/inventory/stock-table";
 import {
@@ -43,7 +44,13 @@ export default async function InventoryPage({ searchParams }: InventoryPageProps
 
   const params = await searchParams;
   const query = params.q ?? "";
-  const locationId = params.locationId ?? "";
+  const headerShopId = (await getSelectedShopId()) ?? "";
+
+  const rawLocationParam = params.locationId;
+  const selectedLocationFilter = rawLocationParam !== undefined 
+    ? rawLocationParam 
+    : (headerShopId || "all");
+
   const status = parseStockStatus(params.status);
   const asOfDate = params.asOfDate ?? "";
 
@@ -51,13 +58,13 @@ export default async function InventoryPage({ searchParams }: InventoryPageProps
     getInventoryFilterOptions(),
     getStockByLocation({
       query,
-      locationId: locationId || undefined,
+      locationId: selectedLocationFilter,
       status,
       asOfDate: parseAsOfDate(asOfDate),
     }),
     getInventorySummaryMetrics({
       query,
-      locationId: locationId || undefined,
+      locationId: selectedLocationFilter,
       status,
       asOfDate: parseAsOfDate(asOfDate),
     }),
@@ -142,7 +149,7 @@ export default async function InventoryPage({ searchParams }: InventoryPageProps
         )}
         <StockFilters
           query={query}
-          locationId={locationId}
+          locationId={selectedLocationFilter}
           status={status}
           asOfDate={asOfDate}
           locations={options.locations}

@@ -61,8 +61,8 @@ export function StockFilters({
 
   function updateParam(key: string, value: string) {
     const params = new URLSearchParams(searchParams.toString());
-    if (!value || value === "all") {
-      params.delete(key);
+    if (value === "all" || value === "") {
+      params.set(key, "all");
     } else {
       params.set(key, value);
     }
@@ -73,7 +73,7 @@ export function StockFilters({
     router.push("/admin/inventory");
   }
 
-  const hasActiveFilters = Boolean(query || locationId || (status && status !== "all") || asOfDate);
+  const hasActiveFilters = Boolean(query || (locationId && locationId !== "all") || (status && status !== "all") || asOfDate);
 
   return (
     <div className="border-b border-border/80 bg-card p-4 space-y-3.5">
@@ -126,11 +126,11 @@ export function StockFilters({
           <span>{t("field.location", "Location")}</span>
           <select
             name="locationId"
-            defaultValue={locationId}
+            value={locationId || "all"}
             onChange={(e) => updateParam("locationId", e.target.value)}
-            className="h-10 rounded-xl border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring transition-colors"
+            className="h-10 rounded-xl border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring transition-colors cursor-pointer"
           >
-            <option value="">{t("inventory.allLocations", "All Locations")}</option>
+            <option value="all">{t("inventory.allLocations", "All Locations")}</option>
             {locations.map((loc) => (
               <option key={loc.id} value={loc.id}>
                 {loc.code} · {loc.name}

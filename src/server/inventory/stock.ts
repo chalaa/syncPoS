@@ -319,7 +319,7 @@ export async function getStockByLocation(params: {
   status?: StockStatusOption;
   asOfDate?: Date;
 }): Promise<StockByLocationRow[]> {
-  const effectiveLocationId = params.locationId ?? (await getSelectedShopId()) ?? undefined;
+  const effectiveLocationId = (!params.locationId || params.locationId === "all") ? undefined : params.locationId;
 
   if (params.asOfDate) {
     return getStockByLocationAsOf({
@@ -611,7 +611,7 @@ export async function getInventorySummaryMetrics(params?: {
   status?: StockStatusOption;
   asOfDate?: Date;
 }): Promise<InventorySummaryMetrics> {
-  const effectiveLocationId = params?.locationId ?? (await getSelectedShopId()) ?? undefined;
+  const effectiveLocationId = (!params?.locationId || params.locationId === "all") ? undefined : params.locationId;
   const rows = await getStockByLocation({
     query: params?.query,
     locationId: effectiveLocationId,
