@@ -605,48 +605,56 @@ export async function getSerialHistory(params: {
     .orderBy(desc(stockMovements.movementDate), desc(stockMovementLines.lineNo));
 }
 
-export async function getInventorySummaryMetrics(): Promise<InventorySummaryMetrics> {
-  const company = await getDefaultCompany();
-  const [row] = await db.execute<{
-    totalValuationMinor: string | number;
-    currencyCode: string | null;
-    totalSkusOnHand: number;
-    totalQuantityOnHand: string | number;
-    lowStockCount: number;
-    outOfStockCount: number;
-    totalReservedQuantity: string | number;
-  }>(sql`
-    with product_totals as (
-      select
-        p.id as product_id,
-        coalesce(sum(cast(sb.quantity_on_hand as numeric)), 0) as on_hand,
-        coalesce(sum(cast(sb.quantity_available as numeric)), 0) as available,
-        coalesce(sum(cast(sb.quantity_reserved as numeric)), 0) as reserved,
-        coalesce(sum(cast(sb.quantity_on_hand as numeric) * sb.average_cost_minor), 0)::bigint as valuation_minor,
-        max(sb.currency_code) as currency_code
-      from products p
-      left join stock_balances sb on sb.product_id = p.id and sb.deleted_at is null and sb.company_id = ${company.id}
-      where p.company_id = ${company.id} and p.deleted_at is null
-      group by p.id
-    )
-    select
-      coalesce(sum(valuation_minor), 0)::bigint as "totalValuationMinor",
-      coalesce(max(currency_code), 'ETB') as "currencyCode",
-      count(*) filter (where on_hand > 0)::int as "totalSkusOnHand",
-      coalesce(sum(on_hand) filter (where on_hand > 0), 0)::numeric as "totalQuantityOnHand",
-      count(*) filter (where available > 0 and available <= 10)::int as "lowStockCount",
-      count(*) filter (where on_hand <= 0)::int as "outOfStockCount",
-      coalesce(sum(reserved), 0)::numeric as "totalReservedQuantity"
-    from product_totals
-  `);
+export async function getInventorySummaryMetrics(params?: {
+  query?: string;
+  locationId?: string;
+  status?: StockStatusOption;
+  asOfDate?: Date;
+}): Promise<InventorySummaryMetrics> {
+  const effectiveLocationId = params?.locationId ?? (await getSelectedShopId()) ?? undefined;
+  const rows = await getStockByLocation({
+    query: params?.query,
+    locationId: effectiveLocationId,
+    asOfDate: params?.asOfDate,
+  });
+
+  let totalValuationMinor = 0;
+  let totalQuantityOnHand = 0;
+  let totalReservedQuantity = 0;
+  const activeProducts = new Set<string>();
+  const lowStockProducts = new Set<string>();
+  const outOfStockProducts = new Set<string>();
+
+  for (const row of rows) {
+    const qtyOnHand = Number(row.quantityOnHand) || 0;
+    const qtyAvail = Number(row.quantityAvailable) || 0;
+    const qtyReserved = Number(row.quantityReserved) || 0;
+    const costMinor = Number(row.averageCostMinor) || 0;
+
+    if (qtyOnHand > 0) {
+      totalValuationMinor += Math.round(qtyOnHand * costMinor);
+      totalQuantityOnHand += qtyOnHand;
+      activeProducts.add(row.productId);
+    } else {
+      outOfStockProducts.add(row.productId);
+    }
+
+    if (qtyAvail > 0 && qtyAvail <= 5) {
+      lowStockProducts.add(row.productId);
+    }
+
+    if (qtyReserved > 0) {
+      totalReservedQuantity += qtyReserved;
+    }
+  }
 
   return {
-    totalValuationMinor: Number(row?.totalValuationMinor ?? 0),
-    currencyCode: row?.currencyCode || "ETB",
-    totalSkusOnHand: Number(row?.totalSkusOnHand ?? 0),
-    totalQuantityOnHand: Number(row?.totalQuantityOnHand ?? 0),
-    lowStockCount: Number(row?.lowStockCount ?? 0),
-    outOfStockCount: Number(row?.outOfStockCount ?? 0),
-    totalReservedQuantity: Number(row?.totalReservedQuantity ?? 0),
+    totalValuationMinor,
+    currencyCode: rows[0]?.currencyCode || "ETB",
+    totalSkusOnHand: activeProducts.size,
+    totalQuantityOnHand,
+    lowStockCount: lowStockProducts.size,
+    outOfStockCount: outOfStockProducts.size,
+    totalReservedQuantity,
   };
 }

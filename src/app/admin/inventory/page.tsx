@@ -55,7 +55,12 @@ export default async function InventoryPage({ searchParams }: InventoryPageProps
       status,
       asOfDate: parseAsOfDate(asOfDate),
     }),
-    getInventorySummaryMetrics(),
+    getInventorySummaryMetrics({
+      query,
+      locationId: locationId || undefined,
+      status,
+      asOfDate: parseAsOfDate(asOfDate),
+    }),
     getInventoryAdjustmentFormOptions(),
   ]);
   const stockPage = paginateRows(rows, params);
