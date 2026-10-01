@@ -123,31 +123,71 @@ function findBalance(
   products: InventoryOperationFormOptions["products"],
   params: {
     locationId: string;
-    ownerId: string;
+    ownerId?: string;
     productId: string;
     serialNo: string | null;
     lotNo: string | null;
   },
 ) {
+  if (!params.locationId || !params.productId) {
+    return undefined;
+  }
+
   const product = products.find((item) => item.id === params.productId);
-  const balanceByKey = new Map(
-    balances.map((balance) => [
-      lineKey(balance.locationId, balance.ownerId ?? "", balance.productId, balance.serialNo, balance.lotNo),
-      balance,
-    ]),
-  );
-  const productBalanceByKey = aggregateProductBalance(balances);
-  const exactBalance = balanceByKey.get(
-    lineKey(
-      params.locationId,
-      params.ownerId,
-      params.productId,
-      product?.trackingMode === "serial" ? params.serialNo : null,
-      product?.trackingMode === "lot" ? params.lotNo : null,
-    ),
+
+  // Filter balances matching ONLY the dropdown selected locationId and productId
+  const locationBalances = balances.filter(
+    (b) => b.locationId === params.locationId && b.productId === params.productId,
   );
 
-  return exactBalance ?? productBalanceByKey.get(productLocationKey(params.locationId, params.ownerId, params.productId));
+  if (locationBalances.length === 0) {
+    return undefined;
+  }
+
+  // If tracking mode is serial/lot and serialNo/lotNo is provided, try exact tracking match first
+  if (product?.trackingMode === "serial" && params.serialNo) {
+    const exactSerial = locationBalances.find((b) => b.serialNo === params.serialNo);
+    if (exactSerial) return exactSerial;
+  }
+  if (product?.trackingMode === "lot" && params.lotNo) {
+    const exactLot = locationBalances.find((b) => b.lotNo === params.lotNo);
+    if (exactLot) return exactLot;
+  }
+
+  // Aggregate total onHand, available, and cost for the selected location dropdown
+  let quantityOnHand = 0;
+  let quantityAvailable = 0;
+  let averageCostMinor = 0;
+  let currencyCode = "ETB";
+
+  for (const b of locationBalances) {
+    if (product?.trackingMode === "serial" && params.serialNo && b.serialNo && b.serialNo !== params.serialNo) {
+      continue;
+    }
+    if (product?.trackingMode === "lot" && params.lotNo && b.lotNo && b.lotNo !== params.lotNo) {
+      continue;
+    }
+
+    quantityOnHand += Number(b.quantityOnHand) || 0;
+    quantityAvailable += Number(b.quantityAvailable) || 0;
+    if (b.averageCostMinor > 0) {
+      averageCostMinor = b.averageCostMinor;
+      currencyCode = b.currencyCode;
+    }
+  }
+
+  return {
+    locationId: params.locationId,
+    ownerId: params.ownerId || null,
+    ownerName: null,
+    productId: params.productId,
+    serialNo: params.serialNo,
+    lotNo: params.lotNo,
+    quantityOnHand: String(quantityOnHand),
+    quantityAvailable: String(quantityAvailable),
+    averageCostMinor,
+    currencyCode,
+  };
 }
 
 type InternalTransferValidationValues = {
@@ -302,16 +342,13 @@ export function AdjustmentLinesEditor({
         }
 
         if (values.productId && next.countedQuantity === "") {
-          const bal =
-            balanceByKey.get(
-              lineKey(
-                locationId,
-                ownerId,
-                values.productId,
-                product?.trackingMode === "serial" ? next.serialNo || null : null,
-                product?.trackingMode === "lot" ? next.lotNo || null : null,
-              ),
-            ) ?? productBalanceByKey.get(productLocationKey(locationId, ownerId, values.productId));
+          const bal = findBalance(balances, products, {
+            locationId,
+            ownerId,
+            productId: values.productId,
+            serialNo: product?.trackingMode === "serial" ? next.serialNo || null : null,
+            lotNo: product?.trackingMode === "lot" ? next.lotNo || null : null,
+          });
 
           if (bal) {
             next.countedQuantity = String(Number(bal.quantityOnHand));
@@ -325,17 +362,13 @@ export function AdjustmentLinesEditor({
 
   function currentBalance(line: AdjustmentLine) {
     const product = productById.get(line.productId);
-    const exactBalance = balanceByKey.get(
-      lineKey(
-        locationId,
-        ownerId,
-        line.productId,
-        product?.trackingMode === "serial" ? line.serialNo || null : null,
-        product?.trackingMode === "lot" ? line.lotNo || null : null,
-      ),
-    );
-
-    return exactBalance ?? productBalanceByKey.get(productLocationKey(locationId, ownerId, line.productId));
+    return findBalance(balances, products, {
+      locationId,
+      ownerId,
+      productId: line.productId,
+      serialNo: product?.trackingMode === "serial" ? line.serialNo || null : null,
+      lotNo: product?.trackingMode === "lot" ? line.lotNo || null : null,
+    });
   }
 
   const [editingLineIds, setEditingLineIds] = useState<Set<string>>(() => new Set([lines[0]?.id ?? ""]));
@@ -897,17 +930,13 @@ export function ScrapLinesEditor({
 
   function currentBalance(line: ScrapLine) {
     const product = productById.get(line.productId);
-    const exactBalance = balanceByKey.get(
-      lineKey(
-        locationId,
-        ownerId,
-        line.productId,
-        product?.trackingMode === "serial" ? line.serialNo || null : null,
-        product?.trackingMode === "lot" ? line.lotNo || null : null,
-      ),
-    );
-
-    return exactBalance ?? productBalanceByKey.get(productLocationKey(locationId, ownerId, line.productId));
+    return findBalance(balances, products, {
+      locationId,
+      ownerId,
+      productId: line.productId,
+      serialNo: product?.trackingMode === "serial" ? line.serialNo || null : null,
+      lotNo: product?.trackingMode === "lot" ? line.lotNo || null : null,
+    });
   }
 
   return (
@@ -1428,17 +1457,13 @@ export function InternalTransferLinesEditor({
 
   function currentBalance(line: InternalTransferLine) {
     const product = productById.get(line.productId);
-    const exactBalance = balanceByKey.get(
-      lineKey(
-        fromLocationId,
-        ownerId,
-        line.productId,
-        product?.trackingMode === "serial" ? line.serialNo || null : null,
-        product?.trackingMode === "lot" ? line.lotNo || null : null,
-      ),
-    );
-
-    return exactBalance ?? productBalanceByKey.get(productLocationKey(fromLocationId, ownerId, line.productId));
+    return findBalance(balances, products, {
+      locationId: fromLocationId,
+      ownerId,
+      productId: line.productId,
+      serialNo: product?.trackingMode === "serial" ? line.serialNo || null : null,
+      lotNo: product?.trackingMode === "lot" ? line.lotNo || null : null,
+    });
   }
 
   return (
