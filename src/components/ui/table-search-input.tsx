@@ -64,7 +64,7 @@ export function TableSearchInput({
   const displayPlaceholder = t(placeholder, placeholder);
 
   return (
-    <div className={cn("relative min-w-0 flex-1", className)}>
+    <div className={cn("relative w-full min-w-[180px] sm:min-w-[220px] flex-1", className)}>
       <SearchIcon className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground pointer-events-none" />
       <input
         type="text"

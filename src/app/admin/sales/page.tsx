@@ -42,6 +42,7 @@ type SalesPageProps = {
     status?: string;
     paymentTerm?: string;
     paymentStatus?: string;
+    locationId?: string;
     page?: string;
     pageSize?: string;
   }>;
@@ -68,8 +69,9 @@ export default async function SalesPage({ searchParams }: SalesPageProps) {
   const status = params.status ?? "";
   const paymentTerm = params.paymentTerm ?? "";
   const paymentStatus = params.paymentStatus ?? "";
+  const locationId = params.locationId ?? "";
 
-  const allOrders = await getSalesOrderList({ query, status, paymentTerm, paymentStatus });
+  const allOrders = await getSalesOrderList({ query, status, paymentTerm, paymentStatus, locationId: locationId || undefined });
 
   if (view === "deliveries") {
     const deliveries = await getDeliveryList({ salesOrderId: params.salesOrderId });

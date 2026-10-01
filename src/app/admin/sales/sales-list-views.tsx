@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import { TableFilterBar } from "@/components/ui/table-filter-bar";
 import { TableFilterSelect } from "@/components/ui/table-filter-select";
-import { TableSearchInput } from "@/components/ui/table-search-input";
 import { StatusBadge } from "@/components/ui/badge";
 import { ButtonLink } from "@/components/ui/button";
 import { ClickableTableRow } from "@/components/ui/clickable-table-row";
@@ -17,23 +17,21 @@ export function CustomerReturnList({ returns }: { returns: CustomerReturnListRow
 
   return (
     <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-xs">
-      <div className="flex flex-col gap-3 border-b border-border bg-muted/20 p-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="min-w-0 flex-1 sm:max-w-md">
-          <TableSearchInput placeholder={t("sales.searchReturns", "Search return #, order #, or customer...")} />
-        </div>
-        <div className="flex flex-wrap items-center gap-3">
-          <TableFilterSelect
-            paramName="status"
-            label="Status"
-            options={[
-              { value: "draft", label: t("inventory.draft", "Draft") },
-              { value: "posted", label: t("inventory.posted", "Posted") },
-              { value: "cancelled", label: t("inventory.cancelled", "Cancelled") },
-            ]}
-            allLabel="All Statuses"
-          />
-        </div>
-      </div>
+      <TableFilterBar
+        searchPlaceholder={t("sales.searchReturns", "Search return #, order #, or customer...")}
+        filterParamNames={["status"]}
+      >
+        <TableFilterSelect
+          paramName="status"
+          label="Status"
+          options={[
+            { value: "draft", label: t("inventory.draft", "Draft") },
+            { value: "posted", label: t("inventory.posted", "Posted") },
+            { value: "cancelled", label: t("inventory.cancelled", "Cancelled") },
+          ]}
+          allLabel="All Statuses"
+        />
+      </TableFilterBar>
       <div className="overflow-x-auto">
         <table className="w-full min-w-[900px] text-left text-sm">
           <thead>
@@ -92,33 +90,31 @@ export function CustomerInvoiceList({ invoices }: { invoices: CustomerInvoiceLis
 
   return (
     <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-xs">
-      <div className="flex flex-col gap-3 border-b border-border bg-muted/20 p-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="min-w-0 flex-1 sm:max-w-md">
-          <TableSearchInput placeholder={t("sales.searchInvoices", "Search invoice #, customer name, or source ref...")} />
-        </div>
-        <div className="flex flex-wrap items-center gap-3">
-          <TableFilterSelect
-            paramName="status"
-            label="Status"
-            options={[
-              { value: "draft", label: t("inventory.draft", "Draft") },
-              { value: "posted", label: t("inventory.posted", "Posted") },
-              { value: "cancelled", label: t("inventory.cancelled", "Cancelled") },
-            ]}
-            allLabel="All Statuses"
-          />
-          <TableFilterSelect
-            paramName="paymentStatus"
-            label="Payment"
-            options={[
-              { value: "fully_paid", label: t("purchasing.fullyPaid", "Fully Paid") },
-              { value: "partially_paid", label: t("purchasing.partiallyPaid", "Partially Paid") },
-              { value: "not_paid", label: t("status.unpaid", "Not Paid") },
-            ]}
-            allLabel="All Payments"
-          />
-        </div>
-      </div>
+      <TableFilterBar
+        searchPlaceholder={t("sales.searchInvoices", "Search invoice #, customer name, or source ref...")}
+        filterParamNames={["status", "paymentStatus"]}
+      >
+        <TableFilterSelect
+          paramName="status"
+          label="Status"
+          options={[
+            { value: "draft", label: t("inventory.draft", "Draft") },
+            { value: "posted", label: t("inventory.posted", "Posted") },
+            { value: "cancelled", label: t("inventory.cancelled", "Cancelled") },
+          ]}
+          allLabel="All Statuses"
+        />
+        <TableFilterSelect
+          paramName="paymentStatus"
+          label="Payment"
+          options={[
+            { value: "fully_paid", label: t("purchasing.fullyPaid", "Fully Paid") },
+            { value: "partially_paid", label: t("purchasing.partiallyPaid", "Partially Paid") },
+            { value: "not_paid", label: t("status.unpaid", "Not Paid") },
+          ]}
+          allLabel="All Payments"
+        />
+      </TableFilterBar>
       <div className="overflow-x-auto">
         <table className="w-full min-w-[1120px] text-left text-sm">
           <thead>
@@ -200,23 +196,21 @@ export function CustomerPaymentList({ payments }: { payments: PaymentListRow[] }
 
   return (
     <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-xs">
-      <div className="flex flex-col gap-3 border-b border-border bg-muted/20 p-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="min-w-0 flex-1 sm:max-w-md">
-          <TableSearchInput placeholder={t("sales.searchPayments", "Search payment #, customer, or reference...")} />
-        </div>
-        <div className="flex flex-wrap items-center gap-3">
-          <TableFilterSelect
-            paramName="status"
-            label="Status"
-            options={[
-              { value: "draft", label: t("inventory.draft", "Draft") },
-              { value: "posted", label: t("inventory.posted", "Posted") },
-              { value: "cancelled", label: t("inventory.cancelled", "Cancelled") },
-            ]}
-            allLabel="All Statuses"
-          />
-        </div>
-      </div>
+      <TableFilterBar
+        searchPlaceholder={t("sales.searchPayments", "Search payment #, customer, or reference...")}
+        filterParamNames={["status"]}
+      >
+        <TableFilterSelect
+          paramName="status"
+          label="Status"
+          options={[
+            { value: "draft", label: t("inventory.draft", "Draft") },
+            { value: "posted", label: t("inventory.posted", "Posted") },
+            { value: "cancelled", label: t("inventory.cancelled", "Cancelled") },
+          ]}
+          allLabel="All Statuses"
+        />
+      </TableFilterBar>
       <div className="overflow-x-auto">
         <table className="w-full min-w-[960px] text-left text-sm">
           <thead>
@@ -281,24 +275,22 @@ export function DeliveryList({ deliveries }: { deliveries: DeliveryListRow[] }) 
 
   return (
     <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-xs">
-      <div className="flex flex-col gap-3 border-b border-border bg-muted/20 p-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="min-w-0 flex-1 sm:max-w-md">
-          <TableSearchInput placeholder={t("sales.searchDeliveries", "Search delivery #, order #, or customer...")} />
-        </div>
-        <div className="flex flex-wrap items-center gap-3">
-          <TableFilterSelect
-            paramName="status"
-            label="Status"
-            options={[
-              { value: "draft", label: t("inventory.draft", "Draft") },
-              { value: "confirmed", label: t("inventory.confirmed", "Confirmed") },
-              { value: "done", label: t("inventory.done", "Done") },
-              { value: "cancelled", label: t("inventory.cancelled", "Cancelled") },
-            ]}
-            allLabel="All Statuses"
-          />
-        </div>
-      </div>
+      <TableFilterBar
+        searchPlaceholder={t("sales.searchDeliveries", "Search delivery #, order #, or customer...")}
+        filterParamNames={["status"]}
+      >
+        <TableFilterSelect
+          paramName="status"
+          label="Status"
+          options={[
+            { value: "draft", label: t("inventory.draft", "Draft") },
+            { value: "confirmed", label: t("inventory.confirmed", "Confirmed") },
+            { value: "done", label: t("inventory.done", "Done") },
+            { value: "cancelled", label: t("inventory.cancelled", "Cancelled") },
+          ]}
+          allLabel="All Statuses"
+        />
+      </TableFilterBar>
       <div className="overflow-x-auto">
         <table className="w-full min-w-[960px] text-left text-sm">
           <thead>
@@ -385,45 +377,41 @@ export function SalesOrderList({
 
   return (
     <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-xs">
-      <div className="flex flex-col gap-3 border-b border-border bg-muted/20 p-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="min-w-0 flex-1 sm:max-w-md">
-          <TableSearchInput
-            placeholder="Search order #, customer name, ref, or FS #..."
-          />
-        </div>
-        <div className="flex flex-wrap items-center gap-3">
-          {locations.length > 0 ? (
-            <TableFilterSelect
-              paramName="locationId"
-              label="Warehouse"
-              options={locations.map((loc) => ({ value: loc.id, label: `${loc.code} - ${loc.name}` }))}
-              allLabel="All Locations"
-            />
-          ) : null}
+      <TableFilterBar
+        searchPlaceholder="Search order #, customer name, ref, or FS #..."
+        filterParamNames={["locationId", "status", "paymentTerm", "paymentStatus"]}
+      >
+        {locations.length > 0 ? (
           <TableFilterSelect
-            paramName="status"
-            label="Status"
-            options={statusOptions}
-            allLabel="All Statuses"
+            paramName="locationId"
+            label="Warehouse"
+            options={locations.map((loc) => ({ value: loc.id, label: `${loc.code} - ${loc.name}` }))}
+            allLabel="All Locations"
           />
-          <TableFilterSelect
-            paramName="paymentTerm"
-            label="Term"
-            options={paymentTermOptions}
-            allLabel="All Terms"
-          />
-          <TableFilterSelect
-            paramName="paymentStatus"
-            label="Payment"
-            options={[
-              { value: "fully_paid", label: t("purchasing.fullyPaid", "Fully Paid") },
-              { value: "partially_paid", label: t("purchasing.partiallyPaid", "Partially Paid") },
-              { value: "not_paid", label: t("status.unpaid", "Not Paid") },
-            ]}
-            allLabel="All Payments"
-          />
-        </div>
-      </div>
+        ) : null}
+        <TableFilterSelect
+          paramName="status"
+          label="Status"
+          options={statusOptions}
+          allLabel="All Statuses"
+        />
+        <TableFilterSelect
+          paramName="paymentTerm"
+          label="Term"
+          options={paymentTermOptions}
+          allLabel="All Terms"
+        />
+        <TableFilterSelect
+          paramName="paymentStatus"
+          label="Payment"
+          options={[
+            { value: "fully_paid", label: t("purchasing.fullyPaid", "Fully Paid") },
+            { value: "partially_paid", label: t("purchasing.partiallyPaid", "Partially Paid") },
+            { value: "not_paid", label: t("status.unpaid", "Not Paid") },
+          ]}
+          allLabel="All Payments"
+        />
+      </TableFilterBar>
       <div className="overflow-x-auto">
         <table className="w-full min-w-[1080px] text-left text-sm">
           <thead>

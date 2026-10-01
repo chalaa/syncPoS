@@ -7,6 +7,7 @@ import { Alert } from "@/components/ui/alert";
 import { StatusBadge } from "@/components/ui/badge";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { ClickableTableRow } from "@/components/ui/clickable-table-row";
+import { TableFilterBar } from "@/components/ui/table-filter-bar";
 import { TableFilterSelect } from "@/components/ui/table-filter-select";
 import { TableSearchInput } from "@/components/ui/table-search-input";
 import { TablePagination } from "@/components/ui/table-pagination";
@@ -93,36 +94,31 @@ export default async function ExpensesPage({ searchParams }: ExpensesPageProps) 
       {params.error ? <Alert kind="error">{params.error}</Alert> : null}
 
       <section className="rounded-xl border border-border bg-card shadow-xs">
-        <div className="flex flex-col gap-3 border-b border-border p-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="min-w-0 flex-1 sm:max-w-md">
-            <TableSearchInput
-              defaultValue={query}
-              placeholder="Search expense, category, or description..."
-            />
+        <TableFilterBar
+          searchPlaceholder="Search expense, category, or description..."
+          filterParamNames={["category", "paymentStatus"]}
+        >
+          <TableFilterSelect
+            paramName="category"
+            label="Category"
+            options={categoryOptions}
+            allLabel="All Categories"
+          />
+          <TableFilterSelect
+            paramName="paymentStatus"
+            label="Payment"
+            options={paymentStatusOptions}
+            allLabel="All Payments"
+          />
+          <div className="flex rounded-lg border border-border bg-muted/40 p-1 text-sm">
+            <Button asChild variant={!showCancelled ? "secondary" : "ghost"} size="sm">
+              <Link href="/admin/operations/expenses"><T k="common.normal" fallback="Normal" /></Link>
+            </Button>
+            <Button asChild variant={showCancelled ? "secondary" : "ghost"} size="sm">
+              <Link href="/admin/operations/expenses?show=cancelled"><T k="status.cancelled" fallback="Cancelled" /></Link>
+            </Button>
           </div>
-          <div className="flex flex-wrap items-center gap-3">
-            <TableFilterSelect
-              paramName="category"
-              label="Category"
-              options={categoryOptions}
-              allLabel="All Categories"
-            />
-            <TableFilterSelect
-              paramName="paymentStatus"
-              label="Payment"
-              options={paymentStatusOptions}
-              allLabel="All Payments"
-            />
-            <div className="flex rounded-lg border border-border bg-muted/40 p-1 text-sm">
-              <Button asChild variant={!showCancelled ? "secondary" : "ghost"} size="sm">
-                <Link href="/admin/operations/expenses"><T k="common.normal" fallback="Normal" /></Link>
-              </Button>
-              <Button asChild variant={showCancelled ? "secondary" : "ghost"} size="sm">
-                <Link href="/admin/operations/expenses?show=cancelled"><T k="status.cancelled" fallback="Cancelled" /></Link>
-              </Button>
-            </div>
-          </div>
-        </div>
+        </TableFilterBar>
 
         <ExpenseTable rows={expensePage.rows} showCancelled={showCancelled} />
         <TablePagination pagination={expensePage.pagination} />

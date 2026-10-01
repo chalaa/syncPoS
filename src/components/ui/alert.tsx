@@ -1,10 +1,17 @@
+"use client";
+
 import type { ReactNode } from "react";
 
+import { useTranslation } from "@/lib/i18n/use-translation";
 import { cn } from "@/lib/utils";
 
 type AlertKind = "success" | "error" | "warning";
 
 export function Alert({ kind, children }: { kind: AlertKind; children: ReactNode }) {
+  const { t } = useTranslation();
+
+  const renderedContent = typeof children === "string" ? t(children, children) : children;
+
   return (
     <div
       className={cn(
@@ -14,7 +21,7 @@ export function Alert({ kind, children }: { kind: AlertKind; children: ReactNode
         kind === "warning" && "border-gold/40 bg-gold-muted text-[#7E5700] font-medium",
       )}
     >
-      {children}
+      {renderedContent}
     </div>
   );
 }

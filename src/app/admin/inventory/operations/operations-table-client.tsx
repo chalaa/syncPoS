@@ -20,6 +20,7 @@ import { OperationDetailModal } from "@/app/admin/inventory/operations/operation
 import { StatusBadge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ClickableTableRow } from "@/components/ui/clickable-table-row";
+import { TableFilterBar } from "@/components/ui/table-filter-bar";
 import { TableFilterSelect } from "@/components/ui/table-filter-select";
 import { TableSearchInput } from "@/components/ui/table-search-input";
 import { cn } from "@/lib/utils";
@@ -141,36 +142,31 @@ export function OperationsTableClient({
             })}
           </div>
 
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="min-w-0 flex-1 sm:max-w-md">
-              <TableSearchInput
-                defaultValue={query}
-                placeholder={t("inventory.searchOperationsPlaceholder", "Search movement number, source document reference, or notes...")}
-              />
-            </div>
-            <div className="flex flex-wrap items-center gap-3">
-              <TableFilterSelect
-                paramName="locationId"
-                label={t("status.warehouse", "Warehouse")}
-                options={formOptions.locations.map((loc) => ({
-                  value: loc.id,
-                  label: `${loc.code} - ${loc.name}`,
-                }))}
-                allLabel={t("action.allLocations", "All Locations")}
-              />
-              <TableFilterSelect
-                paramName="status"
-                label={t("table.status", "Status")}
-                options={[
-                  { value: "draft", label: t("inventory.draft", "Draft") },
-                  { value: "confirmed", label: t("inventory.confirmed", "Confirmed") },
-                  { value: "done", label: t("inventory.done", "Done") },
-                  { value: "cancelled", label: t("inventory.cancelled", "Cancelled") },
-                ]}
-                allLabel={t("action.allStatuses", "All Statuses")}
-              />
-            </div>
-          </div>
+          <TableFilterBar
+            searchPlaceholder={t("inventory.searchOperationsPlaceholder", "Search movement number, source document reference, or notes...")}
+            filterParamNames={["locationId", "status"]}
+          >
+            <TableFilterSelect
+              paramName="locationId"
+              label={t("status.warehouse", "Warehouse")}
+              options={formOptions.locations.map((loc) => ({
+                value: loc.id,
+                label: `${loc.code} - ${loc.name}`,
+              }))}
+              allLabel={t("action.allLocations", "All Locations")}
+            />
+            <TableFilterSelect
+              paramName="status"
+              label={t("table.status", "Status")}
+              options={[
+                { value: "draft", label: t("inventory.draft", "Draft") },
+                { value: "confirmed", label: t("inventory.confirmed", "Confirmed") },
+                { value: "done", label: t("inventory.done", "Done") },
+                { value: "cancelled", label: t("inventory.cancelled", "Cancelled") },
+              ]}
+              allLabel={t("action.allStatuses", "All Statuses")}
+            />
+          </TableFilterBar>
         </div>
 
         {/* Operations Table */}

@@ -4,7 +4,6 @@ import {
   AlertTriangle,
   ArrowRight,
   ArrowUpRight,
-  Building2,
   Package,
   PlusCircle,
   Receipt,
@@ -13,8 +12,7 @@ import {
   Wallet,
 } from "lucide-react";
 
-import { Badge, StatusBadge } from "@/components/ui/badge";
-import { ButtonLink } from "@/components/ui/button";
+import { StatusBadge } from "@/components/ui/badge";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
 import { requirePermission } from "@/server/auth/session";
 import { displayReportMoney } from "@/lib/report-formatters";
@@ -31,31 +29,6 @@ export default async function AdminDashboardPage() {
       <PageHeader
         eyebrow="Dashboard"
         title="Operations Overview"
-        actions={
-          <div className="flex flex-wrap items-center gap-2">
-            <ButtonLink
-              href="/admin/purchasing/new"
-              className="gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold shadow-xs hover:brightness-110 text-xs sm:text-sm"
-            >
-              <ShoppingCart className="size-4 text-blue-100" />
-              Add Purchase
-            </ButtonLink>
-            <ButtonLink
-              href="/admin/sales/new"
-              className="gap-2 bg-gradient-to-r from-[#0B5D4B] to-[#073B35] text-white font-semibold shadow-xs hover:brightness-110 text-xs sm:text-sm"
-            >
-              <PlusCircle className="size-4 text-emerald-200" />
-              Add Sales
-            </ButtonLink>
-            <ButtonLink
-              href="/admin/operations/expenses/new"
-              className="gap-2 bg-gradient-to-r from-amber-600 to-orange-600 text-white font-semibold shadow-xs hover:brightness-110 text-xs sm:text-sm"
-            >
-              <Receipt className="size-4 text-amber-100" />
-              Add Expense
-            </ButtonLink>
-          </div>
-        }
       />
 
 
