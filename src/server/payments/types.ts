@@ -84,6 +84,10 @@ export type PaymentAllocationRow = {
   invoiceNo: string | null;
   salesOrderId: string | null;
   salesOrderNo: string | null;
+  customerDirectVendorSaleId: string | null;
+  customerDirectVendorSaleNo: string | null;
+  vendorDirectVendorSaleId: string | null;
+  vendorDirectVendorSaleNo: string | null;
   amountMinor: number;
   currencyCode: string;
 };

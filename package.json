@@ -13,6 +13,8 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx scripts/db-migrate.ts",
     "db:repair:0047": "tsx scripts/reconcile-0047-migration.ts",
+    "db:repair:0049": "tsx scripts/reconcile-0049-owner-locations-migration.ts",
+    "db:repair:direct-vendor": "tsx scripts/reconcile-direct-vendor-migrations.ts",
     "db:studio": "drizzle-kit studio",
     "db:seed": "tsx scripts/seed.ts",
     "db:seed:demo": "tsx scripts/seed-demo.ts",

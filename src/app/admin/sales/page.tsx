@@ -34,6 +34,7 @@ type SalesPageProps = {
     view?: string;
     salesOrderId?: string;
     customerInvoiceId?: string;
+    directVendorSaleId?: string;
     partnerId?: string;
     notice?: string;
     error?: string;
@@ -103,6 +104,7 @@ export default async function SalesPage({ searchParams }: SalesPageProps) {
       paymentType: "inbound",
       salesOrderId: params.salesOrderId,
       customerInvoiceId: params.customerInvoiceId,
+      directVendorSaleId: params.directVendorSaleId,
     });
     const page = paginateRows(payments, params);
 

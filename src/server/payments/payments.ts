@@ -201,6 +201,7 @@ export async function getPaymentList(params: {
   expenseId?: string;
   customerInvoiceId?: string;
   salesOrderId?: string;
+  directVendorSaleId?: string;
   locationId?: string;
 }): Promise<PaymentListRow[]> {
   const company = await getDefaultCompany();
@@ -231,6 +232,7 @@ export async function getPaymentList(params: {
       and (${params.paymentType ?? null}::payment_type is null or p.payment_type = ${params.paymentType ?? null}::payment_type)
       and (
         ${locationId}::uuid is null
+        or ${params.directVendorSaleId ?? null}::uuid is not null
         or exists (
           select 1
           from payment_allocations target_loc_pal
@@ -249,7 +251,6 @@ export async function getPaymentList(params: {
               or target_po.deliver_to_location_id = ${locationId}::uuid
               or target_vbpo.deliver_to_location_id = ${locationId}::uuid
               or target_ex.location_id = ${locationId}::uuid
-              or target_loc_pal.location_id = ${locationId}::uuid
             )
         )
       )
@@ -301,6 +302,19 @@ export async function getPaymentList(params: {
           where po_pal.payment_id = p.id
             and po_pal.purchase_order_id = ${params.purchaseOrderId ?? null}::uuid
             and po_pal.deleted_at is null
+        )
+      )
+      and (
+        ${params.directVendorSaleId ?? null}::uuid is null
+        or exists (
+          select 1
+          from payment_allocations dvs_pal
+          where dvs_pal.payment_id = p.id
+            and (
+              dvs_pal.customer_direct_vendor_sale_id = ${params.directVendorSaleId ?? null}::uuid
+              or dvs_pal.vendor_direct_vendor_sale_id = ${params.directVendorSaleId ?? null}::uuid
+            )
+            and dvs_pal.deleted_at is null
         )
       )
     group by p.id, partner.id, pm.id, pa.id
@@ -428,6 +442,10 @@ export async function getPaymentDetail(id: string): Promise<PaymentDetail | null
       invoiceNo: customerInvoices.invoiceNo,
       salesOrderId: paymentAllocations.salesOrderId,
       salesOrderNo: salesOrders.orderNo,
+      customerDirectVendorSaleId: paymentAllocations.customerDirectVendorSaleId,
+      customerDirectVendorSaleNo: sql<string | null>`(select dvs.sale_no from direct_vendor_sales dvs where dvs.id = ${paymentAllocations.customerDirectVendorSaleId})`,
+      vendorDirectVendorSaleId: paymentAllocations.vendorDirectVendorSaleId,
+      vendorDirectVendorSaleNo: sql<string | null>`(select dvs.sale_no from direct_vendor_sales dvs where dvs.id = ${paymentAllocations.vendorDirectVendorSaleId})`,
       amountMinor: paymentAllocations.amountMinor,
       currencyCode: payments.currencyCode,
     })

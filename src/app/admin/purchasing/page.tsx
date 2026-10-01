@@ -43,6 +43,7 @@ type PurchasingPageProps = {
     view?: string;
     purchaseOrderId?: string;
     vendorBillId?: string;
+    directVendorSaleId?: string;
     partnerId?: string;
     notice?: string;
     error?: string;
@@ -149,6 +150,7 @@ export default async function PurchasingPage({ searchParams }: PurchasingPagePro
       paymentType: "outbound",
       purchaseOrderId: params.purchaseOrderId,
       vendorBillId: params.vendorBillId,
+      directVendorSaleId: params.directVendorSaleId,
     });
     if (query) {
       const q = query.toLowerCase();

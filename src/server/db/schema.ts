@@ -180,6 +180,11 @@ export const salesOrderStatus = pgEnum("sales_order_status", [
   "cancelled",
 ]);
 export const salesPaymentTerm = pgEnum("sales_payment_term", ["cash", "credit"]);
+export const directVendorSaleStatus = pgEnum("direct_vendor_sale_status", [
+  "draft",
+  "posted",
+  "cancelled",
+]);
 export const salesLineApprovalStatus = pgEnum("sales_line_approval_status", [
   "pending",
   "approved",
@@ -2320,6 +2325,157 @@ export const salesOrderLineTaxes = pgTable(
   ],
 );
 
+export const directVendorSales = pgTable(
+  "direct_vendor_sales",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    companyId: uuid("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    saleNo: varchar("sale_no", { length: 60 }).notNull(),
+    customerId: uuid("customer_id")
+      .notNull()
+      .references(() => partners.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    vendorId: uuid("vendor_id")
+      .notNull()
+      .references(() => partners.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    ownerId: uuid("owner_id").references(() => owners.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
+    saleDate: date("sale_date").notNull().defaultNow(),
+    status: directVendorSaleStatus("status").notNull().default("draft"),
+    currencyCode: char("currency_code", { length: 3 })
+      .notNull()
+      .references(() => currencies.code, { onDelete: "restrict", onUpdate: "cascade" }),
+    customerPaymentTerm: salesPaymentTerm("customer_payment_term").notNull().default("cash"),
+    customerPaymentMethodId: uuid("customer_payment_method_id").references(() => paymentMethods.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
+    customerPaymentAccountId: uuid("customer_payment_account_id").references(() => paymentAccounts.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
+    customerPaymentReference: varchar("customer_payment_reference", { length: 120 }),
+    vendorPaymentTerm: purchasePaymentTerm("vendor_payment_term").notNull().default("cash"),
+    vendorPaymentMethodId: uuid("vendor_payment_method_id").references(() => paymentMethods.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
+    vendorPaymentAccountId: uuid("vendor_payment_account_id").references(() => paymentAccounts.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
+    vendorPaymentReference: varchar("vendor_payment_reference", { length: 120 }),
+    subtotalMinor: bigint("subtotal_minor", { mode: "number" }).notNull().default(0),
+    taxAmountMinor: bigint("tax_amount_minor", { mode: "number" }).notNull().default(0),
+    customerTotalMinor: bigint("customer_total_minor", { mode: "number" }).notNull().default(0),
+    vendorCostTotalMinor: bigint("vendor_cost_total_minor", { mode: "number" }).notNull().default(0),
+    marginMinor: bigint("margin_minor", { mode: "number" }).notNull().default(0),
+    customerPaidMinor: bigint("customer_paid_minor", { mode: "number" }).notNull().default(0),
+    vendorPaidMinor: bigint("vendor_paid_minor", { mode: "number" }).notNull().default(0),
+    notes: text("notes"),
+    createdBy: uuid("created_by").references(() => users.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
+    postedAt: timestamp("posted_at", { withTimezone: true }),
+    postedBy: uuid("posted_by").references(() => users.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
+    cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
+    cancelledBy: uuid("cancelled_by").references(() => users.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
+    ...softDelete,
+    ...timestamps,
+  },
+  (table) => [
+    check("direct_vendor_sales_subtotal_chk", sql`${table.subtotalMinor} >= 0`),
+    check("direct_vendor_sales_tax_amount_chk", sql`${table.taxAmountMinor} >= 0`),
+    check("direct_vendor_sales_customer_total_chk", sql`${table.customerTotalMinor} >= 0`),
+    check("direct_vendor_sales_vendor_cost_chk", sql`${table.vendorCostTotalMinor} >= 0`),
+    check("direct_vendor_sales_customer_paid_chk", sql`${table.customerPaidMinor} >= 0`),
+    check("direct_vendor_sales_vendor_paid_chk", sql`${table.vendorPaidMinor} >= 0`),
+    check(
+      "direct_vendor_sales_posted_state_chk",
+      sql`
+        (${table.status} = 'posted' and ${table.postedAt} is not null and ${table.cancelledAt} is null)
+        or (${table.status} = 'cancelled' and ${table.cancelledAt} is not null)
+        or (${table.status} = 'draft' and ${table.postedAt} is null and ${table.cancelledAt} is null)
+      `,
+    ),
+    check(
+      "direct_vendor_sales_payment_chk",
+      sql`
+        (
+          ${table.status} <> 'posted'
+          or (
+            ${table.customerPaidMinor} <= ${table.customerTotalMinor}
+            and ${table.vendorPaidMinor} <= ${table.vendorCostTotalMinor}
+          )
+        )
+      `,
+    ),
+    uniqueIndex("direct_vendor_sales_no_active_uidx")
+      .on(table.companyId, table.saleNo)
+      .where(sql`${table.deletedAt} is null`),
+    index("direct_vendor_sales_customer_idx").on(table.customerId),
+    index("direct_vendor_sales_vendor_idx").on(table.vendorId),
+    index("direct_vendor_sales_status_idx").on(table.companyId, table.status),
+    index("direct_vendor_sales_date_idx").on(table.companyId, table.saleDate),
+  ],
+);
+
+export const directVendorSaleLines = pgTable(
+  "direct_vendor_sale_lines",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    directVendorSaleId: uuid("direct_vendor_sale_id")
+      .notNull()
+      .references(() => directVendorSales.id, { onDelete: "cascade", onUpdate: "cascade" }),
+    lineNo: smallint("line_no").notNull(),
+    productId: uuid("product_id")
+      .notNull()
+      .references(() => products.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    description: text("description"),
+    unitId: uuid("unit_id")
+      .notNull()
+      .references(() => unitsOfMeasure.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    quantity: numeric("quantity", { precision: 20, scale: 6 }).notNull(),
+    vendorUnitCostMinor: bigint("vendor_unit_cost_minor", { mode: "number" }).notNull().default(0),
+    customerUnitPriceMinor: bigint("customer_unit_price_minor", { mode: "number" }).notNull().default(0),
+    discountMinor: bigint("discount_minor", { mode: "number" }).notNull().default(0),
+    taxAmountMinor: bigint("tax_amount_minor", { mode: "number" }).notNull().default(0),
+    vendorLineTotalMinor: bigint("vendor_line_total_minor", { mode: "number" }).notNull().default(0),
+    customerLineTotalMinor: bigint("customer_line_total_minor", { mode: "number" }).notNull().default(0),
+    lineMarginMinor: bigint("line_margin_minor", { mode: "number" }).notNull().default(0),
+    currencyCode: char("currency_code", { length: 3 })
+      .notNull()
+      .references(() => currencies.code, { onDelete: "restrict", onUpdate: "cascade" }),
+    notes: text("notes"),
+    ...softDelete,
+    ...timestamps,
+  },
+  (table) => [
+    check("direct_vendor_sale_lines_line_no_chk", sql`${table.lineNo} > 0`),
+    check("direct_vendor_sale_lines_quantity_chk", sql`${table.quantity} > 0`),
+    check("direct_vendor_sale_lines_vendor_unit_cost_chk", sql`${table.vendorUnitCostMinor} >= 0`),
+    check("direct_vendor_sale_lines_customer_unit_price_chk", sql`${table.customerUnitPriceMinor} >= 0`),
+    check("direct_vendor_sale_lines_discount_chk", sql`${table.discountMinor} >= 0`),
+    check("direct_vendor_sale_lines_tax_amount_chk", sql`${table.taxAmountMinor} >= 0`),
+    check("direct_vendor_sale_lines_vendor_total_chk", sql`${table.vendorLineTotalMinor} >= 0`),
+    check("direct_vendor_sale_lines_customer_total_chk", sql`${table.customerLineTotalMinor} >= 0`),
+    uniqueIndex("direct_vendor_sale_lines_no_active_uidx")
+      .on(table.directVendorSaleId, table.lineNo)
+      .where(sql`${table.deletedAt} is null`),
+    index("direct_vendor_sale_lines_product_idx").on(table.productId),
+  ],
+);
+
 export const salesLineApprovals = pgTable(
   "sales_line_approvals",
   {
@@ -2635,6 +2791,14 @@ export const paymentAllocations = pgTable(
       onDelete: "restrict",
       onUpdate: "cascade",
     }),
+    customerDirectVendorSaleId: uuid("customer_direct_vendor_sale_id").references(() => directVendorSales.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
+    vendorDirectVendorSaleId: uuid("vendor_direct_vendor_sale_id").references(() => directVendorSales.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
     amountMinor: bigint("amount_minor", { mode: "number" }).notNull().default(0),
     notes: text("notes"),
     ...softDelete,
@@ -2650,6 +2814,8 @@ export const paymentAllocations = pgTable(
         + (case when ${table.expenseId} is not null then 1 else 0 end)
         + (case when ${table.customerInvoiceId} is not null then 1 else 0 end)
         + (case when ${table.salesOrderId} is not null then 1 else 0 end)
+        + (case when ${table.customerDirectVendorSaleId} is not null then 1 else 0 end)
+        + (case when ${table.vendorDirectVendorSaleId} is not null then 1 else 0 end)
         = 1
       `,
     ),
@@ -2668,12 +2834,20 @@ export const paymentAllocations = pgTable(
     uniqueIndex("payment_allocations_sales_order_active_uidx")
       .on(table.paymentId, table.salesOrderId)
       .where(sql`${table.deletedAt} is null and ${table.salesOrderId} is not null`),
+    uniqueIndex("payment_allocations_customer_direct_vendor_sale_active_uidx")
+      .on(table.paymentId, table.customerDirectVendorSaleId)
+      .where(sql`${table.deletedAt} is null and ${table.customerDirectVendorSaleId} is not null`),
+    uniqueIndex("payment_allocations_vendor_direct_vendor_sale_active_uidx")
+      .on(table.paymentId, table.vendorDirectVendorSaleId)
+      .where(sql`${table.deletedAt} is null and ${table.vendorDirectVendorSaleId} is not null`),
     index("payment_allocations_payment_idx").on(table.paymentId),
     index("payment_allocations_vendor_bill_idx").on(table.vendorBillId),
     index("payment_allocations_purchase_order_idx").on(table.purchaseOrderId),
     index("payment_allocations_expense_idx").on(table.expenseId),
     index("payment_allocations_customer_invoice_idx").on(table.customerInvoiceId),
     index("payment_allocations_sales_order_idx").on(table.salesOrderId),
+    index("payment_allocations_customer_direct_vendor_sale_idx").on(table.customerDirectVendorSaleId),
+    index("payment_allocations_vendor_direct_vendor_sale_idx").on(table.vendorDirectVendorSaleId),
   ],
 );
 

@@ -45,7 +45,8 @@ export default async function PaymentDetailPage({ params, searchParams }: Paymen
   const purchaseOrderId = payment.allocations.find((allocation) => allocation.purchaseOrderId)?.purchaseOrderId;
   const expenseId = payment.allocations.find((allocation) => allocation.expenseId)?.expenseId;
   const customerInvoiceId = payment.allocations.find((allocation) => allocation.customerInvoiceId)?.customerInvoiceId;
-  const isSupplierPayment = Boolean(vendorBillId || purchaseOrderId);
+  const vendorDirectVendorSaleId = payment.allocations.find((allocation) => allocation.vendorDirectVendorSaleId)?.vendorDirectVendorSaleId;
+  const isSupplierPayment = Boolean(vendorBillId || purchaseOrderId || vendorDirectVendorSaleId);
 
   return (
     <PageShell>
@@ -107,6 +108,17 @@ export default async function PaymentDetailPage({ params, searchParams }: Paymen
                 {payment.allocations.find((allocation) => allocation.purchaseOrderId === purchaseOrderId)?.purchaseOrderNo ?? <T k="Purchase Order" />}
               </span>
               <span className="text-xs font-medium text-muted-foreground"><T k="Purchase Order" /></span>
+            </Link>
+          ) : null}
+          {vendorDirectVendorSaleId ? (
+            <Link
+              href={`/admin/sales/direct-vendor/${vendorDirectVendorSaleId}`}
+              className="group flex flex-col rounded-lg border border-border bg-card px-4 py-2 text-sm shadow-xs transition-all hover:border-primary/50 hover:bg-secondary/40"
+            >
+              <span className="text-lg font-bold tracking-tight text-foreground transition-colors group-hover:text-primary">
+                {payment.allocations.find((allocation) => allocation.vendorDirectVendorSaleId === vendorDirectVendorSaleId)?.vendorDirectVendorSaleNo ?? "Direct Vendor Sale"}
+              </span>
+              <span className="text-xs font-medium text-muted-foreground">Direct Vendor Sale</span>
             </Link>
           ) : null}
         </div>
@@ -182,6 +194,10 @@ export default async function PaymentDetailPage({ params, searchParams }: Paymen
             ) : customerInvoiceId ? (
               <Link href={`/admin/sales/invoices/${customerInvoiceId}`} className="mt-1 block text-sm font-medium text-primary underline-offset-4 hover:underline">
                 <T k="purchasing.openCustomerInvoice" fallback="Open customer invoice" />
+              </Link>
+            ) : vendorDirectVendorSaleId ? (
+              <Link href={`/admin/sales/direct-vendor/${vendorDirectVendorSaleId}`} className="mt-1 block text-sm font-medium text-primary underline-offset-4 hover:underline">
+                Open direct vendor sale
               </Link>
             ) : (
               <p className="mt-1 text-sm font-medium">-</p>
@@ -260,6 +276,10 @@ export default async function PaymentDetailPage({ params, searchParams }: Paymen
                     ) : allocation.customerInvoiceId ? (
                       <Link href={`/admin/sales/invoices/${allocation.customerInvoiceId}`} className="font-medium text-primary underline-offset-4 hover:underline">
                         {allocation.invoiceNo}
+                      </Link>
+                    ) : allocation.vendorDirectVendorSaleId ? (
+                      <Link href={`/admin/sales/direct-vendor/${allocation.vendorDirectVendorSaleId}`} className="font-medium text-primary underline-offset-4 hover:underline">
+                        {allocation.vendorDirectVendorSaleNo}
                       </Link>
                     ) : (
                       "-"

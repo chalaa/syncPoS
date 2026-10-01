@@ -358,6 +358,27 @@
       "when": 1790777140264,
       "tag": "0050_unique_scalphunter",
       "breakpoints": true
+    },
+    {
+      "idx": 51,
+      "version": "7",
+      "when": 1790843049241,
+      "tag": "0051_striped_colleen_wing",
+      "breakpoints": true
+    },
+    {
+      "idx": 52,
+      "version": "7",
+      "when": 1790846374746,
+      "tag": "0052_military_secret_warriors",
+      "breakpoints": true
+    },
+    {
+      "idx": 53,
+      "version": "7",
+      "when": 1790852986624,
+      "tag": "0053_goofy_pete_wisdom",
+      "breakpoints": true
     }
   ]
 }

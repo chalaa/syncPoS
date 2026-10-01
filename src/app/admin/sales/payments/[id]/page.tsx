@@ -38,6 +38,7 @@ export default async function CustomerPaymentPage({ params, searchParams }: Cust
 
   const customerInvoiceId = payment.allocations.find((allocation) => allocation.customerInvoiceId)?.customerInvoiceId;
   const salesOrderId = payment.allocations.find((allocation) => allocation.salesOrderId)?.salesOrderId;
+  const customerDirectVendorSaleId = payment.allocations.find((allocation) => allocation.customerDirectVendorSaleId)?.customerDirectVendorSaleId;
 
   return (
     <PageShell>
@@ -86,17 +87,30 @@ export default async function CustomerPaymentPage({ params, searchParams }: Cust
       {query.notice ? <Alert kind="success">{query.notice}</Alert> : null}
       {query.error ? <Alert kind="error">{query.error}</Alert> : null}
 
-      {salesOrderId ? (
+      {salesOrderId || customerDirectVendorSaleId ? (
         <div className="mb-4 flex flex-wrap gap-2">
-          <Link
-            href={`/admin/sales/${salesOrderId}`}
-            className="rounded-md border border-border bg-card px-4 py-3 text-sm hover:bg-accent"
-          >
-            <span className="block text-base font-semibold">
-              {payment.allocations.find((allocation) => allocation.salesOrderId === salesOrderId)?.salesOrderNo ?? "Sales Order"}
-            </span>
-            <span className="text-muted-foreground"><T k="sales.order">Sales Order</T></span>
-          </Link>
+          {salesOrderId ? (
+            <Link
+              href={`/admin/sales/${salesOrderId}`}
+              className="rounded-md border border-border bg-card px-4 py-3 text-sm hover:bg-accent"
+            >
+              <span className="block text-base font-semibold">
+                {payment.allocations.find((allocation) => allocation.salesOrderId === salesOrderId)?.salesOrderNo ?? "Sales Order"}
+              </span>
+              <span className="text-muted-foreground"><T k="sales.order">Sales Order</T></span>
+            </Link>
+          ) : null}
+          {customerDirectVendorSaleId ? (
+            <Link
+              href={`/admin/sales/direct-vendor/${customerDirectVendorSaleId}`}
+              className="rounded-md border border-border bg-card px-4 py-3 text-sm hover:bg-accent"
+            >
+              <span className="block text-base font-semibold">
+                {payment.allocations.find((allocation) => allocation.customerDirectVendorSaleId === customerDirectVendorSaleId)?.customerDirectVendorSaleNo ?? "Direct Vendor Sale"}
+              </span>
+              <span className="text-muted-foreground">Direct Vendor Sale</span>
+            </Link>
+          ) : null}
         </div>
       ) : null}
 
@@ -123,6 +137,10 @@ export default async function CustomerPaymentPage({ params, searchParams }: Cust
             ) : salesOrderId ? (
               <Link href={`/admin/sales/${salesOrderId}`} className="mt-1 block text-sm font-medium text-primary underline-offset-4 hover:underline">
                 <T k="field.openSalesOrder">Open sales order</T>
+              </Link>
+            ) : customerDirectVendorSaleId ? (
+              <Link href={`/admin/sales/direct-vendor/${customerDirectVendorSaleId}`} className="mt-1 block text-sm font-medium text-primary underline-offset-4 hover:underline">
+                Open direct vendor sale
               </Link>
             ) : (
               <p className="mt-1 text-sm font-medium">-</p>
@@ -193,6 +211,10 @@ export default async function CustomerPaymentPage({ params, searchParams }: Cust
                     ) : allocation.salesOrderId ? (
                       <Link href={`/admin/sales/${allocation.salesOrderId}`} className="font-medium text-primary underline-offset-4 hover:underline">
                         {allocation.salesOrderNo}
+                      </Link>
+                    ) : allocation.customerDirectVendorSaleId ? (
+                      <Link href={`/admin/sales/direct-vendor/${allocation.customerDirectVendorSaleId}`} className="font-medium text-primary underline-offset-4 hover:underline">
+                        {allocation.customerDirectVendorSaleNo}
                       </Link>
                     ) : (
                       "-"
