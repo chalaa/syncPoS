@@ -11,6 +11,7 @@ import { db } from "@/server/db/client";
 import { generateCompanyDocumentNo } from "@/server/db/code-generator";
 import {
   auditLogs,
+  ownerLocations,
   owners,
   productLots,
   productSerials,
@@ -24,6 +25,7 @@ import {
 
 const createTransferSchema = z.object({
   ownerId: z.string().uuid(),
+  toOwnerId: z.string().uuid().optional().or(z.literal("")),
   fromLocationId: z.string().uuid(),
   transitLocationId: z.string().uuid(),
   toLocationId: z.string().uuid(),
@@ -200,6 +202,7 @@ export async function createTransfer(formData: FormData) {
   const user = await requirePermission("inventory.receive");
   const parsed = createTransferSchema.safeParse({
     ownerId: formValue(formData, "ownerId"),
+    toOwnerId: formValue(formData, "toOwnerId"),
     fromLocationId: formValue(formData, "fromLocationId"),
     transitLocationId: formValue(formData, "transitLocationId"),
     toLocationId: formValue(formData, "toLocationId"),
@@ -240,6 +243,33 @@ export async function createTransfer(formData: FormData) {
         throw new Error("Owner is invalid.");
       }
 
+      const destinationOwnerRows = await tx
+        .select({ ownerId: ownerLocations.ownerId })
+        .from(ownerLocations)
+        .where(eq(ownerLocations.locationId, parsed.data.toLocationId));
+
+      let effectiveToOwnerId = parsed.data.toOwnerId || null;
+
+      if (destinationOwnerRows.length > 1) {
+        if (!effectiveToOwnerId) {
+          throw new Error("Multiple owners exist for the destination location. Selecting a receiver owner is required.");
+        }
+      } else if (destinationOwnerRows.length === 1 && !effectiveToOwnerId) {
+        effectiveToOwnerId = destinationOwnerRows[0].ownerId;
+      } else if (!effectiveToOwnerId) {
+        effectiveToOwnerId = owner.id;
+      }
+
+      const [toOwner] = await tx
+        .select({ id: owners.id, name: owners.name })
+        .from(owners)
+        .where(and(eq(owners.id, effectiveToOwnerId), eq(owners.companyId, company.id), isNull(owners.deletedAt)))
+        .limit(1);
+
+      if (!toOwner) {
+        throw new Error("Receiver owner is invalid.");
+      }
+
       const productRows = await tx
         .select({
           id: products.id,
@@ -259,6 +289,7 @@ export async function createTransfer(formData: FormData) {
           transferNo,
           status: "draft",
           ownerId: owner.id,
+          toOwnerId: toOwner.id,
           fromLocationId: parsed.data.fromLocationId,
           transitLocationId: parsed.data.transitLocationId,
           toLocationId: parsed.data.toLocationId,
@@ -287,6 +318,7 @@ export async function createTransfer(formData: FormData) {
             transferId: transfer.id,
             lineNo: index + 1,
             ownerId: owner.id,
+            toOwnerId: toOwner.id,
             productId: product.id,
             unitId: product.unitId,
             quantityRequested: String(line.quantity),
@@ -566,6 +598,7 @@ export async function receiveTransfer(formData: FormData) {
           transferNo: transfers.transferNo,
           status: transfers.status,
           ownerId: transfers.ownerId,
+          toOwnerId: transfers.toOwnerId,
           transitLocationId: transfers.transitLocationId,
           toLocationId: transfers.toLocationId,
         })
@@ -583,6 +616,7 @@ export async function receiveTransfer(formData: FormData) {
           lineNo: transferLines.lineNo,
           productId: transferLines.productId,
           ownerId: transferLines.ownerId,
+          toOwnerId: transferLines.toOwnerId,
           productSerialId: transferLines.productSerialId,
           productLotId: transferLines.productLotId,
           unitId: transferLines.unitId,
@@ -609,13 +643,17 @@ export async function receiveTransfer(formData: FormData) {
           status: "posted",
           fromLocationId: transfer.transitLocationId,
           toLocationId: transfer.toLocationId,
-          ownerId: transfer.ownerId,
+          ownerId: transfer.toOwnerId ?? transfer.ownerId,
           sourceType: "transfer_receipt",
           sourceId: transfer.id,
           sourceNo: transfer.transferNo,
           postedAt: new Date(),
           postedBy: user.id,
           notes: `Transfer receipt ${transfer.transferNo}`,
+          metadata: {
+            fromOwnerId: transfer.ownerId,
+            toOwnerId: transfer.toOwnerId ?? transfer.ownerId,
+          },
         })
         .returning({ id: stockMovements.id });
 
@@ -627,9 +665,10 @@ export async function receiveTransfer(formData: FormData) {
         }
 
         const remaining = Number(line.quantityDispatched) - Number(line.quantityReceived);
-        const ownerId = line.ownerId ?? transfer.ownerId;
+        const sourceOwnerId = line.ownerId ?? transfer.ownerId;
+        const receiverOwnerId = line.toOwnerId ?? transfer.toOwnerId ?? sourceOwnerId;
 
-        if (!ownerId) {
+        if (!sourceOwnerId || !receiverOwnerId) {
           throw new Error(`Owner is required on transfer line ${line.lineNo}.`);
         }
 
@@ -640,7 +679,7 @@ export async function receiveTransfer(formData: FormData) {
         const balance = await removeBalance(tx, {
           companyId: company.id,
           locationId: transfer.transitLocationId,
-          ownerId,
+          ownerId: sourceOwnerId,
           productId: line.productId,
           productSerialId: line.productSerialId,
           productLotId: line.productLotId,
@@ -650,7 +689,7 @@ export async function receiveTransfer(formData: FormData) {
         await addBalance(tx, {
           companyId: company.id,
           locationId: transfer.toLocationId,
-          ownerId,
+          ownerId: receiverOwnerId,
           productId: line.productId,
           productSerialId: line.productSerialId,
           productLotId: line.productLotId,
@@ -662,7 +701,7 @@ export async function receiveTransfer(formData: FormData) {
         await tx.insert(stockMovementLines).values({
           stockMovementId: movement.id,
           lineNo: line.lineNo,
-          ownerId,
+          ownerId: receiverOwnerId,
           productId: line.productId,
           productSerialId: line.productSerialId,
           productLotId: line.productLotId,
@@ -673,6 +712,10 @@ export async function receiveTransfer(formData: FormData) {
           totalCostMinor: Math.round(input.quantity * balance.averageCostMinor),
           currencyCode: line.currencyCode,
           notes: input.discrepancy === "none" ? "Received from transit" : `Received with ${input.discrepancy}`,
+          metadata: {
+            fromOwnerId: sourceOwnerId,
+            toOwnerId: receiverOwnerId,
+          },
         });
 
         const nextReceived = Number(line.quantityReceived) + input.quantity;

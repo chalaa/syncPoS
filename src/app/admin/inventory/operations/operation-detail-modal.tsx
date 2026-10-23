@@ -201,6 +201,18 @@ export function OperationDetailModal({
                 </div>
               </div>
 
+              {/* Ownership Transfer Indicator */}
+              {operation.metadata && typeof operation.metadata === "object" && Boolean((operation.metadata as Record<string, string>).fromOwnerName || (operation.metadata as Record<string, string>).toOwnerName) && (
+                <div className="flex items-center justify-between rounded-xl border border-sky-500/30 bg-sky-500/5 px-4 py-2.5 text-xs">
+                  <span className="text-muted-foreground font-medium">{t("inventory.ownershipTransfer", "Ownership Transfer")}:</span>
+                  <div className="flex items-center gap-1.5 font-semibold text-foreground">
+                    <span>{(operation.metadata as Record<string, string>).fromOwnerName ?? "—"}</span>
+                    <span className="text-muted-foreground">→</span>
+                    <span className="text-sky-600 dark:text-sky-400">{(operation.metadata as Record<string, string>).toOwnerName ?? "—"}</span>
+                  </div>
+                </div>
+              )}
+
               {/* Source Document Reference */}
               {operation.sourceNo && (
                 <div className="flex items-center justify-between rounded-xl border border-border/60 bg-muted/30 px-4 py-2.5 text-xs">

@@ -78,7 +78,7 @@ const salesOrderLineSchema = z.object({
   sourceLocationId: z.string().uuid().or(z.literal("")).transform((value) => value || null),
   productId: z.string().uuid(),
   quantity: z.coerce.number().positive(),
-  unitPrice: z.string().trim().default("0"),
+  unitPrice: z.string().trim().refine((val) => majorToMinor(val) > 0, "Unit price is mandatory and must be greater than zero."),
   discount: z.string().trim().default("0"),
   taxIds: z.array(z.string().uuid()).default([]),
 });
@@ -1091,6 +1091,9 @@ async function prepareSalesLines(
     }
 
     const unitPriceMinor = majorToMinor(line.unitPrice);
+    if (unitPriceMinor <= 0) {
+      throw new Error(`Unit price is mandatory and must be greater than zero for line ${index + 1}.`);
+    }
     const discountMinor = majorToMinor(line.discount);
     const effectiveUnitPriceMinor = Math.max(unitPriceMinor - discountMinor, 0);
     const lineAmountMinor = Math.round(line.quantity * effectiveUnitPriceMinor);
@@ -1214,10 +1217,12 @@ async function executeSalesOrderConfirmationTx(
     company,
     user,
     orderId,
+    deliverProduct = true,
   }: {
     company: { id: string; baseCurrencyCode: string };
     user: { id: string };
     orderId: string;
+    deliverProduct?: boolean;
   },
 ) {
   const [order] = await tx
@@ -1253,6 +1258,7 @@ async function executeSalesOrderConfirmationTx(
       productId: salesOrderLines.productId,
       productName: products.name,
       sku: products.sku,
+      trackingMode: products.trackingMode,
       quantityOrdered: salesOrderLines.quantityOrdered,
       quantityDelivered: salesOrderLines.quantityDelivered,
       unitId: salesOrderLines.unitId,
@@ -1469,6 +1475,8 @@ async function executeSalesOrderConfirmationTx(
     .where(and(eq(deliveries.salesOrderId, order.id), isNull(deliveries.deletedAt)))
     .limit(1);
 
+  let targetDeliveryId: string | undefined;
+
   if (!existingDelivery) {
     const deliveryNo = documentNo("DO");
     const [delivery] = await tx
@@ -1484,25 +1492,98 @@ async function executeSalesOrderConfirmationTx(
       })
       .returning({ id: deliveries.id });
 
-    const deliveryLineValues = lines
-      .map((line) => {
-        const quantityRemaining = Number(line.quantityOrdered) - Number(line.quantityDelivered);
+    targetDeliveryId = delivery.id;
 
-        return {
-          deliveryId: delivery.id,
-          salesOrderLineId: line.id,
-          lineNo: line.lineNo,
-          productId: line.productId,
-          unitId: line.unitId,
-          quantityDelivered: String(quantityRemaining),
-          currencyCode: line.currencyCode,
-        };
-      })
-      .filter((line) => Number(line.quantityDelivered) > 0);
+    const deliveryLineValues = [];
+    for (const line of lines) {
+      const quantityRemaining = Number(line.quantityOrdered) - Number(line.quantityDelivered);
+      if (quantityRemaining <= 0) continue;
+
+      let serialNo: string | null = null;
+      let lotNo: string | null = null;
+
+      if (line.trackingMode === "serial") {
+        const [reservation] = await tx
+          .select({ serialNo: productSerials.serialNo })
+          .from(stockReservations)
+          .innerJoin(productSerials, eq(stockReservations.productSerialId, productSerials.id))
+          .where(and(eq(stockReservations.sourceId, line.id), eq(stockReservations.status, "active")))
+          .limit(1);
+
+        if (reservation) {
+          serialNo = reservation.serialNo;
+        } else {
+          const [availableSerial] = await tx
+            .select({ serialNo: productSerials.serialNo })
+            .from(productSerials)
+            .where(
+              and(
+                eq(productSerials.productId, line.productId),
+                eq(productSerials.currentLocationId, line.sourceLocationId ?? order.sourceLocationId!),
+                eq(productSerials.status, "available"),
+                isNull(productSerials.deletedAt),
+              ),
+            )
+            .limit(1);
+          serialNo = availableSerial?.serialNo ?? null;
+        }
+      } else if (line.trackingMode === "lot") {
+        const [reservation] = await tx
+          .select({ lotNo: productLots.lotNo })
+          .from(stockReservations)
+          .innerJoin(productLots, eq(stockReservations.productLotId, productLots.id))
+          .where(and(eq(stockReservations.sourceId, line.id), eq(stockReservations.status, "active")))
+          .limit(1);
+
+        if (reservation) {
+          lotNo = reservation.lotNo;
+        } else {
+          const [availableLot] = await tx
+            .select({ lotNo: productLots.lotNo })
+            .from(productLots)
+            .where(
+              and(
+                eq(productLots.productId, line.productId),
+                eq(productLots.currentLocationId, line.sourceLocationId ?? order.sourceLocationId!),
+                eq(productLots.status, "available"),
+                isNull(productLots.deletedAt),
+              ),
+            )
+            .limit(1);
+          lotNo = availableLot?.lotNo ?? null;
+        }
+      }
+
+      deliveryLineValues.push({
+        deliveryId: delivery.id,
+        salesOrderLineId: line.id,
+        lineNo: line.lineNo,
+        productId: line.productId,
+        unitId: line.unitId,
+        quantityDelivered: String(quantityRemaining),
+        currencyCode: line.currencyCode,
+        serialNo,
+        lotNo,
+      });
+    }
 
     if (deliveryLineValues.length > 0) {
       await tx.insert(deliveryLines).values(deliveryLineValues);
     }
+  } else {
+    targetDeliveryId = existingDelivery.id;
+  }
+
+  let notice = "Sales order confirmed";
+  if (deliverProduct && targetDeliveryId) {
+    const customerLocation = await getOrCreatePartnerStockLocation(company.id, "customer");
+    await postDraftDeliveryInsideTransaction(tx, {
+      companyId: company.id,
+      userId: user.id,
+      deliveryId: targetDeliveryId,
+      customerLocationId: customerLocation.id,
+    });
+    notice = "Sales order confirmed and delivery posted";
   }
 
   await tx.insert(auditLogs).values({
@@ -1512,10 +1593,10 @@ async function executeSalesOrderConfirmationTx(
     entityType: "sales_order",
     entityId: order.id,
     severity: "info",
-    metadata: { orderNo: order.orderNo, reserveOnConfirm: order.reserveOnConfirm },
+    metadata: { orderNo: order.orderNo, reserveOnConfirm: order.reserveOnConfirm, deliverProduct },
   });
 
-  return { notice: "Sales order confirmed" };
+  return { notice };
 }
 
 export async function createSalesOrder(formData: FormData) {
@@ -1647,10 +1728,12 @@ export async function createSalesOrder(formData: FormData) {
         if (approvalResult.pending > 0) {
           noticeMessage = `Quotation saved and ${approvalResult.pending} line approval${approvalResult.pending === 1 ? "" : "s"} requested`;
         } else {
+          const deliverProduct = formValue(formData, "deliverProduct") !== "false";
           const confirmResult = await executeSalesOrderConfirmationTx(tx, {
             company,
             user,
             orderId: order.id,
+            deliverProduct,
           });
           if (confirmResult?.notice) {
             noticeMessage = confirmResult.notice;
@@ -1831,10 +1914,12 @@ export async function updateSalesOrder(formData: FormData) {
         if (approvalResult.pending > 0) {
           noticeMessage = `Quotation updated and ${approvalResult.pending} line approval${approvalResult.pending === 1 ? "" : "s"} requested`;
         } else {
+          const deliverProduct = formValue(formData, "deliverProduct") !== "false";
           const confirmResult = await executeSalesOrderConfirmationTx(tx, {
             company,
             user,
             orderId: existingOrder.id,
+            deliverProduct,
           });
           if (confirmResult?.notice) {
             noticeMessage = confirmResult.notice;
@@ -1869,6 +1954,7 @@ export async function confirmSalesOrder(formData: FormData) {
 
   const company = await getDefaultCompany();
   let noticeMessage = "Sales order confirmed";
+  const deliverProduct = formValue(formData, "deliverProduct") !== "false";
 
   try {
     await db.transaction(async (tx) => {
@@ -1876,6 +1962,7 @@ export async function confirmSalesOrder(formData: FormData) {
         company,
         user,
         orderId: parsed.data.salesOrderId,
+        deliverProduct,
       });
       if (confirmResult?.notice) {
         noticeMessage = confirmResult.notice;

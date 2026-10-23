@@ -15,6 +15,7 @@ import {
   ShieldCheck,
   Tag,
   Trash2Icon,
+  Truck,
   Users,
   Wallet,
 } from "lucide-react";
@@ -70,7 +71,7 @@ function newLine(ownerId = "", sourceLocationId = ""): SalesLineDraft {
     sourceLocationId,
     productId: "",
     quantity: "1",
-    unitPrice: "0",
+    unitPrice: "",
     discount: "0",
     taxIds: [],
   };
@@ -182,8 +183,8 @@ function validateSalesOrderForm(values: SalesFormValues, t: (key: string, fallba
     }
 
     const unitPrice = Number(line.unitPrice);
-    if (!Number.isFinite(unitPrice) || unitPrice < 0) {
-      fieldErrors[fieldKey("unitPrice", line.key)] = t("sales.error.enterUnitPrice", "Enter a valid unit price.");
+    if (!line.unitPrice || !Number.isFinite(unitPrice) || unitPrice <= 0) {
+      fieldErrors[fieldKey("unitPrice", line.key)] = t("sales.error.enterUnitPrice", "Unit price is mandatory and must be greater than zero.");
     }
 
     const discount = Number(line.discount);
@@ -373,6 +374,7 @@ export const SalesOrderForm = forwardRef<SalesOrderFormHandle, SalesOrderFormPro
   const [orderDate, setOrderDate] = useState(order?.orderDate ?? defaultDate);
   const [validUntil, setValidUntil] = useState(order?.validUntil ?? defaultDate);
   const [reserveOnConfirm, setReserveOnConfirm] = useState(order?.reserveOnConfirm ?? true);
+  const [deliverProduct, setDeliverProduct] = useState(true);
   const [notes, setNotes] = useState(order?.notes ?? "");
 
   const [productOptions, setProductOptions] = useState<ProductSelectOption[]>(products);
@@ -559,7 +561,7 @@ export const SalesOrderForm = forwardRef<SalesOrderFormHandle, SalesOrderFormPro
 
     updateLine(key, {
       productId,
-      unitPrice: product?.listPriceMinor !== undefined ? String(product.listPriceMinor / 100) : "0",
+      unitPrice: product?.listPriceMinor ? String(product.listPriceMinor / 100) : "",
       taxIds: product?.saleTaxIds ?? [],
     });
   }
@@ -732,6 +734,7 @@ export const SalesOrderForm = forwardRef<SalesOrderFormHandle, SalesOrderFormPro
         value={isModal ? "/admin/sales" : order ? `/admin/sales/${order.id}` : "/admin/sales/new"}
       />
       <input type="hidden" name="intent" value={submitIntent} />
+      <input type="hidden" name="deliverProduct" value={deliverProduct ? "true" : "false"} />
 
       {error || serverError ? (
         <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-3.5 text-sm text-destructive flex items-center gap-2">
@@ -1244,7 +1247,7 @@ export const SalesOrderForm = forwardRef<SalesOrderFormHandle, SalesOrderFormPro
                               {/* Unit Price */}
                               <div className="flex flex-col gap-1.5">
                                 <label className="text-xs font-semibold text-foreground flex items-center justify-between">
-                                  <span>{t("sales.form.unitPrice", "Unit Price")}</span>
+                                  <span>{t("sales.form.unitPrice", "Unit Price")} <span className="text-destructive">*</span></span>
                                   <span className="text-[10px] text-muted-foreground font-normal">{t("sales.form.inEthiopianBirr", "In Ethiopian Birr")}</span>
                                 </label>
                                 <div className="relative flex items-center">
@@ -1253,8 +1256,9 @@ export const SalesOrderForm = forwardRef<SalesOrderFormHandle, SalesOrderFormPro
                                   </span>
                                   <input
                                     type="number"
-                                    min="0"
+                                    min="0.01"
                                     step="0.01"
+                                    required
                                     value={line.unitPrice}
                                     placeholder="0.00"
                                     className={cn(
@@ -1599,6 +1603,30 @@ export const SalesOrderForm = forwardRef<SalesOrderFormHandle, SalesOrderFormPro
           </div>
         </div>
 
+        {/* Deliver Product Toggle Card */}
+        <div className="rounded-xl border border-border/80 bg-card p-4 shadow-xs flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="flex size-9 items-center justify-center rounded-lg bg-[#0B5D4B]/10 text-[#0B5D4B] dark:bg-emerald-950 dark:text-emerald-300">
+              <Truck className="size-4" />
+            </div>
+            <div>
+              <label htmlFor="sales-deliver-product-checkbox" className="text-sm font-semibold text-foreground cursor-pointer flex items-center gap-2">
+                <span>{t("sales.form.deliverProduct", "Deliver product")}</span>
+              </label>
+              <p className="text-xs text-muted-foreground">
+                {t("sales.form.deliverProductHint", "Automatically post delivery and dispatch stock upon order confirmation.")}
+              </p>
+            </div>
+          </div>
+          <input
+            id="sales-deliver-product-checkbox"
+            type="checkbox"
+            checked={deliverProduct}
+            onChange={(e) => setDeliverProduct(e.target.checked)}
+            className="size-5 rounded border-border text-[#0B5D4B] focus:ring-[#0B5D4B] cursor-pointer"
+          />
+        </div>
+
         {/* Order Items Review Table */}
         <div className="rounded-xl border border-border/80 bg-card overflow-hidden shadow-xs">
           <div className="flex items-center justify-between border-b border-border/70 bg-muted/30 px-4 py-3">
@@ -1727,15 +1755,8 @@ export const SalesOrderForm = forwardRef<SalesOrderFormHandle, SalesOrderFormPro
         </div>
       </div>
 
-      {/* Action Footer (Sticky inside modal or pinned bottom) */}
-      <div
-        className={cn(
-          "flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 sm:gap-4",
-          isModal
-            ? "sticky bottom-0 z-10 -mx-6 -mb-5 border-t border-border/80 bg-card/95 px-4 sm:px-6 py-3.5 backdrop-blur-md shadow-lg mt-4"
-            : "mt-4 pt-4 border-t border-border"
-        )}
-      >
+      {/* Action Footer */}
+      <div className="mt-6 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 sm:gap-4 border-t border-border pt-4">
         {step === 1 ? (
           <>
             <div className="flex items-center justify-between sm:justify-start gap-3 text-xs w-full sm:w-auto">

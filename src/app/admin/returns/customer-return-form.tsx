@@ -56,6 +56,7 @@ export function CustomerReturnForm({
   const { t } = useTranslation();
   const validInitialSalesOrderId = salesOrders.some((order) => order.id === initialSalesOrderId) ? initialSalesOrderId ?? "" : "";
   const [salesOrderId, setSalesOrderId] = useState(validInitialSalesOrderId);
+  const [hasSubmitted, setHasSubmitted] = useState(false);
   const [rows, setRows] = useState<CustomerReturnRow[]>(() =>
     validInitialSalesOrderId
       ? lines.filter((line) => line.salesOrderId === validInitialSalesOrderId).map(createRow)
@@ -131,6 +132,7 @@ export function CustomerReturnForm({
   const currencyCode = rows[0]?.currencyCode ?? "ETB";
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    setHasSubmitted(true);
     if (validationErrors.length > 0) {
       event.preventDefault();
     }
@@ -142,11 +144,22 @@ export function CustomerReturnForm({
         <label className="space-y-1">
           <span className="text-xs font-medium text-muted-foreground">{t("return.originalSalesOrder", "Original Sales Order")}</span>
           <select name="salesOrderId" required value={salesOrderId} className={inputClass} onChange={(event) => changeOrder(event.target.value)}>
-            <option value="">{t("return.selectSalesOrder", "Select sales order")}</option>
+            <option value="">
+              {salesOrders.length === 0
+                ? t("return.noDeliveredOrders", "No delivered sales orders available")
+                : t("return.selectSalesOrder", "Select sales order")}
+            </option>
             {salesOrders.map((order) => (
-              <option key={order.id} value={order.id}>{order.code} - {order.name}</option>
+              <option key={order.id} value={order.id}>
+                {order.orderDate ? `${order.orderDate} - ${order.name}` : `${order.code} - ${order.name}`}
+              </option>
             ))}
           </select>
+          {salesOrders.length === 0 && (
+            <span className="block text-[11px] text-muted-foreground">
+              {t("return.deliveredRequiredHint", "Only orders with completed/posted deliveries can be returned.")}
+            </span>
+          )}
         </label>
         <label className="space-y-1">
           <span className="text-xs font-medium text-muted-foreground">{t("return.returnLocation", "Return Location")}</span>
@@ -159,7 +172,7 @@ export function CustomerReturnForm({
         </label>
       </div>
 
-      {validationErrors.length > 0 ? (
+      {hasSubmitted && validationErrors.length > 0 ? (
         <div className="mt-4 rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
           {validationErrors[0]}
         </div>
@@ -262,7 +275,7 @@ export function CustomerReturnForm({
       </label>
 
       <div className="mt-5 flex justify-end">
-        <Button type="submit" disabled={validationErrors.length > 0}>{t("action.createReturn", "Create Return")}</Button>
+        <Button type="submit">{t("action.createReturn", "Create Return")}</Button>
       </div>
     </form>
   );

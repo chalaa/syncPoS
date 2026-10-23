@@ -70,6 +70,7 @@ export function SupplierReturnForm({
   const [purchaseOrderId, setPurchaseOrderId] = useState(validInitialPurchaseOrderId);
   const [goodsReceiptId, setGoodsReceiptId] = useState(validInitialGoodsReceiptId);
   const [sourceLocationId, setSourceLocationId] = useState(initialLines[0]?.sourceLocationId ?? "");
+  const [hasSubmitted, setHasSubmitted] = useState(false);
   const [rows, setRows] = useState<SupplierReturnRow[]>(() => initialLines.map(createRow));
 
   const selectedReceipt = receipts.find((receipt) => receipt.id === goodsReceiptId);
@@ -162,6 +163,7 @@ export function SupplierReturnForm({
   const currencyCode = rows[0]?.currencyCode ?? "ETB";
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    setHasSubmitted(true);
     if (validationErrors.length > 0) {
       event.preventDefault();
     }
@@ -173,11 +175,22 @@ export function SupplierReturnForm({
         <label className="space-y-1">
           <span className="text-xs font-medium text-muted-foreground">{t("return.purchaseReference", "Purchase Reference")}</span>
           <select required value={purchaseOrderId} className={inputClass} onChange={(event) => changePurchaseOrder(event.target.value)}>
-            <option value="">{t("return.selectPurchaseOrder", "Select purchase order")}</option>
+            <option value="">
+              {purchaseOrders.length === 0
+                ? t("return.noReceivedOrders", "No received purchase orders available")
+                : t("return.selectPurchaseOrder", "Select purchase order")}
+            </option>
             {purchaseOrders.map((order) => (
-              <option key={order.id} value={order.id}>{order.code} - {order.name}</option>
+              <option key={order.id} value={order.id}>
+                {order.orderDate ? `${order.orderDate} - ${order.name}` : `${order.code} - ${order.name}`}
+              </option>
             ))}
           </select>
+          {purchaseOrders.length === 0 && (
+            <span className="block text-[11px] text-muted-foreground">
+              {t("return.receivedRequiredHint", "Only orders with completed/posted goods receipts can be returned.")}
+            </span>
+          )}
         </label>
         <label className="space-y-1">
           <span className="text-xs font-medium text-muted-foreground">{t("return.purchaseReceipt", "Purchase Receipt")}</span>
@@ -200,7 +213,7 @@ export function SupplierReturnForm({
         </label>
       </div>
 
-      {validationErrors.length > 0 ? (
+      {hasSubmitted && validationErrors.length > 0 ? (
         <div className="mt-4 rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
           {validationErrors[0]}
         </div>
@@ -303,7 +316,7 @@ export function SupplierReturnForm({
       </label>
 
       <div className="mt-5 flex justify-end">
-        <Button type="submit" disabled={validationErrors.length > 0}>{t("action.createReturn", "Create Return")}</Button>
+        <Button type="submit">{t("action.createReturn", "Create Return")}</Button>
       </div>
     </form>
   );

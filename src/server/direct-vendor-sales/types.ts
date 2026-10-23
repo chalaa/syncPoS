@@ -1,6 +1,6 @@
 import type { CategorySelectOption, SelectOption } from "@/server/catalog/types";
 import type { OwnerOption } from "@/server/owners/types";
-import type { SalesFormOption } from "@/server/sales/types";
+import type { SalesFormOption, SalesTaxOption } from "@/server/sales/types";
 
 export type DirectVendorSaleStatus = "draft" | "posted" | "cancelled";
 export type DirectVendorSalePaymentTerm = "cash" | "credit";
@@ -33,6 +33,7 @@ export type DirectVendorSaleFormOptions = {
   productCategories: CategorySelectOption[];
   productBrands: SelectOption[];
   productUnits: SelectOption[];
+  taxes: SalesTaxOption[];
   inboundPaymentAccounts: DirectVendorSalePaymentOption[];
   outboundPaymentAccounts: DirectVendorSalePaymentOption[];
 };

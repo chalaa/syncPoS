@@ -103,7 +103,17 @@ function TransferList({ transfers }: { transfers: TransferListRow[] }) {
                 <td className="px-4 py-3.5">
                   <StatusBadge status={transfer.status} />
                 </td>
-                <td className="px-4 py-3.5 text-xs text-muted-foreground">{transfer.ownerName ?? "—"}</td>
+                <td className="px-4 py-3.5 text-xs text-muted-foreground">
+                  {transfer.toOwnerName && transfer.toOwnerName !== transfer.ownerName ? (
+                    <div className="flex items-center gap-1">
+                      <span>{transfer.ownerName ?? "—"}</span>
+                      <span className="text-muted-foreground/60">→</span>
+                      <span className="font-medium text-foreground">{transfer.toOwnerName}</span>
+                    </div>
+                  ) : (
+                    <span>{transfer.ownerName ?? "—"}</span>
+                  )}
+                </td>
                 <td className="px-4 py-3.5 text-xs text-muted-foreground font-medium">{transfer.transferDate}</td>
                 <td className="px-4 py-3.5 font-medium text-xs text-foreground">{transfer.fromLocationCode}</td>
                 <td className="px-4 py-3.5 font-medium text-xs text-muted-foreground">{transfer.transitLocationCode}</td>

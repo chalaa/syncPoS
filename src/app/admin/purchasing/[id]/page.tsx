@@ -101,7 +101,8 @@ export default async function PurchaseOrderDetailPage({ params, searchParams }: 
 
   const isDraft = order.status === "draft";
   const canReceive = order.status === "confirmed" || order.status === "partially_received";
-  const canCreateReturn = !isDraft && order.receiptCount > 0;
+  const canCreateReturn =
+    !isDraft && order.status !== "cancelled" && order.lines.some((line) => Number(line.quantityReceived) > 0);
 
   return (
     <PageShell>

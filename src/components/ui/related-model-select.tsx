@@ -122,6 +122,12 @@ export function RelatedModelSelect({
   }, []);
 
   useEffect(() => {
+    if (disabled) {
+      setIsOpen(false);
+    }
+  }, [disabled]);
+
+  useEffect(() => {
     if (!isOpen || !inputRef.current) return;
 
     function updatePositionAndPlacement() {
@@ -287,6 +293,20 @@ export function RelatedModelSelect({
     ? Math.max(8, Math.min(coords.left, winWidth - dropdownWidth - 8))
     : Math.max(8, Math.min(coords.left, winWidth - dropdownWidth - 8));
 
+  const dropdownZIndex = useMemo(() => {
+    if (!inputRef.current) return 50;
+    const modalEl = inputRef.current.closest('[role="dialog"]');
+    if (!modalEl) return 50;
+    try {
+      const computedZ = window.getComputedStyle(modalEl).zIndex;
+      const parsedZ = parseInt(computedZ, 10);
+      if (!Number.isNaN(parsedZ) && parsedZ > 0) {
+        return parsedZ + 2;
+      }
+    } catch {}
+    return 55;
+  }, [isOpen]);
+
   function handleDropdownWheel(event: React.WheelEvent<HTMLDivElement>) {
     // Prevent react-remove-scroll on document from cancelling the wheel event
     event.stopPropagation();
@@ -319,7 +339,7 @@ export function RelatedModelSelect({
         position: "fixed",
         left: `${dropdownLeft}px`,
         width: `${dropdownWidth}px`,
-        zIndex: 999999,
+        zIndex: dropdownZIndex,
         pointerEvents: "auto",
         maxHeight: `${effectiveMaxHeight}px`,
         height: effectiveHeight ? `${effectiveHeight}px` : undefined,
@@ -371,18 +391,30 @@ export function RelatedModelSelect({
             {onCreateAndEdit ? (
               <button
                 type="button"
+                onPointerDown={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  inputRef.current?.blur();
+                  setIsOpen(false);
+                  onCreateAndEdit(trimmedQuery);
+                }}
                 onMouseDown={(e) => {
                   e.preventDefault();
+                  e.stopPropagation();
+                  inputRef.current?.blur();
                   setIsOpen(false);
                   onCreateAndEdit(trimmedQuery);
                 }}
-                onClick={() => {
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  inputRef.current?.blur();
                   setIsOpen(false);
                   onCreateAndEdit(trimmedQuery);
                 }}
-                className="flex w-full items-center gap-2 rounded px-3 py-2 text-left text-sm text-foreground transition-colors hover:bg-secondary/80"
+                className="flex w-full items-center gap-2 rounded px-3 py-2 text-left text-sm text-foreground transition-colors hover:bg-secondary/80 font-medium"
               >
-                <PlusIcon className="size-4" />
+                <PlusIcon className="size-4 text-[#0B5D4B]" />
                 {trimmedQuery ? `${tCreateLabel.replace(/\.\.\.$/, "")} "${trimmedQuery}"` : tCreateLabel}
               </button>
             ) : null}

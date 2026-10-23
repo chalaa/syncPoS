@@ -11,10 +11,13 @@ import {
   paymentAccounts,
   paymentMethods,
   productCategories,
+  productSaleTaxes,
   products,
+  taxes,
   unitsOfMeasure,
 } from "@/server/db/schema";
 import { getOwnerOptions } from "@/server/owners/owners";
+import type { SalesTaxOption } from "@/server/sales/types";
 import type {
   DirectVendorSaleDetail,
   DirectVendorSaleDetailLine,
@@ -31,7 +34,7 @@ export function displayDirectVendorSaleMoney(value: number, currencyCode: string
 export async function getDirectVendorSaleFormOptions(): Promise<DirectVendorSaleFormOptions> {
   const company = await getDefaultCompany();
 
-  const [customers, vendors, ownerRows, productRows, categoryRows, brandRows, unitRows, inboundPaymentRows, outboundPaymentRows] = await Promise.all([
+  const [customers, vendors, ownerRows, productRows, categoryRows, brandRows, unitRows, taxRows, inboundPaymentRows, outboundPaymentRows] = await Promise.all([
     db
       .select({ id: partners.id, code: partners.code, name: partners.displayName })
       .from(partners)
@@ -51,9 +54,12 @@ export async function getDirectVendorSaleFormOptions(): Promise<DirectVendorSale
         name: products.name,
         listPriceMinor: products.listPriceMinor,
         standardCostMinor: products.standardCostMinor,
+        saleTaxIds: sql<string[]>`coalesce(array_agg(${productSaleTaxes.taxId}) filter (where ${productSaleTaxes.taxId} is not null), '{}')`,
       })
       .from(products)
+      .leftJoin(productSaleTaxes, eq(productSaleTaxes.productId, products.id))
       .where(and(eq(products.companyId, company.id), eq(products.isActive, true), isNull(products.deletedAt)))
+      .groupBy(products.id)
       .orderBy(asc(products.name)),
     db
       .select({
@@ -75,6 +81,26 @@ export async function getDirectVendorSaleFormOptions(): Promise<DirectVendorSale
       .from(unitsOfMeasure)
       .where(and(eq(unitsOfMeasure.companyId, company.id), eq(unitsOfMeasure.isActive, true), isNull(unitsOfMeasure.deletedAt)))
       .orderBy(asc(unitsOfMeasure.code)),
+    db
+      .select({
+        id: taxes.id,
+        code: taxes.code,
+        name: taxes.name,
+        computation: taxes.computation,
+        rate: taxes.rate,
+        amountMinor: taxes.amountMinor,
+        priceIncluded: taxes.priceIncluded,
+      })
+      .from(taxes)
+      .where(
+        and(
+          eq(taxes.companyId, company.id),
+          isNull(taxes.deletedAt),
+          eq(taxes.isActive, true),
+          sql`${taxes.scope} in ('sale', 'both')`,
+        ),
+      )
+      .orderBy(asc(taxes.name)),
     getPaymentAccounts("inbound"),
     getPaymentAccounts("outbound"),
   ]);
@@ -88,6 +114,7 @@ export async function getDirectVendorSaleFormOptions(): Promise<DirectVendorSale
     productCategories: categoryRows,
     productBrands: brandRows,
     productUnits: unitRows,
+    taxes: taxRows satisfies SalesTaxOption[],
     inboundPaymentAccounts: inboundPaymentRows,
     outboundPaymentAccounts: outboundPaymentRows,
   };
@@ -122,12 +149,25 @@ async function getPaymentAccounts(direction: "inbound" | "outbound"): Promise<Di
     .orderBy(asc(paymentMethods.name), asc(paymentAccounts.name));
 }
 
-export async function getDirectVendorSaleList(params?: { query?: string; status?: string }): Promise<DirectVendorSaleListRow[]> {
+export async function getDirectVendorSaleList(params?: {
+  query?: string;
+  status?: string;
+  customerPaymentTerm?: string;
+  vendorPaymentTerm?: string;
+}): Promise<DirectVendorSaleListRow[]> {
   const company = await getDefaultCompany();
   const query = params?.query?.trim() ?? "";
   const status = params?.status?.trim() ?? "";
+  const customerPaymentTerm = params?.customerPaymentTerm?.trim() ?? "";
+  const vendorPaymentTerm = params?.vendorPaymentTerm?.trim() ?? "";
 
   const statusFilter = status ? sql`and dvs.status = ${status}::direct_vendor_sale_status` : sql``;
+  const customerPaymentTermFilter = customerPaymentTerm
+    ? sql`and dvs.customer_payment_term = ${customerPaymentTerm}::sales_payment_term`
+    : sql``;
+  const vendorPaymentTermFilter = vendorPaymentTerm
+    ? sql`and dvs.vendor_payment_term = ${vendorPaymentTerm}::purchase_payment_term`
+    : sql``;
   const searchFilter = query
     ? sql`and (dvs.sale_no ilike ${`%${query}%`} or customer.display_name ilike ${`%${query}%`} or vendor.display_name ilike ${`%${query}%`})`
     : sql``;
@@ -161,6 +201,8 @@ export async function getDirectVendorSaleList(params?: { query?: string; status?
     where dvs.company_id = ${company.id}
       and dvs.deleted_at is null
       ${statusFilter}
+      ${customerPaymentTermFilter}
+      ${vendorPaymentTermFilter}
       ${searchFilter}
     group by dvs.id, customer.id, vendor.id, own.id, customer_pm.id, vendor_pm.id
     order by dvs.created_at desc

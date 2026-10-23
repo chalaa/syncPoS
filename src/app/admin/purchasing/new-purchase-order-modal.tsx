@@ -92,17 +92,17 @@ export function NewPurchaseOrderModal({
       </DialogTrigger>
 
       <DialogContent
-        className="fixed left-1/2 top-1/2 z-50 -translate-x-1/2 -translate-y-1/2 w-[calc(100%-1rem)] sm:w-full max-w-6xl max-h-[92vh] sm:max-h-[90vh] p-0 gap-0 flex flex-col rounded-2xl border border-border/80 bg-card shadow-2xl overflow-y-auto outline-none"
+        className="fixed left-1/2 top-1/2 z-50 -translate-x-1/2 -translate-y-1/2 w-[calc(100%-1rem)] sm:w-full max-w-6xl max-h-[92vh] sm:max-h-[90vh] p-0 gap-0 flex flex-col rounded-2xl border border-border/80 bg-card shadow-2xl overflow-hidden outline-none"
         showCloseButton={false}
         onPointerDownOutside={() => handleCloseRequest()}
         onInteractOutside={() => handleCloseRequest()}
         onEscapeKeyDown={() => handleCloseRequest()}
       >
         {/* Top Brand Accent Line */}
-        <div className="h-1.5 w-full bg-gradient-to-r from-[#0B5D4B] via-[#073B35] to-[#D9A441]" />
+        <div className="h-1.5 w-full shrink-0 bg-gradient-to-r from-[#0B5D4B] via-[#073B35] to-[#D9A441]" />
 
         {/* Modal Header */}
-        <DialogHeader className="border-b border-border/70 bg-background/95 px-4 sm:px-6 py-4 backdrop-blur-md flex flex-row items-center justify-between gap-4">
+        <DialogHeader className="shrink-0 border-b border-border/70 bg-background/95 px-4 sm:px-6 py-4 backdrop-blur-md flex flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#0B5D4B] to-[#073B35] text-white shadow-md shadow-[#0B5D4B]/25 ring-1 ring-white/20">
               <FileText className="h-5 w-5 text-emerald-200" />
@@ -132,7 +132,7 @@ export function NewPurchaseOrderModal({
         </DialogHeader>
 
         {/* Modal Body */}
-        <div className="px-4 sm:px-6 py-4 sm:py-5">
+        <div className="flex-1 overflow-y-auto min-h-0 px-4 sm:px-6 py-4 sm:py-5">
           <PurchaseOrderForm
             ref={formRef}
             action={createPurchaseOrder}

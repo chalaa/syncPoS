@@ -12,6 +12,7 @@ import { generateCompanyDocumentNo } from "@/server/db/code-generator";
 import {
   auditLogs,
   locations,
+  ownerLocations,
   owners,
   productLots,
   productSerials,
@@ -61,6 +62,7 @@ const scrapSchema = z.object({
 
 const internalTransferSchema = z.object({
   ownerId: z.string().uuid("Owner is required"),
+  toOwnerId: z.string().uuid().optional().or(z.literal("")),
   fromLocationId: z.string().uuid("Source location is required"),
   toLocationId: z.string().uuid("Destination location is required"),
   sourceNo: z.string().trim().max(80).optional(),
@@ -195,7 +197,7 @@ async function validateOwner(
   ownerId: string,
 ) {
   const [owner] = await tx
-    .select({ id: owners.id })
+    .select({ id: owners.id, name: owners.name })
     .from(owners)
     .where(and(eq(owners.id, ownerId), eq(owners.companyId, companyId), isNull(owners.deletedAt)))
     .limit(1);
@@ -925,6 +927,7 @@ export async function createInternalTransferOperation(formData: FormData) {
   const fallbackPath = returnPath || "/admin/inventory/operations/internal-transfers/new";
   const parsed = internalTransferSchema.safeParse({
     ownerId: formValue(formData, "ownerId"),
+    toOwnerId: formValue(formData, "toOwnerId"),
     fromLocationId: formValue(formData, "fromLocationId"),
     toLocationId: formValue(formData, "toLocationId"),
     sourceNo: formValue(formData, "sourceNo"),
@@ -958,6 +961,25 @@ export async function createInternalTransferOperation(formData: FormData) {
       const owner = await validateOwner(tx, company.id, parsed.data.ownerId);
       await validateSelectableLocation(tx, company.id, parsed.data.fromLocationId);
       await validateSelectableLocation(tx, company.id, parsed.data.toLocationId);
+
+      const destinationOwnerRows = await tx
+        .select({ ownerId: ownerLocations.ownerId })
+        .from(ownerLocations)
+        .where(eq(ownerLocations.locationId, parsed.data.toLocationId));
+
+      let effectiveToOwnerId = parsed.data.toOwnerId || null;
+
+      if (destinationOwnerRows.length > 1) {
+        if (!effectiveToOwnerId) {
+          throw new Error("Multiple owners exist for the destination location. Selecting a receiver owner is required.");
+        }
+      } else if (destinationOwnerRows.length === 1 && !effectiveToOwnerId) {
+        effectiveToOwnerId = destinationOwnerRows[0].ownerId;
+      } else if (!effectiveToOwnerId) {
+        effectiveToOwnerId = owner.id;
+      }
+
+      const toOwner = await validateOwner(tx, company.id, effectiveToOwnerId);
 
       await requireStockOutApproval(tx, {
         companyId: company.id,
@@ -1021,7 +1043,7 @@ export async function createInternalTransferOperation(formData: FormData) {
 
         await addToBalance(tx, {
           companyId: company.id,
-          ownerId: owner.id,
+          ownerId: toOwner.id,
           locationId: parsed.data.toLocationId,
           productId: product.id,
           productSerialId: tracked.productSerialId,
@@ -1054,7 +1076,7 @@ export async function createInternalTransferOperation(formData: FormData) {
         }
 
         preparedLines.push({
-          ownerId: owner.id,
+          ownerId: toOwner.id,
           product,
           productSerialId: tracked.productSerialId,
           productLotId: tracked.productLotId,
@@ -1063,7 +1085,10 @@ export async function createInternalTransferOperation(formData: FormData) {
           fromLocationId: parsed.data.fromLocationId,
           toLocationId: parsed.data.toLocationId,
           notes: line.notes,
-          metadata: {},
+          metadata: {
+            fromOwnerId: owner.id,
+            toOwnerId: toOwner.id,
+          },
         });
       }
 
@@ -1071,7 +1096,7 @@ export async function createInternalTransferOperation(formData: FormData) {
         .insert(stockMovements)
         .values({
           companyId: company.id,
-          ownerId: owner.id,
+          ownerId: toOwner.id,
           movementNo,
           movementType: "transfer",
           status: "posted",
@@ -1082,6 +1107,12 @@ export async function createInternalTransferOperation(formData: FormData) {
           postedAt: new Date(),
           postedBy: user.id,
           notes: parsed.data.notes || null,
+          metadata: {
+            fromOwnerId: owner.id,
+            toOwnerId: toOwner.id,
+            fromOwnerName: owner.name,
+            toOwnerName: toOwner.name,
+          },
         })
         .returning({ id: stockMovements.id });
       movementId = movement.id;

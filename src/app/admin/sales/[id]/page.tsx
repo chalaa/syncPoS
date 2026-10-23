@@ -130,7 +130,8 @@ export default async function SalesOrderDetailPage({ params, searchParams }: Sal
     hasRemainingDeliveryQuantity;
   const canRegisterPayment =
     !isQuotation && order.status !== "cancelled" && order.totalMinor > 0 && order.residualAmountMinor > 0;
-  const canCreateReturn = !isQuotation && order.status !== "cancelled" && order.deliveryCount > 0;
+  const canCreateReturn =
+    !isQuotation && order.status !== "cancelled" && order.lines.some((line) => Number(line.quantityDelivered) > 0);
 
   return (
     <PageShell>

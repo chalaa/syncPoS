@@ -3246,6 +3246,10 @@ export const transfers = pgTable(
       onDelete: "restrict",
       onUpdate: "cascade",
     }),
+    toOwnerId: uuid("to_owner_id").references(() => owners.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
     fromLocationId: uuid("from_location_id")
       .notNull()
       .references(() => locations.id, { onDelete: "restrict", onUpdate: "cascade" }),
@@ -3308,6 +3312,7 @@ export const transfers = pgTable(
       .where(sql`${table.deletedAt} is null`),
     index("transfers_status_idx").on(table.companyId, table.status),
     index("transfers_owner_idx").on(table.companyId, table.ownerId),
+    index("transfers_to_owner_idx").on(table.companyId, table.toOwnerId),
     index("transfers_from_location_idx").on(table.fromLocationId),
     index("transfers_to_location_idx").on(table.toLocationId),
   ],
@@ -3325,6 +3330,10 @@ export const transferLines = pgTable(
       .notNull()
       .references(() => products.id, { onDelete: "restrict", onUpdate: "cascade" }),
     ownerId: uuid("owner_id").references(() => owners.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
+    toOwnerId: uuid("to_owner_id").references(() => owners.id, {
       onDelete: "restrict",
       onUpdate: "cascade",
     }),
@@ -3364,6 +3373,7 @@ export const transferLines = pgTable(
       .where(sql`${table.deletedAt} is null`),
     index("transfer_lines_product_idx").on(table.productId),
     index("transfer_lines_owner_idx").on(table.ownerId),
+    index("transfer_lines_to_owner_idx").on(table.toOwnerId),
     index("transfer_lines_serial_idx").on(table.productSerialId),
     index("transfer_lines_lot_idx").on(table.productLotId),
   ],

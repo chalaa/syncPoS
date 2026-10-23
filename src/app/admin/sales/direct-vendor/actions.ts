@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { and, eq, isNull, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { majorToMinor } from "@/lib/catalog-utils";
@@ -15,11 +15,14 @@ import {
   auditLogs,
   directVendorSaleLines,
   directVendorSales,
+  partnerContacts,
   partners,
   paymentAllocations,
   payments,
   products,
+  taxes,
 } from "@/server/db/schema";
+import { generateCompanyCode } from "@/server/db/code-generator";
 import { PERMISSIONS } from "@/server/iam/permissions";
 import { paymentLinesTotal, replacePaymentLines, resolvePaymentLines } from "@/server/payments/payment-lines";
 
@@ -44,10 +47,9 @@ const directVendorSaleLineSchema = z.object({
   productId: z.string().uuid(),
   description: z.string().trim().max(500).optional(),
   quantity: z.coerce.number().positive("Quantity must be greater than zero."),
-  vendorUnitCost: z.string().trim().default("0"),
-  customerUnitPrice: z.string().trim().default("0"),
-  discount: z.string().trim().default("0"),
-  taxAmount: z.string().trim().default("0"),
+  vendorUnitCost: z.string().trim().refine((val) => majorToMinor(val) > 0, "Vendor cost/purchase price is mandatory and must be greater than zero."),
+  customerUnitPrice: z.string().trim().refine((val) => majorToMinor(val) > 0, "Sale price is mandatory and must be greater than zero."),
+  taxIds: z.array(z.string().uuid()).default([]),
   notes: z.string().trim().optional(),
 });
 
@@ -97,6 +99,12 @@ async function nextDirectVendorSaleNo(tx: Parameters<Parameters<typeof db.transa
 }
 
 function parseDirectVendorSaleForm(formData: FormData, errorPath: string) {
+  const deliverProduct = formValue(formData, "deliverProduct") !== "false";
+  let intent = formValue(formData, "intent") || "post";
+  if (!deliverProduct && intent === "post") {
+    intent = "draft";
+  }
+
   const parsedHeader = directVendorSaleHeaderSchema.safeParse({
     customerId: formValue(formData, "customerId"),
     vendorId: formValue(formData, "vendorId"),
@@ -105,7 +113,7 @@ function parseDirectVendorSaleForm(formData: FormData, errorPath: string) {
     customerPaymentTerm: formValue(formData, "customerPaymentTerm") || "cash",
     vendorPaymentTerm: formValue(formData, "vendorPaymentTerm") || "cash",
     notes: formValue(formData, "notes"),
-    intent: formValue(formData, "intent") || "post",
+    intent,
   });
 
   if (!parsedHeader.success) {
@@ -117,8 +125,7 @@ function parseDirectVendorSaleForm(formData: FormData, errorPath: string) {
   const quantities = formValues(formData, "quantity");
   const vendorUnitCosts = formValues(formData, "vendorUnitCost");
   const customerUnitPrices = formValues(formData, "customerUnitPrice");
-  const discounts = formValues(formData, "discount");
-  const taxAmounts = formValues(formData, "taxAmount");
+  const taxIdValues = formValues(formData, "taxIds");
   const notes = formValues(formData, "lineNotes");
 
   const parsedLines = productIds
@@ -128,8 +135,7 @@ function parseDirectVendorSaleForm(formData: FormData, errorPath: string) {
       quantity: quantities[index] ?? "",
       vendorUnitCost: vendorUnitCosts[index] ?? "0",
       customerUnitPrice: customerUnitPrices[index] ?? "0",
-      discount: discounts[index] ?? "0",
-      taxAmount: taxAmounts[index] ?? "0",
+      taxIds: parseTaxIds(taxIdValues[index] ?? ""),
       notes: notes[index] ?? "",
     }))
     .filter((line) => line.productId || Number(line.quantity) > 0);
@@ -151,39 +157,68 @@ function parseDirectVendorSaleForm(formData: FormData, errorPath: string) {
   return { header: parsedHeader.data, lines };
 }
 
-function lineAmounts(line: z.infer<typeof directVendorSaleLineSchema>) {
-  const quantity = line.quantity;
-  const vendorUnitCostMinor = majorToMinor(line.vendorUnitCost);
-  const customerUnitPriceMinor = majorToMinor(line.customerUnitPrice);
-  const discountMinor = majorToMinor(line.discount);
-  const taxAmountMinor = majorToMinor(line.taxAmount);
+function parseTaxIds(value: string) {
+  return value
+    .split(",")
+    .map((taxId) => taxId.trim())
+    .filter(Boolean);
+}
 
-  if (vendorUnitCostMinor < 0 || customerUnitPriceMinor < 0 || discountMinor < 0 || taxAmountMinor < 0) {
-    throw new Error("Amounts cannot be negative.");
+function calculateLineTax(
+  lineAmountMinor: number,
+  quantity: number,
+  tax: {
+    id: string;
+    computation: "percent" | "fixed";
+    rate: string;
+    amountMinor: number;
+    priceIncluded: boolean;
+  },
+) {
+  if (tax.computation === "fixed") {
+    const amount = Math.round(tax.amountMinor * quantity);
+    return tax.priceIncluded ? Math.min(amount, lineAmountMinor) : amount;
   }
 
-  const vendorLineTotalMinor = Math.round(vendorUnitCostMinor * quantity);
-  const grossCustomerMinor = Math.round(customerUnitPriceMinor * quantity);
-
-  if (discountMinor > grossCustomerMinor) {
-    throw new Error("Discount cannot exceed the line sale amount.");
+  const rate = Number(tax.rate);
+  if (!Number.isFinite(rate) || rate <= 0) {
+    return 0;
   }
 
-  const subtotalMinor = grossCustomerMinor - discountMinor;
-  const customerLineTotalMinor = subtotalMinor + taxAmountMinor;
-  const lineMarginMinor = customerLineTotalMinor - vendorLineTotalMinor;
+  if (tax.priceIncluded) {
+    return Math.round(lineAmountMinor - lineAmountMinor / (1 + rate / 100));
+  }
 
-  return {
-    quantity,
-    vendorUnitCostMinor,
-    customerUnitPriceMinor,
-    discountMinor,
-    taxAmountMinor,
-    vendorLineTotalMinor,
-    subtotalMinor,
-    customerLineTotalMinor,
-    lineMarginMinor,
-  };
+  return Math.round(lineAmountMinor * (rate / 100));
+}
+
+function calculateLineTaxes(
+  lineAmountMinor: number,
+  quantity: number,
+  selectedTaxes: {
+    id: string;
+    computation: "percent" | "fixed";
+    rate: string;
+    amountMinor: number;
+    priceIncluded: boolean;
+  }[],
+) {
+  const lineTaxes = selectedTaxes.map((tax) => ({
+    taxId: tax.id,
+    taxAmountMinor: calculateLineTax(lineAmountMinor, quantity, tax),
+    priceIncluded: tax.priceIncluded,
+  }));
+  const includedTaxAmount = lineTaxes
+    .filter((tax) => tax.priceIncluded)
+    .reduce((sum, tax) => sum + tax.taxAmountMinor, 0);
+  const excludedTaxAmount = lineTaxes
+    .filter((tax) => !tax.priceIncluded)
+    .reduce((sum, tax) => sum + tax.taxAmountMinor, 0);
+  const taxAmountMinor = includedTaxAmount + excludedTaxAmount;
+  const subtotalMinor = Math.max(lineAmountMinor - includedTaxAmount, 0);
+  const lineTotalMinor = lineAmountMinor + excludedTaxAmount;
+
+  return { lineTaxes, taxAmountMinor, subtotalMinor, lineTotalMinor };
 }
 
 export async function createDirectVendorSale(formData: FormData) {
@@ -221,6 +256,30 @@ export async function createDirectVendorSale(formData: FormData) {
         .where(and(eq(products.companyId, company.id), isNull(products.deletedAt)));
       const unitByProductId = new Map(productRows.map((product) => [product.id, product.unitId]));
 
+      const uniqueTaxIds = [...new Set(lines.flatMap((line) => line.taxIds))];
+      const taxRows =
+        uniqueTaxIds.length > 0
+          ? await tx
+              .select({
+                id: taxes.id,
+                computation: taxes.computation,
+                rate: taxes.rate,
+                amountMinor: taxes.amountMinor,
+                priceIncluded: taxes.priceIncluded,
+              })
+              .from(taxes)
+              .where(
+                and(
+                  eq(taxes.companyId, company.id),
+                  isNull(taxes.deletedAt),
+                  eq(taxes.isActive, true),
+                  sql`${taxes.scope} in ('sale', 'both')`,
+                  inArray(taxes.id, uniqueTaxIds),
+                ),
+              )
+          : [];
+      const taxById = new Map(taxRows.map((tax) => [tax.id, tax]));
+
       let subtotalMinor = 0;
       let taxAmountMinor = 0;
       let customerTotalMinor = 0;
@@ -232,14 +291,52 @@ export async function createDirectVendorSale(formData: FormData) {
           throw new Error(`Product on line ${index + 1} does not exist.`);
         }
 
-        const amounts = lineAmounts(line);
-        subtotalMinor += amounts.subtotalMinor;
-        taxAmountMinor += amounts.taxAmountMinor;
-        customerTotalMinor += amounts.customerLineTotalMinor;
-        vendorCostTotalMinor += amounts.vendorLineTotalMinor;
-        marginMinor += amounts.lineMarginMinor;
+        const quantity = line.quantity;
+        const vendorUnitCostMinor = majorToMinor(line.vendorUnitCost);
+        const customerUnitPriceMinor = majorToMinor(line.customerUnitPrice);
 
-        return { line, unitId, amounts };
+        if (vendorUnitCostMinor <= 0) {
+          throw new Error("Vendor/purchase unit cost is mandatory and must be greater than zero.");
+        }
+
+        if (customerUnitPriceMinor <= 0) {
+          throw new Error("Customer/sale unit price is mandatory and must be greater than zero.");
+        }
+
+        const vendorLineTotalMinor = Math.round(vendorUnitCostMinor * quantity);
+        const grossCustomerMinor = Math.round(customerUnitPriceMinor * quantity);
+
+        const selectedTaxes = line.taxIds
+          .map((id) => taxById.get(id))
+          .filter((tax): tax is NonNullable<typeof tax> => Boolean(tax));
+
+        const taxCalc = calculateLineTaxes(grossCustomerMinor, quantity, selectedTaxes);
+        const lineTaxAmountMinor = taxCalc.taxAmountMinor;
+        const lineSubtotalMinor = taxCalc.subtotalMinor;
+        const customerLineTotalMinor = taxCalc.lineTotalMinor;
+        const lineMarginMinor = customerLineTotalMinor - vendorLineTotalMinor;
+
+        subtotalMinor += lineSubtotalMinor;
+        taxAmountMinor += lineTaxAmountMinor;
+        customerTotalMinor += customerLineTotalMinor;
+        vendorCostTotalMinor += vendorLineTotalMinor;
+        marginMinor += lineMarginMinor;
+
+        return {
+          line,
+          unitId,
+          amounts: {
+            quantity,
+            vendorUnitCostMinor,
+            customerUnitPriceMinor,
+            discountMinor: 0,
+            taxAmountMinor: lineTaxAmountMinor,
+            vendorLineTotalMinor,
+            subtotalMinor: lineSubtotalMinor,
+            customerLineTotalMinor,
+            lineMarginMinor,
+          },
+        };
       });
 
       const saleNo = await nextDirectVendorSaleNo(tx, company.id);
@@ -707,4 +804,160 @@ export async function cancelDirectVendorSale(formData: FormData) {
   revalidatePath("/admin/sales/direct-vendor");
   revalidatePath(`/admin/sales/direct-vendor/${saleId}`);
   redirect(`/admin/sales/direct-vendor/${saleId}?notice=${encodeURIComponent("Direct vendor sale cancelled.")}`);
+}
+
+const partnerCreateSchema = z.object({
+  displayName: z.string().trim().min(1, "Display name is required").max(200),
+  legalName: z.string().trim().max(200).optional(),
+  tin: z.string().trim().max(30).optional(),
+  phone: z.string().trim().max(40).optional(),
+  email: z.string().trim().email("Email is invalid").max(160).or(z.literal("")).optional(),
+});
+
+export async function createCustomerFromDirectVendor(input: unknown) {
+  const user = await requirePermission(PERMISSIONS.SALES.CREATE);
+
+  const parsed = partnerCreateSchema.safeParse(input);
+  if (!parsed.success) {
+    throw new Error(parsed.error.issues[0]?.message ?? "Invalid customer.");
+  }
+
+  const company = await getDefaultCompany();
+
+  try {
+    const customer = await db.transaction(async (tx) => {
+      const code = await generateCompanyCode(tx, {
+        companyId: company.id,
+        table: "partners",
+        prefix: "CUST",
+      });
+
+      const [created] = await tx
+        .insert(partners)
+        .values({
+          companyId: company.id,
+          code,
+          displayName: parsed.data.displayName,
+          legalName: parsed.data.legalName || parsed.data.displayName,
+          tin: parsed.data.tin || null,
+          isCustomer: true,
+          isSupplier: false,
+          creditLimitMinor: 0,
+          currencyCode: company.baseCurrencyCode,
+          status: "active",
+        })
+        .returning({
+          id: partners.id,
+          code: partners.code,
+          name: partners.displayName,
+        });
+
+      if (!created) {
+        throw new Error("Could not create customer.");
+      }
+
+      if (parsed.data.phone || parsed.data.email) {
+        await tx.insert(partnerContacts).values({
+          partnerId: created.id,
+          fullName: parsed.data.displayName,
+          phone: parsed.data.phone || null,
+          email: parsed.data.email || null,
+          isPrimary: true,
+        });
+      }
+
+      await tx.insert(auditLogs).values({
+        companyId: company.id,
+        actorUserId: user.id,
+        action: "customer.quick_create_from_direct_vendor",
+        entityType: "partner",
+        entityId: created.id,
+        severity: "info",
+        metadata: { code: created.code, displayName: created.name },
+      });
+
+      return created;
+    });
+
+    revalidatePath("/admin/sales/direct-vendor");
+    revalidatePath("/admin/partners");
+
+    return customer;
+  } catch (error) {
+    throw new Error(uniqueViolationMessage(error, "Could not create customer."));
+  }
+}
+
+export async function createVendorFromDirectVendor(input: unknown) {
+  const user = await requirePermission(PERMISSIONS.SALES.CREATE);
+
+  const parsed = partnerCreateSchema.safeParse(input);
+  if (!parsed.success) {
+    throw new Error(parsed.error.issues[0]?.message ?? "Invalid vendor.");
+  }
+
+  const company = await getDefaultCompany();
+
+  try {
+    const vendor = await db.transaction(async (tx) => {
+      const code = await generateCompanyCode(tx, {
+        companyId: company.id,
+        table: "partners",
+        prefix: "SUP",
+      });
+
+      const [created] = await tx
+        .insert(partners)
+        .values({
+          companyId: company.id,
+          code,
+          displayName: parsed.data.displayName,
+          legalName: parsed.data.legalName || parsed.data.displayName,
+          tin: parsed.data.tin || null,
+          isCustomer: false,
+          isSupplier: true,
+          creditLimitMinor: 0,
+          currencyCode: company.baseCurrencyCode,
+          status: "active",
+        })
+        .returning({
+          id: partners.id,
+          code: partners.code,
+          name: partners.displayName,
+        });
+
+      if (!created) {
+        throw new Error("Could not create vendor.");
+      }
+
+      if (parsed.data.phone || parsed.data.email) {
+        await tx.insert(partnerContacts).values({
+          partnerId: created.id,
+          fullName: parsed.data.displayName,
+          phone: parsed.data.phone || null,
+          email: parsed.data.email || null,
+          isPrimary: true,
+        });
+      }
+
+      await tx.insert(auditLogs).values({
+        companyId: company.id,
+        actorUserId: user.id,
+        action: "vendor.quick_create_from_direct_vendor",
+        entityType: "partner",
+        entityId: created.id,
+        severity: "info",
+        metadata: { code: created.code, displayName: created.name },
+      });
+
+      return created;
+    });
+
+    revalidatePath("/admin/sales/direct-vendor");
+    revalidatePath("/admin/partners");
+
+    return vendor;
+  } catch (error) {
+    throw new Error(uniqueViolationMessage(error, "Could not create vendor."));
+  }
 }

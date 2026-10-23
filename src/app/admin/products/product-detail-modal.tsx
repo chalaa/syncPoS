@@ -259,7 +259,8 @@ export function ProductDetailModal({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex max-h-[92vh] sm:max-h-[90vh] w-[calc(100%-1rem)] sm:w-full max-w-5xl flex-col overflow-y-auto rounded-2xl border border-border/80 bg-card p-0 shadow-2xl transition-all outline-none"
+        className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex max-h-[92vh] sm:max-h-[90vh] w-[calc(100%-1rem)] sm:w-full max-w-5xl flex-col overflow-y-auto rounded-2xl border border-border/80 bg-card p-0 shadow-2xl transition-all outline-none z-[70]"
+        overlayClassName="z-[70]"
         showCloseButton={false}
       >
         {/* Top Ethiopian Accent Gradient Stripe */}

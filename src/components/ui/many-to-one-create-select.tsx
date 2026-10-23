@@ -307,6 +307,20 @@ export function ManyToOneCreateSelect({
     ? Math.max(8, Math.min(coords.left, winWidth - dropdownWidth - 8))
     : Math.max(8, Math.min(coords.left, winWidth - dropdownWidth - 8));
 
+  const dropdownZIndex = useMemo(() => {
+    if (!inputRef.current) return 50;
+    const modalEl = inputRef.current.closest('[role="dialog"]');
+    if (!modalEl) return 50;
+    try {
+      const computedZ = window.getComputedStyle(modalEl).zIndex;
+      const parsedZ = parseInt(computedZ, 10);
+      if (!Number.isNaN(parsedZ) && parsedZ > 0) {
+        return parsedZ + 2;
+      }
+    } catch {}
+    return 55;
+  }, [isOpen]);
+
   function handleDropdownWheel(event: React.WheelEvent<HTMLDivElement>) {
     // Prevent react-remove-scroll on document from cancelling the wheel event
     event.stopPropagation();
@@ -339,7 +353,7 @@ export function ManyToOneCreateSelect({
         position: "fixed",
         left: `${dropdownLeft}px`,
         width: `${dropdownWidth}px`,
-        zIndex: 999999,
+        zIndex: dropdownZIndex,
         pointerEvents: "auto",
         maxHeight: `${effectiveMaxHeight}px`,
         height: effectiveHeight ? `${effectiveHeight}px` : undefined,

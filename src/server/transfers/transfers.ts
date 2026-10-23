@@ -1,12 +1,13 @@
 import "server-only";
 
-import { and, asc, eq, isNull, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 
 import { getDefaultCompany } from "@/server/catalog/products";
 import { db } from "@/server/db/client";
 import {
   locations,
+  ownerLocations,
   owners,
   products,
   transferLines,
@@ -17,6 +18,7 @@ import type {
   TransferDetailLine,
   TransferFormOptions,
   TransferListRow,
+  TransferOwnerOption,
 } from "@/server/transfers/types";
 
 export async function getTransferFormOptions(): Promise<TransferFormOptions> {
@@ -44,8 +46,32 @@ export async function getTransferFormOptions(): Promise<TransferFormOptions> {
       .orderBy(asc(products.name)),
   ]);
 
+  const ownerIds = ownerRows.map((o) => o.id);
+  const links = ownerIds.length
+    ? await db
+        .select({
+          ownerId: ownerLocations.ownerId,
+          locationId: ownerLocations.locationId,
+        })
+        .from(ownerLocations)
+        .where(inArray(ownerLocations.ownerId, ownerIds))
+    : [];
+
+  const linksByOwner = new Map<string, string[]>();
+  links.forEach((link) => {
+    const list = linksByOwner.get(link.ownerId) ?? [];
+    list.push(link.locationId);
+    linksByOwner.set(link.ownerId, list);
+  });
+
+  const ownersWithOptions: TransferOwnerOption[] = ownerRows.map((owner) => ({
+    id: owner.id,
+    name: owner.name,
+    locationIds: linksByOwner.get(owner.id) ?? [],
+  }));
+
   return {
-    owners: ownerRows,
+    owners: ownersWithOptions,
     locations: locationRows,
     transitLocations: transitRows,
     products: productRows,
@@ -57,6 +83,7 @@ export async function getTransferList(): Promise<TransferListRow[]> {
   const fromLocations = alias(locations, "transfer_from_locations");
   const transitLocations = alias(locations, "transfer_transit_locations");
   const toLocations = alias(locations, "transfer_to_locations");
+  const toOwners = alias(owners, "transfer_to_owners");
 
   return db
     .select({
@@ -64,6 +91,7 @@ export async function getTransferList(): Promise<TransferListRow[]> {
       transferNo: transfers.transferNo,
       status: transfers.status,
       ownerName: owners.name,
+      toOwnerName: toOwners.name,
       transferDate: sql<string>`${transfers.transferDate}::text`,
       fromLocationCode: fromLocations.code,
       transitLocationCode: transitLocations.code,
@@ -75,12 +103,13 @@ export async function getTransferList(): Promise<TransferListRow[]> {
     })
     .from(transfers)
     .leftJoin(owners, eq(transfers.ownerId, owners.id))
+    .leftJoin(toOwners, eq(transfers.toOwnerId, toOwners.id))
     .innerJoin(fromLocations, eq(transfers.fromLocationId, fromLocations.id))
     .innerJoin(transitLocations, eq(transfers.transitLocationId, transitLocations.id))
     .innerJoin(toLocations, eq(transfers.toLocationId, toLocations.id))
     .leftJoin(transferLines, and(eq(transferLines.transferId, transfers.id), isNull(transferLines.deletedAt)))
     .where(and(eq(transfers.companyId, company.id), isNull(transfers.deletedAt)))
-    .groupBy(transfers.id, owners.id, fromLocations.id, transitLocations.id, toLocations.id)
+    .groupBy(transfers.id, owners.id, toOwners.id, fromLocations.id, transitLocations.id, toLocations.id)
     .orderBy(sql`${transfers.transferDate} desc`, sql`${transfers.transferNo} desc`);
 }
 
@@ -89,6 +118,7 @@ export async function getTransferDetail(id: string): Promise<TransferDetail | nu
   const fromLocations = alias(locations, "transfer_detail_from_locations");
   const transitLocations = alias(locations, "transfer_detail_transit_locations");
   const toLocations = alias(locations, "transfer_detail_to_locations");
+  const toOwners = alias(owners, "transfer_detail_to_owners");
 
   const [transfer] = await db
     .select({
@@ -97,6 +127,8 @@ export async function getTransferDetail(id: string): Promise<TransferDetail | nu
       status: transfers.status,
       ownerId: transfers.ownerId,
       ownerName: owners.name,
+      toOwnerId: transfers.toOwnerId,
+      toOwnerName: toOwners.name,
       transferDate: sql<string>`${transfers.transferDate}::text`,
       fromLocationId: transfers.fromLocationId,
       transitLocationId: transfers.transitLocationId,
@@ -117,23 +149,27 @@ export async function getTransferDetail(id: string): Promise<TransferDetail | nu
     })
     .from(transfers)
     .leftJoin(owners, eq(transfers.ownerId, owners.id))
+    .leftJoin(toOwners, eq(transfers.toOwnerId, toOwners.id))
     .innerJoin(fromLocations, eq(transfers.fromLocationId, fromLocations.id))
     .innerJoin(transitLocations, eq(transfers.transitLocationId, transitLocations.id))
     .innerJoin(toLocations, eq(transfers.toLocationId, toLocations.id))
     .leftJoin(transferLines, and(eq(transferLines.transferId, transfers.id), isNull(transferLines.deletedAt)))
     .where(and(eq(transfers.id, id), eq(transfers.companyId, company.id), isNull(transfers.deletedAt)))
-    .groupBy(transfers.id, owners.id, fromLocations.id, transitLocations.id, toLocations.id)
+    .groupBy(transfers.id, owners.id, toOwners.id, fromLocations.id, transitLocations.id, toLocations.id)
     .limit(1);
 
   if (!transfer) {
     return null;
   }
 
+  const lineToOwners = alias(owners, "transfer_line_to_owners");
+
   const lines = await db
     .select({
       id: transferLines.id,
       lineNo: transferLines.lineNo,
       ownerName: owners.name,
+      toOwnerName: lineToOwners.name,
       productName: products.name,
       sku: products.sku,
       trackingMode: products.trackingMode,
@@ -149,6 +185,7 @@ export async function getTransferDetail(id: string): Promise<TransferDetail | nu
     .from(transferLines)
     .innerJoin(products, eq(transferLines.productId, products.id))
     .leftJoin(owners, eq(transferLines.ownerId, owners.id))
+    .leftJoin(lineToOwners, eq(transferLines.toOwnerId, lineToOwners.id))
     .where(and(eq(transferLines.transferId, id), isNull(transferLines.deletedAt)))
     .orderBy(asc(transferLines.lineNo));
 

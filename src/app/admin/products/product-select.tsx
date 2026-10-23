@@ -121,6 +121,7 @@ export function ProductSelect({
             emptyLabel={emptyLabel}
             inputClassName={inputClassName}
             error={error}
+            disabled={isDialogOpen}
             createLabel={allowCreate ? t("Add Product...") : undefined}
             onCreateAndEdit={
               allowCreate

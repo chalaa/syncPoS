@@ -66,7 +66,7 @@ function newLine(ownerId = ""): PurchaseLineDraft {
     ownerId,
     productId: "",
     quantity: "1",
-    unitCost: "0",
+    unitCost: "",
     taxIds: [],
   };
 }
@@ -161,8 +161,8 @@ function validatePurchaseOrderForm(values: PurchaseFormValues, t: (key: string, 
     }
 
     const unitCost = Number(line.unitCost);
-    if (!Number.isFinite(unitCost) || unitCost < 0) {
-      fieldErrors[fieldKey("unitCost", line.key)] = t("purchasing.error.enterUnitCost", "Enter a valid unit cost.");
+    if (!line.unitCost || !Number.isFinite(unitCost) || unitCost <= 0) {
+      fieldErrors[fieldKey("unitCost", line.key)] = t("purchasing.error.enterUnitCost", "Unit cost is mandatory and must be greater than zero.");
     }
   });
 
@@ -331,6 +331,7 @@ export const PurchaseOrderForm = forwardRef<PurchaseOrderFormHandle, PurchaseOrd
   const [orderDate, setOrderDate] = useState(order?.orderDate ?? defaultDate);
   const [paymentDueDate, setPaymentDueDate] = useState(order?.paymentDueDate ?? defaultDate);
   const [notes, setNotes] = useState(order?.notes ?? "");
+  const [deliverProduct, setDeliverProduct] = useState(true);
   const [productOptions, setProductOptions] = useState<ProductSelectOption[]>(products);
   const formRef = useRef<HTMLFormElement>(null);
 
@@ -439,7 +440,7 @@ export const PurchaseOrderForm = forwardRef<PurchaseOrderFormHandle, PurchaseOrd
 
     updateLine(key, {
       productId,
-      unitCost: product?.standardCostMinor !== undefined ? String(product.standardCostMinor / 100) : "0",
+      unitCost: product?.standardCostMinor ? String(product.standardCostMinor / 100) : "",
       taxIds: product?.purchaseTaxIds ?? [],
     });
   }
@@ -562,6 +563,7 @@ export const PurchaseOrderForm = forwardRef<PurchaseOrderFormHandle, PurchaseOrd
       {order ? <input type="hidden" name="purchaseOrderId" value={order.id} /> : null}
       <input type="hidden" name="returnPath" value={isModal ? "/admin/purchasing" : "/admin/purchasing/new"} />
       <input type="hidden" name="intent" value={submitIntent} />
+      <input type="hidden" name="deliverProduct" value={deliverProduct ? "true" : "false"} />
 
       {error || serverError ? (
         <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-3.5 text-sm text-destructive flex items-center gap-2">
@@ -992,7 +994,7 @@ export const PurchaseOrderForm = forwardRef<PurchaseOrderFormHandle, PurchaseOrd
                             {/* Unit Cost */}
                             <div className="flex flex-col gap-1.5 col-span-1">
                               <label className="text-xs font-semibold text-foreground flex items-center justify-between">
-                                <span>{t("purchasing.unitCost", "Unit Cost")}</span>
+                                <span>{t("purchasing.unitCost", "Unit Cost")} <span className="text-destructive">*</span></span>
                                 <span className="text-[10px] text-muted-foreground font-normal">ETB</span>
                               </label>
                               <div className="relative flex items-center">
@@ -1001,8 +1003,9 @@ export const PurchaseOrderForm = forwardRef<PurchaseOrderFormHandle, PurchaseOrd
                                 </span>
                                 <input
                                   type="number"
-                                  min="0"
+                                  min="0.01"
                                   step="0.01"
+                                  required
                                   value={line.unitCost}
                                   placeholder="0.00"
                                   className={cn(
@@ -1265,6 +1268,30 @@ export const PurchaseOrderForm = forwardRef<PurchaseOrderFormHandle, PurchaseOrd
           </div>
         </div>
 
+        {/* Deliver Product Toggle Card */}
+        <div className="rounded-xl border border-border/80 bg-card p-4 shadow-xs flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="flex size-9 items-center justify-center rounded-lg bg-[#0B5D4B]/10 text-[#0B5D4B] dark:bg-emerald-950 dark:text-emerald-300">
+              <Truck className="size-4" />
+            </div>
+            <div>
+              <label htmlFor="purchase-deliver-product-checkbox" className="text-sm font-semibold text-foreground cursor-pointer flex items-center gap-2">
+                <span>{t("purchasing.deliverProduct", "Deliver product")}</span>
+              </label>
+              <p className="text-xs text-muted-foreground">
+                {t("purchasing.deliverProductHint", "Automatically post goods receipt and receive stock into warehouse upon order confirmation.")}
+              </p>
+            </div>
+          </div>
+          <input
+            id="purchase-deliver-product-checkbox"
+            type="checkbox"
+            checked={deliverProduct}
+            onChange={(e) => setDeliverProduct(e.target.checked)}
+            className="size-5 rounded border-border text-[#0B5D4B] focus:ring-[#0B5D4B] cursor-pointer"
+          />
+        </div>
+
         {/* Order Items Review Table */}
         <div className="rounded-xl border border-border/80 bg-card overflow-hidden shadow-xs">
           <div className="flex items-center justify-between border-b border-border/70 bg-muted/30 px-4 py-3">
@@ -1384,15 +1411,8 @@ export const PurchaseOrderForm = forwardRef<PurchaseOrderFormHandle, PurchaseOrd
         </div>
       </div>
 
-      {/* Action Footer (Sticky inside modal or pinned bottom) */}
-      <div
-        className={cn(
-          "flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 sm:gap-4",
-          isModal
-            ? "sticky bottom-0 z-10 -mx-6 -mb-5 border-t border-border/80 bg-card/95 px-4 sm:px-6 py-3.5 backdrop-blur-md shadow-lg mt-4"
-            : "mt-4 pt-4 border-t border-border"
-        )}
-      >
+      {/* Action Footer */}
+      <div className="mt-6 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 sm:gap-4 border-t border-border pt-4">
         {step === 1 ? (
           <>
             <div className="flex items-center justify-between sm:justify-start gap-3 text-xs w-full sm:w-auto">

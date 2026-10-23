@@ -61,7 +61,7 @@ const purchaseOrderLineSchema = z.object({
   productId: z.string().uuid(),
   ownerId: z.string().uuid().or(z.literal("")).transform((value) => value || null),
   quantity: z.coerce.number().positive(),
-  unitCost: z.string().trim().default("0"),
+  unitCost: z.string().trim().refine((val) => majorToMinor(val) > 0, "Unit cost is mandatory and must be greater than zero."),
   taxIds: z.array(z.string().uuid()).default([]),
 });
 
@@ -404,10 +404,12 @@ async function executeOrderConfirmationTx(
     company,
     user,
     orderId,
+    deliverProduct = true,
   }: {
     company: { id: string; baseCurrencyCode: string };
     user: { id: string };
     orderId: string;
+    deliverProduct?: boolean;
   },
 ) {
   const supplierLocation = await getOrCreatePartnerStockLocation(company.id, "supplier");
@@ -502,9 +504,8 @@ async function executeOrderConfirmationTx(
 
   if (!existingReceipt && remainingLines.length > 0) {
     const receiptNo = movementNo("GR");
-    const hasSerialLines = remainingLines.some((line) => line.trackingMode === "serial");
 
-    if (hasSerialLines) {
+    if (!deliverProduct) {
       const [receipt] = await tx
         .insert(goodsReceipts)
         .values({
@@ -514,7 +515,7 @@ async function executeOrderConfirmationTx(
           locationId: order.deliverToLocationId,
           receiptNo,
           status: "draft",
-          notes: `Draft receipt generated from ${order.orderNo}. Assign serial numbers before posting.`,
+          notes: `Draft receipt generated from ${order.orderNo}.`,
         })
         .returning({ id: goodsReceipts.id });
 
@@ -532,7 +533,7 @@ async function executeOrderConfirmationTx(
           currencyCode: line.currencyCode,
         })),
       );
-      notice = "Purchase order confirmed. Draft receipt created for serial assignment.";
+      notice = "Purchase order confirmed. Draft receipt created.";
     } else {
       const stockMoveNo = movementNo("PR");
       const [movement] = await tx
@@ -577,114 +578,185 @@ async function executeOrderConfirmationTx(
           throw new Error(`Owner is required for ${line.sku}.`);
         }
 
-        let productLotId: string | null = null;
-        const lotNo = line.trackingMode === "lot" ? `${receiptNo}-${line.lineNo}` : null;
-        const lineTotalMinor = Math.round(line.quantityRemaining * line.unitCostMinor);
+        if (line.trackingMode === "serial") {
+          const qty = Math.round(line.quantityRemaining);
+          for (let i = 0; i < qty; i++) {
+            const serialNo = `SN-${receiptNo}-${line.lineNo}-${i + 1}-${randomUUID().slice(0, 6).toUpperCase()}`;
+            const [createdSerial] = await tx
+              .insert(productSerials)
+              .values({
+                productId: line.productId,
+                serialNo,
+                status: "available",
+                currentLocationId: order.deliverToLocationId,
+                landedUnitCostMinor: line.unitCostMinor,
+              })
+              .returning({ id: productSerials.id });
 
-        if (lotNo) {
-          const [createdLot] = await tx
-            .insert(productLots)
-            .values({
+            await tx.insert(goodsReceiptLines).values({
+              goodsReceiptId: receipt.id,
+              purchaseOrderLineId: line.id,
+              lineNo: receiptLineNo,
               productId: line.productId,
-              lotNo,
-              status: "available",
-              currentLocationId: order.deliverToLocationId,
+              productSerialId: createdSerial.id,
+              unitId: line.unitId,
+              quantityReceived: "1",
+              unitCostMinor: line.unitCostMinor,
               landedUnitCostMinor: line.unitCostMinor,
-            })
-            .returning({ id: productLots.id });
+              lineTotalMinor: line.unitCostMinor,
+              currencyCode: line.currencyCode,
+              serialNo,
+            });
 
-          productLotId = createdLot.id;
-        }
+            await tx.insert(stockMovementLines).values({
+              stockMovementId: movement.id,
+              ownerId: lineOwnerId,
+              lineNo: receiptLineNo,
+              productId: line.productId,
+              productSerialId: createdSerial.id,
+              fromLocationId: supplierLocation.id,
+              toLocationId: order.deliverToLocationId,
+              unitId: line.unitId,
+              quantity: "1",
+              totalCostMinor: line.unitCostMinor,
+              currencyCode: line.currencyCode,
+              notes: `Received from ${order.orderNo}`,
+            });
 
-        await tx.insert(goodsReceiptLines).values({
-          goodsReceiptId: receipt.id,
-          purchaseOrderLineId: line.id,
-          lineNo: receiptLineNo,
-          productId: line.productId,
-          productLotId,
-          unitId: line.unitId,
-          quantityReceived: String(line.quantityRemaining),
-          unitCostMinor: line.unitCostMinor,
-          landedUnitCostMinor: line.unitCostMinor,
-          lineTotalMinor,
-          currencyCode: line.currencyCode,
-          lotNo,
-        });
-
-        await tx.insert(stockMovementLines).values({
-          stockMovementId: movement.id,
-          ownerId: lineOwnerId,
-          lineNo: receiptLineNo,
-          productId: line.productId,
-          productLotId,
-          fromLocationId: supplierLocation.id,
-          toLocationId: order.deliverToLocationId,
-          unitId: line.unitId,
-          quantity: String(line.quantityRemaining),
-          totalCostMinor: lineTotalMinor,
-          currencyCode: line.currencyCode,
-          notes: `Received from ${order.orderNo}`,
-        });
-
-        const lotFilter = productLotId ? eq(stockBalances.productLotId, productLotId) : isNull(stockBalances.productLotId);
-        const [balance] = await tx
-          .select({
-            id: stockBalances.id,
-            quantityOnHand: stockBalances.quantityOnHand,
-            quantityReserved: stockBalances.quantityReserved,
-          })
-          .from(stockBalances)
-          .where(
-            and(
-              eq(stockBalances.companyId, company.id),
-              eq(stockBalances.ownerId, lineOwnerId),
-              eq(stockBalances.locationId, order.deliverToLocationId),
-              eq(stockBalances.productId, line.productId),
-              isNull(stockBalances.productSerialId),
-              lotFilter,
-              isNull(stockBalances.deletedAt),
-            ),
-          )
-          .limit(1);
-
-        if (balance) {
-          const nextOnHand = Number(balance.quantityOnHand) + line.quantityRemaining;
-          const nextAvailable = nextOnHand - Number(balance.quantityReserved);
-          await tx
-            .update(stockBalances)
-            .set({
-              quantityOnHand: String(nextOnHand),
-              quantityAvailable: String(nextAvailable),
+            await tx.insert(stockBalances).values({
+              companyId: company.id,
+              ownerId: lineOwnerId,
+              locationId: order.deliverToLocationId,
+              productId: line.productId,
+              productSerialId: createdSerial.id,
+              quantityOnHand: "1",
+              quantityReserved: "0",
+              quantityAvailable: "1",
               averageCostMinor: line.unitCostMinor,
+              currencyCode: line.currencyCode,
               lastMovementAt: new Date(),
+            });
+
+            receiptLineNo += 1;
+          }
+
+          await tx
+            .update(purchaseOrderLines)
+            .set({
+              quantityReceived: String(Number(line.quantityReceived) + line.quantityRemaining),
               updatedAt: sql`now()`,
             })
-            .where(eq(stockBalances.id, balance.id));
+            .where(eq(purchaseOrderLines.id, line.id));
         } else {
-          await tx.insert(stockBalances).values({
-            companyId: company.id,
-            ownerId: lineOwnerId,
-            locationId: order.deliverToLocationId,
+          let productLotId: string | null = null;
+          const lotNo = line.trackingMode === "lot" ? `${receiptNo}-${line.lineNo}` : null;
+          const lineTotalMinor = Math.round(line.quantityRemaining * line.unitCostMinor);
+
+          if (lotNo) {
+            const [createdLot] = await tx
+              .insert(productLots)
+              .values({
+                productId: line.productId,
+                lotNo,
+                status: "available",
+                currentLocationId: order.deliverToLocationId,
+                landedUnitCostMinor: line.unitCostMinor,
+              })
+              .returning({ id: productLots.id });
+
+            productLotId = createdLot.id;
+          }
+
+          await tx.insert(goodsReceiptLines).values({
+            goodsReceiptId: receipt.id,
+            purchaseOrderLineId: line.id,
+            lineNo: receiptLineNo,
             productId: line.productId,
             productLotId,
-            quantityOnHand: String(line.quantityRemaining),
-            quantityReserved: "0",
-            quantityAvailable: String(line.quantityRemaining),
-            averageCostMinor: line.unitCostMinor,
+            unitId: line.unitId,
+            quantityReceived: String(line.quantityRemaining),
+            unitCostMinor: line.unitCostMinor,
+            landedUnitCostMinor: line.unitCostMinor,
+            lineTotalMinor,
             currencyCode: line.currencyCode,
-            lastMovementAt: new Date(),
+            lotNo,
           });
+
+          await tx.insert(stockMovementLines).values({
+            stockMovementId: movement.id,
+            ownerId: lineOwnerId,
+            lineNo: receiptLineNo,
+            productId: line.productId,
+            productLotId,
+            fromLocationId: supplierLocation.id,
+            toLocationId: order.deliverToLocationId,
+            unitId: line.unitId,
+            quantity: String(line.quantityRemaining),
+            totalCostMinor: lineTotalMinor,
+            currencyCode: line.currencyCode,
+            notes: `Received from ${order.orderNo}`,
+          });
+
+          const lotFilter = productLotId ? eq(stockBalances.productLotId, productLotId) : isNull(stockBalances.productLotId);
+          const [balance] = await tx
+            .select({
+              id: stockBalances.id,
+              quantityOnHand: stockBalances.quantityOnHand,
+              quantityReserved: stockBalances.quantityReserved,
+            })
+            .from(stockBalances)
+            .where(
+              and(
+                eq(stockBalances.companyId, company.id),
+                eq(stockBalances.ownerId, lineOwnerId),
+                eq(stockBalances.locationId, order.deliverToLocationId),
+                eq(stockBalances.productId, line.productId),
+                isNull(stockBalances.productSerialId),
+                lotFilter,
+                isNull(stockBalances.deletedAt),
+              ),
+            )
+            .limit(1);
+
+          if (balance) {
+            const nextOnHand = Number(balance.quantityOnHand) + line.quantityRemaining;
+            const nextAvailable = nextOnHand - Number(balance.quantityReserved);
+            await tx
+              .update(stockBalances)
+              .set({
+                quantityOnHand: String(nextOnHand),
+                quantityAvailable: String(nextAvailable),
+                averageCostMinor: line.unitCostMinor,
+                lastMovementAt: new Date(),
+                updatedAt: sql`now()`,
+              })
+              .where(eq(stockBalances.id, balance.id));
+          } else {
+            await tx.insert(stockBalances).values({
+              companyId: company.id,
+              ownerId: lineOwnerId,
+              locationId: order.deliverToLocationId,
+              productId: line.productId,
+              productLotId,
+              quantityOnHand: String(line.quantityRemaining),
+              quantityReserved: "0",
+              quantityAvailable: String(line.quantityRemaining),
+              averageCostMinor: line.unitCostMinor,
+              currencyCode: line.currencyCode,
+              lastMovementAt: new Date(),
+            });
+          }
+
+          await tx
+            .update(purchaseOrderLines)
+            .set({
+              quantityReceived: String(Number(line.quantityReceived) + line.quantityRemaining),
+              updatedAt: sql`now()`,
+            })
+            .where(eq(purchaseOrderLines.id, line.id));
+
+          receiptLineNo += 1;
         }
-
-        await tx
-          .update(purchaseOrderLines)
-          .set({
-            quantityReceived: String(Number(line.quantityReceived) + line.quantityRemaining),
-            updatedAt: sql`now()`,
-          })
-          .where(eq(purchaseOrderLines.id, line.id));
-
-        receiptLineNo += 1;
       }
 
       await tx
@@ -725,6 +797,7 @@ export async function createPurchaseOrder(formData: FormData) {
   const user = await requirePermission("inventory.receive");
   const returnPath = formValue(formData, "returnPath") || "/admin/purchasing";
   const intent = formValue(formData, "intent") || "confirm";
+  const deliverProduct = formValue(formData, "deliverProduct") !== "false";
   const { header, lines } = parsePurchaseOrderForm(formData, returnPath);
   const company = await getDefaultCompany();
   let createdOrderId: string | undefined;
@@ -826,6 +899,9 @@ export async function createPurchaseOrder(formData: FormData) {
         }
 
         const unitCostMinor = majorToMinor(line.unitCost);
+        if (unitCostMinor <= 0) {
+          throw new Error(`Unit cost is mandatory and must be greater than zero for line ${index + 1}.`);
+        }
         const grossOrUntaxedMinor = Math.round(line.quantity * unitCostMinor);
         const selectedTaxes = line.taxIds.map((taxId) => taxById.get(taxId)).filter((tax): tax is NonNullable<typeof tax> => Boolean(tax));
         const { lineTaxes, taxAmountMinor, subtotalMinor, lineTotalMinor } = calculateLineTaxes(
@@ -923,6 +999,7 @@ export async function createPurchaseOrder(formData: FormData) {
           company,
           user,
           orderId: order.id,
+          deliverProduct,
         });
         if (confirmResult?.notice) {
           noticeMessage = confirmResult.notice;
@@ -948,6 +1025,7 @@ export async function updatePurchaseOrder(formData: FormData) {
   const purchaseOrderId = formValue(formData, "purchaseOrderId");
   const errorPath = purchaseOrderId ? `/admin/purchasing/${purchaseOrderId}` : "/admin/purchasing";
   const intent = formValue(formData, "intent") || "draft";
+  const deliverProduct = formValue(formData, "deliverProduct") !== "false";
   const { header, lines } = parsePurchaseOrderForm(formData, errorPath);
 
   if (!header.purchaseOrderId) {
@@ -1076,6 +1154,9 @@ export async function updatePurchaseOrder(formData: FormData) {
         }
 
         const unitCostMinor = majorToMinor(line.unitCost);
+        if (unitCostMinor <= 0) {
+          throw new Error(`Unit cost is mandatory and must be greater than zero for line ${index + 1}.`);
+        }
         const grossOrUntaxedMinor = Math.round(line.quantity * unitCostMinor);
         const selectedTaxes = line.taxIds.map((taxId) => taxById.get(taxId)).filter((tax): tax is NonNullable<typeof tax> => Boolean(tax));
         const { lineTaxes, taxAmountMinor, subtotalMinor, lineTotalMinor } = calculateLineTaxes(
@@ -1179,6 +1260,7 @@ export async function updatePurchaseOrder(formData: FormData) {
           company,
           user,
           orderId: existingOrder.id,
+          deliverProduct,
         });
         if (confirmResult?.notice) {
           noticeMessage = confirmResult.notice;
@@ -1201,6 +1283,7 @@ export async function updatePurchaseOrder(formData: FormData) {
 
 export async function confirmPurchaseOrder(formData: FormData) {
   const user = await requirePermission("inventory.receive");
+  const deliverProduct = formValue(formData, "deliverProduct") !== "false";
   const parsed = confirmSchema.safeParse({
     purchaseOrderId: formValue(formData, "purchaseOrderId"),
     returnPath: formValue(formData, "returnPath") || undefined,
@@ -1219,6 +1302,7 @@ export async function confirmPurchaseOrder(formData: FormData) {
         company,
         user,
         orderId: parsed.data.purchaseOrderId,
+        deliverProduct,
       });
       if (result?.notice) {
         notice = result.notice;

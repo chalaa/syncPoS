@@ -1757,6 +1757,7 @@ export function InventoryInternalTransferForm({
 
   const [ownerId, setOwnerId] = useState(initialOwnerId);
   const [toLocationId, setToLocationId] = useState("");
+  const [toOwnerId, setToOwnerId] = useState("");
   const [formErrors, setFormErrors] = useState<string[]>([]);
 
   useEffect(() => {
@@ -1773,6 +1774,7 @@ export function InventoryInternalTransferForm({
 
     if (toLocationId === value) {
       setToLocationId("");
+      setToOwnerId("");
     }
 
     if (value) {
@@ -1783,9 +1785,28 @@ export function InventoryInternalTransferForm({
     }
   }
 
+  function changeToLocation(value: string) {
+    setToLocationId(value);
+
+    if (value) {
+      const matching = owners.filter((owner) => (owner as any).locationIds?.includes(value));
+      if (matching.length === 1) {
+        setToOwnerId(matching[0].id);
+      } else if (matching.length > 1) {
+        setToOwnerId("");
+      } else {
+        const autoOwnerId = findOwnerForLocation(value, owners, balances);
+        setToOwnerId(autoOwnerId || ownerId);
+      }
+    } else {
+      setToOwnerId("");
+    }
+  }
+
   function validateBeforeSubmit(event: React.FormEvent<HTMLFormElement>) {
     const formData = new FormData(event.currentTarget);
     const selectedOwnerId = String(formData.get("ownerId") ?? "");
+    const selectedToOwnerId = String(formData.get("toOwnerId") ?? "");
     const selectedFromLocationId = String(formData.get("fromLocationId") ?? "");
     const selectedToLocationId = String(formData.get("toLocationId") ?? "");
     const productIds = formDataValues(formData, "productId");
@@ -1806,6 +1827,11 @@ export function InventoryInternalTransferForm({
 
     if (!selectedOwnerId) {
       errors.push(t("inventory.errSelectOwner", "Select an owner."));
+    }
+
+    const matchingToOwners = owners.filter((o) => (o as any).locationIds?.includes(selectedToLocationId));
+    if (matchingToOwners.length > 1 && !selectedToOwnerId) {
+      errors.push("Multiple owners exist for the destination location. Selecting a receiver owner is required.");
     }
 
     if (!selectedFromLocationId || !selectedToLocationId) {
@@ -1947,18 +1973,7 @@ export function InventoryInternalTransferForm({
       ) : null}
 
       <div className="rounded-2xl border border-border/70 bg-muted/20 p-4 shadow-2xs">
-        <div className="grid gap-4 md:grid-cols-3">
-          <label className="space-y-1.5">
-            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{t("field.owner", "Owner")}</span>
-            <select name="ownerId" required value={ownerId} onChange={(event) => setOwnerId(event.target.value)} className={inputClass}>
-              <option value="">{t("field.selectOwner", "Select owner")}</option>
-              {owners.map((owner) => (
-                <option key={owner.id} value={owner.id}>
-                  {owner.name}
-                </option>
-              ))}
-            </select>
-          </label>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <label className="space-y-1.5">
             <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{t("field.fromLocation", "From Location")}</span>
             <select name="fromLocationId" required value={fromLocationId} onChange={(event) => changeFromLocation(event.target.value)} className={inputClass}>
@@ -1970,8 +1985,19 @@ export function InventoryInternalTransferForm({
             </select>
           </label>
           <label className="space-y-1.5">
-            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{t("field.toLocation", "To Location")}</span>
-            <select name="toLocationId" required value={toLocationId} onChange={(event) => setToLocationId(event.target.value)} className={inputClass}>
+            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{t("field.owner", "Source Owner")}</span>
+            <select name="ownerId" required value={ownerId} onChange={(event) => setOwnerId(event.target.value)} className={inputClass}>
+              <option value="">{t("field.selectOwner", "Select owner")}</option>
+              {owners.map((owner) => (
+                <option key={owner.id} value={owner.id}>
+                  {owner.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="space-y-1.5">
+            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{t("field.toLocation", "To (Receiver) Location")}</span>
+            <select name="toLocationId" required value={toLocationId} onChange={(event) => changeToLocation(event.target.value)} className={inputClass}>
               <option value="">{t("field.selectDestination", "Select destination")}</option>
               {locations
                 .filter((location) => location.id !== fromLocationId)
@@ -1980,6 +2006,31 @@ export function InventoryInternalTransferForm({
                     {location.code} - {location.name}
                   </option>
                 ))}
+            </select>
+          </label>
+          <label className="space-y-1.5">
+            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center justify-between">
+              <span>{t("field.toOwner", "To Owner (Receiver)")}</span>
+              {owners.filter((o) => (o as any).locationIds?.includes(toLocationId)).length > 1 ? (
+                <span className="text-[10px] text-amber-600 dark:text-amber-400 font-bold">Required</span>
+              ) : null}
+            </span>
+            <select
+              name="toOwnerId"
+              required={owners.filter((o) => (o as any).locationIds?.includes(toLocationId)).length > 1}
+              value={toOwnerId}
+              onChange={(event) => setToOwnerId(event.target.value)}
+              className={inputClass}
+            >
+              <option value="">{t("field.selectOwner", "Select receiver owner")}</option>
+              {owners.map((owner) => {
+                const isAssigned = (owner as any).locationIds?.includes(toLocationId);
+                return (
+                  <option key={owner.id} value={owner.id}>
+                    {owner.name} {isAssigned ? "★ (Assigned)" : ""}
+                  </option>
+                );
+              })}
             </select>
           </label>
         </div>

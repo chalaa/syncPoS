@@ -6,6 +6,7 @@ import { getUserPermissionCodes, requirePermission } from "@/server/auth/session
 import { getDirectVendorSaleFormOptions, getDirectVendorSaleList } from "@/server/direct-vendor-sales/direct-vendor-sales";
 import { PERMISSIONS, userHasPermission } from "@/server/iam/permissions";
 
+import { DirectVendorKpiCards } from "./direct-vendor-kpi-cards";
 import { DirectVendorSaleList } from "./direct-vendor-sale-list";
 import { NewDirectVendorSaleModal } from "./new-direct-vendor-sale-modal";
 
@@ -15,6 +16,8 @@ type DirectVendorSalesPageProps = {
   searchParams: Promise<{
     q?: string;
     status?: string;
+    customerPaymentTerm?: string;
+    vendorPaymentTerm?: string;
     notice?: string;
     error?: string;
     new?: string;
@@ -35,20 +38,25 @@ function todayDate() {
 export default async function DirectVendorSalesPage({ searchParams }: DirectVendorSalesPageProps) {
   const user = await requirePermission(PERMISSIONS.SALES.ORDERS_VIEW);
   const params = await searchParams;
-  const [sales, userPerms] = await Promise.all([
-    getDirectVendorSaleList({ query: params.q, status: params.status }),
+  const [allSales, userPerms] = await Promise.all([
+    getDirectVendorSaleList({
+      query: params.q,
+      status: params.status,
+      customerPaymentTerm: params.customerPaymentTerm,
+      vendorPaymentTerm: params.vendorPaymentTerm,
+    }),
     getUserPermissionCodes(user.id),
   ]);
   const canCreate = userHasPermission(userPerms, PERMISSIONS.SALES.CREATE);
   const formOptions = canCreate ? await getDirectVendorSaleFormOptions() : null;
-  const page = paginateRows(sales, params);
+  const page = paginateRows(allSales, params);
 
   return (
     <PageShell>
       <PageHeader
         eyebrow="Sales Workspace"
         title="Direct Vendor Sales"
-        description="Streamlined order management, direct vendor fulfillment, both-way payments, and margin tracking."
+        description="Streamlined direct-to-customer vendor sourcing, simultaneous payment tracking, and margin visibility."
         actions={
           canCreate && formOptions ? (
             <NewDirectVendorSaleModal
@@ -59,8 +67,12 @@ export default async function DirectVendorSalesPage({ searchParams }: DirectVend
           ) : undefined
         }
       />
+
+      <DirectVendorKpiCards sales={allSales} />
+
       {params.notice ? <Alert kind="success">{params.notice}</Alert> : null}
       {params.error ? <Alert kind="error">{params.error}</Alert> : null}
+
       <DirectVendorSaleList sales={page.rows} />
       <TablePagination pagination={page.pagination} />
     </PageShell>

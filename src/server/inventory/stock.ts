@@ -254,6 +254,7 @@ export async function getInventoryOperationDetail(id: string): Promise<Inventory
       toLocationCode: toLocations.code,
       postedAt: stockMovements.postedAt,
       notes: stockMovements.notes,
+      metadata: stockMovements.metadata,
     })
     .from(stockMovements)
     .leftJoin(fromLocations, eq(stockMovements.fromLocationId, fromLocations.id))
@@ -305,6 +306,7 @@ export async function getInventoryOperationDetail(id: string): Promise<Inventory
 
   return {
     ...operation,
+    metadata: (operation.metadata as Record<string, unknown> | null) ?? null,
     lineCount: lines.length,
     totalQuantity: String(totals.quantity),
     totalCostMinor: totals.totalCostMinor,

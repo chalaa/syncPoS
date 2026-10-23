@@ -136,6 +136,7 @@ export type InventoryOperationDetail = {
   toLocationCode: string | null;
   postedAt: Date | null;
   notes: string | null;
+  metadata?: Record<string, unknown> | null;
   lineCount: number;
   totalQuantity: string;
   totalCostMinor: number;

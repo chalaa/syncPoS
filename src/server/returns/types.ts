@@ -2,6 +2,7 @@ export type ReturnFormOption = {
   id: string;
   code: string;
   name: string;
+  orderDate?: string | null;
 };
 
 export type ReturnReceiptOption = ReturnFormOption & {

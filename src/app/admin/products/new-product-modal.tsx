@@ -605,8 +605,8 @@ export function NewProductModal({
       ) : null}
 
       <DialogContent
-        className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[calc(100%-1rem)] sm:w-full max-w-3xl max-h-[92vh] sm:max-h-[90vh] p-0 overflow-y-auto flex flex-col rounded-2xl border border-border/80 bg-card shadow-2xl z-[60] outline-none"
-        overlayClassName="z-[60]"
+        className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[calc(100%-1rem)] sm:w-full max-w-3xl max-h-[92vh] sm:max-h-[90vh] p-0 overflow-y-auto flex flex-col rounded-2xl border border-border/80 bg-card shadow-2xl z-[70] outline-none"
+        overlayClassName="z-[70]"
         showCloseButton={false}
       >
         <form ref={formRef} onSubmit={handleSubmit} className="flex flex-col min-h-0">
@@ -1565,7 +1565,7 @@ function QuickAddCategoryDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent overlayClassName="z-[70]" className="z-[75] sm:max-w-md">
+      <DialogContent overlayClassName="z-[80]" className="z-[85] sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="text-base font-semibold">{t("modal.quickCategory.title")}</DialogTitle>
           <DialogDescription className="text-xs">
@@ -1687,7 +1687,7 @@ function QuickAddBrandDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent overlayClassName="z-[70]" className="z-[75] sm:max-w-md">
+      <DialogContent overlayClassName="z-[80]" className="z-[85] sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="text-base font-semibold">{t("modal.quickBrand.title")}</DialogTitle>
           <DialogDescription className="text-xs">
@@ -1811,7 +1811,7 @@ function QuickAddUnitDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent overlayClassName="z-[70]" className="z-[75] sm:max-w-md">
+      <DialogContent overlayClassName="z-[80]" className="z-[85] sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="text-base font-semibold">{t("modal.quickUnit.title")}</DialogTitle>
           <DialogDescription className="text-xs">

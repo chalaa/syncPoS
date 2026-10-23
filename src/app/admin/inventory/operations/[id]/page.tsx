@@ -276,6 +276,12 @@ export default async function InventoryOperationDetailPage({ params, searchParam
               <div className="grid gap-3 text-sm md:grid-cols-2">
                 <Info label={<T k="inventory.sourceType" fallback="Source Type" />} value={operation.sourceType ?? "-"} />
                 <Info label={<T k="inventory.sourceNumber" fallback="Source Number" />} value={operation.sourceNo ?? "-"} />
+                {operation.metadata && typeof operation.metadata === "object" && Boolean((operation.metadata as Record<string, string>).fromOwnerName || (operation.metadata as Record<string, string>).toOwnerName) ? (
+                  <Info
+                    label={<T k="inventory.ownershipTransfer" fallback="Ownership Transfer" />}
+                    value={`${(operation.metadata as Record<string, string>).fromOwnerName ?? "—"} → ${(operation.metadata as Record<string, string>).toOwnerName ?? "—"}`}
+                  />
+                ) : null}
                 <Info label={<T k="inventory.postedAt" fallback="Posted At" />} value={operation.postedAt?.toLocaleString() ?? "-"} />
                 <Info label={<T k="common.notes" fallback="Notes" />} value={operation.notes ?? "-"} />
               </div>

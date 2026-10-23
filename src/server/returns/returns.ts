@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, asc, eq, isNull, sql } from "drizzle-orm";
+import { and, asc, desc, eq, isNull, sql } from "drizzle-orm";
 
 import { minorToDisplay, getDefaultCompany } from "@/server/catalog/products";
 import { db } from "@/server/db/client";
@@ -33,23 +33,25 @@ export async function getReturnFormOptions(): Promise<ReturnFormOptions> {
         id: salesOrders.id,
         code: salesOrders.orderNo,
         name: partners.displayName,
+        orderDate: salesOrders.orderDate,
       })
       .from(salesOrders)
       .innerJoin(partners, eq(salesOrders.customerId, partners.id))
       .where(and(eq(salesOrders.companyId, company.id), isNull(salesOrders.deletedAt), sql`${salesOrders.status} in ('delivered', 'invoiced', 'partially_delivered')`))
-      .orderBy(asc(salesOrders.orderNo)),
+      .orderBy(desc(salesOrders.orderDate), asc(salesOrders.orderNo)),
     db
       .select({
         id: purchaseOrders.id,
         code: purchaseOrders.orderNo,
         name: partners.displayName,
+        orderDate: purchaseOrders.orderDate,
       })
       .from(purchaseOrders)
       .innerJoin(partners, eq(purchaseOrders.supplierId, partners.id))
       .innerJoin(goodsReceipts, eq(goodsReceipts.purchaseOrderId, purchaseOrders.id))
       .where(and(eq(purchaseOrders.companyId, company.id), isNull(purchaseOrders.deletedAt), isNull(goodsReceipts.deletedAt), eq(goodsReceipts.status, "posted")))
-      .groupBy(purchaseOrders.id, partners.id)
-      .orderBy(asc(purchaseOrders.orderNo)),
+      .groupBy(purchaseOrders.id, partners.id, purchaseOrders.orderDate)
+      .orderBy(desc(purchaseOrders.orderDate), asc(purchaseOrders.orderNo)),
     db
       .select({
         id: goodsReceipts.id,

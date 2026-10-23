@@ -76,16 +76,20 @@ function Metric({ label: metricLabel, value }: { label: React.ReactNode; value: 
 
 function DetailGrid({ transfer }: { transfer: TransferDetail }) {
   return (
-    <div className="grid gap-3 rounded-lg border border-border bg-card p-4 text-sm md:grid-cols-3">
+    <div className="grid gap-3 rounded-lg border border-border bg-card p-4 text-sm md:grid-cols-4">
       <Field label={<T k="field.from" fallback="From" />} value={transfer.fromLocationCode} />
       <Field label={<T k="field.transit" fallback="Transit" />} value={transfer.transitLocationCode} />
       <Field label={<T k="field.to" fallback="To" />} value={transfer.toLocationCode} />
-      <Field label={<T k="table.owner" fallback="Owner" />} value={transfer.ownerName ?? "-"} />
       <Field label={<T k="table.date" fallback="Transfer Date" />} value={transfer.transferDate} />
+      <Field label={<T k="table.sourceOwner" fallback="Source Owner" />} value={transfer.ownerName ?? "-"} />
+      <Field
+        label={<T k="table.receiverOwner" fallback="Receiver Owner" />}
+        value={transfer.toOwnerName ?? transfer.ownerName ?? "-"}
+      />
       <Field label={<T k="inventory.approved" fallback="Approved" />} value={transfer.approvedAt ?? "-"} />
       <Field label={<T k="table.dispatched" fallback="Dispatched" />} value={transfer.dispatchedAt ?? "-"} />
       <Field label={<T k="table.received" fallback="Received" />} value={transfer.receivedAt ?? "-"} />
-      <Field label={<T k="inventory.notes" fallback="Notes" />} value={transfer.notes ?? "-"} className="md:col-span-2" />
+      <Field label={<T k="inventory.notes" fallback="Notes" />} value={transfer.notes ?? "-"} className="md:col-span-3" />
     </div>
   );
 }
@@ -116,14 +120,15 @@ function SmartButtons({ transfer }: { transfer: TransferDetail }) {
   );
 }
 
-function LinesTable({ lines }: { lines: TransferDetailLine[] }) {
+function LinesTable({ lines, transfer }: { lines: TransferDetailLine[]; transfer: TransferDetail }) {
   return (
     <div className="overflow-x-auto">
-      <table className="w-full min-w-[1040px] text-left text-sm">
+      <table className="w-full min-w-[1100px] text-left text-sm">
         <thead className="text-xs uppercase text-muted-foreground">
           <tr className="border-b border-border">
             <th className="px-3 py-2"><T k="table.product" fallback="Product" /></th>
-            <th className="px-3 py-2"><T k="table.owner" fallback="Owner" /></th>
+            <th className="px-3 py-2"><T k="table.sourceOwner" fallback="Source Owner" /></th>
+            <th className="px-3 py-2"><T k="table.receiverOwner" fallback="Receiver Owner" /></th>
             <th className="px-3 py-2"><T k="field.trackingMode" fallback="Tracking" /></th>
             <th className="px-3 py-2"><T k="table.serial" fallback="Serial / Lot" /></th>
             <th className="px-3 py-2 text-right"><T k="table.requested" fallback="Requested" /></th>
@@ -141,6 +146,9 @@ function LinesTable({ lines }: { lines: TransferDetailLine[] }) {
                 <div className="text-xs text-muted-foreground">{line.sku}</div>
               </td>
               <td className="px-3 py-3">{line.ownerName ?? "-"}</td>
+              <td className="px-3 py-3 font-semibold text-emerald-600 dark:text-emerald-400">
+                {line.toOwnerName ?? transfer.toOwnerName ?? line.ownerName ?? "-"}
+              </td>
               <td className="px-3 py-3 capitalize">{line.trackingMode}</td>
               <td className="px-3 py-3">{line.serialNo ?? line.lotNo ?? "-"}</td>
               <td className="px-3 py-3 text-right">{line.quantityRequested}</td>
@@ -267,7 +275,7 @@ export default async function TransferDetailPage({ params, searchParams }: Trans
           {
             value: "lines",
             label: <T k="header.eyebrow.Operations" fallback="Operations" />,
-            content: <LinesTable lines={transfer.lines} />,
+            content: <LinesTable lines={transfer.lines} transfer={transfer} />,
           },
           {
             value: "receipt",
