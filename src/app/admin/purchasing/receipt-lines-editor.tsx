@@ -152,10 +152,10 @@ export function ReceiptLinesEditor({
             className={inputClass}
             onChange={(event) => setLocationId(event.target.value)}
           >
-            <option value="">{t("field.selectLocation", "Select location")}</option>
+            <option value="" disabled>{t("field.selectLocation", "Select location")}</option>
             {locations.map((location) => (
               <option key={location.id} value={location.id}>
-                {location.code} / {location.name}
+                {location.code} · {location.name}
               </option>
             ))}
           </select>

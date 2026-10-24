@@ -166,7 +166,7 @@ export function CustomerReturnForm({
           <select name="destinationLocationId" required defaultValue="" className={inputClass}>
             <option value="" disabled>{t("field.selectLocation", "Select location")}</option>
             {locations.map((location) => (
-              <option key={location.id} value={location.id}>{location.code} - {location.name}</option>
+              <option key={location.id} value={location.id}>{location.code} · {location.name}</option>
             ))}
           </select>
         </label>

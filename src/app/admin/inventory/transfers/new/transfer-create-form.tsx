@@ -105,7 +105,7 @@ export function TransferCreateForm({ options }: { options: TransferFormOptions }
             <option value="" disabled><T k="field.selectSource" fallback="Select source" /></option>
             {options.locations.map((loc) => (
               <option key={loc.id} value={loc.id}>
-                {loc.code} - {loc.name}
+                {loc.code ? `${loc.code} · ${loc.name}` : loc.name}
               </option>
             ))}
           </select>
@@ -151,7 +151,7 @@ export function TransferCreateForm({ options }: { options: TransferFormOptions }
             <option value="" disabled><T k="field.selectTransit" fallback="Select transit" /></option>
             {options.transitLocations.map((loc) => (
               <option key={loc.id} value={loc.id}>
-                {loc.code} - {loc.name}
+                {loc.code ? `${loc.code} · ${loc.name}` : loc.name}
               </option>
             ))}
           </select>
@@ -176,7 +176,7 @@ export function TransferCreateForm({ options }: { options: TransferFormOptions }
               .filter((loc) => loc.id !== fromLocationId)
               .map((loc) => (
                 <option key={loc.id} value={loc.id}>
-                  {loc.code} - {loc.name}
+                  {loc.code ? `${loc.code} · ${loc.name}` : loc.name}
                 </option>
               ))}
           </select>

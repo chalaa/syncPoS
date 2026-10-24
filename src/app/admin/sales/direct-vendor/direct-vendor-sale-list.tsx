@@ -41,15 +41,15 @@ export function DirectVendorSaleList({ sales }: { sales: DirectVendorSaleListRow
         />
         <TableFilterSelect
           paramName="customerPaymentTerm"
-          label="Customer Term"
+          label={t("directVendor.customerTerm", "Customer Term")}
           options={paymentTermOptions}
-          allLabel="All Terms"
+          allLabel={t("directVendor.allTerms", "All Terms")}
         />
         <TableFilterSelect
           paramName="vendorPaymentTerm"
-          label="Vendor Term"
+          label={t("directVendor.vendorTerm", "Vendor Term")}
           options={paymentTermOptions}
-          allLabel="All Terms"
+          allLabel={t("directVendor.allTerms", "All Terms")}
         />
       </TableFilterBar>
 
@@ -81,12 +81,12 @@ export function DirectVendorSaleList({ sales }: { sales: DirectVendorSaleListRow
             <div className="rounded-xl border border-border/70 bg-muted/20 p-2.5 text-xs space-y-1.5">
               <div className="flex items-center gap-2">
                 <User className="size-3.5 text-primary shrink-0" />
-                <span className="text-muted-foreground">Customer:</span>
+                <span className="text-muted-foreground">{t("sales.col.customer", "Customer")}:</span>
                 <span className="font-semibold text-foreground truncate">{sale.customerName}</span>
               </div>
               <div className="flex items-center gap-2">
                 <Truck className="size-3.5 text-blue-500 shrink-0" />
-                <span className="text-muted-foreground">Vendor:</span>
+                <span className="text-muted-foreground">{t("directVendor.vendor", "Vendor")}:</span>
                 <span className="font-medium text-foreground truncate">{sale.vendorName}</span>
               </div>
             </div>
@@ -94,19 +94,19 @@ export function DirectVendorSaleList({ sales }: { sales: DirectVendorSaleListRow
             {/* Financials Grid */}
             <div className="grid grid-cols-3 gap-2 text-center rounded-xl border border-border/60 bg-card p-2.5 shadow-2xs">
               <div className="flex flex-col items-center">
-                <span className="text-[10px] font-semibold uppercase text-muted-foreground">Sale Total</span>
+                <span className="text-[10px] font-semibold uppercase text-muted-foreground">{t("directVendor.saleTotal", "Sale Total")}</span>
                 <span className="font-mono text-xs font-bold text-foreground mt-0.5">
                   {displaySalesMoney(sale.customerTotalMinor, sale.currencyCode)}
                 </span>
               </div>
               <div className="flex flex-col items-center border-x border-border/60 px-1">
-                <span className="text-[10px] font-semibold uppercase text-muted-foreground">Vendor Cost</span>
+                <span className="text-[10px] font-semibold uppercase text-muted-foreground">{t("directVendor.vendorCost", "Vendor Cost")}</span>
                 <span className="font-mono text-xs text-muted-foreground mt-0.5">
                   {displaySalesMoney(sale.vendorCostTotalMinor, sale.currencyCode)}
                 </span>
               </div>
               <div className="flex flex-col items-center">
-                <span className="text-[10px] font-semibold uppercase text-emerald-600 dark:text-emerald-400">Margin</span>
+                <span className="text-[10px] font-semibold uppercase text-emerald-600 dark:text-emerald-400">{t("directVendor.margin", "Margin")}</span>
                 <span className="font-mono text-xs font-bold text-emerald-600 dark:text-emerald-400 mt-0.5">
                   {displaySalesMoney(sale.marginMinor, sale.currencyCode)}
                 </span>
@@ -117,10 +117,10 @@ export function DirectVendorSaleList({ sales }: { sales: DirectVendorSaleListRow
             <div className="flex items-center justify-between gap-2 pt-1">
               <div className="flex flex-wrap gap-1 text-[11px] text-muted-foreground">
                 <span className="rounded-md bg-muted px-2 py-0.5 font-medium">
-                  Cust: <span className="capitalize font-semibold text-foreground">{sale.customerPaymentTerm}</span>
+                  {t("directVendor.custShort", "Cust")}: <span className="capitalize font-semibold text-foreground">{sale.customerPaymentTerm === "cash" ? t("common.cash", "Cash") : t("common.credit", "Credit")}</span>
                 </span>
                 <span className="rounded-md bg-muted px-2 py-0.5 font-medium">
-                  Vend: <span className="capitalize font-semibold text-foreground">{sale.vendorPaymentTerm}</span>
+                  {t("directVendor.vendShort", "Vend")}: <span className="capitalize font-semibold text-foreground">{sale.vendorPaymentTerm === "cash" ? t("common.cash", "Cash") : t("common.credit", "Credit")}</span>
                 </span>
               </div>
 
@@ -130,7 +130,7 @@ export function DirectVendorSaleList({ sales }: { sales: DirectVendorSaleListRow
                 variant="outline"
                 className="h-8 gap-1.5 px-3 text-xs font-semibold"
               >
-                <span>Details</span>
+                <span>{t("action.details", "Details")}</span>
                 <ChevronRight className="size-3.5" />
               </ButtonLink>
             </div>
@@ -140,8 +140,8 @@ export function DirectVendorSaleList({ sales }: { sales: DirectVendorSaleListRow
         {sales.length === 0 ? (
           <div className="px-4 py-12 text-center">
             <ShoppingBag className="mx-auto size-10 text-muted-foreground/40 mb-3" />
-            <p className="text-sm font-semibold text-foreground">No direct vendor sales found</p>
-            <p className="text-xs text-muted-foreground mt-1">Try adjusting your filters or search terms.</p>
+            <p className="text-sm font-semibold text-foreground">{t("directVendor.noSalesFound", "No direct vendor sales found")}</p>
+            <p className="text-xs text-muted-foreground mt-1">{t("directVendor.noSalesFoundDesc", "Try adjusting your filters or search terms.")}</p>
           </div>
         ) : null}
       </div>
@@ -153,13 +153,13 @@ export function DirectVendorSaleList({ sales }: { sales: DirectVendorSaleListRow
             <tr className="border-b border-border bg-muted/40 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
               <th className="px-4 py-3">{t("sales.col.orderNo", "Sale No")}</th>
               <th className="px-4 py-3">{t("sales.col.customer", "Customer")}</th>
-              <th className="px-4 py-3">Vendor</th>
+              <th className="px-4 py-3">{t("directVendor.vendor", "Vendor")}</th>
               <th className="px-4 py-3">{t("sales.col.status", "Status")}</th>
               <th className="px-4 py-3">{t("sales.col.date", "Date")}</th>
-              <th className="px-4 py-3 text-right">Sale Total</th>
-              <th className="px-4 py-3 text-right">Vendor Cost</th>
-              <th className="px-4 py-3 text-right">Margin</th>
-              <th className="px-4 py-3">Payments</th>
+              <th className="px-4 py-3 text-right">{t("directVendor.saleTotal", "Sale Total")}</th>
+              <th className="px-4 py-3 text-right">{t("directVendor.vendorCost", "Vendor Cost")}</th>
+              <th className="px-4 py-3 text-right">{t("directVendor.margin", "Margin")}</th>
+              <th className="px-4 py-3">{t("directVendor.payments", "Payments")}</th>
               <th className="px-4 py-3 text-right">{t("action.actions", "Actions")}</th>
             </tr>
           </thead>
@@ -196,13 +196,13 @@ export function DirectVendorSaleList({ sales }: { sales: DirectVendorSaleListRow
                 </td>
                 <td className="px-4 py-3.5 text-xs text-muted-foreground">
                   <div>
-                    Cust:{" "}
-                    <span className="font-semibold capitalize text-foreground">{sale.customerPaymentTerm}</span>
+                    {t("directVendor.custShort", "Cust")}:{" "}
+                    <span className="font-semibold capitalize text-foreground">{sale.customerPaymentTerm === "cash" ? t("common.cash", "Cash") : t("common.credit", "Credit")}</span>
                     {sale.customerPaymentName ? ` / ${sale.customerPaymentName}` : ""}
                   </div>
                   <div>
-                    Vend:{" "}
-                    <span className="font-semibold capitalize text-foreground">{sale.vendorPaymentTerm}</span>
+                    {t("directVendor.vendShort", "Vend")}:{" "}
+                    <span className="font-semibold capitalize text-foreground">{sale.vendorPaymentTerm === "cash" ? t("common.cash", "Cash") : t("common.credit", "Credit")}</span>
                     {sale.vendorPaymentName ? ` / ${sale.vendorPaymentName}` : ""}
                   </div>
                 </td>
@@ -223,8 +223,8 @@ export function DirectVendorSaleList({ sales }: { sales: DirectVendorSaleListRow
                 <td colSpan={10} className="px-4 py-12 text-center text-sm text-muted-foreground">
                   <div className="flex flex-col items-center justify-center gap-1.5">
                     <ShoppingBag className="size-8 text-muted-foreground/40" />
-                    <p className="font-medium text-foreground">No direct vendor sales recorded yet</p>
-                    <p className="text-xs">Create a new direct sale to record drop-shipment transactions.</p>
+                    <p className="font-medium text-foreground">{t("directVendor.noSalesYet", "No direct vendor sales recorded yet")}</p>
+                    <p className="text-xs">{t("directVendor.createPrompt", "Create a new direct sale to record drop-shipment transactions.")}</p>
                   </div>
                 </td>
               </tr>

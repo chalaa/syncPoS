@@ -53,7 +53,7 @@ export default async function LocationApproversPage({ searchParams }: LocationAp
               <option value="" disabled><T k="field.selectLocation" fallback="Select location" /></option>
               {data.locations.map((location) => (
                 <option key={location.id} value={location.id}>
-                  {location.code} / {location.name}
+                  {location.code ? `${location.code} · ${location.name}` : location.name}
                 </option>
               ))}
             </select>

@@ -3,6 +3,7 @@
 import {
   ArrowLeft,
   ArrowRight,
+  Building2,
   Calendar,
   Check,
   CheckCircle2,
@@ -277,12 +278,13 @@ export const PurchaseOrderForm = forwardRef<PurchaseOrderFormHandle, PurchaseOrd
   }, [order?.deliverToLocationId, selectedLocationId, locations]);
 
   const [deliverToLocationId, setDeliverToLocationId] = useState(defaultDeliverToLocationId);
+  const [userSelectedLocation, setUserSelectedLocation] = useState(false);
 
   useEffect(() => {
-    if (!order && selectedLocationId && locations.some((loc) => loc.id === selectedLocationId)) {
+    if (!order && !userSelectedLocation && selectedLocationId && locations.some((loc) => loc.id === selectedLocationId)) {
       setDeliverToLocationId(selectedLocationId);
     }
-  }, [selectedLocationId, locations, order]);
+  }, [selectedLocationId, locations, order, userSelectedLocation]);
 
   const findLinkedOwner = useCallback(
     (locId: string) => {
@@ -673,17 +675,39 @@ export const PurchaseOrderForm = forwardRef<PurchaseOrderFormHandle, PurchaseOrd
               />
             </div>
 
-            <div className="relative z-20">
-              <RelatedModelSelect
+            <div>
+              <label className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-foreground/80">
+                <Building2 className="size-3 text-[#0B5D4B]" />
+                {t("purchasing.deliverToLocation", "Deliver to Location")}
+                <span className="text-destructive">*</span>
+              </label>
+              <select
                 name="deliverToLocationId"
-                label="Deliver to Location"
-                options={locations}
+                required
                 value={deliverToLocationId}
-                onValueChange={setDeliverToLocationId}
-                placeholder="Select warehouse..."
-                emptyLabel="No locations found."
-                error={showFieldError("deliverToLocationId")}
-              />
+                onChange={(e) => {
+                  setUserSelectedLocation(true);
+                  setDeliverToLocationId(e.target.value);
+                }}
+                className={cn(
+                  "h-10 w-full rounded-lg border bg-background px-3 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0B5D4B]/30 focus-visible:border-[#0B5D4B]",
+                  showFieldError("deliverToLocationId") ? "border-destructive" : "border-input",
+                )}
+              >
+                <option value="" disabled>
+                  {locations.length === 0
+                    ? t("purchasing.noLocationsFound", "No locations found.")
+                    : t("purchasing.selectWarehouse", "Select warehouse...")}
+                </option>
+                {locations.map((loc) => (
+                  <option key={loc.id} value={loc.id}>
+                    {loc.code ? `${loc.code} · ${loc.name}` : loc.name}
+                  </option>
+                ))}
+              </select>
+              {showFieldError("deliverToLocationId") && (
+                <p className="mt-1 text-xs text-destructive">{showFieldError("deliverToLocationId")}</p>
+              )}
             </div>
 
             <input type="hidden" name="vendorReference" value={order?.vendorReference ?? ""} />

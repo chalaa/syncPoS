@@ -337,7 +337,7 @@ export function DirectVendorSaleForm({
               <span className="inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-white/20 text-[11px] font-bold">
                 1
               </span>
-              <span className="truncate">Details & Products</span>
+              <span className="truncate">{t("directVendor.step1", "Details & Products")}</span>
             </button>
             <button
               type="button"
@@ -352,13 +352,13 @@ export function DirectVendorSaleForm({
               <span className="inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-white/20 text-[11px] font-bold">
                 2
               </span>
-              <span className="truncate">Review & Payment</span>
+              <span className="truncate">{t("directVendor.step2", "Review & Payment")}</span>
             </button>
           </div>
           <div className="flex items-center justify-between sm:justify-end gap-2 text-xs text-muted-foreground">
-            <span>Step {step} of 2</span>
+            <span>{t("sales.form.stepOf", "Step")} {step} {t("sales.form.of2", "of 2")}</span>
             <span className="font-semibold text-primary">
-              {step === 1 ? "1. Products & Pricing" : "2. Ready to Post"}
+              {step === 1 ? t("directVendor.stepProductsPricing", "1. Products & Pricing") : t("directVendor.stepReadyToPost", "2. Ready to Post")}
             </span>
           </div>
         </div>
@@ -378,11 +378,11 @@ export function DirectVendorSaleForm({
                       <Users className="size-4" />
                     </span>
                     <h2 className="text-xs font-bold uppercase tracking-wider text-foreground">
-                      Customer & Vendor
+                      {t("directVendor.customerVendor", "Customer & Vendor")}
                     </h2>
                   </div>
                   <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">
-                    Required Parties
+                    {t("directVendor.requiredParties", "Required Parties")}
                   </span>
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2">
@@ -405,12 +405,12 @@ export function DirectVendorSaleForm({
                   <div className="relative">
                     <ManyToOneCreateSelect
                       name="vendorId"
-                      label="Vendor"
+                      label={t("directVendor.vendor", "Vendor")}
                       options={vendors}
                       value={vendorId}
                       defaultValue={vendorId}
-                      placeholder="Search or add vendor..."
-                      entityLabel="Vendor"
+                      placeholder={t("directVendor.searchVendor", "Search or add vendor...")}
+                      entityLabel={t("directVendor.vendor", "Vendor")}
                       onCreate={createVendorFromDirectVendor}
                       onValueChange={(val) => {
                         setVendorId(val);
@@ -429,16 +429,16 @@ export function DirectVendorSaleForm({
                       <Coins className="size-4" />
                     </span>
                     <h2 className="text-xs font-bold uppercase tracking-wider text-foreground">
-                      Order Settings
+                      {t("directVendor.orderSettings", "Order Settings")}
                     </h2>
                   </div>
                   <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
-                    No Stock Movement
+                    {t("directVendor.badge.noInventory", "No Inventory")}
                   </span>
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <label className="flex flex-col gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                    Sales Owner
+                    {t("sales.form.selectOwner", "Sales Owner")}
                     <select
                       name="ownerId"
                       value={ownerId}
@@ -448,7 +448,7 @@ export function DirectVendorSaleForm({
                       }}
                       className={inputClass}
                     >
-                      <option value="">No owner</option>
+                      <option value="">{t("sales.form.none", "No owner")}</option>
                       {owners.map((owner) => (
                         <option key={owner.id} value={owner.id}>
                           {owner.name}
@@ -457,7 +457,7 @@ export function DirectVendorSaleForm({
                     </select>
                   </label>
                   <label className="flex flex-col gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                    Sale Date
+                    {t("directVendor.saleDate", "Sale Date")}
                     <input
                       name="saleDate"
                       type="date"
@@ -471,8 +471,10 @@ export function DirectVendorSaleForm({
                     <div className="flex items-start gap-2">
                       <CheckCircle2 className="mt-0.5 size-4 text-primary shrink-0" />
                       <div>
-                        <span className="font-semibold text-foreground">Direct vendor fulfillment:</span> Product is shipped
-                        directly from vendor to customer.
+                        <span className="font-semibold text-foreground">
+                          {t("directVendor.fulfillmentNoticeTitle", "Direct vendor fulfillment:")}
+                        </span>{" "}
+                        {t("directVendor.fulfillmentNoticeDesc", "Product is shipped directly from vendor to customer.")}
                       </div>
                     </div>
                   </div>
@@ -487,7 +489,9 @@ export function DirectVendorSaleForm({
                   <span className="inline-flex size-7 items-center justify-center rounded-lg bg-primary/10 text-primary">
                     <Package className="size-4" />
                   </span>
-                  <h2 className="text-sm font-bold tracking-tight text-foreground">Product Lines</h2>
+                  <h2 className="text-sm font-bold tracking-tight text-foreground">
+                    {t("directVendor.productLines", "Product Lines")}
+                  </h2>
                   <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-xs font-bold text-primary">
                     {lines.length}
                   </span>
@@ -500,7 +504,7 @@ export function DirectVendorSaleForm({
                   onClick={() => setLines((current) => [...current, newLine()])}
                 >
                   <PlusIcon className="size-3.5 text-primary" />
-                  <span>Add Line</span>
+                  <span>{t("directVendor.addLine", "Add Line")}</span>
                 </Button>
               </div>
 
@@ -528,7 +532,7 @@ export function DirectVendorSaleForm({
                             brands={productBrands}
                             units={productUnits}
                             taxes={taxes}
-                            placeholder="Select product..."
+                            placeholder={t("sales.form.selectProduct", "Select product...")}
                             inputClassName={inputClass}
                             onValueChange={(productId) => handleProductChange(line, productId)}
                           />
@@ -540,7 +544,7 @@ export function DirectVendorSaleForm({
                           disabled={lines.length === 1}
                           onClick={() => setLines((current) => current.filter((item) => item.key !== line.key))}
                           className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive shrink-0 mt-0.5"
-                          aria-label="Remove line"
+                          aria-label={t("sales.form.removeLine", "Remove line")}
                         >
                           <Trash2Icon className="size-4" />
                         </Button>
@@ -549,7 +553,7 @@ export function DirectVendorSaleForm({
                       {/* Numeric Inputs Responsive Grid */}
                       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5 sm:gap-3 items-start">
                         <label className="flex flex-col gap-1 text-[11px] font-semibold uppercase text-muted-foreground">
-                          Quantity
+                          {t("sales.form.quantity", "Quantity")}
                           <input
                             name="quantity"
                             type="number"
@@ -562,7 +566,7 @@ export function DirectVendorSaleForm({
                           />
                         </label>
                         <label className="flex flex-col gap-1 text-[11px] font-semibold uppercase text-muted-foreground">
-                          <span>Sale Price <span className="text-destructive">*</span></span>
+                          <span>{t("directVendor.salePriceUnit", "Sale Price")} <span className="text-destructive">*</span></span>
                           <input
                             name="customerUnitPrice"
                             type="number"
@@ -576,7 +580,7 @@ export function DirectVendorSaleForm({
                           />
                         </label>
                         <label className="flex flex-col gap-1 text-[11px] font-semibold uppercase text-muted-foreground">
-                          <span>Vendor Cost <span className="text-destructive">*</span></span>
+                          <span>{t("directVendor.vendorCostUnit", "Vendor Cost")} <span className="text-destructive">*</span></span>
                           <input
                             name="vendorUnitCost"
                             type="number"
@@ -596,9 +600,11 @@ export function DirectVendorSaleForm({
                             <label className="text-[11px] font-semibold uppercase text-muted-foreground flex items-center justify-between">
                               <span className="flex items-center gap-1">
                                 <Tag className="size-3 text-[#0B5D4B]" />
-                                <span>Taxes</span>
+                                <span>{t("sales.form.taxes", "Taxes")}</span>
                               </span>
-                              <span className="text-[10px] text-muted-foreground font-normal">Click to toggle</span>
+                              <span className="text-[10px] text-muted-foreground font-normal">
+                                {t("directVendor.clickToToggle", "Click to toggle")}
+                              </span>
                             </label>
                             <div className="flex flex-wrap gap-1.5 min-h-[40px] items-center p-1 rounded-lg border border-input bg-background">
                               {taxes.map((tax) => {
@@ -641,20 +647,20 @@ export function DirectVendorSaleForm({
                       <div className="mt-2.5 flex flex-wrap items-center justify-between gap-2 border-t border-border/50 pt-2 text-[11px] text-muted-foreground">
                         <div className="flex items-center gap-3">
                           <span>
-                            Customer Total:{" "}
+                            {t("directVendor.customerTotal", "Customer Total")}:{" "}
                             <strong className="font-mono text-foreground">
                               {displayMoney(amounts.customerTotalMinor, company.baseCurrencyCode)}
                             </strong>
                           </span>
                           <span>
-                            Vendor Total:{" "}
+                            {t("directVendor.vendorTotal", "Vendor Total")}:{" "}
                             <strong className="font-mono text-foreground">
                               {displayMoney(amounts.vendorTotalMinor, company.baseCurrencyCode)}
                             </strong>
                           </span>
                           {amounts.taxAmountMinor > 0 ? (
                             <span>
-                              Tax:{" "}
+                              {t("common.tax", "Tax")}:{" "}
                               <strong className="font-mono text-foreground">
                                 {displayMoney(amounts.taxAmountMinor, company.baseCurrencyCode)}
                               </strong>
@@ -662,7 +668,7 @@ export function DirectVendorSaleForm({
                           ) : null}
                         </div>
                         <div className="font-mono text-xs font-bold text-emerald-600 dark:text-emerald-400">
-                          Margin: {displayMoney(amounts.marginMinor, company.baseCurrencyCode)}
+                          {t("directVendor.lineMargin", "Margin")}: {displayMoney(amounts.marginMinor, company.baseCurrencyCode)}
                         </div>
                       </div>
                     </div>
@@ -680,7 +686,7 @@ export function DirectVendorSaleForm({
                     onClick={() => setLines((current) => [...current, newLine()])}
                   >
                     <PlusIcon className="size-4 text-primary" />
-                    <span>Add Another Line</span>
+                    <span>{t("directVendor.addAnotherLine", "Add Another Line")}</span>
                   </Button>
                 </div>
                 <SummaryBox totals={totals} currencyCode={company.baseCurrencyCode} />
@@ -696,44 +702,44 @@ export function DirectVendorSaleForm({
                   <Wallet className="size-4" />
                 </span>
                 <h2 className="text-sm font-bold tracking-tight text-foreground">
-                  Both-Way Settlement Terms
+                  {t("directVendor.bothWaySettlement", "Both-Way Settlement Terms")}
                 </h2>
               </div>
 
               <div className="grid gap-4 sm:grid-cols-2">
                 <PaymentTermPanel
-                  title="Customer Payment"
-                  caption="Accounts Receivable (Sales)"
+                  title={t("directVendor.customerPayment", "Customer Payment")}
+                  caption={t("directVendor.accountsReceivable", "Accounts Receivable (Sales)")}
                   term={customerPaymentTerm}
                   onTermChange={setCustomerPaymentTerm}
                   inputName="customerPaymentTerm"
-                  totalLabel="Customer Owes"
+                  totalLabel={t("directVendor.customerOwes", "Customer Owes")}
                   totalValue={displayMoney(totals.customerTotalMinor, company.baseCurrencyCode)}
                 >
                   <p className="text-xs text-muted-foreground leading-relaxed">
-                    Set whether customer pays immediately (Cash) or on account (Credit). Payments can be recorded once the order is posted.
+                    {t("directVendor.customerPaymentHint", "Set whether customer pays immediately (Cash) or on account (Credit). Payments can be recorded once the order is posted.")}
                   </p>
                 </PaymentTermPanel>
 
                 <PaymentTermPanel
-                  title="Vendor Payment"
-                  caption="Accounts Payable (Procurement)"
+                  title={t("directVendor.vendorPayment", "Vendor Payment")}
+                  caption={t("directVendor.accountsPayable", "Accounts Payable (Procurement)")}
                   term={vendorPaymentTerm}
                   onTermChange={setVendorPaymentTerm}
                   inputName="vendorPaymentTerm"
-                  totalLabel="Vendor Sourcing Cost"
+                  totalLabel={t("directVendor.vendorSourcingCost", "Vendor Sourcing Cost")}
                   totalValue={displayMoney(totals.vendorCostTotalMinor, company.baseCurrencyCode)}
                 >
                   <p className="text-xs text-muted-foreground leading-relaxed">
-                    Set whether vendor requires upfront payment (Cash) or supplier credit (Credit). Disbursal is tracked per document.
+                    {t("directVendor.vendorPaymentHint", "Set whether vendor requires upfront payment (Cash) or supplier credit (Credit). Disbursal is tracked per document.")}
                   </p>
                 </PaymentTermPanel>
 
                 <label className="flex flex-col gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground sm:col-span-2">
-                  Order Notes & Instructions
+                  {t("directVendor.orderNotes", "Order Notes & Instructions")}
                   <textarea
                     name="notes"
-                    placeholder="Add any delivery notes, vendor reference, or special terms..."
+                    placeholder={t("directVendor.orderNotesPlaceholder", "Add any delivery notes, vendor reference, or special terms...")}
                     className="min-h-24 w-full rounded-xl border border-input bg-background p-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0B5D4B]/30 focus-visible:border-[#0B5D4B]"
                   />
                 </label>
@@ -746,10 +752,10 @@ export function DirectVendorSaleForm({
                     </div>
                     <div>
                       <label htmlFor="dvs-deliver-product-checkbox" className="text-sm font-semibold text-foreground cursor-pointer flex items-center gap-2">
-                        <span>Deliver product</span>
+                        <span>{t("directVendor.deliverProduct", "Deliver product")}</span>
                       </label>
                       <p className="text-xs text-muted-foreground">
-                        Automatically post delivery and confirm sale upon completion.
+                        {t("directVendor.deliverProductHint", "Automatically post delivery and confirm sale upon completion.")}
                       </p>
                     </div>
                   </div>
@@ -779,13 +785,13 @@ export function DirectVendorSaleForm({
             </span>
           </span>
           <span>
-            Total:{" "}
+            {t("common.total", "Total")}:{" "}
             <strong className="font-mono text-sm font-bold text-foreground">
               {displayMoney(totals.customerTotalMinor, company.baseCurrencyCode)}
             </strong>
           </span>
           <span className="hidden sm:inline text-emerald-600 dark:text-emerald-400 font-semibold">
-            (Margin: {displayMoney(totals.marginMinor, company.baseCurrencyCode)})
+            ({t("directVendor.lineMargin", "Margin")}: {displayMoney(totals.marginMinor, company.baseCurrencyCode)})
           </span>
         </div>
 
@@ -798,7 +804,7 @@ export function DirectVendorSaleForm({
               className="gap-1.5 font-semibold flex-1 sm:flex-initial"
             >
               <ArrowLeft className="size-4" />
-              <span>Back</span>
+              <span>{t("action.back", "Back")}</span>
             </Button>
           ) : null}
 
@@ -809,7 +815,7 @@ export function DirectVendorSaleForm({
               onClick={onCancel}
               className="font-semibold flex-1 sm:flex-initial"
             >
-              Cancel
+              {t("action.cancel", "Cancel")}
             </Button>
           ) : null}
 
@@ -820,7 +826,7 @@ export function DirectVendorSaleForm({
             variant="outline"
             className="font-semibold hidden sm:inline-flex"
           >
-            Save Draft
+            {t("directVendor.saveDraft", "Save Draft")}
           </Button>
 
           {step === 1 ? (
@@ -829,7 +835,7 @@ export function DirectVendorSaleForm({
               onClick={() => goToStep(2)}
               className="gap-2 bg-gradient-to-r from-[#0B5D4B] to-[#073B35] font-semibold text-white shadow-md shadow-[#0B5D4B]/20 hover:brightness-110 flex-1 sm:flex-initial"
             >
-              <span>Continue</span>
+              <span>{t("action.continue", "Continue")}</span>
               <ArrowRight className="size-4" />
             </Button>
           ) : (
@@ -839,7 +845,7 @@ export function DirectVendorSaleForm({
               value={deliverProduct ? "post" : "draft"}
               className="gap-2 bg-gradient-to-r from-[#0B5D4B] to-[#073B35] font-semibold text-white shadow-md shadow-[#0B5D4B]/20 hover:brightness-110 flex-1 sm:flex-initial"
             >
-              <span>{deliverProduct ? "Post Direct Sale" : "Save Direct Sale (Draft)"}</span>
+              <span>{deliverProduct ? t("directVendor.postSale", "Post Direct Sale") : t("directVendor.saveDraftSale", "Save Direct Sale (Draft)")}</span>
               <ArrowRight className="size-4" />
             </Button>
           )}
@@ -868,6 +874,8 @@ function PaymentTermPanel({
   totalValue: string;
   children: ReactNode;
 }) {
+  const { t } = useTranslation();
+
   return (
     <div className="rounded-xl border border-border bg-card p-4 shadow-2xs space-y-3">
       <div className="flex items-start justify-between gap-2 border-b border-border/60 pb-2.5">
@@ -893,7 +901,7 @@ function PaymentTermPanel({
               : "text-muted-foreground hover:text-foreground",
           )}
         >
-          Cash
+          {t("common.cash", "Cash")}
         </button>
         <button
           type="button"
@@ -905,7 +913,7 @@ function PaymentTermPanel({
               : "text-muted-foreground hover:text-foreground",
           )}
         >
-          Credit
+          {t("common.credit", "Credit")}
         </button>
       </div>
 
@@ -929,32 +937,34 @@ function SummaryBox({
   };
   currencyCode: string;
 }) {
+  const { t } = useTranslation();
+
   return (
     <aside className="rounded-2xl border border-border bg-muted/20 p-4 sm:p-5 shadow-xs">
       <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3">
-        Commercial Summary
+        {t("directVendor.summary.title", "Commercial Summary")}
       </h3>
       <dl className="flex flex-col gap-2.5 text-xs">
         <div className="flex items-center justify-between gap-4">
-          <dt className="text-muted-foreground">Untaxed Subtotal</dt>
+          <dt className="text-muted-foreground">{t("directVendor.summary.subtotal", "Untaxed Subtotal")}</dt>
           <dd className="font-mono font-semibold">{displayMoney(totals.subtotalMinor, currencyCode)}</dd>
         </div>
         <div className="flex items-center justify-between gap-4">
-          <dt className="text-muted-foreground">Applicable Taxes</dt>
+          <dt className="text-muted-foreground">{t("directVendor.summary.taxes", "Applicable Taxes")}</dt>
           <dd className="font-mono font-semibold">{displayMoney(totals.taxAmountMinor, currencyCode)}</dd>
         </div>
         <div className="flex items-center justify-between gap-4">
-          <dt className="text-muted-foreground">Vendor Procurement Cost</dt>
+          <dt className="text-muted-foreground">{t("directVendor.summary.vendorCost", "Vendor Procurement Cost")}</dt>
           <dd className="font-mono font-semibold">{displayMoney(totals.vendorCostTotalMinor, currencyCode)}</dd>
         </div>
         <div className="flex items-center justify-between gap-4 border-t border-border pt-3">
-          <dt className="font-bold text-foreground">Customer Total</dt>
+          <dt className="font-bold text-foreground">{t("directVendor.summary.customerTotal", "Customer Total")}</dt>
           <dd className="font-mono text-base font-extrabold text-primary">
             {displayMoney(totals.customerTotalMinor, currencyCode)}
           </dd>
         </div>
         <div className="flex items-center justify-between gap-4 border-t border-border/60 pt-2">
-          <dt className="font-bold text-emerald-600 dark:text-emerald-400">Net Profit Margin</dt>
+          <dt className="font-bold text-emerald-600 dark:text-emerald-400">{t("directVendor.summary.netMargin", "Net Profit Margin")}</dt>
           <dd className="font-mono text-base font-extrabold text-emerald-600 dark:text-emerald-400">
             {displayMoney(totals.marginMinor, currencyCode)}
           </dd>

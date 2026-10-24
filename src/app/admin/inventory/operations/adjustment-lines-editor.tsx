@@ -779,7 +779,7 @@ export function InventoryAdjustmentForm({
             <select name="locationId" required value={locationId} onChange={(event) => handleLocationChange(event.target.value)} className={inputClass}>
               {locations.map((location) => (
                 <option key={location.id} value={location.id}>
-                  {location.code} - {location.name}
+                  {location.code ? `${location.code} · ${location.name}` : location.name}
                 </option>
               ))}
             </select>
@@ -1300,7 +1300,7 @@ export function InventoryScrapForm({
             <select name="locationId" required value={locationId} onChange={(event) => handleLocationChange(event.target.value)} className={inputClass}>
               {locations.map((location) => (
                 <option key={location.id} value={location.id}>
-                  {location.code} - {location.name}
+                  {location.code ? `${location.code} · ${location.name}` : location.name}
                 </option>
               ))}
             </select>
@@ -1979,7 +1979,7 @@ export function InventoryInternalTransferForm({
             <select name="fromLocationId" required value={fromLocationId} onChange={(event) => changeFromLocation(event.target.value)} className={inputClass}>
               {locations.map((location) => (
                 <option key={location.id} value={location.id}>
-                  {location.code} - {location.name}
+                  {location.code ? `${location.code} · ${location.name}` : location.name}
                 </option>
               ))}
             </select>
@@ -2003,7 +2003,7 @@ export function InventoryInternalTransferForm({
                 .filter((location) => location.id !== fromLocationId)
                 .map((location) => (
                   <option key={location.id} value={location.id}>
-                    {location.code} - {location.name}
+                    {location.code ? `${location.code} · ${location.name}` : location.name}
                   </option>
                 ))}
             </select>

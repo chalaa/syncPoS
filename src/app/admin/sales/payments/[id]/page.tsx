@@ -106,9 +106,9 @@ export default async function CustomerPaymentPage({ params, searchParams }: Cust
               className="rounded-md border border-border bg-card px-4 py-3 text-sm hover:bg-accent"
             >
               <span className="block text-base font-semibold">
-                {payment.allocations.find((allocation) => allocation.customerDirectVendorSaleId === customerDirectVendorSaleId)?.customerDirectVendorSaleNo ?? "Direct Vendor Sale"}
+                {payment.allocations.find((allocation) => allocation.customerDirectVendorSaleId === customerDirectVendorSaleId)?.customerDirectVendorSaleNo ?? <T k="Direct Vendor Sale" fallback="Direct Vendor Sale">Direct Vendor Sale</T>}
               </span>
-              <span className="text-muted-foreground">Direct Vendor Sale</span>
+              <span className="text-muted-foreground"><T k="Direct Vendor Sale" fallback="Direct Vendor Sale">Direct Vendor Sale</T></span>
             </Link>
           ) : null}
         </div>

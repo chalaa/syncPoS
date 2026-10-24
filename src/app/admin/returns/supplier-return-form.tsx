@@ -203,11 +203,16 @@ export function SupplierReturnForm({
         </label>
         <label className="space-y-1">
           <span className="text-xs font-medium text-muted-foreground">{t("return.sourceLocation", "Source Location")}</span>
-          <input type="hidden" name="sourceLocationId" value={sourceLocationId} />
-          <select disabled value={sourceLocationId} className={inputClass}>
-            <option value="">{t("return.selectReceiptFirst", "Select receipt first")}</option>
+          <select
+            name="sourceLocationId"
+            required
+            value={sourceLocationId}
+            onChange={(e) => setSourceLocationId(e.target.value)}
+            className={inputClass}
+          >
+            <option value="" disabled>{t("field.selectLocation", "Select location")}</option>
             {locations.map((location) => (
-              <option key={location.id} value={location.id}>{location.code} - {location.name}</option>
+              <option key={location.id} value={location.id}>{location.code} · {location.name}</option>
             ))}
           </select>
         </label>

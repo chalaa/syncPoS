@@ -21,6 +21,7 @@ import { DetailStatCard } from "@/components/ui/detail-stat-card";
 import { StatusBadge } from "@/components/ui/badge";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
+import { T } from "@/components/ui/t";
 import { displaySalesMoney } from "@/lib/catalog-utils";
 import { requirePermission } from "@/server/auth/session";
 import { getDirectVendorSaleDetail } from "@/server/direct-vendor-sales/direct-vendor-sales";
@@ -63,19 +64,23 @@ export default async function DirectVendorSaleDetailPage({
   const canRegisterCustomerPayment = sale.status === "posted" && customerResidualMinor > 0;
   const canRegisterVendorPayment = sale.status === "posted" && vendorResidualMinor > 0;
 
-  const customerPaidStatus =
-    sale.customerPaidMinor >= sale.customerTotalMinor && sale.customerTotalMinor > 0
-      ? "Fully Paid"
-      : sale.customerPaidMinor > 0
-      ? "Partially Paid"
-      : "Not Paid";
+  const customerPaidStatusNode =
+    sale.customerPaidMinor >= sale.customerTotalMinor && sale.customerTotalMinor > 0 ? (
+      <T k="directVendor.detail.fullyPaid" fallback="Fully Paid">Fully Paid</T>
+    ) : sale.customerPaidMinor > 0 ? (
+      <T k="directVendor.detail.partiallyPaid" fallback="Partially Paid">Partially Paid</T>
+    ) : (
+      <T k="directVendor.detail.notPaid" fallback="Not Paid">Not Paid</T>
+    );
 
-  const vendorPaidStatus =
-    sale.vendorPaidMinor >= sale.vendorCostTotalMinor && sale.vendorCostTotalMinor > 0
-      ? "Fully Paid"
-      : sale.vendorPaidMinor > 0
-      ? "Partially Paid"
-      : "Not Paid";
+  const vendorPaidStatusNode =
+    sale.vendorPaidMinor >= sale.vendorCostTotalMinor && sale.vendorCostTotalMinor > 0 ? (
+      <T k="directVendor.detail.fullyPaid" fallback="Fully Paid">Fully Paid</T>
+    ) : sale.vendorPaidMinor > 0 ? (
+      <T k="directVendor.detail.partiallyPaid" fallback="Partially Paid">Partially Paid</T>
+    ) : (
+      <T k="directVendor.detail.notPaid" fallback="Not Paid">Not Paid</T>
+    );
 
   return (
     <PageShell>
@@ -87,7 +92,7 @@ export default async function DirectVendorSaleDetailPage({
           <div className="flex flex-wrap items-center gap-2">
             <ButtonLink href="/admin/sales/direct-vendor" variant="outline" className="gap-1.5 font-semibold">
               <ArrowLeft className="size-4" />
-              <span>Back to Direct Sales</span>
+              <span><T k="directVendor.detail.back" fallback="Back to Direct Sales">Back to Direct Sales</T></span>
             </ButtonLink>
 
             {sale.status === "draft" ? (
@@ -98,13 +103,13 @@ export default async function DirectVendorSaleDetailPage({
                     type="submit"
                     className="bg-gradient-to-r from-[#0B5D4B] to-[#073B35] font-semibold text-white shadow-md shadow-[#0B5D4B]/20 hover:brightness-110"
                   >
-                    Post Direct Sale
+                    <T k="directVendor.postSale" fallback="Post Direct Sale">Post Direct Sale</T>
                   </Button>
                 </form>
                 <form action={cancelDirectVendorSale}>
                   <input type="hidden" name="directVendorSaleId" value={sale.id} />
                   <Button type="submit" variant="danger">
-                    Cancel Sale
+                    <T k="directVendor.detail.cancel" fallback="Cancel Sale">Cancel Sale</T>
                   </Button>
                 </form>
               </>
@@ -165,10 +170,12 @@ export default async function DirectVendorSaleDetailPage({
         </div>
         <div className="flex flex-wrap items-center gap-2 text-xs">
           <span className="rounded-full bg-muted/80 border border-border px-3 py-1 font-medium text-muted-foreground">
-            Customer Settlement: <strong className="text-foreground">{customerPaidStatus}</strong>
+            <T k="directVendor.detail.customerSettlement" fallback="Customer Settlement">Customer Settlement</T>:{" "}
+            <strong className="text-foreground">{customerPaidStatusNode}</strong>
           </span>
           <span className="rounded-full bg-muted/80 border border-border px-3 py-1 font-medium text-muted-foreground">
-            Vendor Settlement: <strong className="text-foreground">{vendorPaidStatus}</strong>
+            <T k="directVendor.detail.vendorSettlement" fallback="Vendor Settlement">Vendor Settlement</T>:{" "}
+            <strong className="text-foreground">{vendorPaidStatusNode}</strong>
           </span>
         </div>
       </div>
@@ -177,34 +184,34 @@ export default async function DirectVendorSaleDetailPage({
       <section className="mb-6 grid grid-cols-2 gap-2 sm:grid-cols-2 lg:grid-cols-4 sm:gap-3">
         <KpiStat
           icon={<DollarSign className="size-4" />}
-          label="Customer Total"
+          label={<T k="directVendor.summary.customerTotal" fallback="Customer Total">Customer Total</T>}
           value={displaySalesMoney(sale.customerTotalMinor, sale.currencyCode)}
           subtitle={`Paid: ${displaySalesMoney(sale.customerPaidMinor, sale.currencyCode)}`}
           variant="emerald"
         />
         <KpiStat
           icon={<TrendingUp className="size-4" />}
-          label="Net Profit Margin"
+          label={<T k="directVendor.summary.netMargin" fallback="Net Profit Margin">Net Profit Margin</T>}
           value={displaySalesMoney(sale.marginMinor, sale.currencyCode)}
           subtitle={
             sale.customerTotalMinor > 0
-              ? `${((sale.marginMinor / sale.customerTotalMinor) * 100).toFixed(1)}% gross return`
+              ? `${((sale.marginMinor / sale.customerTotalMinor) * 100).toFixed(1)}%`
               : "0.0%"
           }
           variant="gold"
         />
         <KpiStat
           icon={<Truck className="size-4" />}
-          label="Vendor Sourcing Cost"
+          label={<T k="directVendor.kpi.vendorCost" fallback="Vendor Sourcing Cost">Vendor Sourcing Cost</T>}
           value={displaySalesMoney(sale.vendorCostTotalMinor, sale.currencyCode)}
           subtitle={`Paid: ${displaySalesMoney(sale.vendorPaidMinor, sale.currencyCode)}`}
           variant="blue"
         />
         <KpiStat
           icon={<Wallet className="size-4" />}
-          label="Customer Balance"
+          label={<T k="directVendor.kpi.customerBalance" fallback="Customer Balance">Customer Balance</T>}
           value={displaySalesMoney(customerResidualMinor, sale.currencyCode)}
-          subtitle={`Vendor balance: ${displaySalesMoney(vendorResidualMinor, sale.currencyCode)}`}
+          subtitle={displaySalesMoney(vendorResidualMinor, sale.currencyCode)}
           variant={customerResidualMinor > 0 ? "amber" : "neutral"}
         />
       </section>
@@ -217,14 +224,16 @@ export default async function DirectVendorSaleDetailPage({
               <span className="inline-flex size-7 items-center justify-center rounded-lg bg-primary/10 text-primary">
                 <Users className="size-4" />
               </span>
-              <h2 className="text-sm font-bold tracking-tight text-foreground">Order Parties & Dates</h2>
+              <h2 className="text-sm font-bold tracking-tight text-foreground">
+                <T k="directVendor.detail.partiesDates" fallback="Order Parties & Dates">Order Parties & Dates</T>
+              </h2>
             </div>
           </div>
           <dl className="grid gap-3.5 text-xs sm:grid-cols-2">
-            <Info label="Customer" value={sale.customerName} />
-            <Info label="Vendor" value={sale.vendorName} />
-            <Info label="Sales Owner" value={sale.ownerName ?? "-"} />
-            <Info label="Sale Date" value={sale.saleDate} />
+            <Info label="sales.col.customer" value={sale.customerName} />
+            <Info label="directVendor.vendor" value={sale.vendorName} />
+            <Info label="sales.col.salesperson" value={sale.ownerName ?? "-"} />
+            <Info label="directVendor.saleDate" value={sale.saleDate} />
           </dl>
         </div>
 
@@ -234,41 +243,45 @@ export default async function DirectVendorSaleDetailPage({
               <span className="inline-flex size-7 items-center justify-center rounded-lg bg-primary/10 text-primary">
                 <CreditCard className="size-4" />
               </span>
-              <h2 className="text-sm font-bold tracking-tight text-foreground">Both-Way Payment Terms</h2>
+              <h2 className="text-sm font-bold tracking-tight text-foreground">
+                <T k="directVendor.detail.bothWayTerms" fallback="Both-Way Payment Terms">Both-Way Payment Terms</T>
+              </h2>
             </div>
           </div>
           <dl className="grid gap-3.5 text-xs sm:grid-cols-2">
             <Info
-              label="Customer Term"
+              label="directVendor.customerTerm"
               value={
-                <span className="capitalize font-semibold text-primary">{sale.customerPaymentTerm}</span>
-              }
-            />
-            <Info
-              label="Customer Method"
-              value={sale.customerPaymentTerm === "cash" ? sale.customerPaymentName ?? "-" : "Credit"}
-            />
-            <Info
-              label="Vendor Term"
-              value={
-                <span className="capitalize font-semibold text-blue-600 dark:text-blue-400">
-                  {sale.vendorPaymentTerm}
+                <span className="capitalize font-semibold text-primary">
+                  {sale.customerPaymentTerm === "cash" ? <T k="common.cash" fallback="Cash">Cash</T> : <T k="common.credit" fallback="Credit">Credit</T>}
                 </span>
               }
             />
             <Info
-              label="Vendor Method"
-              value={sale.vendorPaymentTerm === "cash" ? sale.vendorPaymentName ?? "-" : "Credit"}
+              label="directVendor.detail.customerMethod"
+              value={sale.customerPaymentTerm === "cash" ? sale.customerPaymentName ?? "-" : <T k="common.credit" fallback="Credit">Credit</T>}
             />
             <Info
-              label="Customer Paid / Unpaid"
+              label="directVendor.vendorTerm"
+              value={
+                <span className="capitalize font-semibold text-blue-600 dark:text-blue-400">
+                  {sale.vendorPaymentTerm === "cash" ? <T k="common.cash" fallback="Cash">Cash</T> : <T k="common.credit" fallback="Credit">Credit</T>}
+                </span>
+              }
+            />
+            <Info
+              label="directVendor.detail.vendorMethod"
+              value={sale.vendorPaymentTerm === "cash" ? sale.vendorPaymentName ?? "-" : <T k="common.credit" fallback="Credit">Credit</T>}
+            />
+            <Info
+              label="directVendor.detail.customerPaidUnpaid"
               value={`${displaySalesMoney(sale.customerPaidMinor, sale.currencyCode)} / ${displaySalesMoney(
                 customerResidualMinor,
                 sale.currencyCode,
               )}`}
             />
             <Info
-              label="Vendor Paid / Unpaid"
+              label="directVendor.detail.vendorPaidUnpaid"
               value={`${displaySalesMoney(sale.vendorPaidMinor, sale.currencyCode)} / ${displaySalesMoney(
                 vendorResidualMinor,
                 sale.currencyCode,
@@ -285,7 +298,9 @@ export default async function DirectVendorSaleDetailPage({
             <span className="inline-flex size-6 items-center justify-center rounded-md bg-primary/10 text-primary">
               <Package className="size-3.5" />
             </span>
-            <h2 className="text-sm font-bold tracking-tight text-foreground">Sold Products & Pricing</h2>
+            <h2 className="text-sm font-bold tracking-tight text-foreground">
+              <T k="directVendor.detail.soldProducts" fallback="Sold Products & Pricing">Sold Products & Pricing</T>
+            </h2>
             <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-xs font-bold text-primary">
               {sale.lines.length}
             </span>
@@ -294,7 +309,7 @@ export default async function DirectVendorSaleDetailPage({
 
         {/* Mobile View: Clean Card List (< md) */}
         <div className="divide-y divide-border/60 md:hidden p-3 space-y-3">
-          {sale.lines.map((line, idx) => (
+          {sale.lines.map((line) => (
             <div key={line.id} className="rounded-xl border border-border/80 bg-background/50 p-3.5 space-y-2.5">
               <div className="flex items-start justify-between gap-2">
                 <div>
@@ -312,13 +327,13 @@ export default async function DirectVendorSaleDetailPage({
 
               <div className="grid grid-cols-2 gap-2 rounded-lg border border-border/60 bg-muted/20 p-2 text-xs">
                 <div>
-                  <span className="text-muted-foreground">Sale Price:</span>{" "}
+                  <span className="text-muted-foreground"><T k="directVendor.salePriceUnit" fallback="Sale Price">Sale Price</T>:</span>{" "}
                   <strong className="font-mono text-foreground">
                     {displaySalesMoney(line.customerUnitPriceMinor, line.currencyCode)}
                   </strong>
                 </div>
                 <div>
-                  <span className="text-muted-foreground">Vendor Cost:</span>{" "}
+                  <span className="text-muted-foreground"><T k="directVendor.vendorCostUnit" fallback="Vendor Cost">Vendor Cost</T>:</span>{" "}
                   <span className="font-mono text-muted-foreground">
                     {displaySalesMoney(line.vendorLineTotalMinor, line.currencyCode)}
                   </span>
@@ -327,13 +342,13 @@ export default async function DirectVendorSaleDetailPage({
 
               <div className="flex items-center justify-between border-t border-border/60 pt-2 text-xs">
                 <div className="text-muted-foreground">
-                  Line Total:{" "}
+                  <T k="sales.col.lineTotal" fallback="Line Total">Line Total</T>:{" "}
                   <strong className="font-mono text-foreground font-bold">
                     {displaySalesMoney(line.customerLineTotalMinor, line.currencyCode)}
                   </strong>
                 </div>
                 <div className="text-emerald-600 dark:text-emerald-400 font-bold font-mono">
-                  Margin: {displaySalesMoney(line.lineMarginMinor, line.currencyCode)}
+                  <T k="directVendor.lineMargin" fallback="Margin">Margin</T>: {displaySalesMoney(line.lineMarginMinor, line.currencyCode)}
                 </div>
               </div>
             </div>
@@ -345,13 +360,13 @@ export default async function DirectVendorSaleDetailPage({
           <table className="w-full min-w-[1000px] text-left text-sm">
             <thead>
               <tr className="border-b border-border bg-muted/40 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                <th className="px-4 py-3">Product</th>
-                <th className="px-4 py-3 text-right">Quantity</th>
-                <th className="px-4 py-3 text-right">Vendor Cost</th>
-                <th className="px-4 py-3 text-right">Sale Price</th>
-                <th className="px-4 py-3 text-right">Tax</th>
-                <th className="px-4 py-3 text-right">Customer Total</th>
-                <th className="px-4 py-3 text-right">Line Margin</th>
+                <th className="px-4 py-3"><T k="sales.col.product" fallback="Product">Product</T></th>
+                <th className="px-4 py-3 text-right"><T k="sales.col.quantity" fallback="Quantity">Quantity</T></th>
+                <th className="px-4 py-3 text-right"><T k="directVendor.vendorCostUnit" fallback="Vendor Cost">Vendor Cost</T></th>
+                <th className="px-4 py-3 text-right"><T k="directVendor.salePriceUnit" fallback="Sale Price">Sale Price</T></th>
+                <th className="px-4 py-3 text-right"><T k="common.tax" fallback="Tax">Tax</T></th>
+                <th className="px-4 py-3 text-right"><T k="directVendor.customerTotal" fallback="Customer Total">Customer Total</T></th>
+                <th className="px-4 py-3 text-right"><T k="directVendor.lineMargin" fallback="Line Margin">Line Margin</T></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border/60">
@@ -390,7 +405,9 @@ export default async function DirectVendorSaleDetailPage({
       {/* Notes Section */}
       {sale.notes ? (
         <section className="mt-5 rounded-2xl border border-border bg-card p-4 sm:p-5 shadow-xs">
-          <h2 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Order Notes</h2>
+          <h2 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">
+            <T k="directVendor.orderNotes" fallback="Order Notes">Order Notes</T>
+          </h2>
           <p className="whitespace-pre-wrap text-sm text-foreground leading-relaxed">{sale.notes}</p>
         </section>
       ) : null}
@@ -406,9 +423,9 @@ function KpiStat({
   variant = "neutral",
 }: {
   icon: ReactNode;
-  label: string;
+  label: ReactNode;
   value: ReactNode;
-  subtitle?: string;
+  subtitle?: ReactNode;
   variant?: "emerald" | "gold" | "blue" | "amber" | "neutral";
 }) {
   const styles = {
@@ -448,7 +465,9 @@ function KpiStat({
 function Info({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div className="flex flex-col gap-0.5">
-      <dt className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</dt>
+      <dt className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+        <T k={label} fallback={label}>{label}</T>
+      </dt>
       <dd className="font-medium text-foreground">{value}</dd>
     </div>
   );

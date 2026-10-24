@@ -116,9 +116,9 @@ export default async function PaymentDetailPage({ params, searchParams }: Paymen
               className="group flex flex-col rounded-lg border border-border bg-card px-4 py-2 text-sm shadow-xs transition-all hover:border-primary/50 hover:bg-secondary/40"
             >
               <span className="text-lg font-bold tracking-tight text-foreground transition-colors group-hover:text-primary">
-                {payment.allocations.find((allocation) => allocation.vendorDirectVendorSaleId === vendorDirectVendorSaleId)?.vendorDirectVendorSaleNo ?? "Direct Vendor Sale"}
+                {payment.allocations.find((allocation) => allocation.vendorDirectVendorSaleId === vendorDirectVendorSaleId)?.vendorDirectVendorSaleNo ?? <T k="Direct Vendor Sale" fallback="Direct Vendor Sale">Direct Vendor Sale</T>}
               </span>
-              <span className="text-xs font-medium text-muted-foreground">Direct Vendor Sale</span>
+              <span className="text-xs font-medium text-muted-foreground"><T k="Direct Vendor Sale" fallback="Direct Vendor Sale">Direct Vendor Sale</T></span>
             </Link>
           ) : null}
         </div>

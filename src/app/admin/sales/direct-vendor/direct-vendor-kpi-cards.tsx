@@ -65,7 +65,8 @@ export function DirectVendorKpiCards({ sales }: { sales: DirectVendorSaleListRow
             {formatMoney(totalMarginMinor)}
           </p>
           <p className="mt-0.5 truncate text-[10px] text-muted-foreground sm:text-xs">
-            <span className="font-semibold text-emerald-600 dark:text-emerald-400">{marginPercent}%</span> average return
+            <span className="font-semibold text-emerald-600 dark:text-emerald-400">{marginPercent}%</span>{" "}
+            {t("directVendor.kpi.avgReturn", "average return")}
           </p>
         </div>
         <div className="pointer-events-none absolute -bottom-6 -right-6 size-20 rounded-full bg-amber-500/5 blur-xl" />
@@ -86,7 +87,7 @@ export function DirectVendorKpiCards({ sales }: { sales: DirectVendorSaleListRow
             {formatMoney(totalVendorCostMinor)}
           </p>
           <p className="mt-0.5 truncate text-[10px] text-muted-foreground sm:text-xs">
-            Direct vendor fulfillment
+            {t("directVendor.kpi.fulfillment", "Direct vendor fulfillment")}
           </p>
         </div>
         <div className="pointer-events-none absolute -bottom-6 -right-6 size-20 rounded-full bg-blue-500/5 blur-xl" />
@@ -105,12 +106,18 @@ export function DirectVendorKpiCards({ sales }: { sales: DirectVendorSaleListRow
         <div className="mt-1.5 min-w-0 sm:mt-2">
           <p className="truncate font-mono text-base font-extrabold tracking-tight text-foreground sm:text-2xl">
             {totalCount}{" "}
-            <span className="text-[10px] font-normal text-muted-foreground sm:text-xs">Orders</span>
+            <span className="text-[10px] font-normal text-muted-foreground sm:text-xs">
+              {t("purchasing.col.orders", "Orders")}
+            </span>
           </p>
           <p className="mt-0.5 truncate text-[10px] text-muted-foreground sm:text-xs">
-            <span className="font-semibold text-emerald-600 dark:text-emerald-400">{postedSales.length} posted</span>
+            <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+              {postedSales.length} {t("inventory.posted", "posted")}
+            </span>
             {" · "}
-            <span className="text-amber-600 dark:text-amber-400">{draftSales.length} draft</span>
+            <span className="text-amber-600 dark:text-amber-400">
+              {draftSales.length} {t("inventory.draft", "draft")}
+            </span>
           </p>
         </div>
       </div>

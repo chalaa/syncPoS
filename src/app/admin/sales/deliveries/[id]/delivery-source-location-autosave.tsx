@@ -44,7 +44,7 @@ function AutosaveSelect({
       >
         {locations.map((location) => (
           <option key={location.id} value={location.id}>
-            {location.code} / {location.name}
+            {location.code ? `${location.code} · ${location.name}` : location.name}
           </option>
         ))}
       </select>

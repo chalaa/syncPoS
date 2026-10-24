@@ -3,6 +3,7 @@
 import {
   ArrowLeft,
   ArrowRight,
+  Building2,
   Calendar,
   Check,
   CheckCircle2,
@@ -310,12 +311,13 @@ export const SalesOrderForm = forwardRef<SalesOrderFormHandle, SalesOrderFormPro
       : "";
   const initialSourceLocationId = order?.sourceLocationId ?? selectedShopId ?? locations[0]?.id ?? "";
   const [sourceLocationId, setSourceLocationId] = useState(initialSourceLocationId);
+  const [userSelectedLocation, setUserSelectedLocation] = useState(false);
 
   useEffect(() => {
-    if (!order && selectedLocationId && locations.some((loc) => loc.id === selectedLocationId)) {
+    if (!order && !userSelectedLocation && selectedLocationId && locations.some((loc) => loc.id === selectedLocationId)) {
       setSourceLocationId(selectedLocationId);
     }
-  }, [selectedLocationId, locations, order]);
+  }, [selectedLocationId, locations, order, userSelectedLocation]);
 
   const findLinkedOwner = useCallback(
     (locId: string) => {
@@ -601,12 +603,9 @@ export const SalesOrderForm = forwardRef<SalesOrderFormHandle, SalesOrderFormPro
   }
 
   function changeSourceLocation(locationId: string) {
-    const previousSourceLocationId = effectiveSourceLocationId;
+    setUserSelectedLocation(true);
+    const previousSourceLocationId = sourceLocationId;
     setSourceLocationId(locationId);
-
-    if (!order) {
-      setSelectedLocationId(locationId || null);
-    }
 
     let targetOwnerId = headerOwnerId;
     const currentOwnerHasStock = availableStock.some(
@@ -844,17 +843,36 @@ export const SalesOrderForm = forwardRef<SalesOrderFormHandle, SalesOrderFormPro
                 />
               </div>
 
-              <div className="relative z-20">
-                <RelatedModelSelect
+              <div>
+                <label className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-foreground/80">
+                  <Building2 className="size-3 text-[#0B5D4B]" />
+                  {t("field.sourceWarehouse", "Source Warehouse / Location")}
+                  <span className="text-destructive">*</span>
+                </label>
+                <select
                   name="sourceLocationId"
-                  label={t("field.sourceWarehouse", "Source Warehouse / Location")}
-                  options={locations}
-                  value={effectiveSourceLocationId}
-                  onValueChange={changeSourceLocation}
-                  placeholder={t("sales.form.selectSourceLocation", "Select source location...")}
-                  emptyLabel={t("sales.form.noLocationsFound", "No locations found.")}
-                  error={showFieldError("sourceLocationId")}
-                />
+                  required
+                  value={sourceLocationId}
+                  onChange={(e) => changeSourceLocation(e.target.value)}
+                  className={cn(
+                    "h-10 w-full rounded-lg border bg-background px-3 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0B5D4B]/30 focus-visible:border-[#0B5D4B]",
+                    showFieldError("sourceLocationId") ? "border-destructive" : "border-input",
+                  )}
+                >
+                  <option value="" disabled>
+                    {locations.length === 0
+                      ? t("sales.form.noLocationsFound", "No locations found.")
+                      : t("sales.form.selectSourceLocation", "Select source location...")}
+                  </option>
+                  {locations.map((loc) => (
+                    <option key={loc.id} value={loc.id}>
+                      {loc.code ? `${loc.code} · ${loc.name}` : loc.name}
+                    </option>
+                  ))}
+                </select>
+                {showFieldError("sourceLocationId") && (
+                  <p className="mt-1 text-xs text-destructive">{showFieldError("sourceLocationId")}</p>
+                )}
               </div>
 
               <input type="hidden" name="customerReference" value={order?.customerReference ?? ""} />
@@ -1405,14 +1423,20 @@ export const SalesOrderForm = forwardRef<SalesOrderFormHandle, SalesOrderFormPro
                                 <div className="mt-2.5 flex flex-wrap gap-2 text-left justify-end">
                                   <div className="w-56">
                                     <span className="block text-[11px] font-medium text-muted-foreground mb-1">{t("field.sourceLocation", "Source Location")}</span>
-                                    <RelatedModelSelect
-                                      value={line.sourceLocationId || effectiveSourceLocationId}
-                                      options={locations}
-                                      onValueChange={(locationId) => changeLineSourceLocation(line, locationId)}
-                                      placeholder={t("sales.form.selectLocation", "Select location")}
-                                      emptyLabel={t("sales.form.noLocationsFound", "No locations found.")}
-                                      inputClassName="h-8 text-xs"
-                                    />
+                                    <select
+                                      value={line.sourceLocationId || sourceLocationId}
+                                      onChange={(e) => changeLineSourceLocation(line, e.target.value)}
+                                      className="h-8 w-full rounded-md border border-input bg-background px-2 text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0B5D4B]/30 focus-visible:border-[#0B5D4B]"
+                                    >
+                                      <option value="" disabled>
+                                        {t("sales.form.selectLocation", "Select location")}
+                                      </option>
+                                      {locations.map((loc) => (
+                                        <option key={loc.id} value={loc.id}>
+                                          {loc.code ? `${loc.code} · ${loc.name}` : loc.name}
+                                        </option>
+                                      ))}
+                                    </select>
                                   </div>
                                   <div className="w-56">
                                     <span className="block text-[11px] font-medium text-muted-foreground mb-1">{t("field.stockOwner", "Stock Owner")}</span>
