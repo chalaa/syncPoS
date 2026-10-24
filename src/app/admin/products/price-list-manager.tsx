@@ -21,7 +21,6 @@ import {
 } from "@/components/ui/dialog";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
 import { ProductSelect, type ProductSelectOption } from "@/app/admin/products/product-select";
-import { RelatedModelSelect } from "@/components/ui/related-model-select";
 import { minorToDisplay } from "@/lib/catalog-utils";
 import { cn } from "@/lib/utils";
 import { useTranslation } from "@/lib/i18n/use-translation";
@@ -103,15 +102,27 @@ function PriceListForm({
           {t("field.name")}
           <input name="name" required defaultValue={record?.name} className={inputClass} />
         </label>
-        <RelatedModelSelect
-          name="ownerId"
-          label={t("pricelist.owner")}
-          options={options.owners}
-          defaultValue={record?.ownerId ?? options.owners[0]?.id ?? ""}
-          required={options.owners.length > 0}
-          placeholder="Select owner"
-          emptyLabel="No owners found."
-        />
+        <label className="grid gap-1 text-sm font-medium">
+          <span>
+            {t("pricelist.owner", "Owner")}
+            {options.owners.length > 0 && <span className="text-destructive"> *</span>}
+          </span>
+          <select
+            name="ownerId"
+            required={options.owners.length > 0}
+            defaultValue={record?.ownerId ?? options.owners[0]?.id ?? ""}
+            className={inputClass}
+          >
+            <option value="" disabled>
+              {options.owners.length === 0 ? "No owners found." : "Select owner"}
+            </option>
+            {options.owners.map((owner) => (
+              <option key={owner.id} value={owner.id}>
+                {owner.name}
+              </option>
+            ))}
+          </select>
+        </label>
       </div>
 
       <label className="flex items-center gap-2 text-sm font-medium">

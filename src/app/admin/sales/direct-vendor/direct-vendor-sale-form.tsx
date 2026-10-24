@@ -20,7 +20,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { ProductSelect } from "@/app/admin/products/product-select";
 import { Button } from "@/components/ui/button";
 import { ManyToOneCreateSelect } from "@/components/ui/many-to-one-create-select";
-import { RelatedModelSelect } from "@/components/ui/related-model-select";
 import { useTranslation } from "@/lib/i18n/use-translation";
 import { cn } from "@/lib/utils";
 import type { SalesTaxOption } from "@/server/sales/types";

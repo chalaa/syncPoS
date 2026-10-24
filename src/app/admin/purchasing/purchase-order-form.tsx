@@ -17,6 +17,7 @@ import {
   Tag,
   Trash2Icon,
   Truck,
+  Users,
   Wallet,
 } from "lucide-react";
 import { type FormEvent, forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, useTransition } from "react";
@@ -27,7 +28,6 @@ import { Button } from "@/components/ui/button";
 import { ManyToOneCreateSelect } from "@/components/ui/many-to-one-create-select";
 import { Notebook } from "@/components/ui/notebook";
 import { ProductSelect, type ProductSelectOption } from "@/app/admin/products/product-select";
-import { RelatedModelSelect } from "@/components/ui/related-model-select";
 import { useFormValidation, type FormValidationResult } from "@/hooks/use-form-validation";
 import { useTranslation } from "@/lib/i18n/use-translation";
 import { cn } from "@/lib/utils";
@@ -727,18 +727,36 @@ export const PurchaseOrderForm = forwardRef<PurchaseOrderFormHandle, PurchaseOrd
           </div>
 
           <div className="grid gap-3.5 sm:grid-cols-2">
-            <div className="relative z-20">
-              <RelatedModelSelect
+            <div>
+              <label className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-foreground/80">
+                <Users className="size-3 text-[#0B5D4B]" />
+                {t("purchasing.owner", "Purchasing Owner")}
+                {owners.length > 0 && <span className="text-destructive">*</span>}
+              </label>
+              <select
                 name="ownerId"
-                label="Purchasing Owner"
-                options={owners}
-                value={headerOwnerId}
-                onValueChange={changeHeaderOwner}
                 required={owners.length > 0}
-                placeholder="Select buyer / owner..."
-                emptyLabel="No owners found."
-                error={showFieldError("ownerId")}
-              />
+                value={headerOwnerId}
+                onChange={(e) => changeHeaderOwner(e.target.value)}
+                className={cn(
+                  "h-10 w-full rounded-lg border bg-background px-3 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0B5D4B]/30 focus-visible:border-[#0B5D4B]",
+                  showFieldError("ownerId") ? "border-destructive" : "border-input",
+                )}
+              >
+                <option value="" disabled>
+                  {owners.length === 0
+                    ? t("purchasing.noOwnersFound", "No owners found.")
+                    : t("purchasing.selectOwner", "Select buyer / owner...")}
+                </option>
+                {owners.map((owner) => (
+                  <option key={owner.id} value={owner.id}>
+                    {owner.name}
+                  </option>
+                ))}
+              </select>
+              {showFieldError("ownerId") && (
+                <p className="mt-1 text-xs text-destructive">{showFieldError("ownerId")}</p>
+              )}
             </div>
 
             <div className="flex flex-col gap-1 text-sm font-medium">
@@ -1112,14 +1130,20 @@ export const PurchaseOrderForm = forwardRef<PurchaseOrderFormHandle, PurchaseOrd
                                 {t("purchasing.assignDifferentOwner", "Assign different owner")}
                               </summary>
                               <div className="mt-2 w-56 text-left">
-                                <RelatedModelSelect
+                                <select
                                   value={line.ownerId || headerOwnerId}
-                                  options={owners}
-                                  onValueChange={(ownerId) => updateLine(line.key, { ownerId })}
-                                  placeholder="Select owner"
-                                  emptyLabel="No owners found."
-                                  inputClassName="h-8 text-xs"
-                                />
+                                  onChange={(e) => updateLine(line.key, { ownerId: e.target.value })}
+                                  className="h-8 w-full rounded-md border border-input bg-background px-2 text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0B5D4B]/30 focus-visible:border-[#0B5D4B]"
+                                >
+                                  <option value="" disabled>
+                                    {t("purchasing.selectOwner", "Select owner")}
+                                  </option>
+                                  {owners.map((owner) => (
+                                    <option key={owner.id} value={owner.id}>
+                                      {owner.name}
+                                    </option>
+                                  ))}
+                                </select>
                               </div>
                             </details>
                           </div>

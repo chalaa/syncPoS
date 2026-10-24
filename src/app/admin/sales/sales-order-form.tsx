@@ -26,7 +26,6 @@ import { Button } from "@/components/ui/button";
 import { ManyToOneCreateSelect } from "@/components/ui/many-to-one-create-select";
 import { Notebook } from "@/components/ui/notebook";
 import { ProductSelect, type ProductSelectOption } from "@/app/admin/products/product-select";
-import { RelatedModelSelect } from "@/components/ui/related-model-select";
 import { useTranslation } from "@/lib/i18n/use-translation";
 import { useFormValidation, type FormValidationResult } from "@/hooks/use-form-validation";
 import { cn } from "@/lib/utils";
@@ -905,18 +904,36 @@ export const SalesOrderForm = forwardRef<SalesOrderFormHandle, SalesOrderFormPro
             </div>
 
             <div className="grid gap-3.5 sm:grid-cols-2">
-              <div className="relative z-20">
-                <RelatedModelSelect
+              <div>
+                <label className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-foreground/80">
+                  <Users className="size-3 text-[#0B5D4B]" />
+                  {t("field.salesOwner", "Sales Owner")}
+                  {owners.length > 0 && <span className="text-destructive">*</span>}
+                </label>
+                <select
                   name="ownerId"
-                  label={t("field.salesOwner", "Sales Owner")}
-                  options={owners}
-                  value={headerOwnerId}
-                  onValueChange={changeHeaderOwner}
                   required={owners.length > 0}
-                  placeholder={t("sales.form.selectSalesOwner", "Select sales owner...")}
-                  emptyLabel={t("sales.form.noOwnersFound", "No owners found.")}
-                  error={showFieldError("ownerId")}
-                />
+                  value={headerOwnerId}
+                  onChange={(e) => changeHeaderOwner(e.target.value)}
+                  className={cn(
+                    "h-10 w-full rounded-lg border bg-background px-3 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0B5D4B]/30 focus-visible:border-[#0B5D4B]",
+                    showFieldError("ownerId") ? "border-destructive" : "border-input",
+                  )}
+                >
+                  <option value="" disabled>
+                    {owners.length === 0
+                      ? t("sales.form.noOwnersFound", "No owners found.")
+                      : t("sales.form.selectSalesOwner", "Select sales owner...")}
+                  </option>
+                  {owners.map((owner) => (
+                    <option key={owner.id} value={owner.id}>
+                      {owner.name}
+                    </option>
+                  ))}
+                </select>
+                {showFieldError("ownerId") && (
+                  <p className="mt-1 text-xs text-destructive">{showFieldError("ownerId")}</p>
+                )}
               </div>
 
               <div className="flex flex-col gap-1 text-sm font-medium">
@@ -1440,14 +1457,20 @@ export const SalesOrderForm = forwardRef<SalesOrderFormHandle, SalesOrderFormPro
                                   </div>
                                   <div className="w-56">
                                     <span className="block text-[11px] font-medium text-muted-foreground mb-1">{t("field.stockOwner", "Stock Owner")}</span>
-                                    <RelatedModelSelect
+                                    <select
                                       value={line.ownerId || headerOwnerId}
-                                      options={ownerOptionsForLine(line)}
-                                      onValueChange={(ownerId) => changeLineOwner(line, ownerId)}
-                                      placeholder={t("sales.form.selectOwner", "Select owner")}
-                                      emptyLabel={t("sales.form.noOwnersFound", "No owners found.")}
-                                      inputClassName="h-8 text-xs"
-                                    />
+                                      onChange={(e) => changeLineOwner(line, e.target.value)}
+                                      className="h-8 w-full rounded-md border border-input bg-background px-2 text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0B5D4B]/30 focus-visible:border-[#0B5D4B]"
+                                    >
+                                      <option value="" disabled>
+                                        {t("sales.form.selectOwner", "Select owner")}
+                                      </option>
+                                      {ownerOptionsForLine(line).map((owner) => (
+                                        <option key={owner.id} value={owner.id}>
+                                          {owner.name}
+                                        </option>
+                                      ))}
+                                    </select>
                                   </div>
                                 </div>
                               </details>
