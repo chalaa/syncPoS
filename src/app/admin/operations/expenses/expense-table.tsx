@@ -9,7 +9,7 @@ import { Button, ButtonLink } from "@/components/ui/button";
 import { ClickableTableRow } from "@/components/ui/clickable-table-row";
 import { useViewMode } from "@/components/ui/view-mode-toggle";
 import { T } from "@/components/ui/t";
-import { displayExpenseMoney } from "@/server/expenses/expenses";
+import { displayExpenseMoney } from "@/lib/catalog-utils";
 import type { ExpenseListRow } from "@/server/expenses/types";
 
 export function ExpenseTable({

@@ -9,7 +9,7 @@ import { ClickableTableRow } from "@/components/ui/clickable-table-row";
 import { DeleteConfirmationDialog } from "@/components/ui/delete-confirmation-dialog";
 import { useViewMode } from "@/components/ui/view-mode-toggle";
 import { T } from "@/components/ui/t";
-import { minorToDisplay } from "@/server/partners/partners";
+import { minorToDisplay } from "@/lib/catalog-utils";
 import { restorePartner, softDeletePartner } from "./actions";
 
 export type PartnerRow = {

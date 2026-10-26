@@ -245,6 +245,7 @@ export const SalesOrderForm = forwardRef<SalesOrderFormHandle, SalesOrderFormPro
   }, ref) {
   const { t } = useTranslation();
   const [isPending, startTransition] = useTransition();
+  const [isStepTransitioning, setIsStepTransitioning] = useState(false);
   const [step, setStep] = useState<1 | 2>(1);
   const [submitIntent, setSubmitIntent] = useState<"draft" | "confirm">("confirm");
   const [hasSubmitted, setHasSubmitted] = useState(false);
@@ -380,6 +381,7 @@ export const SalesOrderForm = forwardRef<SalesOrderFormHandle, SalesOrderFormPro
 
   const [productOptions, setProductOptions] = useState<ProductSelectOption[]>(products);
   const formRef = useRef<HTMLFormElement>(null);
+  const stepChangedAt = useRef<number>(0);
 
   const [lines, setLines] = useState<SalesLineDraft[]>(() =>
     order?.lines.length
@@ -663,6 +665,9 @@ export const SalesOrderForm = forwardRef<SalesOrderFormHandle, SalesOrderFormPro
   }, [order, isSubmittedOrFinished, customerId, fsNumber, paymentTerm, sourceLocationId, headerOwnerId, orderDate, validUntil, lines]);
 
   function submitWithIntent(intent: "draft" | "confirm") {
+    if (intent === "confirm" && (isStepTransitioning || isPending)) {
+      return;
+    }
     setSubmitIntent(intent);
     setHasSubmitted(true);
     setServerError(null);
@@ -697,6 +702,10 @@ export const SalesOrderForm = forwardRef<SalesOrderFormHandle, SalesOrderFormPro
     if (!isValid) {
       return;
     }
+    setIsStepTransitioning(true);
+    setTimeout(() => {
+      setIsStepTransitioning(false);
+    }, 500);
     setStep(2);
   }
 
@@ -704,6 +713,9 @@ export const SalesOrderForm = forwardRef<SalesOrderFormHandle, SalesOrderFormPro
     event.preventDefault();
     if (step === 1) {
       handleContinueToStep2();
+      return;
+    }
+    if (submitIntent === "confirm" && isStepTransitioning) {
       return;
     }
     submitWithIntent(submitIntent);
@@ -1892,7 +1904,7 @@ export const SalesOrderForm = forwardRef<SalesOrderFormHandle, SalesOrderFormPro
               <Button
                 type="button"
                 onClick={() => submitWithIntent("confirm")}
-                disabled={isPending || Boolean(confirmationBlockedReason)}
+                disabled={isPending || isStepTransitioning || Boolean(confirmationBlockedReason)}
                 title={confirmationBlockedReason}
                 className={cn(
                   "w-full sm:w-auto gap-2 font-bold text-white shadow-lg shadow-[#0B5D4B]/25 transition-all hover:brightness-110 active:scale-[0.99] px-6 py-2 text-xs justify-center whitespace-nowrap",

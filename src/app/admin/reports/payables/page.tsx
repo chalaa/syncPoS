@@ -53,7 +53,7 @@ export default async function PayablesReportPage({ searchParams }: PayablesRepor
             {reportPage.rows.map((row) => (
               <tr key={row.id} className="border-t border-border transition-colors hover:bg-secondary/30">
                 <td className="px-4 py-3">
-                  <Link href={`/admin/purchasing/vendor-bills/vendor_bill/${row.id}`} className="font-semibold text-primary underline-offset-4 hover:underline">
+                  <Link href={row.href ?? `/admin/purchasing/vendor-bills/vendor_bill/${row.id}`} className="font-semibold text-primary underline-offset-4 hover:underline">
                     {row.billNo}
                   </Link>
                   {row.orderNo ? <div className="text-xs text-muted-foreground">{row.orderNo}</div> : null}

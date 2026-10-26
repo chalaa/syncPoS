@@ -74,6 +74,10 @@ export async function getDashboardReport(overrideLocationId?: string | null): Pr
   const locationIdRaw = overrideLocationId !== undefined ? overrideLocationId : await getSelectedShopId();
   const validLocId = parseValidLocationId(locationIdRaw);
 
+  const dvsLocFilter = validLocId
+    ? sql` and (dvs.owner_id is null or not exists (select 1 from owner_locations ol_all where ol_all.owner_id = dvs.owner_id) or exists (select 1 from owner_locations ol where ol.owner_id = dvs.owner_id and ol.location_id = ${validLocId}::uuid))`
+    : sql``;
+
   const salesLocFilter = validLocId
     ? sql` and (so.source_location_id = ${validLocId}::uuid or d.source_location_id = ${validLocId}::uuid)`
     : sql``;
@@ -85,9 +89,14 @@ export async function getDashboardReport(overrideLocationId?: string | null): Pr
         left join customer_invoices ci on ci.id = pa.customer_invoice_id
         left join deliveries d on d.id = ci.delivery_id
         left join sales_orders so on so.id = ci.sales_order_id or so.id = pa.sales_order_id
+        left join direct_vendor_sales cdvs on cdvs.id = pa.customer_direct_vendor_sale_id
         where pa.payment_id = p.id
           and pa.deleted_at is null
-          and (so.source_location_id = ${validLocId}::uuid or d.source_location_id = ${validLocId}::uuid)
+          and (
+            so.source_location_id = ${validLocId}::uuid
+            or d.source_location_id = ${validLocId}::uuid
+            or (cdvs.id is not null and (cdvs.owner_id is null or not exists (select 1 from owner_locations ol_all where ol_all.owner_id = cdvs.owner_id) or exists (select 1 from owner_locations ol where ol.owner_id = cdvs.owner_id and ol.location_id = ${validLocId}::uuid)))
+          )
       )`
     : sql``;
 
@@ -103,9 +112,15 @@ export async function getDashboardReport(overrideLocationId?: string | null): Pr
         left join goods_receipts gr on gr.id = vb.goods_receipt_id
         left join purchase_orders po on po.id = vb.purchase_order_id or po.id = pa.purchase_order_id
         left join expenses ex on ex.id = pa.expense_id
+        left join direct_vendor_sales vdvs on vdvs.id = pa.vendor_direct_vendor_sale_id
         where pa.payment_id = p.id
           and pa.deleted_at is null
-          and (po.deliver_to_location_id = ${validLocId}::uuid or gr.location_id = ${validLocId}::uuid or ex.location_id = ${validLocId}::uuid)
+          and (
+            po.deliver_to_location_id = ${validLocId}::uuid
+            or gr.location_id = ${validLocId}::uuid
+            or ex.location_id = ${validLocId}::uuid
+            or (vdvs.id is not null and (vdvs.owner_id is null or not exists (select 1 from owner_locations ol_all where ol_all.owner_id = vdvs.owner_id) or exists (select 1 from owner_locations ol where ol.owner_id = vdvs.owner_id and ol.location_id = ${validLocId}::uuid)))
+          )
       )`
     : sql``;
 
@@ -150,9 +165,21 @@ export async function getDashboardReport(overrideLocationId?: string | null): Pr
         left join purchase_orders vbpo on vbpo.id = vb.purchase_order_id
         left join goods_receipts vbgr on vbgr.id = vb.goods_receipt_id
         left join expenses ex on ex.id = pa.expense_id
+        left join direct_vendor_sales cdvs on cdvs.id = pa.customer_direct_vendor_sale_id
+        left join direct_vendor_sales vdvs on vdvs.id = pa.vendor_direct_vendor_sale_id
         where pa.payment_id = p.id
           and pa.deleted_at is null
-          and (so.source_location_id = ${validLocId}::uuid or ciso.source_location_id = ${validLocId}::uuid or cid.source_location_id = ${validLocId}::uuid or po.deliver_to_location_id = ${validLocId}::uuid or vbpo.deliver_to_location_id = ${validLocId}::uuid or vbgr.location_id = ${validLocId}::uuid or ex.location_id = ${validLocId}::uuid)
+          and (
+            so.source_location_id = ${validLocId}::uuid
+            or ciso.source_location_id = ${validLocId}::uuid
+            or cid.source_location_id = ${validLocId}::uuid
+            or po.deliver_to_location_id = ${validLocId}::uuid
+            or vbpo.deliver_to_location_id = ${validLocId}::uuid
+            or vbgr.location_id = ${validLocId}::uuid
+            or ex.location_id = ${validLocId}::uuid
+            or (cdvs.id is not null and (cdvs.owner_id is null or not exists (select 1 from owner_locations ol_all where ol_all.owner_id = cdvs.owner_id) or exists (select 1 from owner_locations ol where ol.owner_id = cdvs.owner_id and ol.location_id = ${validLocId}::uuid)))
+            or (vdvs.id is not null and (vdvs.owner_id is null or not exists (select 1 from owner_locations ol_all where ol_all.owner_id = vdvs.owner_id) or exists (select 1 from owner_locations ol where ol.owner_id = vdvs.owner_id and ol.location_id = ${validLocId}::uuid)))
+          )
       )`
     : sql``;
 
@@ -189,6 +216,14 @@ export async function getDashboardReport(overrideLocationId?: string | null): Pr
             and ci.sales_order_id is null
             and (ci.invoice_date = ${today}::date or ci.created_at::date = ${today}::date)
             ${salesLocFilter}
+          union all
+          select dvs.customer_total_minor as total
+          from direct_vendor_sales dvs
+          where dvs.company_id = ${company.id}
+            and dvs.deleted_at is null
+            and dvs.status <> 'cancelled'
+            and (dvs.sale_date = ${today}::date or dvs.created_at::date = ${today}::date)
+            ${dvsLocFilter}
         ) s
       ), 0)::bigint as "salesTodayMinor",
       coalesce((
@@ -227,6 +262,14 @@ export async function getDashboardReport(overrideLocationId?: string | null): Pr
             and ci.sales_order_id is null
             and (ci.invoice_date = ${today}::date or ci.created_at::date = ${today}::date)
             ${salesLocFilter}
+          union all
+          select greatest(dvs.customer_total_minor - dvs.customer_paid_minor, 0) as unpaid
+          from direct_vendor_sales dvs
+          where dvs.company_id = ${company.id}
+            and dvs.deleted_at is null
+            and dvs.status <> 'cancelled'
+            and (dvs.sale_date = ${today}::date or dvs.created_at::date = ${today}::date)
+            ${dvsLocFilter}
         ) su
       ), 0)::bigint as "salesUnpaidTodayMinor",
       coalesce((
@@ -249,6 +292,14 @@ export async function getDashboardReport(overrideLocationId?: string | null): Pr
             and vb.purchase_order_id is null
             and (vb.bill_date = ${today}::date or vb.created_at::date = ${today}::date)
             ${payLocFilter}
+          union all
+          select dvs.vendor_cost_total_minor as total
+          from direct_vendor_sales dvs
+          where dvs.company_id = ${company.id}
+            and dvs.deleted_at is null
+            and dvs.status <> 'cancelled'
+            and (dvs.sale_date = ${today}::date or dvs.created_at::date = ${today}::date)
+            ${dvsLocFilter}
         ) p_tot
       ), 0)::bigint as "purchasesTodayMinor",
       coalesce((
@@ -287,6 +338,14 @@ export async function getDashboardReport(overrideLocationId?: string | null): Pr
             and vb.purchase_order_id is null
             and (vb.bill_date = ${today}::date or vb.created_at::date = ${today}::date)
             ${payLocFilter}
+          union all
+          select greatest(dvs.vendor_cost_total_minor - dvs.vendor_paid_minor, 0) as unpaid
+          from direct_vendor_sales dvs
+          where dvs.company_id = ${company.id}
+            and dvs.deleted_at is null
+            and dvs.status <> 'cancelled'
+            and (dvs.sale_date = ${today}::date or dvs.created_at::date = ${today}::date)
+            ${dvsLocFilter}
         ) pu
       ), 0)::bigint as "purchasesUnpaidTodayMinor",
       coalesce((
@@ -350,6 +409,15 @@ export async function getDashboardReport(overrideLocationId?: string | null): Pr
       where p.company_id = ${company.id}
         and p.deleted_at is null
         ${recentPaymentLocFilter}
+      union all
+      select dvs.id, dvs.sale_no as "documentNo", 'Direct vendor sale' as "activityType", dvs.sale_date::text as "activityDate", customer.display_name || ' / ' || vendor.display_name as "partyName", dvs.customer_total_minor as "amountMinor", dvs.currency_code as "currencyCode", '/admin/sales/direct-vendor/' || dvs.id::text as "href"
+      from direct_vendor_sales dvs
+      inner join partners customer on customer.id = dvs.customer_id
+      inner join partners vendor on vendor.id = dvs.vendor_id
+      where dvs.company_id = ${company.id}
+        and dvs.deleted_at is null
+        and dvs.status <> 'cancelled'
+        ${dvsLocFilter}
     ) activity
     order by "activityDate" desc, "documentNo" desc
     limit 10
@@ -405,41 +473,80 @@ export async function getSalesReport(filters: ReportFilters): Promise<SalesRepor
   const locFilter = validLocId
     ? sql` and (so.source_location_id = ${validLocId}::uuid or loc.id = ${validLocId}::uuid)`
     : sql``;
+  const dvsLocFilter = validLocId
+    ? sql` and (dvs.owner_id is null or not exists (select 1 from owner_locations ol_all where ol_all.owner_id = dvs.owner_id) or exists (select 1 from owner_locations ol where ol.owner_id = dvs.owner_id and ol.location_id = ${validLocId}::uuid))`
+    : sql``;
 
   return db.execute<SalesReportRow>(sql`
-    select
-      ci.id as "id",
-      ci.invoice_no as "invoiceNo",
-      so.order_no as "orderNo",
-      customer.display_name as "customerName",
-      ci.status::text as "status",
-      ci.payment_status::text as "paymentStatus",
-      ci.invoice_date::text as "invoiceDate",
-      loc.code as "locationCode",
-      ci.untaxed_amount_minor as "untaxedAmountMinor",
-      ci.tax_amount_minor as "taxAmountMinor",
-      ci.total_minor as "totalMinor",
-      coalesce(sum(pa.amount_minor) filter (where p.status = 'posted' and p.deleted_at is null and pa.deleted_at is null), 0)::bigint as "paidAmountMinor",
-      case
-        when ci.status = 'cancelled' then 0::bigint
-        else greatest(ci.total_minor - coalesce(sum(pa.amount_minor) filter (where p.status = 'posted' and p.deleted_at is null and pa.deleted_at is null), 0), 0)::bigint
-      end as "residualAmountMinor",
-      ci.currency_code as "currencyCode"
-    from customer_invoices ci
-    inner join partners customer on customer.id = ci.customer_id
-    left join sales_orders so on so.id = ci.sales_order_id
-    left join locations loc on loc.id = so.source_location_id
-    left join payment_allocations pa on pa.customer_invoice_id = ci.id
-    left join payments p on p.id = pa.payment_id
-    where ci.company_id = ${company.id}
-      and ci.deleted_at is null
-      ${locFilter}
-      and (${filters.dateFrom ?? null}::date is null or ci.invoice_date >= ${filters.dateFrom ?? null}::date)
-      and (${filters.dateTo ?? null}::date is null or ci.invoice_date <= ${filters.dateTo ?? null}::date)
-      and (${filters.status ?? null}::text is null or ci.status::text = ${filters.status ?? null})
-      and (${query} = '' or ci.invoice_no ilike ${`%${query}%`} or customer.display_name ilike ${`%${query}%`} or so.order_no ilike ${`%${query}%`})
-    group by ci.id, so.id, customer.id, loc.id
-    order by ci.invoice_date desc, ci.invoice_no desc
+    select * from (
+      select
+        ci.id as "id",
+        ci.invoice_no as "invoiceNo",
+        so.order_no as "orderNo",
+        customer.display_name as "customerName",
+        ci.status::text as "status",
+        ci.payment_status::text as "paymentStatus",
+        ci.invoice_date::text as "invoiceDate",
+        loc.code as "locationCode",
+        ci.untaxed_amount_minor as "untaxedAmountMinor",
+        ci.tax_amount_minor as "taxAmountMinor",
+        ci.total_minor as "totalMinor",
+        coalesce(sum(pa.amount_minor) filter (where p.status = 'posted' and p.deleted_at is null and pa.deleted_at is null), 0)::bigint as "paidAmountMinor",
+        case
+          when ci.status = 'cancelled' then 0::bigint
+          else greatest(ci.total_minor - coalesce(sum(pa.amount_minor) filter (where p.status = 'posted' and p.deleted_at is null and pa.deleted_at is null), 0), 0)::bigint
+        end as "residualAmountMinor",
+        ci.currency_code as "currencyCode",
+        '/admin/sales/invoices/' || ci.id::text as "href"
+      from customer_invoices ci
+      inner join partners customer on customer.id = ci.customer_id
+      left join sales_orders so on so.id = ci.sales_order_id
+      left join locations loc on loc.id = so.source_location_id
+      left join payment_allocations pa on pa.customer_invoice_id = ci.id
+      left join payments p on p.id = pa.payment_id
+      where ci.company_id = ${company.id}
+        and ci.deleted_at is null
+        ${locFilter}
+        and (${filters.dateFrom ?? null}::date is null or ci.invoice_date >= ${filters.dateFrom ?? null}::date)
+        and (${filters.dateTo ?? null}::date is null or ci.invoice_date <= ${filters.dateTo ?? null}::date)
+        and (${filters.status ?? null}::text is null or ci.status::text = ${filters.status ?? null})
+        and (${query} = '' or ci.invoice_no ilike ${`%${query}%`} or customer.display_name ilike ${`%${query}%`} or so.order_no ilike ${`%${query}%`})
+      group by ci.id, so.id, customer.id, loc.id
+      union all
+      select
+        dvs.id as "id",
+        dvs.sale_no as "invoiceNo",
+        dvs.sale_no as "orderNo",
+        customer.display_name as "customerName",
+        dvs.status::text as "status",
+        case
+          when dvs.customer_paid_minor >= dvs.customer_total_minor and dvs.customer_total_minor > 0 then 'paid'
+          when dvs.customer_paid_minor > 0 then 'partial'
+          else 'not_paid'
+        end as "paymentStatus",
+        dvs.sale_date::text as "invoiceDate",
+        'DIRECT' as "locationCode",
+        dvs.subtotal_minor as "untaxedAmountMinor",
+        dvs.tax_amount_minor as "taxAmountMinor",
+        dvs.customer_total_minor as "totalMinor",
+        dvs.customer_paid_minor as "paidAmountMinor",
+        case
+          when dvs.status = 'cancelled' then 0::bigint
+          else greatest(dvs.customer_total_minor - dvs.customer_paid_minor, 0)::bigint
+        end as "residualAmountMinor",
+        dvs.currency_code as "currencyCode",
+        '/admin/sales/direct-vendor/' || dvs.id::text as "href"
+      from direct_vendor_sales dvs
+      inner join partners customer on customer.id = dvs.customer_id
+      where dvs.company_id = ${company.id}
+        and dvs.deleted_at is null
+        ${dvsLocFilter}
+        and (${filters.dateFrom ?? null}::date is null or dvs.sale_date >= ${filters.dateFrom ?? null}::date)
+        and (${filters.dateTo ?? null}::date is null or dvs.sale_date <= ${filters.dateTo ?? null}::date)
+        and (${filters.status ?? null}::text is null or dvs.status::text = ${filters.status ?? null})
+        and (${query} = '' or dvs.sale_no ilike ${`%${query}%`} or customer.display_name ilike ${`%${query}%`})
+    ) sales_union
+    order by "invoiceDate" desc, "invoiceNo" desc
   `);
 }
 
@@ -508,9 +615,21 @@ export async function getPaymentAccountStatement(filters: ReportFilters): Promis
         left join purchase_orders vbpo on vbpo.id = vb.purchase_order_id
         left join goods_receipts vbgr on vbgr.id = vb.goods_receipt_id
         left join expenses ex on ex.id = allocations.expense_id
+        left join direct_vendor_sales cdvs on cdvs.id = allocations.customer_direct_vendor_sale_id
+        left join direct_vendor_sales vdvs on vdvs.id = allocations.vendor_direct_vendor_sale_id
         where allocations.payment_id = p.id
           and allocations.deleted_at is null
-          and (so.source_location_id = ${validLocId}::uuid or ciso.source_location_id = ${validLocId}::uuid or cid.source_location_id = ${validLocId}::uuid or po.deliver_to_location_id = ${validLocId}::uuid or vbpo.deliver_to_location_id = ${validLocId}::uuid or vbgr.location_id = ${validLocId}::uuid or ex.location_id = ${validLocId}::uuid)
+          and (
+            so.source_location_id = ${validLocId}::uuid
+            or ciso.source_location_id = ${validLocId}::uuid
+            or cid.source_location_id = ${validLocId}::uuid
+            or po.deliver_to_location_id = ${validLocId}::uuid
+            or vbpo.deliver_to_location_id = ${validLocId}::uuid
+            or vbgr.location_id = ${validLocId}::uuid
+            or ex.location_id = ${validLocId}::uuid
+            or (cdvs.id is not null and (cdvs.owner_id is null or not exists (select 1 from owner_locations ol_all where ol_all.owner_id = cdvs.owner_id) or exists (select 1 from owner_locations ol where ol.owner_id = cdvs.owner_id and ol.location_id = ${validLocId}::uuid)))
+            or (vdvs.id is not null and (vdvs.owner_id is null or not exists (select 1 from owner_locations ol_all where ol_all.owner_id = vdvs.owner_id) or exists (select 1 from owner_locations ol where ol.owner_id = vdvs.owner_id and ol.location_id = ${validLocId}::uuid)))
+          )
       )`
     : sql``;
 
@@ -566,9 +685,21 @@ export async function getPaymentReport(filters: ReportFilters): Promise<PaymentR
         left join purchase_orders vbpo on vbpo.id = vbill.purchase_order_id
         left join goods_receipts vbgr on vbgr.id = vbill.goods_receipt_id
         left join expenses ex on ex.id = allocations.expense_id
+        left join direct_vendor_sales cdvs on cdvs.id = allocations.customer_direct_vendor_sale_id
+        left join direct_vendor_sales vdvs on vdvs.id = allocations.vendor_direct_vendor_sale_id
         where allocations.payment_id = p.id
           and allocations.deleted_at is null
-          and (so.source_location_id = ${validLocId}::uuid or ciso.source_location_id = ${validLocId}::uuid or cid.source_location_id = ${validLocId}::uuid or po.deliver_to_location_id = ${validLocId}::uuid or vbpo.deliver_to_location_id = ${validLocId}::uuid or vbgr.location_id = ${validLocId}::uuid or ex.location_id = ${validLocId}::uuid)
+          and (
+            so.source_location_id = ${validLocId}::uuid
+            or ciso.source_location_id = ${validLocId}::uuid
+            or cid.source_location_id = ${validLocId}::uuid
+            or po.deliver_to_location_id = ${validLocId}::uuid
+            or vbpo.deliver_to_location_id = ${validLocId}::uuid
+            or vbgr.location_id = ${validLocId}::uuid
+            or ex.location_id = ${validLocId}::uuid
+            or (cdvs.id is not null and (cdvs.owner_id is null or not exists (select 1 from owner_locations ol_all where ol_all.owner_id = cdvs.owner_id) or exists (select 1 from owner_locations ol where ol.owner_id = cdvs.owner_id and ol.location_id = ${validLocId}::uuid)))
+            or (vdvs.id is not null and (vdvs.owner_id is null or not exists (select 1 from owner_locations ol_all where ol_all.owner_id = vdvs.owner_id) or exists (select 1 from owner_locations ol where ol.owner_id = vdvs.owner_id and ol.location_id = ${validLocId}::uuid)))
+          )
       )`
     : sql``;
 
@@ -588,18 +719,20 @@ export async function getPaymentReport(filters: ReportFilters): Promise<PaymentR
       case when p.payment_type = 'inbound' then p.amount_minor else -p.amount_minor end::bigint as "signedAmountMinor",
       coalesce(sum(pal.amount_minor) filter (where pal.deleted_at is null), 0)::bigint as "allocatedAmountMinor",
       string_agg(
-        distinct coalesce(ci.invoice_no, vb.bill_no, e.expense_no),
+        distinct coalesce(ci.invoice_no, vb.bill_no, e.expense_no, cdvs.sale_no, vdvs.sale_no),
         ', '
-      ) filter (where coalesce(ci.invoice_no, vb.bill_no, e.expense_no) is not null) as "sourceDocuments",
+      ) filter (where coalesce(ci.invoice_no, vb.bill_no, e.expense_no, cdvs.sale_no, vdvs.sale_no) is not null) as "sourceDocuments",
       string_agg(
         distinct case
           when ci.id is not null then 'Customer Invoice'
           when vb.id is not null then 'Vendor Bill'
           when e.id is not null then 'Expense'
+          when cdvs.id is not null then 'Direct Sale (Customer)'
+          when vdvs.id is not null then 'Direct Sale (Vendor)'
           else null
         end,
         ', '
-      ) filter (where ci.id is not null or vb.id is not null or e.id is not null) as "sourceTypes",
+      ) filter (where ci.id is not null or vb.id is not null or e.id is not null or cdvs.id is not null or vdvs.id is not null) as "sourceTypes",
       p.currency_code as "currencyCode"
     from payments p
     left join partners partner on partner.id = p.partner_id
@@ -609,6 +742,8 @@ export async function getPaymentReport(filters: ReportFilters): Promise<PaymentR
     left join customer_invoices ci on ci.id = pal.customer_invoice_id and ci.deleted_at is null
     left join vendor_bills vb on vb.id = pal.vendor_bill_id and vb.deleted_at is null
     left join expenses e on e.id = pal.expense_id and e.deleted_at is null
+    left join direct_vendor_sales cdvs on cdvs.id = pal.customer_direct_vendor_sale_id and cdvs.deleted_at is null
+    left join direct_vendor_sales vdvs on vdvs.id = pal.vendor_direct_vendor_sale_id and vdvs.deleted_at is null
     where p.company_id = ${company.id}
       and p.deleted_at is null
       ${locFilter}
@@ -627,6 +762,8 @@ export async function getPaymentReport(filters: ReportFilters): Promise<PaymentR
         or ci.invoice_no ilike ${`%${query}%`}
         or vb.bill_no ilike ${`%${query}%`}
         or e.expense_no ilike ${`%${query}%`}
+        or cdvs.sale_no ilike ${`%${query}%`}
+        or vdvs.sale_no ilike ${`%${query}%`}
       )
     group by p.id, partner.id, pm.id, pa.id
     order by p.payment_date desc, p.payment_no desc
@@ -683,39 +820,69 @@ export async function getReceivablesReport(filters: ReportFilters): Promise<Rece
   const locFilter = validLocId
     ? sql` and (so.source_location_id = ${validLocId}::uuid or d.source_location_id = ${validLocId}::uuid)`
     : sql``;
+  const dvsLocFilter = validLocId
+    ? sql` and (dvs.owner_id is null or not exists (select 1 from owner_locations ol_all where ol_all.owner_id = dvs.owner_id) or exists (select 1 from owner_locations ol where ol.owner_id = dvs.owner_id and ol.location_id = ${validLocId}::uuid))`
+    : sql``;
 
   return db.execute<ReceivableReportRow>(sql`
-    select
-      ci.id as "id",
-      ci.invoice_no as "invoiceNo",
-      so.order_no as "orderNo",
-      customer.display_name as "customerName",
-      ci.status::text as "status",
-      ci.invoice_date::text as "invoiceDate",
-      ci.due_date::text as "dueDate",
-      ci.total_minor as "totalMinor",
-      coalesce(sum(pa.amount_minor) filter (where p.status = 'posted' and p.deleted_at is null and pa.deleted_at is null), 0)::bigint as "paidAmountMinor",
-      case
-        when ci.status = 'cancelled' then 0::bigint
-        else greatest(ci.total_minor - coalesce(sum(pa.amount_minor) filter (where p.status = 'posted' and p.deleted_at is null and pa.deleted_at is null), 0), 0)::bigint
-      end as "residualAmountMinor",
-      ci.currency_code as "currencyCode"
-    from customer_invoices ci
-    inner join partners customer on customer.id = ci.customer_id
-    left join sales_orders so on so.id = ci.sales_order_id
-    left join deliveries d on d.id = ci.delivery_id
-    left join payment_allocations pa on pa.customer_invoice_id = ci.id
-    left join payments p on p.id = pa.payment_id
-    where ci.company_id = ${company.id}
-      and ci.deleted_at is null
-      and ci.status <> 'cancelled'
-      ${locFilter}
-      and (${filters.dateFrom ?? null}::date is null or ci.invoice_date >= ${filters.dateFrom ?? null}::date)
-      and (${filters.dateTo ?? null}::date is null or ci.invoice_date <= ${filters.dateTo ?? null}::date)
-      and (${query} = '' or ci.invoice_no ilike ${`%${query}%`} or customer.display_name ilike ${`%${query}%`} or so.order_no ilike ${`%${query}%`})
-    group by ci.id, so.id, customer.id
-    having greatest(ci.total_minor - coalesce(sum(pa.amount_minor) filter (where p.status = 'posted' and p.deleted_at is null and pa.deleted_at is null), 0), 0) > 0
-    order by ci.due_date asc nulls last, ci.invoice_date desc
+    select * from (
+      select
+        ci.id as "id",
+        ci.invoice_no as "invoiceNo",
+        so.order_no as "orderNo",
+        customer.display_name as "customerName",
+        ci.status::text as "status",
+        ci.invoice_date::text as "invoiceDate",
+        ci.due_date::text as "dueDate",
+        ci.total_minor as "totalMinor",
+        coalesce(sum(pa.amount_minor) filter (where p.status = 'posted' and p.deleted_at is null and pa.deleted_at is null), 0)::bigint as "paidAmountMinor",
+        case
+          when ci.status = 'cancelled' then 0::bigint
+          else greatest(ci.total_minor - coalesce(sum(pa.amount_minor) filter (where p.status = 'posted' and p.deleted_at is null and pa.deleted_at is null), 0), 0)::bigint
+        end as "residualAmountMinor",
+        ci.currency_code as "currencyCode",
+        '/admin/sales/invoices/' || ci.id::text as "href"
+      from customer_invoices ci
+      inner join partners customer on customer.id = ci.customer_id
+      left join sales_orders so on so.id = ci.sales_order_id
+      left join deliveries d on d.id = ci.delivery_id
+      left join payment_allocations pa on pa.customer_invoice_id = ci.id
+      left join payments p on p.id = pa.payment_id
+      where ci.company_id = ${company.id}
+        and ci.deleted_at is null
+        and ci.status <> 'cancelled'
+        ${locFilter}
+        and (${filters.dateFrom ?? null}::date is null or ci.invoice_date >= ${filters.dateFrom ?? null}::date)
+        and (${filters.dateTo ?? null}::date is null or ci.invoice_date <= ${filters.dateTo ?? null}::date)
+        and (${query} = '' or ci.invoice_no ilike ${`%${query}%`} or customer.display_name ilike ${`%${query}%`} or so.order_no ilike ${`%${query}%`})
+      group by ci.id, so.id, customer.id
+      having greatest(ci.total_minor - coalesce(sum(pa.amount_minor) filter (where p.status = 'posted' and p.deleted_at is null and pa.deleted_at is null), 0), 0) > 0
+      union all
+      select
+        dvs.id as "id",
+        dvs.sale_no as "invoiceNo",
+        dvs.sale_no as "orderNo",
+        customer.display_name as "customerName",
+        dvs.status::text as "status",
+        dvs.sale_date::text as "invoiceDate",
+        dvs.sale_date::text as "dueDate",
+        dvs.customer_total_minor as "totalMinor",
+        dvs.customer_paid_minor as "paidAmountMinor",
+        greatest(dvs.customer_total_minor - dvs.customer_paid_minor, 0)::bigint as "residualAmountMinor",
+        dvs.currency_code as "currencyCode",
+        '/admin/sales/direct-vendor/' || dvs.id::text as "href"
+      from direct_vendor_sales dvs
+      inner join partners customer on customer.id = dvs.customer_id
+      where dvs.company_id = ${company.id}
+        and dvs.deleted_at is null
+        and dvs.status <> 'cancelled'
+        ${dvsLocFilter}
+        and (${filters.dateFrom ?? null}::date is null or dvs.sale_date >= ${filters.dateFrom ?? null}::date)
+        and (${filters.dateTo ?? null}::date is null or dvs.sale_date <= ${filters.dateTo ?? null}::date)
+        and (${query} = '' or dvs.sale_no ilike ${`%${query}%`} or customer.display_name ilike ${`%${query}%`})
+        and greatest(dvs.customer_total_minor - dvs.customer_paid_minor, 0) > 0
+    ) rec_union
+    order by "dueDate" asc nulls last, "invoiceDate" desc
   `);
 }
 
@@ -727,38 +894,68 @@ export async function getPayablesReport(filters: ReportFilters): Promise<Payable
   const locFilter = validLocId
     ? sql` and (po.deliver_to_location_id = ${validLocId}::uuid or gr.location_id = ${validLocId}::uuid)`
     : sql``;
+  const dvsLocFilter = validLocId
+    ? sql` and (dvs.owner_id is null or not exists (select 1 from owner_locations ol_all where ol_all.owner_id = dvs.owner_id) or exists (select 1 from owner_locations ol where ol.owner_id = dvs.owner_id and ol.location_id = ${validLocId}::uuid))`
+    : sql``;
 
   return db.execute<PayableReportRow>(sql`
-    select
-      vb.id as "id",
-      vb.bill_no as "billNo",
-      po.order_no as "orderNo",
-      supplier.display_name as "supplierName",
-      vb.status::text as "status",
-      vb.bill_date::text as "billDate",
-      vb.due_date::text as "dueDate",
-      vb.total_minor as "totalMinor",
-      coalesce(sum(pa.amount_minor) filter (where p.status = 'posted' and p.deleted_at is null and pa.deleted_at is null), 0)::bigint as "paidAmountMinor",
-      case
-        when vb.status = 'cancelled' then 0::bigint
-        else greatest(vb.total_minor - coalesce(sum(pa.amount_minor) filter (where p.status = 'posted' and p.deleted_at is null and pa.deleted_at is null), 0), 0)::bigint
-      end as "residualAmountMinor",
-      vb.currency_code as "currencyCode"
-    from vendor_bills vb
-    inner join partners supplier on supplier.id = vb.supplier_id
-    left join purchase_orders po on po.id = vb.purchase_order_id
-    left join goods_receipts gr on gr.id = vb.goods_receipt_id
-    left join payment_allocations pa on pa.vendor_bill_id = vb.id
-    left join payments p on p.id = pa.payment_id
-    where vb.company_id = ${company.id}
-      and vb.deleted_at is null
-      and vb.status <> 'cancelled'
-      ${locFilter}
-      and (${filters.dateFrom ?? null}::date is null or vb.bill_date >= ${filters.dateFrom ?? null}::date)
-      and (${filters.dateTo ?? null}::date is null or vb.bill_date <= ${filters.dateTo ?? null}::date)
-      and (${query} = '' or vb.bill_no ilike ${`%${query}%`} or supplier.display_name ilike ${`%${query}%`} or po.order_no ilike ${`%${query}%`})
-    group by vb.id, po.id, supplier.id
-    having greatest(vb.total_minor - coalesce(sum(pa.amount_minor) filter (where p.status = 'posted' and p.deleted_at is null and pa.deleted_at is null), 0), 0) > 0
-    order by vb.due_date asc nulls last, vb.bill_date desc
+    select * from (
+      select
+        vb.id as "id",
+        vb.bill_no as "billNo",
+        po.order_no as "orderNo",
+        supplier.display_name as "supplierName",
+        vb.status::text as "status",
+        vb.bill_date::text as "billDate",
+        vb.due_date::text as "dueDate",
+        vb.total_minor as "totalMinor",
+        coalesce(sum(pa.amount_minor) filter (where p.status = 'posted' and p.deleted_at is null and pa.deleted_at is null), 0)::bigint as "paidAmountMinor",
+        case
+          when vb.status = 'cancelled' then 0::bigint
+          else greatest(vb.total_minor - coalesce(sum(pa.amount_minor) filter (where p.status = 'posted' and p.deleted_at is null and pa.deleted_at is null), 0), 0)::bigint
+        end as "residualAmountMinor",
+        vb.currency_code as "currencyCode",
+        '/admin/purchasing/vendor-bills/vendor_bill/' || vb.id::text as "href"
+      from vendor_bills vb
+      inner join partners supplier on supplier.id = vb.supplier_id
+      left join purchase_orders po on po.id = vb.purchase_order_id
+      left join goods_receipts gr on gr.id = vb.goods_receipt_id
+      left join payment_allocations pa on pa.vendor_bill_id = vb.id
+      left join payments p on p.id = pa.payment_id
+      where vb.company_id = ${company.id}
+        and vb.deleted_at is null
+        and vb.status <> 'cancelled'
+        ${locFilter}
+        and (${filters.dateFrom ?? null}::date is null or vb.bill_date >= ${filters.dateFrom ?? null}::date)
+        and (${filters.dateTo ?? null}::date is null or vb.bill_date <= ${filters.dateTo ?? null}::date)
+        and (${query} = '' or vb.bill_no ilike ${`%${query}%`} or supplier.display_name ilike ${`%${query}%`} or po.order_no ilike ${`%${query}%`})
+      group by vb.id, po.id, supplier.id
+      having greatest(vb.total_minor - coalesce(sum(pa.amount_minor) filter (where p.status = 'posted' and p.deleted_at is null and pa.deleted_at is null), 0), 0) > 0
+      union all
+      select
+        dvs.id as "id",
+        dvs.sale_no as "billNo",
+        dvs.sale_no as "orderNo",
+        vendor.display_name as "supplierName",
+        dvs.status::text as "status",
+        dvs.sale_date::text as "billDate",
+        dvs.sale_date::text as "dueDate",
+        dvs.vendor_cost_total_minor as "totalMinor",
+        dvs.vendor_paid_minor as "paidAmountMinor",
+        greatest(dvs.vendor_cost_total_minor - dvs.vendor_paid_minor, 0)::bigint as "residualAmountMinor",
+        dvs.currency_code as "currencyCode",
+        '/admin/sales/direct-vendor/' || dvs.id::text as "href"
+      from direct_vendor_sales dvs
+      inner join partners vendor on vendor.id = dvs.vendor_id
+      where dvs.company_id = ${company.id}
+        and dvs.deleted_at is null
+        and dvs.status <> 'cancelled'
+        ${dvsLocFilter}
+        and (${filters.dateFrom ?? null}::date is null or dvs.sale_date >= ${filters.dateFrom ?? null}::date)
+        and (${filters.dateTo ?? null}::date is null or dvs.sale_date <= ${filters.dateTo ?? null}::date)
+        and (${query} = '' or dvs.sale_no ilike ${`%${query}%`} or vendor.display_name ilike ${`%${query}%`})
+        and greatest(dvs.vendor_cost_total_minor - dvs.vendor_paid_minor, 0) > 0
+    ) pay_union
+    order by "dueDate" asc nulls last, "billDate" desc
   `);
 }

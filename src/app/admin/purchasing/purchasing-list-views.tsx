@@ -11,9 +11,11 @@ import { ClickableTableRow } from "@/components/ui/clickable-table-row";
 import { useViewMode } from "@/components/ui/view-mode-toggle";
 import { useTranslation } from "@/lib/i18n/use-translation";
 import { T } from "@/components/ui/t";
-import { displayPurchaseMoney } from "@/server/purchasing/purchasing";
-import { displayPaymentMoney } from "@/server/payments/payments";
-import { displayReturnMoney } from "@/server/returns/returns";
+import {
+  displayPaymentMoney,
+  displayPurchaseMoney,
+  displayReturnMoney,
+} from "@/lib/catalog-utils";
 import type {
   PurchaseLandedCostListRow,
   PurchaseOrderListRow,

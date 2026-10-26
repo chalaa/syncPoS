@@ -68,6 +68,7 @@ export type SalesReportRow = {
   paidAmountMinor: number;
   residualAmountMinor: number;
   currencyCode: string;
+  href?: string;
 };
 
 export type ExpenseReportRow = {
@@ -141,6 +142,7 @@ export type ReceivableReportRow = {
   paidAmountMinor: number;
   residualAmountMinor: number;
   currencyCode: string;
+  href?: string;
 };
 
 export type PayableReportRow = {
@@ -155,6 +157,7 @@ export type PayableReportRow = {
   paidAmountMinor: number;
   residualAmountMinor: number;
   currencyCode: string;
+  href?: string;
 };
 
 export type ReportSummary = {

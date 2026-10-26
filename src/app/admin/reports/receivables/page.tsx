@@ -53,7 +53,7 @@ export default async function ReceivablesReportPage({ searchParams }: Receivable
             {reportPage.rows.map((row) => (
               <tr key={row.id} className="border-t border-border transition-colors hover:bg-secondary/30">
                 <td className="px-4 py-3">
-                  <Link href={`/admin/sales/invoices/${row.id}`} className="font-semibold text-primary underline-offset-4 hover:underline">
+                  <Link href={row.href ?? `/admin/sales/invoices/${row.id}`} className="font-semibold text-primary underline-offset-4 hover:underline">
                     {row.invoiceNo}
                   </Link>
                   {row.orderNo ? <div className="text-xs text-muted-foreground">{row.orderNo}</div> : null}

@@ -27,3 +27,11 @@ export function displayReturnMoney(value: number, currencyCode: string) {
 export function displayPaymentMoney(value: number, currencyCode: string) {
   return `${currencyCode} ${minorToDisplay(value)}`;
 }
+
+export function displayPurchaseMoney(value: number, currencyCode: string) {
+  return `${currencyCode} ${minorToDisplay(value)}`;
+}
+
+export function displayExpenseMoney(value: number, currencyCode: string) {
+  return `${currencyCode} ${minorToDisplay(value)}`;
+}

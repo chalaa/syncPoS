@@ -97,7 +97,7 @@ export async function getDirectVendorSaleFormOptions(): Promise<DirectVendorSale
           eq(taxes.companyId, company.id),
           isNull(taxes.deletedAt),
           eq(taxes.isActive, true),
-          sql`${taxes.scope} in ('sale', 'purchase', 'both')`,
+          sql`${taxes.scope} in ('sale', 'both')`,
         ),
       )
       .orderBy(asc(taxes.name)),
