@@ -29,8 +29,8 @@ import { paymentLinesTotal, replacePaymentLines, resolvePaymentLines } from "@/s
 const optionalUuid = z.string().uuid().or(z.literal("")).optional().transform((value) => value || null);
 
 const directVendorSaleHeaderSchema = z.object({
-  customerId: z.string().uuid(),
-  vendorId: z.string().uuid(),
+  customerId: z.string().uuid("Customer is required. Please select or create a customer."),
+  vendorId: z.string().uuid("Vendor is required. Please select or create a vendor."),
   ownerId: optionalUuid,
   saleDate: z.string().trim().min(1, "Sale date is required."),
   customerPaymentTerm: z.enum(["cash", "credit"]).default("cash"),
@@ -50,6 +50,7 @@ const directVendorSaleLineSchema = z.object({
   vendorUnitCost: z.string().trim().refine((val) => majorToMinor(val) > 0, "Vendor cost/purchase price is mandatory and must be greater than zero."),
   customerUnitPrice: z.string().trim().refine((val) => majorToMinor(val) > 0, "Sale price is mandatory and must be greater than zero."),
   taxIds: z.array(z.string().uuid()).default([]),
+  taxAppliesTo: z.enum(["sales", "vendor", "both"]).default("sales"),
   notes: z.string().trim().optional(),
 });
 
@@ -99,6 +100,15 @@ async function nextDirectVendorSaleNo(tx: Parameters<Parameters<typeof db.transa
 }
 
 function parseDirectVendorSaleForm(formData: FormData, errorPath: string) {
+  const customerId = formValue(formData, "customerId");
+  const vendorId = formValue(formData, "vendorId");
+  if (!customerId) {
+    redirectWithError(errorPath, "Customer is required. Please select or create a customer.");
+  }
+  if (!vendorId) {
+    redirectWithError(errorPath, "Vendor is required. Please select or create a vendor.");
+  }
+
   const deliverProduct = formValue(formData, "deliverProduct") !== "false";
   let intent = formValue(formData, "intent") || "post";
   if (!deliverProduct && intent === "post") {
@@ -106,8 +116,8 @@ function parseDirectVendorSaleForm(formData: FormData, errorPath: string) {
   }
 
   const parsedHeader = directVendorSaleHeaderSchema.safeParse({
-    customerId: formValue(formData, "customerId"),
-    vendorId: formValue(formData, "vendorId"),
+    customerId,
+    vendorId,
     ownerId: formValue(formData, "ownerId"),
     saleDate: formValue(formData, "saleDate"),
     customerPaymentTerm: formValue(formData, "customerPaymentTerm") || "cash",
@@ -126,6 +136,7 @@ function parseDirectVendorSaleForm(formData: FormData, errorPath: string) {
   const vendorUnitCosts = formValues(formData, "vendorUnitCost");
   const customerUnitPrices = formValues(formData, "customerUnitPrice");
   const taxIdValues = formValues(formData, "taxIds");
+  const taxAppliesToValues = formValues(formData, "taxAppliesTo");
   const notes = formValues(formData, "lineNotes");
 
   const parsedLines = productIds
@@ -136,6 +147,7 @@ function parseDirectVendorSaleForm(formData: FormData, errorPath: string) {
       vendorUnitCost: vendorUnitCosts[index] ?? "0",
       customerUnitPrice: customerUnitPrices[index] ?? "0",
       taxIds: parseTaxIds(taxIdValues[index] ?? ""),
+      taxAppliesTo: (taxAppliesToValues[index] === "vendor" || taxAppliesToValues[index] === "both") ? taxAppliesToValues[index] : "sales",
       notes: notes[index] ?? "",
     }))
     .filter((line) => line.productId || Number(line.quantity) > 0);
@@ -273,7 +285,7 @@ export async function createDirectVendorSale(formData: FormData) {
                   eq(taxes.companyId, company.id),
                   isNull(taxes.deletedAt),
                   eq(taxes.isActive, true),
-                  sql`${taxes.scope} in ('sale', 'both')`,
+                  sql`${taxes.scope} in ('sale', 'purchase', 'both')`,
                   inArray(taxes.id, uniqueTaxIds),
                 ),
               )
@@ -303,23 +315,40 @@ export async function createDirectVendorSale(formData: FormData) {
           throw new Error("Customer/sale unit price is mandatory and must be greater than zero.");
         }
 
-        const vendorLineTotalMinor = Math.round(vendorUnitCostMinor * quantity);
+        const grossVendorMinor = Math.round(vendorUnitCostMinor * quantity);
         const grossCustomerMinor = Math.round(customerUnitPriceMinor * quantity);
 
         const selectedTaxes = line.taxIds
           .map((id) => taxById.get(id))
           .filter((tax): tax is NonNullable<typeof tax> => Boolean(tax));
 
-        const taxCalc = calculateLineTaxes(grossCustomerMinor, quantity, selectedTaxes);
-        const lineTaxAmountMinor = taxCalc.taxAmountMinor;
-        const lineSubtotalMinor = taxCalc.subtotalMinor;
-        const customerLineTotalMinor = taxCalc.lineTotalMinor;
-        const lineMarginMinor = customerLineTotalMinor - vendorLineTotalMinor;
+        let customerSubtotalMinor = grossCustomerMinor;
+        let customerTaxMinor = 0;
+        let customerLineTotalMinor = grossCustomerMinor;
 
-        subtotalMinor += lineSubtotalMinor;
+        let vendorCostTotalMinorForLine = grossVendorMinor;
+        let vendorTaxMinor = 0;
+
+        if (line.taxAppliesTo === "sales" || line.taxAppliesTo === "both") {
+          const custTaxCalc = calculateLineTaxes(grossCustomerMinor, quantity, selectedTaxes);
+          customerSubtotalMinor = custTaxCalc.subtotalMinor;
+          customerTaxMinor = custTaxCalc.taxAmountMinor;
+          customerLineTotalMinor = custTaxCalc.lineTotalMinor;
+        }
+
+        if (line.taxAppliesTo === "vendor" || line.taxAppliesTo === "both") {
+          const vendTaxCalc = calculateLineTaxes(grossVendorMinor, quantity, selectedTaxes);
+          vendorTaxMinor = vendTaxCalc.taxAmountMinor;
+          vendorCostTotalMinorForLine = vendTaxCalc.lineTotalMinor;
+        }
+
+        const lineTaxAmountMinor = customerTaxMinor + vendorTaxMinor;
+        const lineMarginMinor = customerLineTotalMinor - vendorCostTotalMinorForLine;
+
+        subtotalMinor += customerSubtotalMinor;
         taxAmountMinor += lineTaxAmountMinor;
         customerTotalMinor += customerLineTotalMinor;
-        vendorCostTotalMinor += vendorLineTotalMinor;
+        vendorCostTotalMinor += vendorCostTotalMinorForLine;
         marginMinor += lineMarginMinor;
 
         return {
@@ -331,8 +360,8 @@ export async function createDirectVendorSale(formData: FormData) {
             customerUnitPriceMinor,
             discountMinor: 0,
             taxAmountMinor: lineTaxAmountMinor,
-            vendorLineTotalMinor,
-            subtotalMinor: lineSubtotalMinor,
+            vendorLineTotalMinor: vendorCostTotalMinorForLine,
+            subtotalMinor: customerSubtotalMinor,
             customerLineTotalMinor,
             lineMarginMinor,
           },

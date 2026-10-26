@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 
 import { TableSearchInput } from "@/components/ui/table-search-input";
+import { ViewModeToggle, useViewMode, type ViewMode } from "@/components/ui/view-mode-toggle";
 import { cn } from "@/lib/utils";
 
 type TableFilterBarProps = {
@@ -16,24 +17,37 @@ type TableFilterBarProps = {
   className?: string;
   /** Names of search-param keys that belong to the filters (used for active-count badge) */
   filterParamNames?: string[];
+  /** Optional view mode (table, list, grid) */
+  viewMode?: ViewMode;
+  /** Callback when view mode changes */
+  onViewModeChange?: (mode: ViewMode) => void;
+  /** Storage key to auto-enable and synchronize view mode switching across components */
+  storageKey?: string;
 };
 
 /**
  * A responsive filter bar.
  *
- * Mobile  → search field + a SlidersHorizontal icon button.
+ * Mobile  → search field + view mode switcher + a SlidersHorizontal icon button.
  *           Tapping the icon slides open a filter panel containing all children.
- * Desktop → search field + all filter children displayed inline (classic layout).
+ * Desktop → search field + all filter children displayed inline + view mode switcher.
  */
 export function TableFilterBar({
   searchPlaceholder,
   children,
   className,
   filterParamNames = [],
+  viewMode: controlledViewMode,
+  onViewModeChange: controlledOnViewModeChange,
+  storageKey,
 }: TableFilterBarProps) {
   const searchParams = useSearchParams();
   const [isOpen, setIsOpen] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
+
+  const [autoViewMode, setAutoViewMode] = useViewMode(storageKey);
+  const viewMode = controlledViewMode ?? (storageKey ? autoViewMode : undefined);
+  const onViewModeChange = controlledOnViewModeChange ?? (storageKey ? setAutoViewMode : undefined);
 
   // Count how many filter params are currently active for the badge
   const activeCount = filterParamNames.filter(
@@ -54,6 +68,13 @@ export function TableFilterBar({
           <div className="w-full flex-1">
             <TableSearchInput placeholder={searchPlaceholder} />
           </div>
+
+          {/* Mobile view mode switcher */}
+          {viewMode && onViewModeChange ? (
+            <div className="md:hidden shrink-0">
+              <ViewModeToggle value={viewMode} onChange={onViewModeChange} size="sm" />
+            </div>
+          ) : null}
 
           {/* Mobile: filter toggle button */}
           {children ? (
@@ -85,12 +106,13 @@ export function TableFilterBar({
           ) : null}
         </div>
 
-        {/* Desktop & Tablet: filters inline */}
-        {children ? (
-          <div className="hidden md:flex flex-wrap items-center gap-2 sm:gap-2.5">
-            {children}
-          </div>
-        ) : null}
+        {/* Desktop & Tablet: filters inline and view mode switcher */}
+        <div className="hidden md:flex flex-wrap items-center gap-2 sm:gap-2.5">
+          {children}
+          {viewMode && onViewModeChange ? (
+            <ViewModeToggle value={viewMode} onChange={onViewModeChange} />
+          ) : null}
+        </div>
       </div>
 
       {/* Mobile filter panel */}

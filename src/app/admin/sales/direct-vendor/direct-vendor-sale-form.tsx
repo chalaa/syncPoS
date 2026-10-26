@@ -43,6 +43,7 @@ type DirectVendorLineDraft = {
   vendorUnitCost: string;
   customerUnitPrice: string;
   taxIds: string[];
+  taxAppliesTo: "sales" | "vendor" | "both";
   lineNotes: string;
 };
 
@@ -71,6 +72,7 @@ function newLine(): DirectVendorLineDraft {
     vendorUnitCost: "",
     customerUnitPrice: "",
     taxIds: [],
+    taxAppliesTo: "sales",
     lineNotes: "",
   };
 }
@@ -141,15 +143,32 @@ function calculateLineTaxes(lineAmountMinor: number, quantity: number, selectedT
 function calculateLine(line: DirectVendorLineDraft, taxById: Map<string, SalesTaxOption>): LineAmounts {
   const quantity = Number(line.quantity);
   const safeQuantity = Number.isFinite(quantity) && quantity > 0 ? quantity : 0;
-  const vendorTotalMinor = Math.round(majorToMinor(line.vendorUnitCost) * safeQuantity);
+  const grossVendorMinor = Math.round(majorToMinor(line.vendorUnitCost) * safeQuantity);
   const grossCustomerMinor = Math.round(majorToMinor(line.customerUnitPrice) * safeQuantity);
 
   const selectedTaxes = line.taxIds.map((id) => taxById.get(id)).filter((t): t is SalesTaxOption => Boolean(t));
-  const { subtotalMinor, taxAmountMinor, customerTotalMinor } = calculateLineTaxes(
-    grossCustomerMinor,
-    safeQuantity,
-    selectedTaxes,
-  );
+
+  let subtotalMinor = grossCustomerMinor;
+  let customerTaxMinor = 0;
+  let customerTotalMinor = grossCustomerMinor;
+
+  let vendorTotalMinor = grossVendorMinor;
+  let vendorTaxMinor = 0;
+
+  if (line.taxAppliesTo === "sales" || line.taxAppliesTo === "both") {
+    const custCalc = calculateLineTaxes(grossCustomerMinor, safeQuantity, selectedTaxes);
+    subtotalMinor = custCalc.subtotalMinor;
+    customerTaxMinor = custCalc.taxAmountMinor;
+    customerTotalMinor = custCalc.customerTotalMinor;
+  }
+
+  if (line.taxAppliesTo === "vendor" || line.taxAppliesTo === "both") {
+    const vendCalc = calculateLineTaxes(grossVendorMinor, safeQuantity, selectedTaxes);
+    vendorTaxMinor = vendCalc.taxAmountMinor;
+    vendorTotalMinor = vendCalc.customerTotalMinor;
+  }
+
+  const taxAmountMinor = customerTaxMinor + vendorTaxMinor;
 
   return {
     vendorTotalMinor,
@@ -182,6 +201,38 @@ export function DirectVendorSaleForm({
   const [customerId, setCustomerId] = useState("");
   const [vendorId, setVendorId] = useState("");
   const [userSelectedOwner, setUserSelectedOwner] = useState(false);
+  const [createdVendors, setCreatedVendors] = useState<Array<{ id: string; name: string; code: string }>>([]);
+  const [createdCustomers, setCreatedCustomers] = useState<Array<{ id: string; name: string; code: string }>>([]);
+
+  const handleCreateVendor = useCallback(async (input: Parameters<typeof createVendorFromDirectVendor>[0]) => {
+    const created = await createVendorFromDirectVendor(input);
+    setCreatedVendors((prev) => [...prev, created]);
+    setVendorId(created.id);
+    setClientError(null);
+    return created;
+  }, []);
+
+  const handleCreateCustomer = useCallback(async (input: Parameters<typeof createCustomerFromDirectVendor>[0]) => {
+    const created = await createCustomerFromDirectVendor(input);
+    setCreatedCustomers((prev) => [...prev, created]);
+    setCustomerId(created.id);
+    setClientError(null);
+    return created;
+  }, []);
+
+  const allVendors = useMemo(() => {
+    const map = new Map<string, { id: string; name: string; code: string }>();
+    for (const v of vendors) map.set(v.id, v);
+    for (const v of createdVendors) map.set(v.id, v);
+    return Array.from(map.values());
+  }, [vendors, createdVendors]);
+
+  const allCustomers = useMemo(() => {
+    const map = new Map<string, { id: string; name: string; code: string }>();
+    for (const c of customers) map.set(c.id, c);
+    for (const c of createdCustomers) map.set(c.id, c);
+    return Array.from(map.values());
+  }, [customers, createdCustomers]);
 
   const findLinkedOwner = useCallback(
     (locId: string | null) => {
@@ -201,6 +252,19 @@ export function DirectVendorSaleForm({
     }
     return "";
   });
+
+  const selectedCustomer = useMemo(
+    () => allCustomers.find((c) => c.id === customerId),
+    [allCustomers, customerId],
+  );
+  const selectedVendor = useMemo(
+    () => allVendors.find((v) => v.id === vendorId),
+    [allVendors, vendorId],
+  );
+  const selectedOwner = useMemo(
+    () => owners.find((o) => o.id === ownerId),
+    [owners, ownerId],
+  );
 
   useEffect(() => {
     if (userSelectedOwner) return;
@@ -254,43 +318,67 @@ export function DirectVendorSaleForm({
       customerUnitPrice: product?.listPriceMinor ? minorToMajor(product.listPriceMinor) : "",
       vendorUnitCost: product?.standardCostMinor ? minorToMajor(product.standardCostMinor) : "",
       taxIds: product?.saleTaxIds ?? [],
+      taxAppliesTo: "sales",
     });
+  }
+
+  function validateStep1(): boolean {
+    if (!customerId) {
+      setClientError(t("directVendor.error.customerRequired", "Please select or create a customer."));
+      return false;
+    }
+    if (!vendorId) {
+      setClientError(t("directVendor.error.vendorRequired", "Please select or create a vendor."));
+      return false;
+    }
+    const activeProducts = lines.filter((l) => l.productId);
+    if (activeProducts.length === 0) {
+      setClientError(t("directVendor.error.productRequired", "Please select at least one product."));
+      return false;
+    }
+    for (const [idx, line] of activeProducts.entries()) {
+      const sellPrice = Number(line.customerUnitPrice);
+      if (!line.customerUnitPrice || Number.isNaN(sellPrice) || sellPrice <= 0) {
+        setClientError(`${t("directVendor.salePriceUnit", "Sale price")} ${t("directVendor.error.mustBeGreaterThanZero", "is mandatory and must be greater than 0")} (Line ${idx + 1}).`);
+        return false;
+      }
+      const vendorCost = Number(line.vendorUnitCost);
+      if (!line.vendorUnitCost || Number.isNaN(vendorCost) || vendorCost <= 0) {
+        setClientError(`${t("directVendor.vendorCostUnit", "Vendor cost")} ${t("directVendor.error.mustBeGreaterThanZero", "is mandatory and must be greater than 0")} (Line ${idx + 1}).`);
+        return false;
+      }
+    }
+    setClientError(null);
+    return true;
   }
 
   function goToStep(targetStep: 1 | 2) {
     if (targetStep === 2) {
-      if (!customerId) {
-        setClientError("Please select or create a customer.");
+      if (!validateStep1()) {
         return;
-      }
-      if (!vendorId) {
-        setClientError("Please select or create a vendor.");
-        return;
-      }
-      const activeProducts = lines.filter((l) => l.productId);
-      if (activeProducts.length === 0) {
-        setClientError("Please select at least one product.");
-        return;
-      }
-      for (const [idx, line] of activeProducts.entries()) {
-        const sellPrice = Number(line.customerUnitPrice);
-        if (!line.customerUnitPrice || Number.isNaN(sellPrice) || sellPrice <= 0) {
-          setClientError(`Sale price is mandatory and must be greater than 0 (Line ${idx + 1}).`);
-          return;
-        }
-        const vendorCost = Number(line.vendorUnitCost);
-        if (!line.vendorUnitCost || Number.isNaN(vendorCost) || vendorCost <= 0) {
-          setClientError(`Vendor cost/purchase price is mandatory and must be greater than 0 (Line ${idx + 1}).`);
-          return;
-        }
       }
     }
     setClientError(null);
     setStep(targetStep);
   }
 
+  function handleFormSubmit(event: React.FormEvent<HTMLFormElement>) {
+    if (step === 1) {
+      event.preventDefault();
+      if (validateStep1()) {
+        setStep(2);
+      }
+      return;
+    }
+    if (!validateStep1()) {
+      event.preventDefault();
+      setStep(1);
+      return;
+    }
+  }
+
   return (
-    <form action={action} className="flex flex-col">
+    <form id="direct-vendor-sale-form" action={action} onSubmit={handleFormSubmit} className="flex flex-col">
       <input type="hidden" name="deliverProduct" value={deliverProduct ? "true" : "false"} />
       {/* Hidden inputs preserved when on Step 2 */}
       {step === 2 ? (
@@ -307,6 +395,7 @@ export function DirectVendorSaleForm({
               <input type="hidden" name="vendorUnitCost" value={line.vendorUnitCost} />
               <input type="hidden" name="customerUnitPrice" value={line.customerUnitPrice} />
               <input type="hidden" name="taxIds" value={line.taxIds.join(",")} />
+              <input type="hidden" name="taxAppliesTo" value={line.taxAppliesTo} />
               <input type="hidden" name="lineNotes" value={line.lineNotes} />
             </div>
           ))}
@@ -389,12 +478,12 @@ export function DirectVendorSaleForm({
                     <ManyToOneCreateSelect
                       name="customerId"
                       label={t("sales.col.customer", "Customer")}
-                      options={customers}
+                      options={allCustomers}
                       value={customerId}
                       defaultValue={customerId}
                       placeholder={t("sales.form.searchCustomer", "Search or add customer...")}
                       entityLabel={t("sales.col.customer", "Customer")}
-                      onCreate={createCustomerFromDirectVendor}
+                      onCreate={handleCreateCustomer}
                       onValueChange={(val) => {
                         setCustomerId(val);
                         setClientError(null);
@@ -405,12 +494,12 @@ export function DirectVendorSaleForm({
                     <ManyToOneCreateSelect
                       name="vendorId"
                       label={t("directVendor.vendor", "Vendor")}
-                      options={vendors}
+                      options={allVendors}
                       value={vendorId}
                       defaultValue={vendorId}
                       placeholder={t("directVendor.searchVendor", "Search or add vendor...")}
                       entityLabel={t("directVendor.vendor", "Vendor")}
-                      onCreate={createVendorFromDirectVendor}
+                      onCreate={handleCreateVendor}
                       onValueChange={(val) => {
                         setVendorId(val);
                         setClientError(null);
@@ -593,52 +682,99 @@ export function DirectVendorSaleForm({
                           />
                         </label>
 
-                        {/* Taxes Pill Selector */}
+                        {/* Taxes and Tax Target Selector */}
                         {taxes.length > 0 ? (
-                          <div className="flex flex-col gap-1 col-span-2 sm:col-span-2">
-                            <label className="text-[11px] font-semibold uppercase text-muted-foreground flex items-center justify-between">
-                              <span className="flex items-center gap-1">
-                                <Tag className="size-3 text-[#0B5D4B]" />
-                                <span>{t("sales.form.taxes", "Taxes")}</span>
-                              </span>
-                              <span className="text-[10px] text-muted-foreground font-normal">
-                                {t("directVendor.clickToToggle", "Click to toggle")}
-                              </span>
-                            </label>
-                            <div className="flex flex-wrap gap-1.5 min-h-[40px] items-center p-1 rounded-lg border border-input bg-background">
-                              {taxes.map((tax) => {
-                                const isSelected = line.taxIds.includes(tax.id);
-                                return (
-                                  <button
-                                    key={tax.id}
-                                    type="button"
-                                    onClick={() => {
-                                      const nextTaxes = isSelected
-                                        ? line.taxIds.filter((id) => id !== tax.id)
-                                        : [...line.taxIds, tax.id];
-                                      updateLine(line.key, { taxIds: nextTaxes });
-                                    }}
-                                    className={cn(
-                                      "inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium transition-all",
-                                      isSelected
-                                        ? "bg-[#0B5D4B] text-white shadow-xs font-semibold"
-                                        : "bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground",
-                                    )}
-                                  >
-                                    <span className="font-bold">{isSelected ? "✓" : "+"}</span>
-                                    <span>
-                                      {tax.code} ({tax.computation === "fixed" ? (tax.amountMinor / 100).toFixed(2) : `${Number(tax.rate)}%`})
-                                    </span>
-                                  </button>
-                                );
-                              })}
+                          <>
+                            <div className="flex flex-col gap-1 col-span-2 sm:col-span-1">
+                              <label className="text-[11px] font-semibold uppercase text-muted-foreground flex items-center justify-between">
+                                <span>{t("directVendor.taxAppliesTo", "Tax Target")}</span>
+                              </label>
+                              <div className="grid grid-cols-3 gap-1 h-10 p-1 rounded-lg border border-input bg-background items-center">
+                                <button
+                                  type="button"
+                                  onClick={() => updateLine(line.key, { taxAppliesTo: "sales" })}
+                                  className={cn(
+                                    "h-full rounded-md text-[11px] font-semibold transition-all flex items-center justify-center",
+                                    line.taxAppliesTo === "sales"
+                                      ? "bg-[#0B5D4B] text-white shadow-xs"
+                                      : "text-muted-foreground hover:text-foreground",
+                                  )}
+                                >
+                                  {t("directVendor.taxSales", "Sales")}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => updateLine(line.key, { taxAppliesTo: "vendor" })}
+                                  className={cn(
+                                    "h-full rounded-md text-[11px] font-semibold transition-all flex items-center justify-center",
+                                    line.taxAppliesTo === "vendor"
+                                      ? "bg-[#0B5D4B] text-white shadow-xs"
+                                      : "text-muted-foreground hover:text-foreground",
+                                  )}
+                                >
+                                  {t("directVendor.taxVendor", "Vendor")}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => updateLine(line.key, { taxAppliesTo: "both" })}
+                                  className={cn(
+                                    "h-full rounded-md text-[11px] font-semibold transition-all flex items-center justify-center",
+                                    line.taxAppliesTo === "both"
+                                      ? "bg-[#0B5D4B] text-white shadow-xs"
+                                      : "text-muted-foreground hover:text-foreground",
+                                  )}
+                                >
+                                  {t("directVendor.taxBoth", "Both")}
+                                </button>
+                              </div>
                             </div>
-                          </div>
+
+                            <div className="flex flex-col gap-1 col-span-2 sm:col-span-2">
+                              <label className="text-[11px] font-semibold uppercase text-muted-foreground flex items-center justify-between">
+                                <span className="flex items-center gap-1">
+                                  <Tag className="size-3 text-[#0B5D4B]" />
+                                  <span>{t("sales.form.taxes", "Taxes")}</span>
+                                </span>
+                                <span className="text-[10px] text-muted-foreground font-normal">
+                                  {t("directVendor.clickToToggle", "Click to toggle")}
+                                </span>
+                              </label>
+                              <div className="flex flex-wrap gap-1.5 min-h-[40px] items-center p-1 rounded-lg border border-input bg-background">
+                                {taxes.map((tax) => {
+                                  const isSelected = line.taxIds.includes(tax.id);
+                                  return (
+                                    <button
+                                      key={tax.id}
+                                      type="button"
+                                      onClick={() => {
+                                        const nextTaxes = isSelected
+                                          ? line.taxIds.filter((id) => id !== tax.id)
+                                          : [...line.taxIds, tax.id];
+                                        updateLine(line.key, { taxIds: nextTaxes });
+                                      }}
+                                      className={cn(
+                                        "inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium transition-all",
+                                        isSelected
+                                          ? "bg-[#0B5D4B] text-white shadow-xs font-semibold"
+                                          : "bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground",
+                                      )}
+                                    >
+                                      <span className="font-bold">{isSelected ? "✓" : "+"}</span>
+                                      <span>
+                                        {tax.code} ({tax.computation === "fixed" ? (tax.amountMinor / 100).toFixed(2) : `${Number(tax.rate)}%`})
+                                      </span>
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          </>
                         ) : null}
                       </div>
 
-                      {/* Hidden description, taxIds, and notes */}
+                      {/* Hidden description, taxIds, taxAppliesTo, and notes */}
                       <input type="hidden" name="taxIds" value={line.taxIds.join(",")} />
+                      <input type="hidden" name="taxAppliesTo" value={line.taxAppliesTo} />
                       <input type="hidden" name="description" value={line.description} />
                       <input type="hidden" name="lineNotes" value={line.lineNotes} />
 
@@ -695,79 +831,189 @@ export function DirectVendorSaleForm({
         ) : (
           /* Step 2: Review & Both-Way Payment Terms */
           <div className="grid gap-5 lg:grid-cols-[1fr_340px]">
-            <section className="rounded-2xl border border-border bg-card p-4 sm:p-5 shadow-xs space-y-5">
-              <div className="flex items-center gap-2 border-b border-border/70 pb-3">
-                <span className="inline-flex size-7 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                  <Wallet className="size-4" />
-                </span>
-                <h2 className="text-sm font-bold tracking-tight text-foreground">
-                  {t("directVendor.bothWaySettlement", "Both-Way Settlement Terms")}
-                </h2>
-              </div>
-
-              <div className="grid gap-4 sm:grid-cols-2">
-                <PaymentTermPanel
-                  title={t("directVendor.customerPayment", "Customer Payment")}
-                  caption={t("directVendor.accountsReceivable", "Accounts Receivable (Sales)")}
-                  term={customerPaymentTerm}
-                  onTermChange={setCustomerPaymentTerm}
-                  inputName="customerPaymentTerm"
-                  totalLabel={t("directVendor.customerOwes", "Customer Owes")}
-                  totalValue={displayMoney(totals.customerTotalMinor, company.baseCurrencyCode)}
-                >
-                  <p className="text-xs text-muted-foreground leading-relaxed">
-                    {t("directVendor.customerPaymentHint", "Set whether customer pays immediately (Cash) or on account (Credit). Payments can be recorded once the order is posted.")}
-                  </p>
-                </PaymentTermPanel>
-
-                <PaymentTermPanel
-                  title={t("directVendor.vendorPayment", "Vendor Payment")}
-                  caption={t("directVendor.accountsPayable", "Accounts Payable (Procurement)")}
-                  term={vendorPaymentTerm}
-                  onTermChange={setVendorPaymentTerm}
-                  inputName="vendorPaymentTerm"
-                  totalLabel={t("directVendor.vendorSourcingCost", "Vendor Sourcing Cost")}
-                  totalValue={displayMoney(totals.vendorCostTotalMinor, company.baseCurrencyCode)}
-                >
-                  <p className="text-xs text-muted-foreground leading-relaxed">
-                    {t("directVendor.vendorPaymentHint", "Set whether vendor requires upfront payment (Cash) or supplier credit (Credit). Disbursal is tracked per document.")}
-                  </p>
-                </PaymentTermPanel>
-
-                <label className="flex flex-col gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground sm:col-span-2">
-                  {t("directVendor.orderNotes", "Order Notes & Instructions")}
-                  <textarea
-                    name="notes"
-                    placeholder={t("directVendor.orderNotesPlaceholder", "Add any delivery notes, vendor reference, or special terms...")}
-                    className="min-h-24 w-full rounded-xl border border-input bg-background p-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0B5D4B]/30 focus-visible:border-[#0B5D4B]"
-                  />
-                </label>
-
-                {/* Deliver Product Toggle Card */}
-                <div className="flex items-center justify-between rounded-xl border border-border bg-card p-4 transition-all sm:col-span-2 shadow-xs">
-                  <div className="flex items-center gap-3">
-                    <div className="flex size-9 items-center justify-center rounded-lg bg-[#0B5D4B]/10 text-[#0B5D4B] dark:bg-emerald-950 dark:text-emerald-300">
-                      <Truck className="size-4" />
-                    </div>
-                    <div>
-                      <label htmlFor="dvs-deliver-product-checkbox" className="text-sm font-semibold text-foreground cursor-pointer flex items-center gap-2">
-                        <span>{t("directVendor.deliverProduct", "Deliver product")}</span>
-                      </label>
-                      <p className="text-xs text-muted-foreground">
-                        {t("directVendor.deliverProductHint", "Automatically post delivery and confirm sale upon completion.")}
-                      </p>
-                    </div>
-                  </div>
-                  <input
-                    id="dvs-deliver-product-checkbox"
-                    type="checkbox"
-                    checked={deliverProduct}
-                    onChange={(e) => setDeliverProduct(e.target.checked)}
-                    className="size-5 rounded border-border text-[#0B5D4B] focus:ring-[#0B5D4B] cursor-pointer"
-                  />
+            <div className="space-y-5">
+              {/* Review Parties Card */}
+              <section className="rounded-2xl border border-border bg-card p-4 sm:p-5 shadow-xs space-y-3">
+                <div className="flex items-center gap-2 border-b border-border/70 pb-3">
+                  <span className="inline-flex size-7 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                    <Users className="size-4" />
+                  </span>
+                  <h2 className="text-sm font-bold tracking-tight text-foreground">
+                    {t("directVendor.selectedParties", "Selected Parties")}
+                  </h2>
                 </div>
-              </div>
-            </section>
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 text-xs">
+                  <div className="flex flex-col gap-0.5 rounded-xl border border-border bg-muted/20 p-3">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                      {t("sales.col.customer", "Customer")}
+                    </span>
+                    <span className="font-semibold text-foreground text-sm truncate">
+                      {selectedCustomer?.name || customerId}
+                    </span>
+                    {selectedCustomer?.code ? (
+                      <span className="font-mono text-[11px] text-muted-foreground">{selectedCustomer.code}</span>
+                    ) : null}
+                  </div>
+                  <div className="flex flex-col gap-0.5 rounded-xl border border-border bg-muted/20 p-3">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                      {t("directVendor.vendor", "Vendor")}
+                    </span>
+                    <span className="font-semibold text-primary text-sm truncate">
+                      {selectedVendor?.name || vendorId}
+                    </span>
+                    {selectedVendor?.code ? (
+                      <span className="font-mono text-[11px] text-muted-foreground">{selectedVendor.code}</span>
+                    ) : null}
+                  </div>
+                  <div className="flex flex-col gap-0.5 rounded-xl border border-border bg-muted/20 p-3">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                      {t("sales.form.selectOwner", "Sales Owner")}
+                    </span>
+                    <span className="font-semibold text-foreground truncate">
+                      {selectedOwner?.name || t("sales.form.none", "No owner")}
+                    </span>
+                  </div>
+                  <div className="flex flex-col gap-0.5 rounded-xl border border-border bg-muted/20 p-3">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                      {t("directVendor.saleDate", "Sale Date")}
+                    </span>
+                    <span className="font-mono font-semibold text-foreground">
+                      {saleDate}
+                    </span>
+                  </div>
+                </div>
+              </section>
+
+              {/* Review Lines Card */}
+              <section className="rounded-2xl border border-border bg-card p-4 sm:p-5 shadow-xs space-y-3">
+                <div className="flex items-center justify-between border-b border-border/70 pb-3">
+                  <div className="flex items-center gap-2">
+                    <span className="inline-flex size-7 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                      <Package className="size-4" />
+                    </span>
+                    <h2 className="text-sm font-bold tracking-tight text-foreground">
+                      {t("directVendor.selectedLines", "Order Lines Summary")}
+                    </h2>
+                  </div>
+                  <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-xs font-bold text-primary">
+                    {lines.filter((l) => l.productId).length} {t("sales.col.lines", "Lines")}
+                  </span>
+                </div>
+                <div className="space-y-2">
+                  {lines.filter((l) => l.productId).map((line, idx) => {
+                    const product = products.find((p) => p.id === line.productId);
+                    const amounts = calculateLine(line, taxById);
+                    return (
+                      <div key={line.key} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-xl border border-border/70 bg-background/50 p-3 text-xs">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="inline-flex size-5 shrink-0 items-center justify-center rounded bg-primary/10 text-[11px] font-bold text-primary">
+                              {idx + 1}
+                            </span>
+                            <span className="font-semibold text-foreground truncate">
+                              {product?.name || line.productId}
+                            </span>
+                          </div>
+                          <div className="mt-1 flex items-center gap-3 text-[11px] text-muted-foreground">
+                            <span>Qty: <strong className="font-mono text-foreground">{line.quantity}</strong></span>
+                            <span>Sale: <strong className="font-mono text-foreground">{line.customerUnitPrice}</strong></span>
+                            <span>Cost: <strong className="font-mono text-foreground">{line.vendorUnitCost}</strong></span>
+                            {line.taxIds.length > 0 ? (
+                              <span className="inline-flex items-center gap-1 rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground uppercase">
+                                Tax: {line.taxAppliesTo}
+                              </span>
+                            ) : null}
+                          </div>
+                        </div>
+                        <div className="flex sm:flex-col items-end justify-between sm:justify-center border-t sm:border-t-0 border-border/50 pt-1.5 sm:pt-0">
+                          <span className="font-mono font-bold text-foreground">
+                            {displayMoney(amounts.customerTotalMinor, company.baseCurrencyCode)}
+                          </span>
+                          <span className="font-mono text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
+                            Margin: {displayMoney(amounts.marginMinor, company.baseCurrencyCode)}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </section>
+
+              {/* Both-Way Settlement Terms */}
+              <section className="rounded-2xl border border-border bg-card p-4 sm:p-5 shadow-xs space-y-5">
+                <div className="flex items-center gap-2 border-b border-border/70 pb-3">
+                  <span className="inline-flex size-7 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                    <Wallet className="size-4" />
+                  </span>
+                  <h2 className="text-sm font-bold tracking-tight text-foreground">
+                    {t("directVendor.bothWaySettlement", "Both-Way Settlement Terms")}
+                  </h2>
+                </div>
+
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <PaymentTermPanel
+                    title={t("directVendor.customerPayment", "Customer Payment")}
+                    caption={t("directVendor.accountsReceivable", "Accounts Receivable (Sales)")}
+                    term={customerPaymentTerm}
+                    onTermChange={setCustomerPaymentTerm}
+                    inputName="customerPaymentTerm"
+                    totalLabel={t("directVendor.customerOwes", "Customer Owes")}
+                    totalValue={displayMoney(totals.customerTotalMinor, company.baseCurrencyCode)}
+                  >
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                      {t("directVendor.customerPaymentHint", "Set whether customer pays immediately (Cash) or on account (Credit). Payments can be recorded once the order is posted.")}
+                    </p>
+                  </PaymentTermPanel>
+
+                  <PaymentTermPanel
+                    title={t("directVendor.vendorPayment", "Vendor Payment")}
+                    caption={t("directVendor.accountsPayable", "Accounts Payable (Procurement)")}
+                    term={vendorPaymentTerm}
+                    onTermChange={setVendorPaymentTerm}
+                    inputName="vendorPaymentTerm"
+                    totalLabel={t("directVendor.vendorSourcingCost", "Vendor Sourcing Cost")}
+                    totalValue={displayMoney(totals.vendorCostTotalMinor, company.baseCurrencyCode)}
+                  >
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                      {t("directVendor.vendorPaymentHint", "Set whether vendor requires upfront payment (Cash) or supplier credit (Credit). Disbursal is tracked per document.")}
+                    </p>
+                  </PaymentTermPanel>
+
+                  <label className="flex flex-col gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground sm:col-span-2">
+                    {t("directVendor.orderNotes", "Order Notes & Instructions")}
+                    <textarea
+                      name="notes"
+                      placeholder={t("directVendor.orderNotesPlaceholder", "Add any delivery notes, vendor reference, or special terms...")}
+                      className="min-h-24 w-full rounded-xl border border-input bg-background p-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0B5D4B]/30 focus-visible:border-[#0B5D4B]"
+                    />
+                  </label>
+
+                  {/* Deliver Product Toggle Card */}
+                  <div className="flex items-center justify-between rounded-xl border border-border bg-card p-4 transition-all sm:col-span-2 shadow-xs">
+                    <div className="flex items-center gap-3">
+                      <div className="flex size-9 items-center justify-center rounded-lg bg-[#0B5D4B]/10 text-[#0B5D4B] dark:bg-emerald-950 dark:text-emerald-300">
+                        <Truck className="size-4" />
+                      </div>
+                      <div>
+                        <label htmlFor="dvs-deliver-product-checkbox" className="text-sm font-semibold text-foreground cursor-pointer flex items-center gap-2">
+                          <span>{t("directVendor.deliverProduct", "Deliver product")}</span>
+                        </label>
+                        <p className="text-xs text-muted-foreground">
+                          {t("directVendor.deliverProductHint", "Automatically post delivery and confirm sale upon completion.")}
+                        </p>
+                      </div>
+                    </div>
+                    <input
+                      id="dvs-deliver-product-checkbox"
+                      type="checkbox"
+                      checked={deliverProduct}
+                      onChange={(e) => setDeliverProduct(e.target.checked)}
+                      className="size-5 rounded border-border text-[#0B5D4B] focus:ring-[#0B5D4B] cursor-pointer"
+                    />
+                  </div>
+                </div>
+              </section>
+            </div>
 
             <SummaryBox totals={totals} currencyCode={company.baseCurrencyCode} />
           </div>
@@ -824,6 +1070,11 @@ export function DirectVendorSaleForm({
             value="draft"
             variant="outline"
             className="font-semibold hidden sm:inline-flex"
+            onClick={(e) => {
+              if (!validateStep1()) {
+                e.preventDefault();
+              }
+            }}
           >
             {t("directVendor.saveDraft", "Save Draft")}
           </Button>
@@ -842,6 +1093,12 @@ export function DirectVendorSaleForm({
               type="submit"
               name="intent"
               value={deliverProduct ? "post" : "draft"}
+              onClick={(e) => {
+                if (!validateStep1()) {
+                  e.preventDefault();
+                  setStep(1);
+                }
+              }}
               className="gap-2 bg-gradient-to-r from-[#0B5D4B] to-[#073B35] font-semibold text-white shadow-md shadow-[#0B5D4B]/20 hover:brightness-110 flex-1 sm:flex-initial"
             >
               <span>{deliverProduct ? t("directVendor.postSale", "Post Direct Sale") : t("directVendor.saveDraftSale", "Save Direct Sale (Draft)")}</span>

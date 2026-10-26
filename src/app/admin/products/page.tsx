@@ -100,6 +100,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
         <TableFilterBar
           searchPlaceholder="Search item code, SKU, product name, or model..."
           filterParamNames={["category", "brand", "unit", "trackingMode", "status"]}
+          storageKey="products"
         >
           <TableFilterSelect
             paramName="category"

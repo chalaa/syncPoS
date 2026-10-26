@@ -3,13 +3,8 @@ import { redirect } from "next/navigation";
 
 import { NewPartnerModal } from "@/app/admin/partners/new-partner-modal";
 import { Alert } from "@/components/ui/alert";
-import { Badge, StatusBadge } from "@/components/ui/badge";
-import { Button, ButtonLink } from "@/components/ui/button";
-import { ClickableTableRow } from "@/components/ui/clickable-table-row";
-import { DeleteConfirmationDialog } from "@/components/ui/delete-confirmation-dialog";
 import { TableFilterBar } from "@/components/ui/table-filter-bar";
 import { TableFilterSelect } from "@/components/ui/table-filter-select";
-import { TableSearchInput } from "@/components/ui/table-search-input";
 import { TablePagination } from "@/components/ui/table-pagination";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
 import { T } from "@/components/ui/t";
@@ -17,11 +12,10 @@ import { paginateRows } from "@/lib/pagination";
 import {
   getPartnerFormOptions,
   getPartnerList,
-  minorToDisplay,
 } from "@/server/partners/partners";
 import { requirePermission, getUserPermissionCodes } from "@/server/auth/session";
 import { PERMISSIONS, userHasPermission } from "@/server/iam/permissions";
-import { restorePartner, softDeletePartner } from "./actions";
+import { PartnerListTable } from "./partner-list-table";
 
 export const dynamic = "force-dynamic";
 
@@ -95,6 +89,7 @@ export default async function PartnersPage({ searchParams }: PartnersPageProps) 
           <TableFilterBar
             searchPlaceholder="Search code, name, legal name, TIN..."
             filterParamNames={["status", "paymentTerm"]}
+            storageKey="partners"
           >
             <TableFilterSelect
               paramName="status"
@@ -137,104 +132,10 @@ export default async function PartnersPage({ searchParams }: PartnersPageProps) 
             </Link>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[920px] text-left text-sm">
-              <thead className="bg-secondary/40 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                <tr className="border-b border-border">
-                  <th className="px-4 py-3"><T k="field.code" /></th>
-                  <th className="px-4 py-3"><T k="Partner" /></th>
-                  <th className="px-4 py-3"><T k="field.role" /></th>
-                  <th className="px-4 py-3"><T k="field.status" /></th>
-                  <th className="px-4 py-3"><T k="Contact" /></th>
-                  <th className="px-4 py-3 text-right"><T k="Credit limit" /></th>
-                  <th className="px-4 py-3 text-right"><T k="action.actions" /></th>
-                </tr>
-              </thead>
-              <tbody>
-                {partnerPage.rows.map((partner) => (
-                  <ClickableTableRow key={partner.id} href={`/admin/partners/${partner.id}`}>
-                    <td className="px-4 py-3 font-mono text-xs font-semibold text-foreground">{partner.code}</td>
-                    <td className="px-4 py-3">
-                      <Link
-                        href={`/admin/partners/${partner.id}`}
-                        className="font-semibold text-primary underline-offset-4 hover:underline"
-                      >
-                        {partner.displayName}
-                      </Link>
-                      <div className="text-xs text-muted-foreground">
-                        {[partner.legalName, partner.tin ? `TIN ${partner.tin}` : null]
-                          .filter(Boolean)
-                          .join(" / ") || <T k="No legal detail" />}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex flex-wrap gap-1">
-                        {partner.isCustomer ? (
-                          <Badge variant="primary" className="text-[10px]">
-                            <T k="Customer" />
-                          </Badge>
-                        ) : null}
-                        {partner.isSupplier ? (
-                          <Badge variant="accent" className="text-[10px]">
-                            <T k="Supplier" />
-                          </Badge>
-                        ) : null}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <StatusBadge status={partner.status} size="sm" />
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="font-medium text-foreground">{partner.primaryContactName ?? <T k="No contact" />}</div>
-                      <div className="text-xs text-muted-foreground">
-                        {[partner.primaryContactPhone, partner.primaryContactEmail]
-                          .filter(Boolean)
-                          .join(" / ")}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-right font-medium text-foreground">
-                      {partner.currencyCode} {minorToDisplay(partner.creditLimitMinor)}
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex justify-end gap-2">
-                        {!showDeleted ? (
-                          <>
-                            <ButtonLink
-                              href={`/admin/partners/${partner.id}/edit`}
-                              variant="outline"
-                              size="sm"
-                            >
-                              <T k="action.edit" />
-                            </ButtonLink>
-                            <DeleteConfirmationDialog
-                              action={softDeletePartner}
-                              hiddenInputs={{ id: partner.id }}
-                              itemName={partner.displayName}
-                            />
-                          </>
-                        ) : (
-                          <form action={restorePartner}>
-                            <input type="hidden" name="id" value={partner.id} />
-                            <Button variant="outline" size="sm">
-                              <T k="action.restore" />
-                            </Button>
-                          </form>
-                        )}
-                      </div>
-                    </td>
-                  </ClickableTableRow>
-                ))}
-                {partnerPage.rows.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} className="px-4 py-12 text-center text-muted-foreground">
-                      <p className="font-medium text-foreground"><T k="No partners found" /></p>
-                      <p className="mt-1 text-xs text-muted-foreground"><T k="Try adjusting your search criteria." /></p>
-                    </td>
-                  </tr>
-                ) : null}
-              </tbody>
-            </table>
-          </div>
+          <PartnerListTable
+            partners={partnerPage.rows}
+            showDeleted={showDeleted}
+          />
           <TablePagination pagination={partnerPage.pagination} />
         </section>
       </div>

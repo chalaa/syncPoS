@@ -1,23 +1,20 @@
 import { BanknoteIcon, FolderIcon } from "lucide-react";
 import Link from "next/link";
 
-import { cancelExpense } from "@/app/admin/operations/expenses/actions";
 import { NewExpenseModal } from "@/app/admin/operations/expenses/new-expense-modal";
 import { Alert } from "@/components/ui/alert";
-import { StatusBadge } from "@/components/ui/badge";
-import { Button, ButtonLink } from "@/components/ui/button";
-import { ClickableTableRow } from "@/components/ui/clickable-table-row";
+import { Button } from "@/components/ui/button";
+import { ButtonLink } from "@/components/ui/button";
 import { TableFilterBar } from "@/components/ui/table-filter-bar";
 import { TableFilterSelect } from "@/components/ui/table-filter-select";
-import { TableSearchInput } from "@/components/ui/table-search-input";
 import { TablePagination } from "@/components/ui/table-pagination";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
 import { T } from "@/components/ui/t";
 import { paginateRows } from "@/lib/pagination";
 import { requirePermission, getUserPermissionCodes } from "@/server/auth/session";
-import { displayExpenseMoney, getExpenseFormOptions, getExpenseList } from "@/server/expenses/expenses";
-import type { ExpenseListRow } from "@/server/expenses/types";
+import { getExpenseFormOptions, getExpenseList } from "@/server/expenses/expenses";
 import { PERMISSIONS, userHasPermission } from "@/server/iam/permissions";
+import { ExpenseTable } from "./expense-table";
 
 export const dynamic = "force-dynamic";
 
@@ -97,6 +94,7 @@ export default async function ExpensesPage({ searchParams }: ExpensesPageProps) 
         <TableFilterBar
           searchPlaceholder="Search expense, category, or description..."
           filterParamNames={["category", "paymentStatus"]}
+          storageKey="expenses"
         >
           <TableFilterSelect
             paramName="category"
@@ -124,79 +122,5 @@ export default async function ExpensesPage({ searchParams }: ExpensesPageProps) 
         <TablePagination pagination={expensePage.pagination} />
       </section>
     </PageShell>
-  );
-}
-
-function ExpenseTable({ rows, showCancelled }: { rows: ExpenseListRow[]; showCancelled: boolean }) {
-  return (
-    <div className="overflow-x-auto">
-      <table className="w-full min-w-[1040px] text-left text-sm">
-        <thead className="bg-secondary/40 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-          <tr className="border-b border-border">
-            <th className="px-4 py-3"><T k="Expense" /></th>
-            <th className="px-4 py-3"><T k="field.date" fallback="Date" /></th>
-            <th className="px-4 py-3"><T k="field.category" /></th>
-            <th className="px-4 py-3"><T k="Employee / Vendor" /></th>
-            <th className="px-4 py-3"><T k="field.location" fallback="Location" /></th>
-            <th className="px-4 py-3"><T k="Payment" /></th>
-            <th className="px-4 py-3 text-right"><T k="field.amount" fallback="Amount" /></th>
-            <th className="px-4 py-3 text-right"><T k="Residual" /></th>
-            <th className="px-4 py-3 text-right"><T k="action.actions" /></th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((expense) => (
-            <ClickableTableRow key={expense.id} href={`/admin/operations/expenses/${expense.id}`}>
-              <td className="px-4 py-3">
-                <Link href={`/admin/operations/expenses/${expense.id}`} className="font-semibold text-primary underline-offset-4 hover:underline">
-                  {expense.expenseNo}
-                </Link>
-                {expense.description ? <div className="text-xs text-muted-foreground">{expense.description}</div> : null}
-              </td>
-              <td className="px-4 py-3 text-muted-foreground">{expense.expenseDate}</td>
-              <td className="px-4 py-3 font-medium text-foreground">{expense.categoryName}</td>
-              <td className="px-4 py-3">
-                <div className="font-medium text-foreground">{expense.employeeName ?? "-"}</div>
-                {expense.vendorName ? <div className="text-xs text-muted-foreground">{expense.vendorName}</div> : null}
-              </td>
-              <td className="px-4 py-3 text-muted-foreground">{expense.locationName ?? "-"}</td>
-              <td className="px-4 py-3">
-                <div className="flex flex-col gap-1 items-start">
-                  <StatusBadge status={expense.paymentStatus} size="sm" />
-                  {expense.status === "cancelled" ? (
-                    <StatusBadge status="cancelled" size="sm" />
-                  ) : null}
-                </div>
-              </td>
-              <td className="px-4 py-3 text-right font-semibold text-foreground">{displayExpenseMoney(expense.amountMinor, expense.currencyCode)}</td>
-              <td className="px-4 py-3 text-right font-medium text-amber-600 dark:text-amber-400">{displayExpenseMoney(expense.residualAmountMinor, expense.currencyCode)}</td>
-              <td className="px-4 py-3">
-                <div className="flex justify-end gap-2">
-                  <ButtonLink href={`/admin/operations/expenses/${expense.id}`} size="sm" variant="outline">
-                    <BanknoteIcon data-icon="inline-start" />
-                    <T k="action.details" fallback="Details" />
-                  </ButtonLink>
-                  {!showCancelled && expense.status !== "cancelled" && expense.paymentStatus !== "paid" ? (
-                    <form action={cancelExpense}>
-                      <input type="hidden" name="id" value={expense.id} />
-                      <input type="hidden" name="returnPath" value="/admin/operations/expenses" />
-                      <Button variant="danger" size="sm"><T k="action.cancelExpense" fallback="Cancel" /></Button>
-                    </form>
-                  ) : null}
-                </div>
-              </td>
-            </ClickableTableRow>
-          ))}
-          {rows.length === 0 ? (
-            <tr>
-              <td colSpan={9} className="px-4 py-12 text-center text-muted-foreground">
-                <p className="font-medium text-foreground"><T k="No expenses found" /></p>
-                <p className="mt-1 text-xs text-muted-foreground"><T k="Try adjusting your search keywords." /></p>
-              </td>
-            </tr>
-          ) : null}
-        </tbody>
-      </table>
-    </div>
   );
 }

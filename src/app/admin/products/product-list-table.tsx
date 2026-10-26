@@ -7,6 +7,7 @@ import { minorToDisplay } from "@/lib/catalog-utils";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { ClickableTableRow } from "@/components/ui/clickable-table-row";
 import { DeleteConfirmationDialog } from "@/components/ui/delete-confirmation-dialog";
+import { useViewMode } from "@/components/ui/view-mode-toggle";
 import { ProductDetailModal } from "./product-detail-modal";
 import { restoreProduct, softDeleteProduct } from "./actions";
 import { useTranslation } from "@/lib/i18n/use-translation";
@@ -44,6 +45,7 @@ export function ProductListTable({
   initialProductId,
   initialProductDetail,
 }: ProductListTableProps) {
+  const [viewMode] = useViewMode("products", "table");
   const [selectedProductId, setSelectedProductId] = useState<string | null>(
     initialProductId ?? null,
   );
@@ -92,162 +94,327 @@ export function ProductListTable({
     }
   }
 
+  const renderEmptyState = () => (
+    <div className="mx-auto flex max-w-xs flex-col items-center justify-center py-16 text-center">
+      <div className="flex size-12 items-center justify-center rounded-2xl bg-muted/60 text-muted-foreground ring-1 ring-border">
+        <Package className="size-6" />
+      </div>
+      <p className="mt-3 font-semibold text-foreground">{t("product.emptyTitle")}</p>
+      <p className="mt-1 text-xs text-muted-foreground">
+        {t("product.emptyDescription")}
+      </p>
+    </div>
+  );
+
+  const renderActions = (product: ProductListItem) => (
+    <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+      {!showDeleted ? (
+        <>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => handleOpen(product.id)}
+            className="h-8 gap-1 px-2 text-xs font-medium hover:bg-primary/10 hover:text-primary"
+          >
+            <ExternalLink className="size-3.5" />
+            {t("action.view")}
+          </Button>
+          <ButtonLink
+            href={`/admin/products/${product.id}/edit`}
+            variant="outline"
+            size="sm"
+            className="h-8 px-2.5 text-xs"
+          >
+            {t("action.edit")}
+          </ButtonLink>
+          <DeleteConfirmationDialog
+            action={softDeleteProduct}
+            hiddenInputs={{ id: product.id }}
+            itemName={product.name}
+          >
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 px-2 text-destructive hover:bg-destructive/10 hover:text-destructive"
+              title={t("action.delete")}
+            >
+              <Trash2 className="size-3.5" />
+            </Button>
+          </DeleteConfirmationDialog>
+        </>
+      ) : (
+        <form action={restoreProduct}>
+          <input type="hidden" name="id" value={product.id} />
+          <Button variant="outline" size="sm" className="h-8 gap-1 px-2.5 text-xs">
+            <RotateCcw className="size-3.5" />
+            {t("action.restore")}
+          </Button>
+        </form>
+      )}
+    </div>
+  );
+
   return (
     <>
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[920px] text-left text-sm">
-          <thead>
-            <tr className="border-b border-border bg-muted/40 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-              <th className="px-4 py-3">{t("field.sku")}</th>
-              <th className="px-4 py-3">{t("field.info")}</th>
-              <th className="px-4 py-3">{t("product.category")}</th>
-              <th className="px-4 py-3">{t("field.tracking")}</th>
-              <th className="px-4 py-3">{t("field.unit")}</th>
-              <th className="px-4 py-3 text-right">{t("product.stdCost")}</th>
-              <th className="px-4 py-3 text-right">{t("product.sellingPrice")}</th>
-              <th className="px-4 py-3 text-right">{t("action.actions")}</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-border/60">
-            {products.map((product) => (
-              <ClickableTableRow key={product.id} onClickRow={() => handleOpen(product.id)}>
-                <td className="px-4 py-3.5 align-middle">
-                  <button
-                    type="button"
-                    onClick={() => handleOpen(product.id)}
-                    className="inline-flex items-center gap-1.5 rounded-lg border border-primary/20 bg-primary/5 px-2.5 py-1 font-mono text-xs font-semibold text-primary transition-all hover:bg-primary/10 hover:border-primary/40 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                  >
-                    {product.sku}
-                  </button>
-                </td>
-                <td className="px-4 py-3.5 align-middle">
-                  <div className="font-semibold text-foreground group-hover:text-primary transition-colors">
-                    {product.name}
-                  </div>
-                  {product.standardName && product.standardName !== product.name ? (
-                    <div className="text-xs text-muted-foreground line-clamp-1">
-                      {t("product.altName")}: {product.standardName}
-                    </div>
-                  ) : null}
-                  {product.country ? (
-                    <div className="text-[11px] text-muted-foreground">{t("product.origin")}: {product.country}</div>
-                  ) : null}
-                </td>
-                <td className="px-4 py-3.5 align-middle">
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    {product.categoryName ? (
-                      <span className="inline-flex items-center gap-1 rounded-md bg-secondary/80 px-2 py-0.5 text-[11px] font-medium text-secondary-foreground border border-border/50">
-                        <Layers className="size-3 text-muted-foreground" />
-                        {product.categoryName}
+      {viewMode === "grid" ? (
+        <div className="p-4 sm:p-5">
+          {products.length === 0 ? (
+            renderEmptyState()
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {products.map((product) => (
+                <div
+                  key={product.id}
+                  onClick={() => handleOpen(product.id)}
+                  className="group relative flex flex-col justify-between rounded-xl border border-border bg-card p-4 transition-all duration-150 hover:border-primary/40 hover:shadow-md cursor-pointer"
+                >
+                  <div>
+                    {/* Header: SKU & Tracking */}
+                    <div className="flex items-center justify-between gap-2 mb-2">
+                      <span className="inline-flex items-center font-mono text-xs font-semibold px-2 py-0.5 rounded-md border border-primary/20 bg-primary/5 text-primary">
+                        {product.sku}
                       </span>
-                    ) : null}
-                    {product.brandName ? (
-                      <span className="inline-flex items-center gap-1 rounded-md bg-blue-500/10 px-2 py-0.5 text-[11px] font-medium text-blue-700 dark:text-blue-300 border border-blue-500/20">
-                        <Tag className="size-3 text-blue-500" />
-                        {product.brandName}
-                      </span>
-                    ) : null}
-                    {!product.categoryName && !product.brandName ? (
-                      <span className="text-xs text-muted-foreground">{t("product.unassigned")}</span>
-                    ) : null}
-                  </div>
-                </td>
-                <td className="px-4 py-3.5 align-middle">
-                  {product.trackingMode === "serial" ? (
-                    <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-400 border border-emerald-500/20">
-                      <span className="size-1.5 rounded-full bg-emerald-500" />
-                      {t("product.trackingSerial")}
-                    </span>
-                  ) : product.trackingMode === "lot" ? (
-                    <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-500/10 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wider text-blue-700 dark:text-blue-400 border border-blue-500/20">
-                      <span className="size-1.5 rounded-full bg-blue-500" />
-                      {t("product.trackingLot")}
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center rounded-full bg-muted px-2.5 py-0.5 text-[11px] font-medium text-muted-foreground border border-border/60">
-                      {t("product.trackingStandard")}
-                    </span>
-                  )}
-                </td>
-                <td className="px-4 py-3.5 align-middle">
-                  <span className="inline-flex items-center rounded bg-muted/60 px-2 py-0.5 text-xs font-medium text-foreground">
-                    {product.unitCode || "PCS"}
-                  </span>
-                </td>
-                <td className="px-4 py-3.5 align-middle text-right font-mono text-xs text-muted-foreground">
-                  {product.currencyCode} {minorToDisplay(product.standardCostMinor)}
-                </td>
-                <td className="px-4 py-3.5 align-middle text-right font-mono text-xs font-bold text-foreground">
-                  {product.currencyCode} {minorToDisplay(product.listPriceMinor)}
-                </td>
-                <td className="px-4 py-3.5 align-middle">
-                  <div className="flex items-center justify-end gap-1.5">
-                    {!showDeleted ? (
-                      <>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleOpen(product.id)}
-                          className="h-8 gap-1 px-2 text-xs font-medium hover:bg-primary/10 hover:text-primary"
-                        >
-                          <ExternalLink className="size-3.5" />
-                          {t("action.view")}
-                        </Button>
-                        <ButtonLink
-                          href={`/admin/products/${product.id}/edit`}
-                          variant="outline"
-                          size="sm"
-                          className="h-8 px-2.5 text-xs"
-                        >
-                          {t("action.edit")}
-                        </ButtonLink>
-                        <DeleteConfirmationDialog
-                          action={softDeleteProduct}
-                          hiddenInputs={{ id: product.id }}
-                          itemName={product.name}
-                        >
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-8 px-2 text-destructive hover:bg-destructive/10 hover:text-destructive"
-                            title={t("action.delete")}
-                          >
-                            <Trash2 className="size-3.5" />
-                          </Button>
-                        </DeleteConfirmationDialog>
-                      </>
-                    ) : (
-                      <form action={restoreProduct}>
-                        <input type="hidden" name="id" value={product.id} />
-                        <Button variant="outline" size="sm" className="h-8 gap-1 px-2.5 text-xs">
-                          <RotateCcw className="size-3.5" />
-                          {t("action.restore")}
-                        </Button>
-                      </form>
-                    )}
-                  </div>
-                </td>
-              </ClickableTableRow>
-            ))}
-            {products.length === 0 ? (
-              <tr>
-                <td colSpan={8} className="px-4 py-16 text-center text-sm text-muted-foreground">
-                  <div className="mx-auto flex max-w-xs flex-col items-center justify-center text-center">
-                    <div className="flex size-12 items-center justify-center rounded-2xl bg-muted/60 text-muted-foreground ring-1 ring-border">
-                      <Package className="size-6" />
+                      {product.trackingMode === "serial" ? (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 dark:text-emerald-400 border border-emerald-500/20">
+                          <span className="size-1.5 rounded-full bg-emerald-500" />
+                          Serial
+                        </span>
+                      ) : product.trackingMode === "lot" ? (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-blue-500/10 px-2 py-0.5 text-[10px] font-semibold text-blue-700 dark:text-blue-400 border border-blue-500/20">
+                          <span className="size-1.5 rounded-full bg-blue-500" />
+                          Lot
+                        </span>
+                      ) : null}
                     </div>
-                    <p className="mt-3 font-semibold text-foreground">{t("product.emptyTitle")}</p>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      {t("product.emptyDescription")}
-                    </p>
+
+                    {/* Product Name & Details */}
+                    <h4 className="font-semibold text-foreground group-hover:text-primary transition-colors line-clamp-2">
+                      {product.name}
+                    </h4>
+                    {product.standardName && product.standardName !== product.name ? (
+                      <p className="text-xs text-muted-foreground line-clamp-1 mt-0.5">
+                        {product.standardName}
+                      </p>
+                    ) : null}
+
+                    {/* Tags */}
+                    <div className="flex flex-wrap items-center gap-1.5 mt-3">
+                      {product.categoryName ? (
+                        <span className="inline-flex items-center gap-1 rounded-md bg-secondary/80 px-2 py-0.5 text-[11px] font-medium text-secondary-foreground border border-border/50">
+                          <Layers className="size-3 text-muted-foreground" />
+                          {product.categoryName}
+                        </span>
+                      ) : null}
+                      {product.brandName ? (
+                        <span className="inline-flex items-center gap-1 rounded-md bg-blue-500/10 px-2 py-0.5 text-[11px] font-medium text-blue-700 dark:text-blue-300 border border-blue-500/20">
+                          <Tag className="size-3 text-blue-500" />
+                          {product.brandName}
+                        </span>
+                      ) : null}
+                    </div>
                   </div>
-                </td>
+
+                  {/* Pricing & Footer Actions */}
+                  <div className="mt-4 pt-3 border-t border-border/60">
+                    <div className="flex items-baseline justify-between mb-3">
+                      <div>
+                        <span className="text-[10px] uppercase font-semibold text-muted-foreground block">
+                          {t("product.stdCost")}
+                        </span>
+                        <span className="font-mono text-xs text-muted-foreground">
+                          {product.currencyCode} {minorToDisplay(product.standardCostMinor)}
+                        </span>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-[10px] uppercase font-semibold text-muted-foreground block">
+                          {t("product.sellingPrice")}
+                        </span>
+                        <span className="font-mono text-sm font-bold text-foreground">
+                          {product.currencyCode} {minorToDisplay(product.listPriceMinor)}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-end">
+                      {renderActions(product)}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      ) : viewMode === "list" ? (
+        <div>
+          {products.length === 0 ? (
+            renderEmptyState()
+          ) : (
+            <div className="divide-y divide-border/60">
+              {products.map((product) => (
+                <div
+                  key={product.id}
+                  onClick={() => handleOpen(product.id)}
+                  className="group flex flex-col md:flex-row md:items-center justify-between gap-3 p-4 hover:bg-muted/30 transition-colors cursor-pointer"
+                >
+                  <div className="flex items-start gap-3">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleOpen(product.id);
+                      }}
+                      className="shrink-0 inline-flex items-center rounded-lg border border-primary/20 bg-primary/5 px-2.5 py-1 font-mono text-xs font-semibold text-primary hover:bg-primary/10 transition-colors"
+                    >
+                      {product.sku}
+                    </button>
+                    <div>
+                      <div className="font-semibold text-foreground group-hover:text-primary transition-colors">
+                        {product.name}
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2 mt-1">
+                        {product.categoryName ? (
+                          <span className="inline-flex items-center gap-1 rounded bg-secondary/80 px-1.5 py-0.5 text-[10px] text-secondary-foreground border border-border/50">
+                            {product.categoryName}
+                          </span>
+                        ) : null}
+                        {product.brandName ? (
+                          <span className="inline-flex items-center gap-1 rounded bg-blue-500/10 px-1.5 py-0.5 text-[10px] text-blue-700 dark:text-blue-300 border border-blue-500/20">
+                            {product.brandName}
+                          </span>
+                        ) : null}
+                        <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground font-medium">
+                          {product.unitCode || "PCS"}
+                        </span>
+                        {product.trackingMode !== "none" ? (
+                          <span className="rounded bg-emerald-500/10 px-1.5 py-0.5 text-[10px] text-emerald-700 dark:text-emerald-400 font-semibold border border-emerald-500/20">
+                            {product.trackingMode === "serial" ? "Serial" : "Lot"}
+                          </span>
+                        ) : null}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between md:justify-end gap-6 shrink-0">
+                    <div className="text-right">
+                      <div className="font-mono text-xs text-muted-foreground">
+                        {product.currencyCode} {minorToDisplay(product.standardCostMinor)}
+                      </div>
+                      <div className="font-mono text-sm font-bold text-foreground">
+                        {product.currencyCode} {minorToDisplay(product.listPriceMinor)}
+                      </div>
+                    </div>
+                    {renderActions(product)}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[920px] text-left text-sm">
+            <thead>
+              <tr className="border-b border-border bg-muted/40 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                <th className="px-4 py-3">{t("field.sku")}</th>
+                <th className="px-4 py-3">{t("field.info")}</th>
+                <th className="px-4 py-3">{t("product.category")}</th>
+                <th className="px-4 py-3">{t("field.tracking")}</th>
+                <th className="px-4 py-3">{t("field.unit")}</th>
+                <th className="px-4 py-3 text-right">{t("product.stdCost")}</th>
+                <th className="px-4 py-3 text-right">{t("product.sellingPrice")}</th>
+                <th className="px-4 py-3 text-right">{t("action.actions")}</th>
               </tr>
-            ) : null}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody className="divide-y divide-border/60">
+              {products.map((product) => (
+                <ClickableTableRow key={product.id} onClickRow={() => handleOpen(product.id)}>
+                  <td className="px-4 py-3.5 align-middle">
+                    <button
+                      type="button"
+                      onClick={() => handleOpen(product.id)}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-primary/20 bg-primary/5 px-2.5 py-1 font-mono text-xs font-semibold text-primary transition-all hover:bg-primary/10 hover:border-primary/40 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                    >
+                      {product.sku}
+                    </button>
+                  </td>
+                  <td className="px-4 py-3.5 align-middle">
+                    <div className="font-semibold text-foreground group-hover:text-primary transition-colors">
+                      {product.name}
+                    </div>
+                    {product.standardName && product.standardName !== product.name ? (
+                      <div className="text-xs text-muted-foreground line-clamp-1">
+                        {t("product.altName")}: {product.standardName}
+                      </div>
+                    ) : null}
+                    {product.country ? (
+                      <div className="text-[11px] text-muted-foreground">{t("product.origin")}: {product.country}</div>
+                    ) : null}
+                  </td>
+                  <td className="px-4 py-3.5 align-middle">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      {product.categoryName ? (
+                        <span className="inline-flex items-center gap-1 rounded-md bg-secondary/80 px-2 py-0.5 text-[11px] font-medium text-secondary-foreground border border-border/50">
+                          <Layers className="size-3 text-muted-foreground" />
+                          {product.categoryName}
+                        </span>
+                      ) : null}
+                      {product.brandName ? (
+                        <span className="inline-flex items-center gap-1 rounded-md bg-blue-500/10 px-2 py-0.5 text-[11px] font-medium text-blue-700 dark:text-blue-300 border border-blue-500/20">
+                          <Tag className="size-3 text-blue-500" />
+                          {product.brandName}
+                        </span>
+                      ) : null}
+                      {!product.categoryName && !product.brandName ? (
+                        <span className="text-xs text-muted-foreground">{t("product.unassigned")}</span>
+                      ) : null}
+                    </div>
+                  </td>
+                  <td className="px-4 py-3.5 align-middle">
+                    {product.trackingMode === "serial" ? (
+                      <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-400 border border-emerald-500/20">
+                        <span className="size-1.5 rounded-full bg-emerald-500" />
+                        {t("product.trackingSerial")}
+                      </span>
+                    ) : product.trackingMode === "lot" ? (
+                      <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-500/10 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wider text-blue-700 dark:text-blue-400 border border-blue-500/20">
+                        <span className="size-1.5 rounded-full bg-blue-500" />
+                        {t("product.trackingLot")}
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center rounded-full bg-muted px-2.5 py-0.5 text-[11px] font-medium text-muted-foreground border border-border/60">
+                        {t("product.trackingStandard")}
+                      </span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3.5 align-middle">
+                    <span className="inline-flex items-center rounded bg-muted/60 px-2 py-0.5 text-xs font-medium text-foreground">
+                      {product.unitCode || "PCS"}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3.5 align-middle text-right font-mono text-xs text-muted-foreground">
+                    {product.currencyCode} {minorToDisplay(product.standardCostMinor)}
+                  </td>
+                  <td className="px-4 py-3.5 align-middle text-right font-mono text-xs font-bold text-foreground">
+                    {product.currencyCode} {minorToDisplay(product.listPriceMinor)}
+                  </td>
+                  <td className="px-4 py-3.5 align-middle">
+                    <div className="flex items-center justify-end">
+                      {renderActions(product)}
+                    </div>
+                  </td>
+                </ClickableTableRow>
+              ))}
+              {products.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="px-4 py-16 text-center text-sm text-muted-foreground">
+                    {renderEmptyState()}
+                  </td>
+                </tr>
+              ) : null}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       <ProductDetailModal
         productId={selectedProductId}
