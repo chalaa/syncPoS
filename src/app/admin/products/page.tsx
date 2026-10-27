@@ -1,7 +1,7 @@
 import { Alert } from "@/components/ui/alert";
 import { TableFilterBar } from "@/components/ui/table-filter-bar";
 import { TableFilterSelect } from "@/components/ui/table-filter-select";
-import { TableSearchInput } from "@/components/ui/table-search-input";
+import { TableSortSelect, type TableSortOption } from "@/components/ui/table-sort-select";
 import { TablePagination } from "@/components/ui/table-pagination";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
 import { paginateRows } from "@/lib/pagination";
@@ -29,10 +29,23 @@ type ProductsPageProps = {
     unit?: string;
     trackingMode?: string;
     status?: string;
+    sortBy?: string;
+    sortOrder?: string;
     page?: string;
     pageSize?: string;
   }>;
 };
+
+const productSortOptions: TableSortOption[] = [
+  { value: "name:asc", label: "sort.nameAsc" },
+  { value: "name:desc", label: "sort.nameDesc" },
+  { value: "listPriceMinor:asc", label: "sort.priceAsc" },
+  { value: "listPriceMinor:desc", label: "sort.priceDesc" },
+  { value: "standardCostMinor:asc", label: "sort.costAsc" },
+  { value: "standardCostMinor:desc", label: "sort.costDesc" },
+  { value: "sku:asc", label: "sort.skuAsc" },
+  { value: "sku:desc", label: "sort.skuDesc" },
+];
 
 export default async function ProductsPage({ searchParams }: ProductsPageProps) {
   const user = await requirePermission(PERMISSIONS.PRODUCTS.VIEW);
@@ -132,6 +145,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
             options={statusOptions}
             allLabel="All Statuses"
           />
+          <TableSortSelect options={productSortOptions} />
         </TableFilterBar>
 
         <ProductListTable

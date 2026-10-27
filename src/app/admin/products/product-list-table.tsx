@@ -7,6 +7,7 @@ import { minorToDisplay } from "@/lib/catalog-utils";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { ClickableTableRow } from "@/components/ui/clickable-table-row";
 import { DeleteConfirmationDialog } from "@/components/ui/delete-confirmation-dialog";
+import { SortableTableHead } from "@/components/ui/sortable-table-head";
 import { useViewMode } from "@/components/ui/view-mode-toggle";
 import { ProductDetailModal } from "./product-detail-modal";
 import { restoreProduct, softDeleteProduct } from "./actions";
@@ -315,13 +316,13 @@ export function ProductListTable({
           <table className="w-full min-w-[920px] text-left text-sm">
             <thead>
               <tr className="border-b border-border bg-muted/40 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                <th className="px-4 py-3">{t("field.sku")}</th>
-                <th className="px-4 py-3">{t("field.info")}</th>
-                <th className="px-4 py-3">{t("product.category")}</th>
-                <th className="px-4 py-3">{t("field.tracking")}</th>
-                <th className="px-4 py-3">{t("field.unit")}</th>
-                <th className="px-4 py-3 text-right">{t("product.stdCost")}</th>
-                <th className="px-4 py-3 text-right">{t("product.sellingPrice")}</th>
+                <SortableTableHead sortKey="sku" label={t("field.sku")} className="px-4 py-3" />
+                <SortableTableHead sortKey="name" label={t("field.info")} className="px-4 py-3" />
+                <SortableTableHead sortKey="categoryName" label={t("product.category")} className="px-4 py-3" />
+                <SortableTableHead sortKey="trackingMode" label={t("field.tracking")} className="px-4 py-3" />
+                <SortableTableHead sortKey="unitCode" label={t("field.unit")} className="px-4 py-3" />
+                <SortableTableHead sortKey="standardCostMinor" label={t("product.stdCost")} align="right" className="px-4 py-3" />
+                <SortableTableHead sortKey="listPriceMinor" label={t("product.sellingPrice")} align="right" className="px-4 py-3" />
                 <th className="px-4 py-3 text-right">{t("action.actions")}</th>
               </tr>
             </thead>

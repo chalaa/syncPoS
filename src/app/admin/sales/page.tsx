@@ -44,6 +44,8 @@ type SalesPageProps = {
     paymentTerm?: string;
     paymentStatus?: string;
     locationId?: string;
+    sortBy?: string;
+    sortOrder?: string;
     page?: string;
     pageSize?: string;
   }>;

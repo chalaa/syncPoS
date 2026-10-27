@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { ButtonLink } from "@/components/ui/button";
 import { TableFilterBar } from "@/components/ui/table-filter-bar";
 import { TableFilterSelect } from "@/components/ui/table-filter-select";
+import { TableSortSelect, type TableSortOption } from "@/components/ui/table-sort-select";
 import { TablePagination } from "@/components/ui/table-pagination";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
 import { T } from "@/components/ui/t";
@@ -26,10 +27,21 @@ type ExpensesPageProps = {
     error?: string;
     category?: string;
     paymentStatus?: string;
+    sortBy?: string;
+    sortOrder?: string;
     page?: string;
     pageSize?: string;
   }>;
 };
+
+const expenseSortOptions: TableSortOption[] = [
+  { value: "expenseDate:desc", label: "sort.dateDesc" },
+  { value: "expenseDate:asc", label: "sort.dateAsc" },
+  { value: "amountMinor:desc", label: "sort.amountDesc" },
+  { value: "amountMinor:asc", label: "sort.amountAsc" },
+  { value: "expenseNo:asc", label: "sort.skuAsc" },
+  { value: "categoryName:asc", label: "sort.nameAsc" },
+];
 
 function statusLabel(value: string) {
   return value.replace(/_/g, " ");
@@ -108,6 +120,7 @@ export default async function ExpensesPage({ searchParams }: ExpensesPageProps) 
             options={paymentStatusOptions}
             allLabel="All Payments"
           />
+          <TableSortSelect options={expenseSortOptions} />
           <div className="flex rounded-lg border border-border bg-muted/40 p-1 text-sm">
             <Button asChild variant={!showCancelled ? "secondary" : "ghost"} size="sm">
               <Link href="/admin/operations/expenses"><T k="common.normal" fallback="Normal" /></Link>

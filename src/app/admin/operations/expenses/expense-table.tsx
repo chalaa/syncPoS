@@ -7,6 +7,7 @@ import { cancelExpense } from "@/app/admin/operations/expenses/actions";
 import { StatusBadge } from "@/components/ui/badge";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { ClickableTableRow } from "@/components/ui/clickable-table-row";
+import { SortableTableHead } from "@/components/ui/sortable-table-head";
 import { useViewMode } from "@/components/ui/view-mode-toggle";
 import { T } from "@/components/ui/t";
 import { displayExpenseMoney } from "@/lib/catalog-utils";
@@ -190,14 +191,14 @@ export function ExpenseTable({
           <table className="w-full min-w-[1040px] text-left text-sm">
             <thead className="bg-secondary/40 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               <tr className="border-b border-border">
-                <th className="px-4 py-3"><T k="Expense" /></th>
-                <th className="px-4 py-3"><T k="field.date" fallback="Date" /></th>
-                <th className="px-4 py-3"><T k="field.category" /></th>
+                <SortableTableHead sortKey="expenseNo" label={<T k="Expense" />} className="px-4 py-3" />
+                <SortableTableHead sortKey="expenseDate" label={<T k="field.date" fallback="Date" />} className="px-4 py-3" />
+                <SortableTableHead sortKey="categoryName" label={<T k="field.category" />} className="px-4 py-3" />
                 <th className="px-4 py-3"><T k="Employee / Vendor" /></th>
                 <th className="px-4 py-3"><T k="field.location" fallback="Location" /></th>
                 <th className="px-4 py-3"><T k="Payment" /></th>
-                <th className="px-4 py-3 text-right"><T k="field.amount" fallback="Amount" /></th>
-                <th className="px-4 py-3 text-right"><T k="Residual" /></th>
+                <SortableTableHead sortKey="amountMinor" label={<T k="field.amount" fallback="Amount" />} align="right" className="px-4 py-3" />
+                <SortableTableHead sortKey="residualAmountMinor" label={<T k="Residual" />} align="right" className="px-4 py-3" />
                 <th className="px-4 py-3 text-right"><T k="action.actions" /></th>
               </tr>
             </thead>

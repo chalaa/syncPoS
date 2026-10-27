@@ -6,8 +6,10 @@ import { Calendar, ChevronRight, ShoppingBag, Truck, User } from "lucide-react";
 import { StatusBadge } from "@/components/ui/badge";
 import { ButtonLink } from "@/components/ui/button";
 import { ClickableTableRow } from "@/components/ui/clickable-table-row";
+import { SortableTableHead } from "@/components/ui/sortable-table-head";
 import { TableFilterBar } from "@/components/ui/table-filter-bar";
 import { TableFilterSelect } from "@/components/ui/table-filter-select";
+import { TableSortSelect, type TableSortOption } from "@/components/ui/table-sort-select";
 import { useViewMode } from "@/components/ui/view-mode-toggle";
 import { displaySalesMoney } from "@/lib/catalog-utils";
 import { useTranslation } from "@/lib/i18n/use-translation";
@@ -26,6 +28,15 @@ export function DirectVendorSaleList({ sales }: { sales: DirectVendorSaleListRow
   const paymentTermOptions = [
     { value: "cash", label: t("common.cash", "Cash") },
     { value: "credit", label: t("common.credit", "Credit") },
+  ];
+
+  const sortOptions: TableSortOption[] = [
+    { value: "saleDate:desc", label: "sort.dateDesc" },
+    { value: "saleDate:asc", label: "sort.dateAsc" },
+    { value: "totalMinor:desc", label: "sort.amountDesc" },
+    { value: "totalMinor:asc", label: "sort.amountAsc" },
+    { value: "customerName:asc", label: "sort.nameAsc" },
+    { value: "saleNo:asc", label: "sort.skuAsc" },
   ];
 
   const renderEmptyState = () => (
@@ -67,6 +78,7 @@ export function DirectVendorSaleList({ sales }: { sales: DirectVendorSaleListRow
           options={paymentTermOptions}
           allLabel={t("directVendor.allTerms", "All Terms")}
         />
+        <TableSortSelect options={sortOptions} />
       </TableFilterBar>
 
       {/* Grid View */}
@@ -245,14 +257,14 @@ export function DirectVendorSaleList({ sales }: { sales: DirectVendorSaleListRow
           <table className="w-full min-w-[1080px] text-left text-sm">
             <thead>
               <tr className="border-b border-border bg-muted/40 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                <th className="px-4 py-3">{t("sales.col.orderNo", "Sale No")}</th>
-                <th className="px-4 py-3">{t("sales.col.customer", "Customer")}</th>
-                <th className="px-4 py-3">{t("directVendor.vendor", "Vendor")}</th>
-                <th className="px-4 py-3">{t("sales.col.status", "Status")}</th>
-                <th className="px-4 py-3">{t("sales.col.date", "Date")}</th>
-                <th className="px-4 py-3 text-right">{t("directVendor.saleTotal", "Sale Total")}</th>
-                <th className="px-4 py-3 text-right">{t("directVendor.vendorCost", "Vendor Cost")}</th>
-                <th className="px-4 py-3 text-right">{t("directVendor.margin", "Margin")}</th>
+                <SortableTableHead sortKey="saleNo" label={t("sales.col.orderNo", "Sale No")} className="px-4 py-3" />
+                <SortableTableHead sortKey="customerName" label={t("sales.col.customer", "Customer")} className="px-4 py-3" />
+                <SortableTableHead sortKey="vendorName" label={t("directVendor.vendor", "Vendor")} className="px-4 py-3" />
+                <SortableTableHead sortKey="status" label={t("sales.col.status", "Status")} className="px-4 py-3" />
+                <SortableTableHead sortKey="saleDate" label={t("sales.col.date", "Date")} className="px-4 py-3" />
+                <SortableTableHead sortKey="totalMinor" label={t("directVendor.saleTotal", "Sale Total")} align="right" className="px-4 py-3" />
+                <SortableTableHead sortKey="vendorCostMinor" label={t("directVendor.vendorCost", "Vendor Cost")} align="right" className="px-4 py-3" />
+                <SortableTableHead sortKey="marginMinor" label={t("directVendor.margin", "Margin")} align="right" className="px-4 py-3" />
                 <th className="px-4 py-3">{t("directVendor.payments", "Payments")}</th>
                 <th className="px-4 py-3 text-right">{t("action.actions", "Actions")}</th>
               </tr>

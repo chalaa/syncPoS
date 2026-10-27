@@ -7,6 +7,7 @@ import { Badge, StatusBadge } from "@/components/ui/badge";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { ClickableTableRow } from "@/components/ui/clickable-table-row";
 import { DeleteConfirmationDialog } from "@/components/ui/delete-confirmation-dialog";
+import { SortableTableHead } from "@/components/ui/sortable-table-head";
 import { useViewMode } from "@/components/ui/view-mode-toggle";
 import { T } from "@/components/ui/t";
 import { minorToDisplay } from "@/lib/catalog-utils";
@@ -231,12 +232,12 @@ export function PartnerListTable({
           <table className="w-full min-w-[920px] text-left text-sm">
             <thead className="bg-secondary/40 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               <tr className="border-b border-border">
-                <th className="px-4 py-3"><T k="field.code" /></th>
-                <th className="px-4 py-3"><T k="Partner" /></th>
+                <SortableTableHead sortKey="code" label={<T k="field.code" />} className="px-4 py-3" />
+                <SortableTableHead sortKey="displayName" label={<T k="Partner" />} className="px-4 py-3" />
                 <th className="px-4 py-3"><T k="field.role" /></th>
-                <th className="px-4 py-3"><T k="field.status" /></th>
+                <SortableTableHead sortKey="status" label={<T k="field.status" />} className="px-4 py-3" />
                 <th className="px-4 py-3"><T k="Contact" /></th>
-                <th className="px-4 py-3 text-right"><T k="Credit limit" /></th>
+                <SortableTableHead sortKey="creditLimitMinor" label={<T k="Credit limit" />} align="right" className="px-4 py-3" />
                 <th className="px-4 py-3 text-right"><T k="action.actions" /></th>
               </tr>
             </thead>

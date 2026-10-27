@@ -5,6 +5,7 @@ import { NewPartnerModal } from "@/app/admin/partners/new-partner-modal";
 import { Alert } from "@/components/ui/alert";
 import { TableFilterBar } from "@/components/ui/table-filter-bar";
 import { TableFilterSelect } from "@/components/ui/table-filter-select";
+import { TableSortSelect, type TableSortOption } from "@/components/ui/table-sort-select";
 import { TablePagination } from "@/components/ui/table-pagination";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
 import { T } from "@/components/ui/t";
@@ -29,10 +30,21 @@ type PartnersPageProps = {
     error?: string;
     status?: string;
     paymentTerm?: string;
+    sortBy?: string;
+    sortOrder?: string;
     page?: string;
     pageSize?: string;
   }>;
 };
+
+const partnerSortOptions: TableSortOption[] = [
+  { value: "displayName:asc", label: "sort.nameAsc" },
+  { value: "displayName:desc", label: "sort.nameDesc" },
+  { value: "code:asc", label: "sort.skuAsc" },
+  { value: "code:desc", label: "sort.skuDesc" },
+  { value: "creditLimitMinor:asc", label: "sort.amountAsc" },
+  { value: "creditLimitMinor:desc", label: "sort.amountDesc" },
+];
 
 export default async function PartnersPage({ searchParams }: PartnersPageProps) {
   const user = await requirePermission(PERMISSIONS.PARTNERS.VIEW);
@@ -103,6 +115,7 @@ export default async function PartnersPage({ searchParams }: PartnersPageProps) 
               options={paymentTermOptions}
               allLabel="All Terms"
             />
+            <TableSortSelect options={partnerSortOptions} />
           </TableFilterBar>
 
           <div className="flex gap-2 border-b border-border px-4 py-2.5 text-sm">

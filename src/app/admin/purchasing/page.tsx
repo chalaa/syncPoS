@@ -62,6 +62,8 @@ type PurchasingPageProps = {
     paymentStatus?: string;
     locationId?: string;
     costType?: string;
+    sortBy?: string;
+    sortOrder?: string;
     page?: string;
     pageSize?: string;
   }>;

@@ -1,3 +1,5 @@
+import { sortRows, type SortColumnConfig } from "@/lib/table-sort";
+
 export const PAGE_SIZES = [5, 10, 25, 50, 100] as const;
 
 export type PageSize = (typeof PAGE_SIZES)[number];
@@ -5,6 +7,8 @@ export type PageSize = (typeof PAGE_SIZES)[number];
 export type PaginationParams = {
   page?: string;
   pageSize?: string;
+  sortBy?: string;
+  sortOrder?: string;
 };
 
 export type PaginationMeta = {
@@ -28,16 +32,21 @@ export function parsePagination(params: PaginationParams) {
   };
 }
 
-export function paginateRows<T>(rows: T[], params: PaginationParams) {
+export function paginateRows<T>(
+  rows: T[],
+  params: PaginationParams,
+  sortConfigs?: Record<string, SortColumnConfig<T>>,
+) {
+  const sorted = params?.sortBy ? sortRows(rows, params, sortConfigs) : rows;
   const parsed = parsePagination(params);
-  const totalRows = rows.length;
+  const totalRows = sorted.length;
   const totalPages = Math.max(1, Math.ceil(totalRows / parsed.pageSize));
   const page = Math.min(parsed.page, totalPages);
   const start = (page - 1) * parsed.pageSize;
   const end = Math.min(start + parsed.pageSize, totalRows);
 
   return {
-    rows: rows.slice(start, end),
+    rows: sorted.slice(start, end),
     pagination: {
       page,
       pageSize: parsed.pageSize,

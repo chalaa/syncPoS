@@ -4,6 +4,8 @@ import Link from "next/link";
 import { Calendar, ChevronRight, Package, Truck, User, CreditCard } from "lucide-react";
 import { TableFilterBar } from "@/components/ui/table-filter-bar";
 import { TableFilterSelect } from "@/components/ui/table-filter-select";
+import { TableSortSelect, type TableSortOption } from "@/components/ui/table-sort-select";
+import { SortableTableHead } from "@/components/ui/sortable-table-head";
 import { StatusBadge } from "@/components/ui/badge";
 import { ButtonLink } from "@/components/ui/button";
 import { ClickableTableRow } from "@/components/ui/clickable-table-row";
@@ -225,6 +227,15 @@ export function CustomerInvoiceList({ invoices }: { invoices: CustomerInvoiceLis
   const { t } = useTranslation();
   const [viewMode, setViewMode] = useViewMode("sales_invoices", "table");
 
+  const invoiceSortOptions: TableSortOption[] = [
+    { value: "invoiceDate:desc", label: "sort.dateDesc" },
+    { value: "invoiceDate:asc", label: "sort.dateAsc" },
+    { value: "totalMinor:desc", label: "sort.amountDesc" },
+    { value: "totalMinor:asc", label: "sort.amountAsc" },
+    { value: "invoiceNo:asc", label: "sort.skuAsc" },
+    { value: "customerName:asc", label: "sort.nameAsc" },
+  ];
+
   return (
     <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-xs">
       <TableFilterBar
@@ -253,6 +264,7 @@ export function CustomerInvoiceList({ invoices }: { invoices: CustomerInvoiceLis
           ]}
           allLabel="All Payments"
         />
+        <TableSortSelect options={invoiceSortOptions} />
       </TableFilterBar>
 
       {viewMode === "grid" ? (
@@ -410,16 +422,16 @@ export function CustomerInvoiceList({ invoices }: { invoices: CustomerInvoiceLis
           <table className="w-full min-w-[1120px] text-left text-sm">
             <thead>
               <tr className="border-b border-border bg-muted/40 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                <th className="px-4 py-3">{t("sales.col.invoiceNo", "Invoice No")}</th>
-                <th className="px-4 py-3">{t("sales.col.customer", "Customer")}</th>
+                <SortableTableHead sortKey="invoiceNo" label={t("sales.col.invoiceNo", "Invoice No")} className="px-4 py-3" />
+                <SortableTableHead sortKey="customerName" label={t("sales.col.customer", "Customer")} className="px-4 py-3" />
                 <th className="px-4 py-3">{t("sales.col.sourceRef", "Source Ref")}</th>
-                <th className="px-4 py-3">{t("sales.col.invoiceStatus", "Invoice Status")}</th>
+                <SortableTableHead sortKey="status" label={t("sales.col.invoiceStatus", "Invoice Status")} className="px-4 py-3" />
                 <th className="px-4 py-3">{t("sales.col.payment", "Payment")}</th>
-                <th className="px-4 py-3">{t("sales.col.invoiceDate", "Invoice Date")}</th>
-                <th className="px-4 py-3">{t("sales.col.dueDate", "Due Date")}</th>
+                <SortableTableHead sortKey="invoiceDate" label={t("sales.col.invoiceDate", "Invoice Date")} className="px-4 py-3" />
+                <SortableTableHead sortKey="dueDate" label={t("sales.col.dueDate", "Due Date")} className="px-4 py-3" />
                 <th className="px-4 py-3">{t("sales.col.products", "Products")}</th>
-                <th className="px-4 py-3 text-right">{t("sales.col.grandTotal", "Grand Total")}</th>
-                <th className="px-4 py-3 text-right">{t("sales.col.residual", "Residual")}</th>
+                <SortableTableHead sortKey="totalMinor" label={t("sales.col.grandTotal", "Grand Total")} align="right" className="px-4 py-3" />
+                <SortableTableHead sortKey="residualAmountMinor" label={t("sales.col.residual", "Residual")} align="right" className="px-4 py-3" />
                 <th className="px-4 py-3 text-right">{t("action.actions", "Actions")}</th>
               </tr>
             </thead>
@@ -942,6 +954,15 @@ export function SalesOrderList({
     { value: "credit", label: t("common.credit", "Credit") },
   ];
 
+  const salesOrderSortOptions: TableSortOption[] = [
+    { value: "orderDate:desc", label: "sort.dateDesc" },
+    { value: "orderDate:asc", label: "sort.dateAsc" },
+    { value: "totalMinor:desc", label: "sort.amountDesc" },
+    { value: "totalMinor:asc", label: "sort.amountAsc" },
+    { value: "orderNo:asc", label: "sort.skuAsc" },
+    { value: "customerName:asc", label: "sort.nameAsc" },
+  ];
+
   return (
     <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-xs">
       <TableFilterBar
@@ -980,6 +1001,7 @@ export function SalesOrderList({
           ]}
           allLabel="All Payments"
         />
+        <TableSortSelect options={salesOrderSortOptions} />
       </TableFilterBar>
 
       {viewMode === "grid" ? (
@@ -1140,16 +1162,16 @@ export function SalesOrderList({
           <table className="w-full min-w-[1080px] text-left text-sm">
             <thead>
               <tr className="border-b border-border bg-muted/40 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                <th className="px-4 py-3">{t("sales.col.orderNo", "Order No")}</th>
-                <th className="px-4 py-3">{t("sales.col.customer", "Customer")}</th>
-                <th className="px-4 py-3">{t("sales.col.orderStatus", "Order Status")}</th>
-                <th className="px-4 py-3">{t("sales.col.orderDate", "Order Date")}</th>
+                <SortableTableHead sortKey="orderNo" label={t("sales.col.orderNo", "Order No")} className="px-4 py-3" />
+                <SortableTableHead sortKey="customerName" label={t("sales.col.customer", "Customer")} className="px-4 py-3" />
+                <SortableTableHead sortKey="status" label={t("sales.col.orderStatus", "Order Status")} className="px-4 py-3" />
+                <SortableTableHead sortKey="orderDate" label={t("sales.col.orderDate", "Order Date")} className="px-4 py-3" />
                 <th className="px-4 py-3">{t("sales.col.paymentSettlement", "Payment Settlement")}</th>
                 <th className="px-4 py-3">{t("sales.col.sourceWarehouse", "Source Warehouse")}</th>
                 <th className="px-4 py-3 text-right">{t("sales.col.lines", "Lines")}</th>
-                <th className="px-4 py-3 text-right">{t("sales.col.ordered", "Ordered")}</th>
-                <th className="px-4 py-3 text-right">{t("sales.col.delivered", "Delivered")}</th>
-                <th className="px-4 py-3 text-right">{t("sales.col.grandTotal", "Grand Total")}</th>
+                <SortableTableHead sortKey="orderedQuantity" label={t("sales.col.ordered", "Ordered")} align="right" className="px-4 py-3" />
+                <SortableTableHead sortKey="deliveredQuantity" label={t("sales.col.delivered", "Delivered")} align="right" className="px-4 py-3" />
+                <SortableTableHead sortKey="totalMinor" label={t("sales.col.grandTotal", "Grand Total")} align="right" className="px-4 py-3" />
                 <th className="px-4 py-3 text-right">{t("action.actions", "Actions")}</th>
               </tr>
             </thead>

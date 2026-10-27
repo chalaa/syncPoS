@@ -5,6 +5,8 @@ import { Calendar, ChevronRight, Package, Truck, User, DollarSign, Layers } from
 
 import { TableFilterBar } from "@/components/ui/table-filter-bar";
 import { TableFilterSelect } from "@/components/ui/table-filter-select";
+import { TableSortSelect, type TableSortOption } from "@/components/ui/table-sort-select";
+import { SortableTableHead } from "@/components/ui/sortable-table-head";
 import { StatusBadge } from "@/components/ui/badge";
 import { ButtonLink } from "@/components/ui/button";
 import { ClickableTableRow } from "@/components/ui/clickable-table-row";
@@ -477,6 +479,15 @@ export function PurchaseOrderList({
     label: `${loc.name} (${loc.code})`,
   }));
 
+  const orderSortOptions: TableSortOption[] = [
+    { value: "orderDate:desc", label: "sort.dateDesc" },
+    { value: "orderDate:asc", label: "sort.dateAsc" },
+    { value: "totalMinor:desc", label: "sort.amountDesc" },
+    { value: "totalMinor:asc", label: "sort.amountAsc" },
+    { value: "orderNo:asc", label: "sort.skuAsc" },
+    { value: "supplierName:asc", label: "sort.nameAsc" },
+  ];
+
   return (
     <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-xs">
       <TableFilterBar
@@ -515,6 +526,7 @@ export function PurchaseOrderList({
             allLabel="All Warehouses"
           />
         ) : null}
+        <TableSortSelect options={orderSortOptions} />
       </TableFilterBar>
 
       {viewMode === "grid" ? (
@@ -694,15 +706,15 @@ export function PurchaseOrderList({
           <table className="w-full min-w-[1080px] text-left text-sm">
             <thead>
               <tr className="border-b border-border bg-muted/40 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                <th className="px-4 py-3"><T k="purchasing.orderNo" fallback="Order No" /></th>
-                <th className="px-4 py-3"><T k="Supplier" /></th>
-                <th className="px-4 py-3"><T k="purchasing.orderStatus" fallback="Order Status" /></th>
-                <th className="px-4 py-3"><T k="purchasing.orderDate" fallback="Order Date" /></th>
+                <SortableTableHead sortKey="orderNo" label={<T k="purchasing.orderNo" fallback="Order No" />} className="px-4 py-3" />
+                <SortableTableHead sortKey="supplierName" label={<T k="Supplier" />} className="px-4 py-3" />
+                <SortableTableHead sortKey="status" label={<T k="purchasing.orderStatus" fallback="Order Status" />} className="px-4 py-3" />
+                <SortableTableHead sortKey="orderDate" label={<T k="purchasing.orderDate" fallback="Order Date" />} className="px-4 py-3" />
                 <th className="px-4 py-3"><T k="purchasing.paymentSettlement" fallback="Payment Settlement" /></th>
                 <th className="px-4 py-3"><T k="purchasing.deliverTo" fallback="Deliver To" /></th>
-                <th className="px-4 py-3 text-right"><T k="purchasing.orderedQty" fallback="Ordered Qty" /></th>
-                <th className="px-4 py-3 text-right"><T k="purchasing.receivedQty" fallback="Received Qty" /></th>
-                <th className="px-4 py-3 text-right"><T k="purchasing.grandTotal" fallback="Grand Total" /></th>
+                <SortableTableHead sortKey="orderedQuantity" label={<T k="purchasing.orderedQty" fallback="Ordered Qty" />} align="right" className="px-4 py-3" />
+                <SortableTableHead sortKey="receivedQuantity" label={<T k="purchasing.receivedQty" fallback="Received Qty" />} align="right" className="px-4 py-3" />
+                <SortableTableHead sortKey="totalMinor" label={<T k="purchasing.grandTotal" fallback="Grand Total" />} align="right" className="px-4 py-3" />
                 <th className="px-4 py-3 text-right"><T k="action.actions" /></th>
               </tr>
             </thead>
@@ -807,6 +819,15 @@ export function ReceiptList({
     label: `${loc.name} (${loc.code})`,
   }));
 
+  const receiptSortOptions: TableSortOption[] = [
+    { value: "receiptDate:desc", label: "sort.dateDesc" },
+    { value: "receiptDate:asc", label: "sort.dateAsc" },
+    { value: "totalMinor:desc", label: "sort.amountDesc" },
+    { value: "totalMinor:asc", label: "sort.amountAsc" },
+    { value: "receiptNo:asc", label: "sort.skuAsc" },
+    { value: "supplierName:asc", label: "sort.nameAsc" },
+  ];
+
   return (
     <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-xs">
       <TableFilterBar
@@ -815,10 +836,21 @@ export function ReceiptList({
         viewMode={viewMode}
         onViewModeChange={setViewMode}
       >
-        <TableFilterSelect paramName="status" label="Status" options={statusOptions} allLabel="All Statuses" />
+        <TableFilterSelect
+          paramName="status"
+          label="Status"
+          options={statusOptions}
+          allLabel="All Statuses"
+        />
         {locationOptions.length > 0 ? (
-          <TableFilterSelect paramName="locationId" label="status.warehouse" options={locationOptions} allLabel="All Warehouses" />
+          <TableFilterSelect
+            paramName="locationId"
+            label="status.warehouse"
+            options={locationOptions}
+            allLabel="All Warehouses"
+          />
         ) : null}
+        <TableSortSelect options={receiptSortOptions} />
       </TableFilterBar>
 
       {viewMode === "grid" ? (
@@ -967,15 +999,15 @@ export function ReceiptList({
           <table className="w-full min-w-[980px] text-left text-sm">
             <thead>
               <tr className="border-b border-border bg-muted/40 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                <th className="px-4 py-3"><T k="purchasing.receiptNo" fallback="Receipt No" /></th>
+                <SortableTableHead sortKey="receiptNo" label={<T k="purchasing.receiptNo" fallback="Receipt No" />} className="px-4 py-3" />
                 <th className="px-4 py-3"><T k="purchasing.poRef" fallback="PO Ref" /></th>
-                <th className="px-4 py-3"><T k="Supplier" /></th>
-                <th className="px-4 py-3"><T k="field.status" /></th>
-                <th className="px-4 py-3"><T k="field.date" fallback="Date" /></th>
+                <SortableTableHead sortKey="supplierName" label={<T k="Supplier" />} className="px-4 py-3" />
+                <SortableTableHead sortKey="status" label={<T k="field.status" />} className="px-4 py-3" />
+                <SortableTableHead sortKey="receiptDate" label={<T k="field.date" fallback="Date" />} className="px-4 py-3" />
                 <th className="px-4 py-3"><T k="status.warehouse" fallback="Warehouse" /></th>
                 <th className="px-4 py-3 text-right"><T k="purchasing.lines" fallback="Lines" /></th>
-                <th className="px-4 py-3 text-right"><T k="purchasing.receivedQty" fallback="Received Qty" /></th>
-                <th className="px-4 py-3 text-right"><T k="purchasing.totalValue" fallback="Total Value" /></th>
+                <SortableTableHead sortKey="quantityReceived" label={<T k="purchasing.receivedQty" fallback="Received Qty" />} align="right" className="px-4 py-3" />
+                <SortableTableHead sortKey="totalMinor" label={<T k="purchasing.totalValue" fallback="Total Value" />} align="right" className="px-4 py-3" />
                 <th className="px-4 py-3 text-right"><T k="action.actions" /></th>
               </tr>
             </thead>
