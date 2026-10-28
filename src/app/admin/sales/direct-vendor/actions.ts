@@ -273,7 +273,6 @@ export async function createDirectVendorSale(formData: FormData) {
                   eq(taxes.companyId, company.id),
                   isNull(taxes.deletedAt),
                   eq(taxes.isActive, true),
-                  sql`${taxes.scope} in ('sale', 'both')`,
                   inArray(taxes.id, uniqueTaxIds),
                 ),
               )

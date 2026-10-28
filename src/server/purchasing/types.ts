@@ -9,6 +9,7 @@ export type PurchaseFormOption = {
 };
 
 export type PurchaseTaxOption = PurchaseFormOption & {
+  scope?: "purchase" | "sale" | "both";
   computation: "percent" | "fixed";
   rate: string;
   amountMinor: number;

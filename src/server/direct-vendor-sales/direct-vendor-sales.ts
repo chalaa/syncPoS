@@ -11,6 +11,7 @@ import {
   paymentAccounts,
   paymentMethods,
   productCategories,
+  productPurchaseTaxes,
   productSaleTaxes,
   products,
   taxes,
@@ -54,10 +55,12 @@ export async function getDirectVendorSaleFormOptions(): Promise<DirectVendorSale
         name: products.name,
         listPriceMinor: products.listPriceMinor,
         standardCostMinor: products.standardCostMinor,
-        saleTaxIds: sql<string[]>`coalesce(array_agg(${productSaleTaxes.taxId}) filter (where ${productSaleTaxes.taxId} is not null), '{}')`,
+        saleTaxIds: sql<string[]>`coalesce(array_agg(distinct ${productSaleTaxes.taxId}) filter (where ${productSaleTaxes.taxId} is not null), '{}')`,
+        purchaseTaxIds: sql<string[]>`coalesce(array_agg(distinct ${productPurchaseTaxes.taxId}) filter (where ${productPurchaseTaxes.taxId} is not null), '{}')`,
       })
       .from(products)
       .leftJoin(productSaleTaxes, eq(productSaleTaxes.productId, products.id))
+      .leftJoin(productPurchaseTaxes, eq(productPurchaseTaxes.productId, products.id))
       .where(and(eq(products.companyId, company.id), eq(products.isActive, true), isNull(products.deletedAt)))
       .groupBy(products.id)
       .orderBy(asc(products.name)),
@@ -86,6 +89,7 @@ export async function getDirectVendorSaleFormOptions(): Promise<DirectVendorSale
         id: taxes.id,
         code: taxes.code,
         name: taxes.name,
+        scope: taxes.scope,
         computation: taxes.computation,
         rate: taxes.rate,
         amountMinor: taxes.amountMinor,
@@ -97,7 +101,6 @@ export async function getDirectVendorSaleFormOptions(): Promise<DirectVendorSale
           eq(taxes.companyId, company.id),
           isNull(taxes.deletedAt),
           eq(taxes.isActive, true),
-          sql`${taxes.scope} in ('sale', 'both')`,
         ),
       )
       .orderBy(asc(taxes.name)),

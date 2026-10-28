@@ -259,11 +259,14 @@ export function DirectVendorSaleForm({
 
   function handleProductChange(line: DirectVendorLineDraft, productId: string) {
     const product = products.find((item) => item.id === productId);
+    const combinedTaxIds = Array.from(
+      new Set([...(product?.saleTaxIds ?? []), ...(product?.purchaseTaxIds ?? [])]),
+    );
     updateLine(line.key, {
       productId,
       customerUnitPrice: product?.listPriceMinor ? minorToMajor(product.listPriceMinor) : "",
       vendorUnitCost: product?.standardCostMinor ? minorToMajor(product.standardCostMinor) : "",
-      taxIds: product?.saleTaxIds ?? [],
+      taxIds: combinedTaxIds,
     });
   }
 
@@ -800,6 +803,13 @@ export function DirectVendorSaleForm({
                             <div className="flex flex-wrap gap-1.5 min-h-[40px] items-center p-1 rounded-lg border border-input bg-background">
                               {taxes.map((tax) => {
                                 const isSelected = line.taxIds.includes(tax.id);
+                                const scopeLabel =
+                                  tax.scope === "purchase"
+                                    ? t("tax.scope.purchase", "Purch")
+                                    : tax.scope === "sale"
+                                      ? t("tax.scope.sale", "Sale")
+                                      : t("tax.scope.both", "Both");
+
                                 return (
                                   <button
                                     key={tax.id}
@@ -811,7 +821,7 @@ export function DirectVendorSaleForm({
                                       updateLine(line.key, { taxIds: nextTaxes });
                                     }}
                                     className={cn(
-                                      "inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium transition-all",
+                                      "inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium transition-all cursor-pointer",
                                       isSelected
                                         ? "bg-[#0B5D4B] text-white shadow-xs font-semibold"
                                         : "bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground",
@@ -821,6 +831,20 @@ export function DirectVendorSaleForm({
                                     <span>
                                       {tax.code} ({tax.computation === "fixed" ? (tax.amountMinor / 100).toFixed(2) : `${Number(tax.rate)}%`})
                                     </span>
+                                    {tax.scope ? (
+                                      <span
+                                        className={cn(
+                                          "rounded px-1 py-0.5 text-[10px] font-semibold uppercase",
+                                          isSelected
+                                            ? "bg-white/20 text-white"
+                                            : tax.scope === "purchase"
+                                              ? "bg-blue-500/10 text-blue-600 dark:text-blue-400"
+                                              : "bg-amber-500/10 text-amber-600 dark:text-amber-400",
+                                        )}
+                                      >
+                                        {scopeLabel}
+                                      </span>
+                                    ) : null}
                                   </button>
                                 );
                               })}
