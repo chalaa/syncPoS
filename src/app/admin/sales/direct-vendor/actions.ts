@@ -262,6 +262,7 @@ export async function createDirectVendorSale(formData: FormData) {
           ? await tx
               .select({
                 id: taxes.id,
+                scope: taxes.scope,
                 computation: taxes.computation,
                 rate: taxes.rate,
                 amountMinor: taxes.amountMinor,
@@ -302,17 +303,23 @@ export async function createDirectVendorSale(formData: FormData) {
           throw new Error("Customer/sale unit price is mandatory and must be greater than zero.");
         }
 
-        const vendorLineTotalMinor = Math.round(vendorUnitCostMinor * quantity);
+        const grossVendorMinor = Math.round(vendorUnitCostMinor * quantity);
         const grossCustomerMinor = Math.round(customerUnitPriceMinor * quantity);
 
         const selectedTaxes = line.taxIds
           .map((id) => taxById.get(id))
           .filter((tax): tax is NonNullable<typeof tax> => Boolean(tax));
 
-        const taxCalc = calculateLineTaxes(grossCustomerMinor, quantity, selectedTaxes);
-        const lineTaxAmountMinor = taxCalc.taxAmountMinor;
-        const lineSubtotalMinor = taxCalc.subtotalMinor;
-        const customerLineTotalMinor = taxCalc.lineTotalMinor;
+        const saleTaxes = selectedTaxes.filter((t) => t.scope !== "purchase");
+        const purchaseTaxes = selectedTaxes.filter((t) => t.scope === "purchase");
+
+        const custTaxCalc = calculateLineTaxes(grossCustomerMinor, quantity, saleTaxes);
+        const vendTaxCalc = calculateLineTaxes(grossVendorMinor, quantity, purchaseTaxes);
+
+        const lineSubtotalMinor = custTaxCalc.subtotalMinor;
+        const customerLineTotalMinor = custTaxCalc.lineTotalMinor;
+        const vendorLineTotalMinor = vendTaxCalc.lineTotalMinor;
+        const lineTaxAmountMinor = custTaxCalc.taxAmountMinor + vendTaxCalc.taxAmountMinor;
         const lineMarginMinor = customerLineTotalMinor - vendorLineTotalMinor;
 
         subtotalMinor += lineSubtotalMinor;

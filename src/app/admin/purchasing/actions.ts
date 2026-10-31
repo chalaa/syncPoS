@@ -398,6 +398,235 @@ export async function createSupplierFromPurchasing(input: unknown) {
   }
 }
 
+async function createVendorBillTx(
+  tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
+  company: { id: string },
+  source: "receipt" | "purchase_order",
+  sourceId: string,
+  userId: string,
+  postImmediately = false,
+) {
+  const receiptFilter = source === "receipt" ? eq(goodsReceipts.id, sourceId) : undefined;
+  const orderFilter = source === "purchase_order" ? eq(purchaseOrders.id, sourceId) : undefined;
+
+  const [document] = await tx
+    .select({
+      purchaseOrderId: purchaseOrders.id,
+      orderNo: purchaseOrders.orderNo,
+      supplierId: purchaseOrders.supplierId,
+      supplierInvoiceNo: goodsReceipts.supplierInvoiceNo,
+      goodsReceiptId: goodsReceipts.id,
+      status: purchaseOrders.status,
+      currencyCode: purchaseOrders.currencyCode,
+    })
+    .from(purchaseOrders)
+    .leftJoin(goodsReceipts, eq(goodsReceipts.purchaseOrderId, purchaseOrders.id))
+    .where(
+      and(
+        eq(purchaseOrders.companyId, company.id),
+        isNull(purchaseOrders.deletedAt),
+        source === "receipt" ? receiptFilter : orderFilter,
+        source === "receipt" ? isNull(goodsReceipts.deletedAt) : undefined,
+      ),
+    )
+    .limit(1);
+
+  if (!document) {
+    throw new Error(source === "receipt" ? "Receipt does not exist." : "Purchase order does not exist.");
+  }
+
+  if (source === "purchase_order" && document.status === "draft") {
+    throw new Error("Confirm the purchase order before creating a vendor bill.");
+  }
+
+  const [existingBill] = await tx
+    .select({ id: vendorBills.id })
+    .from(vendorBills)
+    .where(
+      and(
+        eq(vendorBills.companyId, company.id),
+        source === "receipt"
+          ? eq(vendorBills.goodsReceiptId, sourceId)
+          : and(eq(vendorBills.purchaseOrderId, sourceId), isNull(vendorBills.goodsReceiptId)),
+        isNull(vendorBills.deletedAt),
+      ),
+    )
+    .limit(1);
+
+  if (existingBill) {
+    return existingBill.id;
+  }
+
+  const sourceLines =
+    source === "receipt"
+      ? await tx
+          .select({
+            lineNo: goodsReceiptLines.lineNo,
+            purchaseOrderLineId: goodsReceiptLines.purchaseOrderLineId,
+            goodsReceiptLineId: goodsReceiptLines.id,
+            productId: goodsReceiptLines.productId,
+            productName: products.name,
+            unitId: goodsReceiptLines.unitId,
+            quantity: goodsReceiptLines.quantityReceived,
+            unitCostMinor: goodsReceiptLines.unitCostMinor,
+            currencyCode: goodsReceiptLines.currencyCode,
+          })
+          .from(goodsReceiptLines)
+          .innerJoin(products, eq(goodsReceiptLines.productId, products.id))
+          .where(and(eq(goodsReceiptLines.goodsReceiptId, sourceId), isNull(goodsReceiptLines.deletedAt)))
+          .orderBy(sql`${goodsReceiptLines.lineNo}`)
+      : await tx
+          .select({
+            lineNo: purchaseOrderLines.lineNo,
+            purchaseOrderLineId: purchaseOrderLines.id,
+            goodsReceiptLineId: sql<string | null>`null`,
+            productId: purchaseOrderLines.productId,
+            productName: products.name,
+            unitId: purchaseOrderLines.unitId,
+            quantity: purchaseOrderLines.quantityOrdered,
+            unitCostMinor: purchaseOrderLines.unitCostMinor,
+            currencyCode: purchaseOrderLines.currencyCode,
+          })
+          .from(purchaseOrderLines)
+          .innerJoin(products, eq(purchaseOrderLines.productId, products.id))
+          .where(and(eq(purchaseOrderLines.purchaseOrderId, sourceId), isNull(purchaseOrderLines.deletedAt)))
+          .orderBy(sql`${purchaseOrderLines.lineNo}`);
+
+  if (sourceLines.length === 0) {
+    throw new Error("There are no billable lines.");
+  }
+
+  const purchaseOrderLineIds = sourceLines
+    .map((line) => line.purchaseOrderLineId)
+    .filter((lineId): lineId is string => Boolean(lineId));
+  const sourceLineTaxRows = purchaseOrderLineIds.length
+    ? await tx
+        .select({
+          purchaseOrderLineId: purchaseOrderLineTaxes.purchaseOrderLineId,
+          taxId: taxes.id,
+          computation: taxes.computation,
+          rate: taxes.rate,
+          amountMinor: taxes.amountMinor,
+          priceIncluded: taxes.priceIncluded,
+        })
+        .from(purchaseOrderLineTaxes)
+        .innerJoin(taxes, eq(purchaseOrderLineTaxes.taxId, taxes.id))
+        .where(inArray(purchaseOrderLineTaxes.purchaseOrderLineId, purchaseOrderLineIds))
+    : [];
+  const taxesByPurchaseLineId = new Map<string, typeof sourceLineTaxRows>();
+  for (const taxRow of sourceLineTaxRows) {
+    const current = taxesByPurchaseLineId.get(taxRow.purchaseOrderLineId) ?? [];
+    current.push(taxRow);
+    taxesByPurchaseLineId.set(taxRow.purchaseOrderLineId, current);
+  }
+
+  const preparedLines = sourceLines.map((line) => {
+    const quantity = Number(line.quantity);
+    const grossOrUntaxedMinor = Math.round(quantity * line.unitCostMinor);
+    const selectedTaxes = line.purchaseOrderLineId
+      ? (taxesByPurchaseLineId.get(line.purchaseOrderLineId) ?? []).map((tax) => ({
+          id: tax.taxId,
+          computation: tax.computation,
+          rate: tax.rate,
+          amountMinor: tax.amountMinor,
+          priceIncluded: tax.priceIncluded,
+        }))
+      : [];
+    const { lineTaxes, taxAmountMinor, subtotalMinor, lineTotalMinor } = calculateLineTaxes(
+      grossOrUntaxedMinor,
+      quantity,
+      selectedTaxes,
+    );
+
+    return {
+      ...line,
+      quantity: String(quantity),
+      lineTaxes,
+      subtotalMinor,
+      taxAmountMinor,
+      totalMinor: lineTotalMinor,
+    };
+  });
+  const untaxedAmountMinor = preparedLines.reduce((sum, line) => sum + line.subtotalMinor, 0);
+  const taxAmountMinor = preparedLines.reduce((sum, line) => sum + line.taxAmountMinor, 0);
+  const totalMinor = preparedLines.reduce((sum, line) => sum + line.totalMinor, 0);
+  const billNo =
+    source === "receipt" && document.supplierInvoiceNo
+      ? document.supplierInvoiceNo
+      : movementNo(source === "receipt" ? "VB-GR" : "VB-PO");
+
+  const [bill] = await tx
+    .insert(vendorBills)
+    .values({
+      companyId: company.id,
+      supplierId: document.supplierId,
+      purchaseOrderId: document.purchaseOrderId,
+      goodsReceiptId: source === "receipt" ? sourceId : (document.goodsReceiptId ?? null),
+      billNo,
+      vendorReference: source === "receipt" ? document.supplierInvoiceNo || null : null,
+      status: postImmediately ? "posted" : "draft",
+      paymentStatus: totalMinor <= 0 ? "paid" : "not_paid",
+      postedAt: postImmediately ? new Date() : null,
+      postedBy: postImmediately ? userId : null,
+      untaxedAmountMinor,
+      taxAmountMinor,
+      totalMinor,
+      currencyCode: document.currencyCode,
+      notes: source === "receipt" ? "Created from goods receipt." : "Created from purchase order.",
+    })
+    .returning({ id: vendorBills.id });
+
+  const insertedLines = await tx
+    .insert(vendorBillLines)
+    .values(
+      preparedLines.map((line) => ({
+        vendorBillId: bill.id,
+        purchaseOrderLineId: line.purchaseOrderLineId,
+        goodsReceiptLineId: line.goodsReceiptLineId,
+        lineNo: line.lineNo,
+        productId: line.productId,
+        description: line.productName,
+        unitId: line.unitId,
+        quantity: line.quantity,
+        unitPriceMinor: line.unitCostMinor,
+        subtotalMinor: line.subtotalMinor,
+        taxAmountMinor: line.taxAmountMinor,
+        totalMinor: line.totalMinor,
+        currencyCode: line.currencyCode,
+      })),
+    )
+    .returning({ id: vendorBillLines.id, lineNo: vendorBillLines.lineNo });
+
+  const billLineTaxes = preparedLines
+    .flatMap((line) => {
+      const insertedLine = insertedLines.find((record) => record.lineNo === line.lineNo);
+
+      return insertedLine
+        ? line.lineTaxes.map((lineTax) => ({
+            vendorBillLineId: insertedLine.id,
+            taxId: lineTax.taxId,
+            taxAmountMinor: lineTax.taxAmountMinor,
+          }))
+        : [];
+    });
+
+  if (billLineTaxes.length > 0) {
+    await tx.insert(vendorBillLineTaxes).values(billLineTaxes);
+  }
+
+  await tx.insert(auditLogs).values({
+    companyId: company.id,
+    actorUserId: userId,
+    action: postImmediately ? "vendor_bill.post" : "vendor_bill.create",
+    entityType: "vendor_bill",
+    entityId: bill.id,
+    severity: "info",
+    metadata: { purchaseOrderId: document.purchaseOrderId, automatic: postImmediately },
+  });
+
+  return bill.id;
+}
+
 async function executeOrderConfirmationTx(
   tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
   {
@@ -405,11 +634,13 @@ async function executeOrderConfirmationTx(
     user,
     orderId,
     deliverProduct = true,
+    postVendorBill = false,
   }: {
     company: { id: string; baseCurrencyCode: string };
     user: { id: string };
     orderId: string;
     deliverProduct?: boolean;
+    postVendorBill?: boolean;
   },
 ) {
   const supplierLocation = await getOrCreatePartnerStockLocation(company.id, "supplier");
@@ -780,6 +1011,17 @@ async function executeOrderConfirmationTx(
     }
   }
 
+  if (postVendorBill) {
+    try {
+      await createVendorBillTx(tx, company, "purchase_order", order.id, user.id, true);
+      notice = deliverProduct
+        ? "Purchase order confirmed, receipt posted, and vendor bill posted"
+        : "Purchase order confirmed and vendor bill posted";
+    } catch {
+      // Keep confirmation successful if vendor bill auto-post encounters an issue
+    }
+  }
+
   await tx.insert(auditLogs).values({
     companyId: company.id,
     actorUserId: user.id,
@@ -798,6 +1040,7 @@ export async function createPurchaseOrder(formData: FormData) {
   const returnPath = formValue(formData, "returnPath") || "/admin/purchasing";
   const intent = formValue(formData, "intent") || "confirm";
   const deliverProduct = formValue(formData, "deliverProduct") !== "false";
+  const postVendorBill = formValue(formData, "postVendorBill") === "true";
   const { header, lines } = parsePurchaseOrderForm(formData, returnPath);
   const company = await getDefaultCompany();
   let createdOrderId: string | undefined;
@@ -1000,6 +1243,7 @@ export async function createPurchaseOrder(formData: FormData) {
           user,
           orderId: order.id,
           deliverProduct,
+          postVendorBill,
         });
         if (confirmResult?.notice) {
           noticeMessage = confirmResult.notice;
@@ -1026,6 +1270,7 @@ export async function updatePurchaseOrder(formData: FormData) {
   const errorPath = purchaseOrderId ? `/admin/purchasing/${purchaseOrderId}` : "/admin/purchasing";
   const intent = formValue(formData, "intent") || "draft";
   const deliverProduct = formValue(formData, "deliverProduct") !== "false";
+  const postVendorBill = formValue(formData, "postVendorBill") === "true";
   const { header, lines } = parsePurchaseOrderForm(formData, errorPath);
 
   if (!header.purchaseOrderId) {
@@ -1261,6 +1506,7 @@ export async function updatePurchaseOrder(formData: FormData) {
           user,
           orderId: existingOrder.id,
           deliverProduct,
+          postVendorBill,
         });
         if (confirmResult?.notice) {
           noticeMessage = confirmResult.notice;
@@ -1284,6 +1530,7 @@ export async function updatePurchaseOrder(formData: FormData) {
 export async function confirmPurchaseOrder(formData: FormData) {
   const user = await requirePermission("inventory.receive");
   const deliverProduct = formValue(formData, "deliverProduct") !== "false";
+  const postVendorBill = formValue(formData, "postVendorBill") === "true";
   const parsed = confirmSchema.safeParse({
     purchaseOrderId: formValue(formData, "purchaseOrderId"),
     returnPath: formValue(formData, "returnPath") || undefined,
@@ -1303,6 +1550,7 @@ export async function confirmPurchaseOrder(formData: FormData) {
         user,
         orderId: parsed.data.purchaseOrderId,
         deliverProduct,
+        postVendorBill,
       });
       if (result?.notice) {
         notice = result.notice;
@@ -1699,223 +1947,7 @@ async function createVendorBill(
   let createdBillId: string | undefined;
 
   await db.transaction(async (tx) => {
-    const receiptFilter = source === "receipt" ? eq(goodsReceipts.id, sourceId) : undefined;
-    const orderFilter = source === "purchase_order" ? eq(purchaseOrders.id, sourceId) : undefined;
-
-    const [document] = await tx
-      .select({
-        purchaseOrderId: purchaseOrders.id,
-        orderNo: purchaseOrders.orderNo,
-        supplierId: purchaseOrders.supplierId,
-        supplierInvoiceNo: goodsReceipts.supplierInvoiceNo,
-        goodsReceiptId: goodsReceipts.id,
-        status: purchaseOrders.status,
-        currencyCode: purchaseOrders.currencyCode,
-      })
-      .from(purchaseOrders)
-      .leftJoin(goodsReceipts, eq(goodsReceipts.purchaseOrderId, purchaseOrders.id))
-      .where(
-        and(
-          eq(purchaseOrders.companyId, company.id),
-          isNull(purchaseOrders.deletedAt),
-          source === "receipt" ? receiptFilter : orderFilter,
-          source === "receipt" ? isNull(goodsReceipts.deletedAt) : undefined,
-        ),
-      )
-      .limit(1);
-
-    if (!document) {
-      throw new Error(source === "receipt" ? "Receipt does not exist." : "Purchase order does not exist.");
-    }
-
-    if (source === "purchase_order" && document.status === "draft") {
-      throw new Error("Confirm the purchase order before creating a vendor bill.");
-    }
-
-    const [existingBill] = await tx
-      .select({ id: vendorBills.id })
-      .from(vendorBills)
-      .where(
-        and(
-          eq(vendorBills.companyId, company.id),
-          source === "receipt"
-            ? eq(vendorBills.goodsReceiptId, sourceId)
-            : and(eq(vendorBills.purchaseOrderId, sourceId), isNull(vendorBills.goodsReceiptId)),
-          isNull(vendorBills.deletedAt),
-        ),
-      )
-      .limit(1);
-
-    if (existingBill) {
-      createdBillId = existingBill.id;
-      return;
-    }
-
-    const sourceLines =
-      source === "receipt"
-        ? await tx
-            .select({
-              lineNo: goodsReceiptLines.lineNo,
-              purchaseOrderLineId: goodsReceiptLines.purchaseOrderLineId,
-              goodsReceiptLineId: goodsReceiptLines.id,
-              productId: goodsReceiptLines.productId,
-              productName: products.name,
-              unitId: goodsReceiptLines.unitId,
-              quantity: goodsReceiptLines.quantityReceived,
-              unitCostMinor: goodsReceiptLines.unitCostMinor,
-              currencyCode: goodsReceiptLines.currencyCode,
-            })
-            .from(goodsReceiptLines)
-            .innerJoin(products, eq(goodsReceiptLines.productId, products.id))
-            .where(and(eq(goodsReceiptLines.goodsReceiptId, sourceId), isNull(goodsReceiptLines.deletedAt)))
-            .orderBy(sql`${goodsReceiptLines.lineNo}`)
-        : await tx
-            .select({
-              lineNo: purchaseOrderLines.lineNo,
-              purchaseOrderLineId: purchaseOrderLines.id,
-              goodsReceiptLineId: sql<string | null>`null`,
-              productId: purchaseOrderLines.productId,
-              productName: products.name,
-              unitId: purchaseOrderLines.unitId,
-              quantity: purchaseOrderLines.quantityOrdered,
-              unitCostMinor: purchaseOrderLines.unitCostMinor,
-              currencyCode: purchaseOrderLines.currencyCode,
-            })
-            .from(purchaseOrderLines)
-            .innerJoin(products, eq(purchaseOrderLines.productId, products.id))
-            .where(and(eq(purchaseOrderLines.purchaseOrderId, sourceId), isNull(purchaseOrderLines.deletedAt)))
-            .orderBy(sql`${purchaseOrderLines.lineNo}`);
-
-    if (sourceLines.length === 0) {
-      throw new Error("There are no billable lines.");
-    }
-
-    const purchaseOrderLineIds = sourceLines
-      .map((line) => line.purchaseOrderLineId)
-      .filter((lineId): lineId is string => Boolean(lineId));
-    const sourceLineTaxRows = purchaseOrderLineIds.length
-      ? await tx
-          .select({
-            purchaseOrderLineId: purchaseOrderLineTaxes.purchaseOrderLineId,
-            taxId: taxes.id,
-            computation: taxes.computation,
-            rate: taxes.rate,
-            amountMinor: taxes.amountMinor,
-            priceIncluded: taxes.priceIncluded,
-          })
-          .from(purchaseOrderLineTaxes)
-          .innerJoin(taxes, eq(purchaseOrderLineTaxes.taxId, taxes.id))
-          .where(inArray(purchaseOrderLineTaxes.purchaseOrderLineId, purchaseOrderLineIds))
-      : [];
-    const taxesByPurchaseLineId = new Map<string, typeof sourceLineTaxRows>();
-    for (const taxRow of sourceLineTaxRows) {
-      const current = taxesByPurchaseLineId.get(taxRow.purchaseOrderLineId) ?? [];
-      current.push(taxRow);
-      taxesByPurchaseLineId.set(taxRow.purchaseOrderLineId, current);
-    }
-
-    const preparedLines = sourceLines.map((line) => {
-      const quantity = Number(line.quantity);
-      const grossOrUntaxedMinor = Math.round(quantity * line.unitCostMinor);
-      const selectedTaxes = line.purchaseOrderLineId
-        ? (taxesByPurchaseLineId.get(line.purchaseOrderLineId) ?? []).map((tax) => ({
-            id: tax.taxId,
-            computation: tax.computation,
-            rate: tax.rate,
-            amountMinor: tax.amountMinor,
-            priceIncluded: tax.priceIncluded,
-          }))
-        : [];
-      const { lineTaxes, taxAmountMinor, subtotalMinor, lineTotalMinor } = calculateLineTaxes(
-        grossOrUntaxedMinor,
-        quantity,
-        selectedTaxes,
-      );
-
-      return {
-        ...line,
-        quantity: String(quantity),
-        lineTaxes,
-        subtotalMinor,
-        taxAmountMinor,
-        totalMinor: lineTotalMinor,
-      };
-    });
-    const untaxedAmountMinor = preparedLines.reduce((sum, line) => sum + line.subtotalMinor, 0);
-    const taxAmountMinor = preparedLines.reduce((sum, line) => sum + line.taxAmountMinor, 0);
-    const totalMinor = preparedLines.reduce((sum, line) => sum + line.totalMinor, 0);
-    const billNo =
-      source === "receipt" && document.supplierInvoiceNo
-        ? document.supplierInvoiceNo
-        : movementNo(source === "receipt" ? "VB-GR" : "VB-PO");
-
-    const [bill] = await tx
-      .insert(vendorBills)
-      .values({
-        companyId: company.id,
-        supplierId: document.supplierId,
-        purchaseOrderId: document.purchaseOrderId,
-        goodsReceiptId: source === "receipt" ? sourceId : null,
-        billNo,
-        vendorReference: source === "receipt" ? document.supplierInvoiceNo || null : null,
-        status: "draft",
-        paymentStatus: totalMinor <= 0 ? "paid" : "not_paid",
-        untaxedAmountMinor,
-        taxAmountMinor,
-        totalMinor,
-        currencyCode: document.currencyCode,
-        notes: source === "receipt" ? "Created from goods receipt." : "Created from purchase order.",
-      })
-      .returning({ id: vendorBills.id });
-    createdBillId = bill.id;
-
-    const insertedLines = await tx
-      .insert(vendorBillLines)
-      .values(
-        preparedLines.map((line) => ({
-          vendorBillId: bill.id,
-          purchaseOrderLineId: line.purchaseOrderLineId,
-          goodsReceiptLineId: line.goodsReceiptLineId,
-          lineNo: line.lineNo,
-          productId: line.productId,
-          description: line.productName,
-          unitId: line.unitId,
-          quantity: line.quantity,
-          unitPriceMinor: line.unitCostMinor,
-          subtotalMinor: line.subtotalMinor,
-          taxAmountMinor: line.taxAmountMinor,
-          totalMinor: line.totalMinor,
-          currencyCode: line.currencyCode,
-        })),
-      )
-      .returning({ id: vendorBillLines.id, lineNo: vendorBillLines.lineNo });
-
-    const billLineTaxes = preparedLines
-      .flatMap((line) => {
-        const insertedLine = insertedLines.find((record) => record.lineNo === line.lineNo);
-
-        return insertedLine
-          ? line.lineTaxes.map((lineTax) => ({
-              vendorBillLineId: insertedLine.id,
-              taxId: lineTax.taxId,
-              taxAmountMinor: lineTax.taxAmountMinor,
-            }))
-          : [];
-      })
-
-    if (billLineTaxes.length > 0) {
-      await tx.insert(vendorBillLineTaxes).values(billLineTaxes);
-    }
-
-    await tx.insert(auditLogs).values({
-      companyId: company.id,
-      actorUserId: userId,
-      action: "vendor_bill.create",
-      entityType: "vendor_bill",
-      entityId: bill.id,
-      severity: "info",
-      metadata: { source, orderNo: document.orderNo, billNo },
-    });
+    createdBillId = await createVendorBillTx(tx, company, source, sourceId, userId, false);
   });
 
   if (!createdBillId) {

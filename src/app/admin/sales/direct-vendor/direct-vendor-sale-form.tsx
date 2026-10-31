@@ -146,22 +146,28 @@ function calculateLineTaxes(lineAmountMinor: number, quantity: number, selectedT
 function calculateLine(line: DirectVendorLineDraft, taxById: Map<string, SalesTaxOption>): LineAmounts {
   const quantity = Number(line.quantity);
   const safeQuantity = Number.isFinite(quantity) && quantity > 0 ? quantity : 0;
-  const vendorTotalMinor = Math.round(majorToMinor(line.vendorUnitCost) * safeQuantity);
+  const grossVendorMinor = Math.round(majorToMinor(line.vendorUnitCost) * safeQuantity);
   const grossCustomerMinor = Math.round(majorToMinor(line.customerUnitPrice) * safeQuantity);
 
   const selectedTaxes = line.taxIds.map((id) => taxById.get(id)).filter((t): t is SalesTaxOption => Boolean(t));
-  const { subtotalMinor, taxAmountMinor, customerTotalMinor } = calculateLineTaxes(
-    grossCustomerMinor,
-    safeQuantity,
-    selectedTaxes,
-  );
+  const saleTaxes = selectedTaxes.filter((t) => t.scope !== "purchase");
+  const purchaseTaxes = selectedTaxes.filter((t) => t.scope === "purchase");
+
+  const custCalc = calculateLineTaxes(grossCustomerMinor, safeQuantity, saleTaxes);
+  const vendCalc = calculateLineTaxes(grossVendorMinor, safeQuantity, purchaseTaxes);
+
+  const subtotalMinor = custCalc.subtotalMinor;
+  const customerTotalMinor = custCalc.customerTotalMinor;
+  const vendorTotalMinor = vendCalc.customerTotalMinor;
+  const taxAmountMinor = custCalc.taxAmountMinor + vendCalc.taxAmountMinor;
+  const marginMinor = customerTotalMinor - vendorTotalMinor;
 
   return {
     vendorTotalMinor,
     subtotalMinor,
     taxAmountMinor,
     customerTotalMinor,
-    marginMinor: customerTotalMinor - vendorTotalMinor,
+    marginMinor,
   };
 }
 

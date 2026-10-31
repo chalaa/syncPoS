@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { Receipt } from "lucide-react";
 
 import {
+  createVendorBillFromPurchaseOrder,
   postGoodsReceipt,
   updatePurchaseOrder,
 } from "@/app/admin/purchasing/actions";
@@ -123,6 +125,15 @@ export default async function PurchaseOrderDetailPage({ params, searchParams }: 
             label="Receipts"
           />
           <DetailStatCard
+            href={
+              order.vendorBills[0]
+                ? `/admin/purchasing/vendor-bills/vendor_bill/${order.vendorBills[0].id}`
+                : `/admin/purchasing?view=supplier-bills&purchaseOrderId=${order.id}`
+            }
+            count={order.vendorBillCount}
+            label="Vendor Bills"
+          />
+          <DetailStatCard
             href={`/admin/purchasing?view=landed-costs&purchaseOrderId=${order.id}`}
             count={order.landedCostCount}
             label="Landed Costs"
@@ -158,6 +169,24 @@ export default async function PurchaseOrderDetailPage({ params, searchParams }: 
 
           {canReceive ? (
             <CreateReceiptDialog order={order} locations={options.locations} />
+          ) : null}
+          {order.vendorBillCount === 0 && !isDraft && order.status !== "cancelled" ? (
+            <form action={createVendorBillFromPurchaseOrder}>
+              <input type="hidden" name="purchaseOrderId" value={order.id} />
+              <Button variant="outline">
+                <Receipt className="size-4" data-icon="inline-start" />
+                <T k="purchasing.createBill" fallback="Create Vendor Bill" />
+              </Button>
+            </form>
+          ) : null}
+          {order.vendorBillCount > 0 && order.vendorBills[0] ? (
+            <ButtonLink
+              href={`/admin/purchasing/vendor-bills/vendor_bill/${order.vendorBills[0].id}`}
+              variant="outline"
+            >
+              <Receipt className="size-4" data-icon="inline-start" />
+              <T k="purchasing.viewBill" fallback="View Vendor Bill" />
+            </ButtonLink>
           ) : null}
           {!isDraft && order.totalMinor > 0 && order.residualAmountMinor > 0 ? (
             <PaymentFormDialog
