@@ -336,7 +336,7 @@ export const PurchaseOrderForm = forwardRef<PurchaseOrderFormHandle, PurchaseOrd
   const [paymentDueDate, setPaymentDueDate] = useState(order?.paymentDueDate ?? defaultDate);
   const [notes, setNotes] = useState(order?.notes ?? "");
   const [deliverProduct, setDeliverProduct] = useState(true);
-  const [postVendorBill, setPostVendorBill] = useState(false);
+  const [postVendorBill, setPostVendorBill] = useState(order ? order.vendorBillCount === 0 : true);
   const [productOptions, setProductOptions] = useState<ProductSelectOption[]>(products);
   const formRef = useRef<HTMLFormElement>(null);
   const stepChangedAt = useRef<number>(0);
@@ -1356,28 +1356,30 @@ export const PurchaseOrderForm = forwardRef<PurchaseOrderFormHandle, PurchaseOrd
         </div>
 
         {/* Post Vendor Bill Toggle Card */}
-        <div className="rounded-xl border border-border/80 bg-card p-4 shadow-xs flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="flex size-9 items-center justify-center rounded-lg bg-[#0B5D4B]/10 text-[#0B5D4B] dark:bg-emerald-950 dark:text-emerald-300">
-              <Receipt className="size-4" />
+        {order && order.vendorBillCount > 0 ? null : (
+          <div className="rounded-xl border border-border/80 bg-card p-4 shadow-xs flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="flex size-9 items-center justify-center rounded-lg bg-[#0B5D4B]/10 text-[#0B5D4B] dark:bg-emerald-950 dark:text-emerald-300">
+                <Receipt className="size-4" />
+              </div>
+              <div>
+                <label htmlFor="purchase-post-vendor-bill-checkbox" className="text-sm font-semibold text-foreground cursor-pointer flex items-center gap-2">
+                  <span>{t("purchasing.postVendorBill", "Post vendor bill")}</span>
+                </label>
+                <p className="text-xs text-muted-foreground">
+                  {t("purchasing.postVendorBillHint", "Automatically create and post vendor bill upon order confirmation.")}
+                </p>
+              </div>
             </div>
-            <div>
-              <label htmlFor="purchase-post-vendor-bill-checkbox" className="text-sm font-semibold text-foreground cursor-pointer flex items-center gap-2">
-                <span>{t("purchasing.postVendorBill", "Post vendor bill")}</span>
-              </label>
-              <p className="text-xs text-muted-foreground">
-                {t("purchasing.postVendorBillHint", "Automatically create and post vendor bill upon order confirmation.")}
-              </p>
-            </div>
+            <input
+              id="purchase-post-vendor-bill-checkbox"
+              type="checkbox"
+              checked={postVendorBill}
+              onChange={(e) => setPostVendorBill(e.target.checked)}
+              className="size-5 rounded border-border text-[#0B5D4B] focus:ring-[#0B5D4B] cursor-pointer"
+            />
           </div>
-          <input
-            id="purchase-post-vendor-bill-checkbox"
-            type="checkbox"
-            checked={postVendorBill}
-            onChange={(e) => setPostVendorBill(e.target.checked)}
-            className="size-5 rounded border-border text-[#0B5D4B] focus:ring-[#0B5D4B] cursor-pointer"
-          />
-        </div>
+        )}
 
         {/* Order Items Review Table */}
         <div className="rounded-xl border border-border/80 bg-card overflow-hidden shadow-xs">
