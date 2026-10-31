@@ -322,21 +322,6 @@ export async function createCustomerReturn(formData: FormData) {
         return total + Math.round((sourceLine?.unitRefundMinor ?? 0) * line.quantity);
       }, 0);
 
-      const paid = await tx.execute<{ amountMinor: number }>(sql`
-        select coalesce(sum(pa.amount_minor) filter (
-          where p.status = 'posted' and p.deleted_at is null and pa.deleted_at is null
-        ), 0)::bigint as "amountMinor"
-        from customer_invoices ci
-        left join payment_allocations pa on pa.customer_invoice_id = ci.id
-        left join payments p on p.id = pa.payment_id
-        where ci.sales_order_id = ${order.id}
-          and ci.deleted_at is null
-      `);
-
-      if (refundAmountMinor > (paid[0]?.amountMinor ?? 0)) {
-        throw new Error("Refund cannot exceed the original paid amount.");
-      }
-
       const [record] = await tx
         .insert(customerReturns)
         .values({
