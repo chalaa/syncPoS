@@ -26,7 +26,8 @@ import {
   type ArchivedItem,
   type TypeGroup,
 } from "@/server/archived/archived-service";
-import { requirePermission } from "@/server/auth/session";
+import { getUserPermissionCodes, requirePermission } from "@/server/auth/session";
+import { PERMISSIONS } from "@/server/iam/permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -71,7 +72,8 @@ function formatDate(date: Date) {
 }
 
 export default async function ArchivedPage({ searchParams }: ArchivedPageProps) {
-  await requirePermission("company:settings:manage");
+  const user = await requirePermission("company:settings:manage");
+  const isAdministrator = (await getUserPermissionCodes(user.id)).has(PERMISSIONS.OWNER.ALL);
 
   const params = await searchParams;
   const query = params.q ?? "";
@@ -226,7 +228,7 @@ export default async function ArchivedPage({ searchParams }: ArchivedPageProps) 
                           {formatDate(item.deletedAt)}
                         </td>
                         <td className="px-4 py-3 text-right align-middle">
-                          <form action={restoreArchivedItem}>
+                          {isAdministrator || !["sales_order", "purchase_order"].includes(item.entityType) ? <form action={restoreArchivedItem}>
                             <input type="hidden" name="entityType" value={item.entityType} />
                             <input type="hidden" name="entityId" value={item.id} />
                             <input type="hidden" name="returnPath" value={returnPath} />
@@ -234,7 +236,7 @@ export default async function ArchivedPage({ searchParams }: ArchivedPageProps) 
                               <RotateCcw className="size-3.5" data-icon="inline-start" />
                               <T k="action.restore" />
                             </Button>
-                          </form>
+                          </form> : null}
                         </td>
                       </tr>
                     );

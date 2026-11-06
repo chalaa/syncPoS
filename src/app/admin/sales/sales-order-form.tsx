@@ -62,6 +62,7 @@ type SalesFormValues = {
   validUntil: string;
   lines: SalesLineDraft[];
   availableQuantityByDomain: Map<string, number>;
+  skipStockAvailability?: boolean;
 };
 
 function newLine(ownerId = "", sourceLocationId = ""): SalesLineDraft {
@@ -175,7 +176,7 @@ function validateSalesOrderForm(values: SalesFormValues, t: (key: string, fallba
     const quantity = Number(line.quantity);
     if (!Number.isFinite(quantity) || quantity <= 0) {
       fieldErrors[fieldKey("quantity", line.key)] = t("sales.error.enterQuantity", "Enter a quantity greater than zero.");
-    } else if (line.productId && ownerId && locationId) {
+    } else if (!values.skipStockAvailability && line.productId && ownerId && locationId) {
       const available = values.availableQuantityByDomain.get(`${locationId}:${ownerId}:${line.productId}`) ?? 0;
       if (quantity > available) {
         fieldErrors[fieldKey("quantity", line.key)] = `${available.toFixed(6)} ${t("sales.error.onlyAvailable", "available for this owner and location.")}`;
@@ -221,6 +222,7 @@ type SalesOrderFormProps = {
   isModal?: boolean;
   onCancel?: () => void;
   confirmationBlockedReason?: string;
+  confirmedEdit?: boolean;
 };
 
 export const SalesOrderForm = forwardRef<SalesOrderFormHandle, SalesOrderFormProps>(
@@ -242,6 +244,7 @@ export const SalesOrderForm = forwardRef<SalesOrderFormHandle, SalesOrderFormPro
     isModal = false,
     onCancel,
     confirmationBlockedReason,
+    confirmedEdit = false,
   }, ref) {
   const { t } = useTranslation();
   const [isPending, startTransition] = useTransition();
@@ -467,7 +470,7 @@ export const SalesOrderForm = forwardRef<SalesOrderFormHandle, SalesOrderFormPro
     [customerId, headerOwnerId, effectiveSourceLocationId, paymentTerm, orderDate, validUntil, lines, availableQuantityByDomain],
   );
 
-  const validate = useCallback((vals: SalesFormValues) => validateSalesOrderForm(vals, t), [t]);
+  const validate = useCallback((vals: SalesFormValues) => validateSalesOrderForm({ ...vals, skipStockAvailability: confirmedEdit }, t), [t, confirmedEdit]);
 
   const { formErrors, fieldErrors, isValid } = useFormValidation(validationValues, validate);
 
@@ -1051,6 +1054,7 @@ export const SalesOrderForm = forwardRef<SalesOrderFormHandle, SalesOrderFormPro
                     {/* Hidden form data elements for submission */}
                     {lines.map((line) => (
                       <div key={`${line.key}-hidden`} className="hidden">
+                        <input type="hidden" name="lineId" value={order?.lines.some((existingLine) => existingLine.id === line.key) ? line.key : ""} />
                         <input type="hidden" name="productId" value={line.productId} />
                         <input type="hidden" name="lineOwnerId" value={line.ownerId || headerOwnerId} />
                         <input type="hidden" name="lineSourceLocationId" value={line.sourceLocationId || effectiveSourceLocationId} />
@@ -1857,7 +1861,7 @@ export const SalesOrderForm = forwardRef<SalesOrderFormHandle, SalesOrderFormPro
                   disabled={isPending}
                   className="flex-1 sm:flex-initial px-3 sm:px-4 text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-muted/80 border-border whitespace-nowrap justify-center"
                 >
-                  {t("action.saveDraftQuotation", "Save as Draft Quotation")}
+                  {confirmedEdit ? submitLabel : t("action.saveDraftQuotation", "Save as Draft Quotation")}
                 </Button>
               </div>
 
@@ -1901,7 +1905,8 @@ export const SalesOrderForm = forwardRef<SalesOrderFormHandle, SalesOrderFormPro
                 {t(submitLabel, submitLabel)}
               </Button>
 
-              <Button
+              {!confirmedEdit ? (
+                <Button
                 type="button"
                 onClick={() => submitWithIntent("confirm")}
                 disabled={isPending || isStepTransitioning || Boolean(confirmationBlockedReason)}
@@ -1922,7 +1927,8 @@ export const SalesOrderForm = forwardRef<SalesOrderFormHandle, SalesOrderFormPro
                     <span>{confirmationBlockedReason ? t("action.awaitingApproval", "Awaiting Approval") : t("action.confirmSalesOrder", "Confirm Sales Order")}</span>
                   </>
                 )}
-              </Button>
+                </Button>
+              ) : null}
             </div>
           </>
         )}

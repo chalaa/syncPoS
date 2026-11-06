@@ -8,6 +8,8 @@ import { z } from "zod";
 
 import type { EntityType } from "@/server/archived/archived-service";
 import { requirePermission } from "@/server/auth/session";
+import { restoreOrderInTransaction } from "@/server/archived/order-archive";
+import { PERMISSIONS } from "@/server/iam/permissions";
 import { getDefaultCompany } from "@/server/catalog/products";
 import { db } from "@/server/db/client";
 import {
@@ -21,8 +23,6 @@ import {
   paymentTerms,
   productCategories,
   products,
-  purchaseOrders,
-  salesOrders,
   taxes,
 } from "@/server/db/schema";
 
@@ -43,16 +43,21 @@ function redirectWithMessage(path: string, key: "notice" | "error", message: str
 }
 
 export async function restoreArchivedItem(formData: FormData) {
-  await requirePermission("company:settings:manage");
+  const user = await requirePermission("company:settings:manage");
   const company = await getDefaultCompany();
 
   const entityType = formValue(formData, "entityType") as EntityType;
   const entityId = formValue(formData, "entityId");
-  const returnPath = formValue(formData, "returnPath") || "/admin/settings/archived";
+  const submittedReturnPath = formValue(formData, "returnPath");
+  const returnPath = /^\/admin\/settings\/archived(?:\?|$)/.test(submittedReturnPath) ? submittedReturnPath : "/admin/settings/archived";
 
   const parsed = restoreSchema.safeParse({ entityType, entityId, returnPath });
   if (!parsed.success) {
     redirectWithMessage(returnPath, "error", "Invalid restore parameters.");
+  }
+
+  if (entityType === "sales_order" || entityType === "purchase_order") {
+    await requirePermission(PERMISSIONS.OWNER.ALL);
   }
 
   try {
@@ -65,17 +70,8 @@ export async function restoreArchivedItem(formData: FormData) {
         break;
 
       case "sales_order":
-        await db
-          .update(salesOrders)
-          .set({ deletedAt: null, updatedAt: new Date() })
-          .where(and(eq(salesOrders.id, entityId), eq(salesOrders.companyId, company.id)));
-        break;
-
       case "purchase_order":
-        await db
-          .update(purchaseOrders)
-          .set({ deletedAt: null, updatedAt: new Date() })
-          .where(and(eq(purchaseOrders.id, entityId), eq(purchaseOrders.companyId, company.id)));
+        await db.transaction((tx) => restoreOrderInTransaction(tx, { entityType, entityId, companyId: user.companyId, userId: user.id }), { isolationLevel: "serializable" });
         break;
 
       case "expense":
@@ -153,7 +149,7 @@ export async function restoreArchivedItem(formData: FormData) {
     }
   } catch (err) {
     console.error("Failed to restore archived item:", err);
-    redirectWithMessage(returnPath, "error", "Database error occurred while restoring item.");
+    redirectWithMessage(returnPath, "error", err instanceof Error ? err.message : "Could not restore archived item.");
   }
 
   // Revalidate relevant paths
@@ -166,6 +162,7 @@ export async function restoreArchivedItem(formData: FormData) {
   revalidatePath("/admin/inventory/locations");
   revalidatePath("/admin/settings/owners");
   revalidatePath("/admin/settings/payments");
+  revalidatePath("/admin", "layout");
 
   redirectWithMessage(returnPath, "notice", "Item successfully restored from archive!");
 }

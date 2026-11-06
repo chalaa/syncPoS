@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { IamManager } from "@/app/admin/settings/iam-manager";
+import { ArchivedModelList } from "@/components/app/archived-model-list";
 import { getUserPermissionCodes, requireUser } from "@/server/auth/session";
 import { getIamManagementData } from "@/server/iam/iam";
 import { PERMISSIONS, userHasPermission } from "@/server/iam/permissions";
@@ -8,7 +9,7 @@ import { PERMISSIONS, userHasPermission } from "@/server/iam/permissions";
 export const dynamic = "force-dynamic";
 
 type SettingsPageProps = {
-  searchParams: Promise<{ view?: string; notice?: string; error?: string }>;
+  searchParams: Promise<{ view?: string; notice?: string; error?: string; show?: string; q?: string; page?: string; pageSize?: string }>;
 };
 
 export default async function SettingsPage({ searchParams }: SettingsPageProps) {
@@ -28,6 +29,10 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
 
   if ((view === "users" && !canViewUsers) || ((view === "roles" || view === "permissions") && !canViewRoles)) {
     redirect("/unauthorized");
+  }
+
+  if (view === "roles" && params.show === "deleted") {
+    return <ArchivedModelList model="role" title="Roles" companyId={user.companyId} params={params} canRestore={false} />;
   }
 
   const data = await getIamManagementData();

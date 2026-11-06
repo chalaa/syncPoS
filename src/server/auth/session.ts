@@ -8,6 +8,7 @@ import { and, eq, gt, isNull, or, sql } from "drizzle-orm";
 import { cache } from "react";
 
 import { db } from "@/server/db/client";
+import { withDatabaseReadRetry } from "@/server/db/read-retry";
 import {
   authSessions,
   permissions,
@@ -101,7 +102,7 @@ export const getCurrentUser = cache(async () => {
     return undefined;
   }
 
-  const [sessionUser] = await db
+  const [sessionUser] = await withDatabaseReadRetry(() => db
     .select({
       id: users.id,
       companyId: users.companyId,
@@ -125,7 +126,7 @@ export const getCurrentUser = cache(async () => {
         isNull(users.deletedAt),
       ),
     )
-    .limit(1);
+    .limit(1));
 
   return sessionUser;
 });
@@ -141,7 +142,7 @@ export async function requireUser() {
 }
 
 export const getUserPermissionCodes = cache(async (userId: string) => {
-  const rows = await db
+  const rows = await withDatabaseReadRetry(() => db
     .select({ code: permissions.code })
     .from(userRoles)
     .innerJoin(roles, eq(userRoles.roleId, roles.id))
@@ -157,7 +158,7 @@ export const getUserPermissionCodes = cache(async (userId: string) => {
         eq(roles.isActive, true),
         eq(permissions.isActive, true),
       ),
-    );
+    ));
 
   return new Set(rows.flatMap((row) => canonicalPermissionCodesFor(row.code)));
 });

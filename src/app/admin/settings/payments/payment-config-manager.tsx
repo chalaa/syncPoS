@@ -9,6 +9,7 @@ import { StatusBadge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DeleteConfirmationDialog } from "@/components/ui/delete-confirmation-dialog";
 import { TableSearchInput } from "@/components/ui/table-search-input";
+import { TableArchiveFilter } from "@/components/ui/table-archive-filter";
 import {
   Dialog,
   DialogClose,
@@ -369,6 +370,7 @@ export function PaymentConfigManager({
               <Link href="/admin/settings/payments?tab=accounts">{t("payment.accounts", "Accounts")}</Link>
             </Button>
           </div>
+          <TableArchiveFilter />
           <TableSearchInput
             defaultValue={query}
             placeholder={

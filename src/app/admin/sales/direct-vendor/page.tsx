@@ -1,4 +1,5 @@
 import { Alert } from "@/components/ui/alert";
+import { ArchivedModelList } from "@/components/app/archived-model-list";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
 import { TablePagination } from "@/components/ui/table-pagination";
 import { paginateRows } from "@/lib/pagination";
@@ -15,6 +16,7 @@ export const dynamic = "force-dynamic";
 type DirectVendorSalesPageProps = {
   searchParams: Promise<{
     q?: string;
+    show?: string;
     status?: string;
     customerPaymentTerm?: string;
     vendorPaymentTerm?: string;
@@ -38,6 +40,10 @@ function todayDate() {
 export default async function DirectVendorSalesPage({ searchParams }: DirectVendorSalesPageProps) {
   const user = await requirePermission(PERMISSIONS.SALES.ORDERS_VIEW);
   const params = await searchParams;
+  if (params.show === "deleted") {
+    const permissions = await getUserPermissionCodes(user.id);
+    return <ArchivedModelList model="direct_vendor_sale" title="Direct Vendor Sales" companyId={user.companyId} params={params} canRestore={permissions.has(PERMISSIONS.OWNER.ALL)} />;
+  }
   const [allSales, userPerms] = await Promise.all([
     getDirectVendorSaleList({
       query: params.q,

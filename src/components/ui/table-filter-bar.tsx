@@ -2,9 +2,10 @@
 
 import { SlidersHorizontal, X } from "lucide-react";
 import { useSearchParams } from "next/navigation";
-import { type ReactNode, useEffect, useRef, useState } from "react";
+import { type ReactNode, useRef, useState } from "react";
 
 import { TableSearchInput } from "@/components/ui/table-search-input";
+import { TableArchiveFilter } from "@/components/ui/table-archive-filter";
 import { ViewModeToggle, useViewMode, type ViewMode } from "@/components/ui/view-mode-toggle";
 import { cn } from "@/lib/utils";
 
@@ -23,6 +24,8 @@ type TableFilterBarProps = {
   onViewModeChange?: (mode: ViewMode) => void;
   /** Storage key to auto-enable and synchronize view mode switching across components */
   storageKey?: string;
+  archiveFilter?: boolean;
+  archiveFilterCancelled?: boolean;
 };
 
 /**
@@ -40,9 +43,14 @@ export function TableFilterBar({
   viewMode: controlledViewMode,
   onViewModeChange: controlledOnViewModeChange,
   storageKey,
+  archiveFilter = false,
+  archiveFilterCancelled = false,
 }: TableFilterBarProps) {
   const searchParams = useSearchParams();
-  const [isOpen, setIsOpen] = useState(false);
+  const queryKey = searchParams.toString();
+  const [panel, setPanel] = useState({ queryKey, open: false });
+  if (panel.queryKey !== queryKey) setPanel({ queryKey, open: false });
+  const isOpen = panel.queryKey === queryKey && panel.open;
   const panelRef = useRef<HTMLDivElement>(null);
 
   const [autoViewMode, setAutoViewMode] = useViewMode(storageKey);
@@ -50,14 +58,9 @@ export function TableFilterBar({
   const onViewModeChange = controlledOnViewModeChange ?? (storageKey ? setAutoViewMode : undefined);
 
   // Count how many filter params are currently active for the badge
-  const activeCount = filterParamNames.filter(
+  const activeCount = [...new Set([...filterParamNames, ...(archiveFilter ? ["show"] : [])])].filter(
     (name) => !!searchParams.get(name),
   ).length;
-
-  // Close panel when any filter param changes (user made a selection)
-  useEffect(() => {
-    setIsOpen(false);
-  }, [searchParams]);
 
   return (
     <div className={cn("border-b border-border bg-muted/20", className)}>
@@ -77,12 +80,12 @@ export function TableFilterBar({
           ) : null}
 
           {/* Mobile: filter toggle button */}
-          {children ? (
+          {children || archiveFilter ? (
             <button
               type="button"
               aria-expanded={isOpen}
               aria-label="Toggle filters"
-              onClick={() => setIsOpen((o) => !o)}
+              onClick={() => setPanel({ queryKey, open: !isOpen })}
               className={cn(
                 "md:hidden relative inline-flex size-10 shrink-0 items-center justify-center rounded-xl border transition-all",
                 isOpen
@@ -108,6 +111,7 @@ export function TableFilterBar({
 
         {/* Desktop & Tablet: filters inline and view mode switcher */}
         <div className="hidden md:flex flex-wrap items-center gap-2 sm:gap-2.5">
+          {archiveFilter ? <TableArchiveFilter includeCancelled={archiveFilterCancelled} /> : null}
           {children}
           {viewMode && onViewModeChange ? (
             <ViewModeToggle value={viewMode} onChange={onViewModeChange} />
@@ -116,7 +120,7 @@ export function TableFilterBar({
       </div>
 
       {/* Mobile filter panel */}
-      {children && isOpen ? (
+      {(children || archiveFilter) && isOpen ? (
         <div
           ref={panelRef}
           className="md:hidden border-t border-border/60 bg-muted/30 px-3.5 py-3 transition-all duration-200 ease-in-out"
@@ -126,6 +130,7 @@ export function TableFilterBar({
               Filters
             </p>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 items-center">
+              {archiveFilter ? <TableArchiveFilter includeCancelled={archiveFilterCancelled} /> : null}
               {children}
             </div>
           </div>

@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { DeleteConfirmationDialog } from "@/components/ui/delete-confirmation-dialog";
 import { CountrySelectField } from "@/components/ui/country-select-field";
 import { TableSearchInput } from "@/components/ui/table-search-input";
+import { TableArchiveFilter } from "@/components/ui/table-archive-filter";
 import {
   Dialog,
   DialogClose,
@@ -299,12 +300,13 @@ export function CatalogReferenceManager({
       {error ? <Alert kind="error">{error}</Alert> : null}
 
       <section className="rounded-xl border border-border bg-card shadow-xs">
-        <div className="border-b border-border p-4">
+        <div className="flex flex-col gap-3 border-b border-border p-4 sm:flex-row sm:items-center sm:justify-between">
           <TableSearchInput
             defaultValue={query}
             placeholder={t("action.searchCodeOrName")}
             className="sm:max-w-md"
           />
+          <TableArchiveFilter />
         </div>
 
         <div className="border-b border-border bg-muted/20 px-4 py-2.5">

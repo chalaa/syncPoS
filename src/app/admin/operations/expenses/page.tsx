@@ -1,9 +1,8 @@
 import { BanknoteIcon, FolderIcon } from "lucide-react";
-import Link from "next/link";
+import { ArchivedModelList } from "@/components/app/archived-model-list";
 
 import { NewExpenseModal } from "@/app/admin/operations/expenses/new-expense-modal";
 import { Alert } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
 import { ButtonLink } from "@/components/ui/button";
 import { TableFilterBar } from "@/components/ui/table-filter-bar";
 import { TableFilterSelect } from "@/components/ui/table-filter-select";
@@ -55,6 +54,9 @@ export default async function ExpensesPage({ searchParams }: ExpensesPageProps) 
   const canManageCategories = userHasPermission(userPerms, PERMISSIONS.EXPENSES.CATEGORIES_MANAGE);
 
   const params = await searchParams;
+  if (params.show === "deleted") {
+    return <ArchivedModelList model="expense" title="Expenses" companyId={user.companyId} params={params} canRestore={canSeeAll} expenseScope={{ userId: user.id, employeeId: user.employeeId, canSeeAll }} />;
+  }
   const query = params.q?.trim() ?? "";
   const showCancelled = params.show === "cancelled";
   const categoryId = params.category ?? "";
@@ -104,6 +106,8 @@ export default async function ExpensesPage({ searchParams }: ExpensesPageProps) 
 
       <section className="rounded-xl border border-border bg-card shadow-xs">
         <TableFilterBar
+          archiveFilter
+          archiveFilterCancelled
           searchPlaceholder="Search expense, category, or description..."
           filterParamNames={["category", "paymentStatus"]}
           storageKey="expenses"
@@ -121,14 +125,6 @@ export default async function ExpensesPage({ searchParams }: ExpensesPageProps) 
             allLabel="All Payments"
           />
           <TableSortSelect options={expenseSortOptions} />
-          <div className="flex rounded-lg border border-border bg-muted/40 p-1 text-sm">
-            <Button asChild variant={!showCancelled ? "secondary" : "ghost"} size="sm">
-              <Link href="/admin/operations/expenses"><T k="common.normal" fallback="Normal" /></Link>
-            </Button>
-            <Button asChild variant={showCancelled ? "secondary" : "ghost"} size="sm">
-              <Link href="/admin/operations/expenses?show=cancelled"><T k="status.cancelled" fallback="Cancelled" /></Link>
-            </Button>
-          </div>
         </TableFilterBar>
 
         <ExpenseTable rows={expensePage.rows} showCancelled={showCancelled} />

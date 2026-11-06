@@ -28,6 +28,7 @@ import {
 } from "@/components/ui/dialog";
 import { ManyToManyTags, type ManyToManyTagOption } from "@/components/ui/many-to-many-tags";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
+import { TableArchiveFilter } from "@/components/ui/table-archive-filter";
 import { useTranslation } from "@/lib/i18n/use-translation";
 import type { IamManagementData, IamRoleRow, IamUserRow } from "@/server/iam/types";
 
@@ -347,6 +348,7 @@ export function IamManager({
         {notice ? <Alert kind="success">{notice}</Alert> : null}
         {error ? <Alert kind="error">{error}</Alert> : null}
 
+        <div className="mb-4 flex justify-end"><TableArchiveFilter /></div>
         <section className="overflow-x-auto rounded-xl border border-border bg-card shadow-xs">
           <table className="w-full min-w-[980px] text-left text-sm">
             <thead className="bg-secondary/40 text-xs font-semibold uppercase tracking-wider text-muted-foreground">

@@ -99,6 +99,7 @@ export default async function PartnersPage({ searchParams }: PartnersPageProps) 
       <div className="grid gap-5">
         <section className="rounded-xl border border-border bg-card shadow-xs">
           <TableFilterBar
+            archiveFilter
             searchPlaceholder="Search code, name, legal name, TIN..."
             filterParamNames={["status", "paymentTerm"]}
             storageKey="partners"

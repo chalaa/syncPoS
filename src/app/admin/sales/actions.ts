@@ -8,7 +8,7 @@ import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { minorToDisplay } from "@/lib/catalog-utils";
-import { requirePermission } from "@/server/auth/session";
+import { getUserPermissionCodes, requirePermission } from "@/server/auth/session";
 import { getDefaultCompany, majorToMinor, uniqueViolationMessage } from "@/server/catalog/products";
 import { db } from "@/server/db/client";
 import { generateCompanyCode, generateCompanyDocumentNo } from "@/server/db/code-generator";
@@ -41,6 +41,7 @@ import {
   warrantyRegistrations,
 } from "@/server/db/schema";
 import { getOrCreatePartnerStockLocation } from "@/server/inventory/partner-locations";
+import { PERMISSIONS } from "@/server/iam/permissions";
 import { approveStockOutApprovals, requireStockOutApproval } from "@/server/inventory/stock-approvals";
 import { paymentLinesTotal, replacePaymentLines, resolvePaymentLines } from "@/server/payments/payment-lines";
 import { getCustomerInvoicePaymentSummary, getSalesOrderPaymentSummary } from "@/server/payments/payments";
@@ -74,6 +75,7 @@ const salesCustomerCreateSchema = z.object({
 });
 
 const salesOrderLineSchema = z.object({
+  lineId: z.string().uuid().or(z.literal("")).default(""),
   ownerId: z.string().uuid().or(z.literal("")).transform((value) => value || null),
   sourceLocationId: z.string().uuid().or(z.literal("")).transform((value) => value || null),
   productId: z.string().uuid(),
@@ -938,6 +940,7 @@ function parseSalesOrderForm(formData: FormData, errorPath: string) {
     notes: formValue(formData, "notes"),
   });
   const productIds = formValues(formData, "productId");
+  const lineIds = formValues(formData, "lineId");
   const ownerIds = formValues(formData, "lineOwnerId");
   const sourceLocationIds = formValues(formData, "lineSourceLocationId");
   const quantities = formValues(formData, "quantity");
@@ -946,6 +949,7 @@ function parseSalesOrderForm(formData: FormData, errorPath: string) {
   const taxIdValues = formValues(formData, "taxIds");
   const parsedLines = productIds
     .map((productId, index) => ({
+      lineId: lineIds[index] ?? "",
       ownerId: ownerIds[index] ?? "",
       sourceLocationId: sourceLocationIds[index] ?? "",
       productId,
@@ -1134,6 +1138,7 @@ async function normalizeSalesLineScope(
   defaultOwnerId: string,
   defaultSourceLocationId: string,
   lines: z.infer<typeof salesOrderLineSchema>[],
+  checkStockAvailability = true,
 ) {
   if (!defaultOwnerId) {
     throw new Error("Owner is required.");
@@ -1186,7 +1191,7 @@ async function normalizeSalesLineScope(
     });
   }
 
-  for (const requested of requestedQuantityByDomain.values()) {
+  for (const requested of checkStockAvailability ? requestedQuantityByDomain.values() : []) {
     const [stock] = await tx
       .select({
         quantityAvailable: sql<string>`coalesce(sum(${stockBalances.quantityAvailable}), 0)::text`,
@@ -1759,6 +1764,7 @@ export async function createSalesOrder(formData: FormData) {
 
 export async function updateSalesOrder(formData: FormData) {
   const user = await requirePermission("sales:orders:create");
+  const canEditConfirmed = (await getUserPermissionCodes(user.id)).has(PERMISSIONS.OWNER.ALL);
   const salesOrderId = formValue(formData, "salesOrderId");
   const errorPath = salesOrderId ? `/admin/sales/${salesOrderId}` : "/admin/sales";
   const intent = formValue(formData, "intent") || "draft";
@@ -1779,17 +1785,25 @@ export async function updateSalesOrder(formData: FormData) {
           id: salesOrders.id,
           orderNo: salesOrders.orderNo,
           status: salesOrders.status,
+          customerId: salesOrders.customerId,
+          ownerId: salesOrders.ownerId,
+          sourceLocationId: salesOrders.sourceLocationId,
+          currencyCode: salesOrders.currencyCode,
+          reserveOnConfirm: salesOrders.reserveOnConfirm,
+          totalMinor: salesOrders.totalMinor,
         })
         .from(salesOrders)
         .where(and(eq(salesOrders.id, orderId), eq(salesOrders.companyId, company.id), isNull(salesOrders.deletedAt)))
-        .limit(1);
+        .limit(1)
+        .for("update");
 
       if (!existingOrder) {
         throw new Error("Sales order does not exist.");
       }
 
-      if (existingOrder.status !== "quotation") {
-        throw new Error("Only draft quotations can be edited.");
+      const isConfirmedEdit = existingOrder.status !== "quotation";
+      if (isConfirmedEdit && (!canEditConfirmed || existingOrder.status === "cancelled")) {
+        throw new Error("Only an administrator can edit confirmed sales orders.");
       }
 
       const [customer] = await tx
@@ -1818,12 +1832,168 @@ export async function updateSalesOrder(formData: FormData) {
         throw new Error("Source location is required.");
       }
 
-      const normalizedLines = await normalizeSalesLineScope(tx, company.id, owner.id, header.sourceLocationId, lines);
+      const normalizedLines = await normalizeSalesLineScope(tx, company.id, owner.id, header.sourceLocationId, lines, !isConfirmedEdit);
       const prepared = await prepareSalesLines(tx, company.id, normalizedLines);
       const existingLineRows = await tx
-        .select({ id: salesOrderLines.id })
+        .select({
+          id: salesOrderLines.id,
+          lineNo: salesOrderLines.lineNo,
+          productId: salesOrderLines.productId,
+          ownerId: salesOrderLines.ownerId,
+          sourceLocationId: salesOrderLines.sourceLocationId,
+          quantityOrdered: salesOrderLines.quantityOrdered,
+          quantityReserved: salesOrderLines.quantityReserved,
+          quantityDelivered: salesOrderLines.quantityDelivered,
+          quantityInvoiced: salesOrderLines.quantityInvoiced,
+          unitPriceMinor: salesOrderLines.unitPriceMinor,
+          discountMinor: salesOrderLines.discountMinor,
+          taxAmountMinor: salesOrderLines.taxAmountMinor,
+          lineTotalMinor: salesOrderLines.lineTotalMinor,
+        })
         .from(salesOrderLines)
-        .where(eq(salesOrderLines.salesOrderId, existingOrder.id));
+        .where(and(eq(salesOrderLines.salesOrderId, existingOrder.id), isNull(salesOrderLines.deletedAt)));
+
+      if (isConfirmedEdit) {
+        if (header.customerId !== existingOrder.customerId || owner.id !== existingOrder.ownerId || header.sourceLocationId !== existingOrder.sourceLocationId || header.reserveOnConfirm !== existingOrder.reserveOnConfirm) {
+          throw new Error("Customer, owner, source location, and reservation setting cannot change after confirmation.");
+        }
+        if (prepared.currencyCode !== existingOrder.currencyCode) {
+          throw new Error("Currency cannot change after confirmation.");
+        }
+
+        const [paidSummary] = await tx.execute<{ paidMinor: number }>(sql`
+          select coalesce(sum(pa.amount_minor), 0)::bigint as "paidMinor"
+          from payment_allocations pa
+          inner join payments p on p.id = pa.payment_id
+          where pa.sales_order_id = ${existingOrder.id}
+            and pa.deleted_at is null and p.deleted_at is null and p.status = 'posted'
+        `);
+        if (prepared.totalMinor < Number(paidSummary?.paidMinor ?? 0)) {
+          throw new Error("Order total cannot be less than posted customer payments.");
+        }
+
+        const existingById = new Map(existingLineRows.map((line) => [line.id, line]));
+        const submittedIds = lines.map((line) => line.lineId).filter(Boolean);
+        if (new Set(submittedIds).size !== submittedIds.length || submittedIds.some((id) => !existingById.has(id))) {
+          throw new Error("Sales order lines changed. Reload and try again.");
+        }
+
+        let nextLineNo = Math.max(0, ...existingLineRows.map((line) => line.lineNo));
+        for (const [index, inputLine] of lines.entries()) {
+          const preparedLine = prepared.preparedLines[index];
+          const existingLine = inputLine.lineId ? existingById.get(inputLine.lineId) : undefined;
+          if (existingLine) {
+            if (existingLine.productId !== preparedLine.product.id || (existingLine.ownerId ?? existingOrder.ownerId) !== preparedLine.ownerId || (existingLine.sourceLocationId ?? existingOrder.sourceLocationId) !== preparedLine.sourceLocationId) {
+              throw new Error("Product, owner, and location on confirmed lines cannot change. Add a new line instead.");
+            }
+            const minimumQuantity = Math.max(Number(existingLine.quantityDelivered), Number(existingLine.quantityInvoiced)) + Number(existingLine.quantityReserved);
+            if (Number(preparedLine.quantityOrdered) < minimumQuantity) {
+              throw new Error(`Line ${existingLine.lineNo} cannot be less than its delivered, invoiced, and reserved quantity.`);
+            }
+            await tx.update(salesOrderLines).set({
+              quantityOrdered: preparedLine.quantityOrdered,
+              unitPriceMinor: preparedLine.unitPriceMinor,
+              discountMinor: preparedLine.discountMinor,
+              taxAmountMinor: preparedLine.taxAmountMinor,
+              lineTotalMinor: preparedLine.lineTotalMinor,
+              updatedAt: sql`now()`,
+            }).where(eq(salesOrderLines.id, existingLine.id));
+            await tx.delete(salesOrderLineTaxes).where(eq(salesOrderLineTaxes.salesOrderLineId, existingLine.id));
+            if (preparedLine.lineTaxes.length > 0) {
+              await tx.insert(salesOrderLineTaxes).values(preparedLine.lineTaxes.map((tax) => ({
+                salesOrderLineId: existingLine.id,
+                taxId: tax.taxId,
+                taxAmountMinor: tax.taxAmountMinor,
+              })));
+            }
+          } else {
+            nextLineNo += 1;
+            const [newLine] = await tx.insert(salesOrderLines).values({
+              salesOrderId: existingOrder.id,
+              ownerId: preparedLine.ownerId,
+              sourceLocationId: preparedLine.sourceLocationId,
+              lineNo: nextLineNo,
+              productId: preparedLine.product.id,
+              unitId: preparedLine.product.unitId,
+              quantityOrdered: preparedLine.quantityOrdered,
+              unitPriceMinor: preparedLine.unitPriceMinor,
+              discountMinor: preparedLine.discountMinor,
+              taxAmountMinor: preparedLine.taxAmountMinor,
+              lineTotalMinor: preparedLine.lineTotalMinor,
+              currencyCode: prepared.currencyCode,
+            }).returning({ id: salesOrderLines.id });
+            if (preparedLine.lineTaxes.length > 0) {
+              await tx.insert(salesOrderLineTaxes).values(preparedLine.lineTaxes.map((tax) => ({
+                salesOrderLineId: newLine.id,
+                taxId: tax.taxId,
+                taxAmountMinor: tax.taxAmountMinor,
+              })));
+            }
+          }
+        }
+
+        for (const existingLine of existingLineRows.filter((line) => !submittedIds.includes(line.id))) {
+          const [linked] = await tx.execute<{ linked: boolean }>(sql`
+            select (
+              exists(select 1 from delivery_lines where sales_order_line_id = ${existingLine.id} and deleted_at is null)
+              or exists(select 1 from customer_invoice_lines where sales_order_line_id = ${existingLine.id} and deleted_at is null)
+              or exists(select 1 from customer_return_lines where sales_order_line_id = ${existingLine.id} and deleted_at is null)
+            ) as linked
+          `);
+          if (linked?.linked || Number(existingLine.quantityReserved) > 0 || Number(existingLine.quantityDelivered) > 0 || Number(existingLine.quantityInvoiced) > 0) {
+            throw new Error(`Line ${existingLine.lineNo} has linked activity and cannot be removed.`);
+          }
+          await tx.delete(salesOrderLineTaxes).where(eq(salesOrderLineTaxes.salesOrderLineId, existingLine.id));
+          await tx.delete(salesOrderLines).where(eq(salesOrderLines.id, existingLine.id));
+        }
+
+        const deliveredQuantity = existingLineRows.reduce((sum, line) => sum + Number(line.quantityDelivered), 0);
+        const invoicedQuantity = existingLineRows.reduce((sum, line) => sum + Number(line.quantityInvoiced), 0);
+        const totalQuantity = prepared.preparedLines.reduce((sum, line) => sum + Number(line.quantityOrdered), 0);
+        const remainingQuantity = totalQuantity - deliveredQuantity;
+        const revisedStatus = existingOrder.status === "invoiced" && totalQuantity <= invoicedQuantity
+          ? "invoiced"
+          : remainingQuantity > 0
+            ? deliveredQuantity > 0 ? "partially_delivered" : "confirmed"
+            : "delivered";
+        await tx.update(salesOrders).set({
+          fsNumber: header.fsNumber || null,
+          paymentTerm: header.paymentTerm,
+          orderDate: header.orderDate || dateOnly(new Date()),
+          validUntil: header.paymentTerm === "credit" ? header.validUntil || null : null,
+          subtotalMinor: prepared.subtotalMinor,
+          taxAmountMinor: prepared.taxAmountMinor,
+          totalMinor: prepared.totalMinor,
+          status: revisedStatus,
+          notes: header.notes || null,
+          updatedAt: sql`now()`,
+        }).where(eq(salesOrders.id, existingOrder.id));
+        await tx.insert(auditLogs).values({
+          companyId: company.id,
+          actorUserId: user.id,
+          action: "sales_order.confirmed_update",
+          entityType: "sales_order",
+          entityId: existingOrder.id,
+          severity: "warning",
+          metadata: {
+            orderNo: existingOrder.orderNo,
+            previousTotalMinor: existingOrder.totalMinor,
+            totalMinor: prepared.totalMinor,
+            previousLines: existingLineRows,
+            revisedLines: prepared.preparedLines.map((line) => ({
+              productId: line.product.id,
+              quantityOrdered: line.quantityOrdered,
+              unitPriceMinor: line.unitPriceMinor,
+              discountMinor: line.discountMinor,
+              taxAmountMinor: line.taxAmountMinor,
+              lineTotalMinor: line.lineTotalMinor,
+            })),
+            linkedDocumentsUnchanged: true,
+          },
+        });
+        noticeMessage = "Confirmed sales order updated. Linked documents were not changed.";
+        return;
+      }
       const existingLineIds = existingLineRows.map((line) => line.id);
 
       if (existingLineIds.length > 0) {

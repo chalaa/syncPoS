@@ -6,6 +6,7 @@ import type { ReactNode } from "react";
 
 import { TableFilterSelect } from "@/components/ui/table-filter-select";
 import { TableSearchInput } from "@/components/ui/table-search-input";
+import { TableArchiveFilter } from "@/components/ui/table-archive-filter";
 import { TablePagination } from "@/components/ui/table-pagination";
 import type { PaginationMeta } from "@/lib/pagination";
 import {
@@ -258,6 +259,7 @@ export function LocationManager({
             />
           </div>
           <div className="flex flex-wrap items-center gap-3">
+            <TableArchiveFilter />
             <TableFilterSelect
               paramName="type"
               label={t("field.type", "Type")}

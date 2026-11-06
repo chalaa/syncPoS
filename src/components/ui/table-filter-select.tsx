@@ -56,6 +56,7 @@ export function TableFilterSelect({
   return (
     <label className={cn("inline-flex items-center text-xs font-medium text-muted-foreground w-full sm:w-auto", className)}>
       <select
+        aria-label={label ? t(label, label) : paramName}
         value={currentValue}
         onChange={(e) => handleChange(e.target.value)}
         className="h-9 w-full sm:w-auto min-w-[120px] rounded-md border border-input bg-background px-2.5 text-xs text-foreground outline-none focus-visible:ring-1 focus-visible:ring-ring transition-colors cursor-pointer"

@@ -3,6 +3,7 @@ import { Plus, RotateCcw, Trash2, Check, Store } from "lucide-react";
 import { and, asc, eq, isNull } from "drizzle-orm";
 
 import { TableSearchInput } from "@/components/ui/table-search-input";
+import { TableArchiveFilter } from "@/components/ui/table-archive-filter";
 import {
   createOwner,
   restoreOwner,
@@ -123,7 +124,7 @@ export default async function OwnersPage({ searchParams }: OwnersPageProps) {
 
         {/* Owners & Linked Shops List */}
         <div className="rounded-xl border border-border bg-card shadow-xs">
-          <div className="border-b border-border p-4">
+          <div className="flex flex-col gap-3 border-b border-border p-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="max-w-md">
               <TableSearchInput
                 placeholder="Search owner names..."
@@ -131,6 +132,7 @@ export default async function OwnersPage({ searchParams }: OwnersPageProps) {
                 paramName="q"
               />
             </div>
+            <TableArchiveFilter />
           </div>
 
           <div className="overflow-x-auto">

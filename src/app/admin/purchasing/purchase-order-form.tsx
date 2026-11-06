@@ -194,6 +194,7 @@ type PurchaseOrderFormProps = {
   defaultDate?: string;
   isModal?: boolean;
   onCancel?: () => void;
+  confirmedEdit?: boolean;
 };
 
 export const PurchaseOrderForm = forwardRef<PurchaseOrderFormHandle, PurchaseOrderFormProps>(
@@ -213,6 +214,7 @@ export const PurchaseOrderForm = forwardRef<PurchaseOrderFormHandle, PurchaseOrd
     defaultDate = "",
     isModal = false,
     onCancel,
+    confirmedEdit = false,
   }, ref) {
   const { t } = useTranslation();
   const [isPending, startTransition] = useTransition();
@@ -867,6 +869,7 @@ export const PurchaseOrderForm = forwardRef<PurchaseOrderFormHandle, PurchaseOrd
                   {/* Hidden form data elements for submission */}
                   {lines.map((line) => (
                     <div key={`${line.key}-fields`} className="hidden">
+                      <input type="hidden" name="lineId" value={order?.lines.some((existingLine) => existingLine.id === line.key) ? line.key : ""} />
                       <input type="hidden" name="productId" value={line.productId} />
                       <input type="hidden" name="lineOwnerId" value={line.ownerId || headerOwnerId} />
                       <input type="hidden" name="quantity" value={line.quantity} />
@@ -1542,7 +1545,7 @@ export const PurchaseOrderForm = forwardRef<PurchaseOrderFormHandle, PurchaseOrd
                   disabled={isPending}
                   className="flex-1 sm:flex-initial px-3 sm:px-4 text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-muted/80 border-border whitespace-nowrap justify-center"
                 >
-                  {t("purchasing.saveAsDraftRfq", "Save as Draft RFQ")}
+                  {confirmedEdit ? submitLabel : t("purchasing.saveAsDraftRfq", "Save as Draft RFQ")}
                 </Button>
               </div>
 
@@ -1583,10 +1586,11 @@ export const PurchaseOrderForm = forwardRef<PurchaseOrderFormHandle, PurchaseOrd
                 disabled={isPending}
                 className="w-full sm:w-auto px-4 text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-muted/80 border-border whitespace-nowrap justify-center"
               >
-                {t("purchasing.saveAsDraftRfq", "Save as Draft RFQ")}
+                {confirmedEdit ? submitLabel : t("purchasing.saveAsDraftRfq", "Save as Draft RFQ")}
               </Button>
 
-              <Button
+              {!confirmedEdit ? (
+                <Button
                 type="button"
                 onClick={() => submitWithIntent("confirm")}
                 disabled={isPending || isStepTransitioning}
@@ -1606,7 +1610,8 @@ export const PurchaseOrderForm = forwardRef<PurchaseOrderFormHandle, PurchaseOrd
                     <span>{t("purchasing.confirmPurchaseOrder", "Confirm Purchase Order")}</span>
                   </>
                 )}
-              </Button>
+                </Button>
+              ) : null}
             </div>
           </>
         )}

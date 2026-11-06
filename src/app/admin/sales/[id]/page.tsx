@@ -10,6 +10,7 @@ import {
 import { CreateDeliveryLinesEditor } from "@/app/admin/sales/[id]/create-delivery-lines-editor";
 import { SalesOrderForm } from "@/app/admin/sales/sales-order-form";
 import { PaymentFormDialog } from "@/components/app/payment-form-dialog";
+import { OrderArchiveDialog } from "@/components/app/order-archive-dialog";
 import { Alert } from "@/components/ui/alert";
 import { StatusBadge } from "@/components/ui/badge";
 import { Button, ButtonLink } from "@/components/ui/button";
@@ -25,7 +26,8 @@ import { Notebook } from "@/components/ui/notebook";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
 import { DetailStatCard } from "@/components/ui/detail-stat-card";
 import { T } from "@/components/ui/t";
-import { requirePermission } from "@/server/auth/session";
+import { getUserPermissionCodes, requirePermission } from "@/server/auth/session";
+import { PERMISSIONS } from "@/server/iam/permissions";
 import { getActivePaymentAccounts } from "@/server/payments/payments";
 import { getSalesLineApprovalSummary } from "@/server/sales/line-approvals";
 import {
@@ -111,6 +113,8 @@ export default async function SalesOrderDetailPage({ params, searchParams }: Sal
   }
 
   const isQuotation = order.status === "quotation";
+  const isAdministrator = (await getUserPermissionCodes(user.id)).has(PERMISSIONS.OWNER.ALL);
+  const canEditConfirmed = order.status !== "cancelled" && isAdministrator;
   const lineApprovals = isQuotation
     ? await getSalesLineApprovalSummary(options.company.id, order.id, user.id)
     : [];
@@ -138,7 +142,12 @@ export default async function SalesOrderDetailPage({ params, searchParams }: Sal
       <PageHeader
         eyebrow="Sales"
         title={order.orderNo}
-        actions={<ButtonLink href="/admin/sales" variant="outline"><T k="action.backToSales">Back to sales</T></ButtonLink>}
+        actions={
+          <div className="flex flex-wrap items-center gap-2">
+            <ButtonLink href="/admin/sales" variant="outline"><T k="action.backToSales">Back to sales</T></ButtonLink>
+            {isAdministrator ? <OrderArchiveDialog entityType="sales_order" entityId={order.id} orderNo={order.orderNo} /> : null}
+          </div>
+        }
       />
 
       {query.notice ? <Alert kind="success">{query.notice}</Alert> : null}
@@ -197,8 +206,9 @@ export default async function SalesOrderDetailPage({ params, searchParams }: Sal
         </div>
       </div>
 
-      {isQuotation ? (
+      {isQuotation || canEditConfirmed ? (
         <div className="grid gap-4">
+          {!isQuotation ? <Alert kind="warning">Administrator edit: linked deliveries, invoices, and payments keep their recorded values.</Alert> : null}
           {lineApprovals.length > 0 ? (
             <section className="rounded-lg border border-border bg-card p-4">
               <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
@@ -286,7 +296,8 @@ export default async function SalesOrderDetailPage({ params, searchParams }: Sal
             availableStock={options.availableStock}
             error={query.error}
             order={order}
-            submitLabel="Save Quotation"
+            submitLabel={isQuotation ? "Save Quotation" : "Save Sales Order"}
+            confirmedEdit={!isQuotation}
             defaultDate={todayDate()}
             confirmationBlockedReason={confirmationBlockedReason}
           />
