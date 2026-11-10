@@ -9,6 +9,7 @@ import {
 } from "@/app/admin/purchasing/actions";
 import { registerSupplierPayment } from "@/app/admin/purchasing/payments/actions";
 import { PaymentFormDialog } from "@/components/app/payment-form-dialog";
+import { OrderArchiveDialog } from "@/components/app/order-archive-dialog";
 import { PurchaseOrderForm } from "@/app/admin/purchasing/purchase-order-form";
 import { ReceiptLinesEditor } from "@/app/admin/purchasing/receipt-lines-editor";
 import { Alert } from "@/components/ui/alert";
@@ -26,7 +27,8 @@ import { Notebook } from "@/components/ui/notebook";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
 import { DetailStatCard } from "@/components/ui/detail-stat-card";
 import { T } from "@/components/ui/t";
-import { requirePermission } from "@/server/auth/session";
+import { getUserPermissionCodes, requirePermission } from "@/server/auth/session";
+import { PERMISSIONS } from "@/server/iam/permissions";
 import {
   displayPurchaseMoney,
   getPurchaseFormOptions,
@@ -41,6 +43,7 @@ type PurchaseOrderDetailPageProps = {
   searchParams: Promise<{
     notice?: string;
     error?: string;
+    edit?: string;
   }>;
 };
 
@@ -87,7 +90,7 @@ function CreateReceiptDialog({
 }
 
 export default async function PurchaseOrderDetailPage({ params, searchParams }: PurchaseOrderDetailPageProps) {
-  await requirePermission("inventory.receive");
+  const user = await requirePermission("inventory.receive");
 
   const [{ id }, query, options, paymentAccounts] = await Promise.all([
     params,
@@ -102,6 +105,9 @@ export default async function PurchaseOrderDetailPage({ params, searchParams }: 
   }
 
   const isDraft = order.status === "draft";
+  const isAdministrator = (await getUserPermissionCodes(user.id)).has(PERMISSIONS.OWNER.ALL);
+  const canEdit = isDraft || (order.status !== "cancelled" && isAdministrator);
+  const isEditing = canEdit && query.edit === "1";
   const canReceive = order.status === "confirmed" || order.status === "partially_received";
   const canCreateReturn =
     !isDraft && order.status !== "cancelled" && order.lines.some((line) => Number(line.quantityReceived) > 0);
@@ -111,7 +117,17 @@ export default async function PurchaseOrderDetailPage({ params, searchParams }: 
       <PageHeader
         eyebrow="Purchasing"
         title={order.orderNo}
-        actions={<ButtonLink href="/admin/purchasing" variant="outline"><T k="purchasing.backToOrders" fallback="Back to orders" /></ButtonLink>}
+        actions={
+          <div className="flex flex-wrap items-center gap-2">
+            <ButtonLink href="/admin/purchasing" variant="outline"><T k="purchasing.backToOrders" fallback="Back to orders" /></ButtonLink>
+            {canEdit ? (
+              <ButtonLink href={isEditing ? `/admin/purchasing/${order.id}` : `/admin/purchasing/${order.id}?edit=1`} variant={isEditing ? "outline" : "default"}>
+                {isEditing ? <T k="action.cancel">Cancel</T> : <T k="action.edit">Edit</T>}
+              </ButtonLink>
+            ) : null}
+            {isAdministrator ? <OrderArchiveDialog entityType="purchase_order" entityId={order.id} orderNo={order.orderNo} /> : null}
+          </div>
+        }
       />
 
       {query.notice ? <Alert kind="success">{query.notice}</Alert> : null}
@@ -217,22 +233,26 @@ export default async function PurchaseOrderDetailPage({ params, searchParams }: 
         </div>
       </div>
 
-      {isDraft ? (
-        <PurchaseOrderForm
-          action={updatePurchaseOrder}
-          suppliers={options.suppliers}
-          owners={options.owners}
-          products={options.products}
-          productCategories={options.productCategories}
-          productBrands={options.productBrands}
-          productUnits={options.productUnits}
-          locations={options.locations}
-          taxes={options.taxes}
-          error={query.error}
-          order={order}
-          submitLabel="Save RFQ"
-          defaultDate={todayDate()}
-        />
+      {isEditing ? (
+        <>
+          {!isDraft ? <Alert kind="warning">Administrator edit: linked receipts, bills, and payments keep their recorded values.</Alert> : null}
+          <PurchaseOrderForm
+            action={updatePurchaseOrder}
+            suppliers={options.suppliers}
+            owners={options.owners}
+            products={options.products}
+            productCategories={options.productCategories}
+            productBrands={options.productBrands}
+            productUnits={options.productUnits}
+            locations={options.locations}
+            taxes={options.taxes}
+            error={query.error}
+            order={order}
+            submitLabel={isDraft ? "Save RFQ" : "Save Purchase Order"}
+            confirmedEdit={!isDraft}
+            defaultDate={todayDate()}
+          />
+        </>
       ) : (
         <section className="rounded-lg border border-border bg-card p-5">
           <div className="mb-5 grid gap-4 md:grid-cols-3">

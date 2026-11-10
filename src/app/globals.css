@@ -31,6 +31,11 @@
   --destructive: #A83226;
   --destructive-foreground: #FFFFFF;
 
+  --financial-receivable: #f59e0b;
+  --financial-credit: #10b981;
+  --financial-payable: #f43f5e;
+  --financial-net: #008574;
+
   --border: #DFE5DF;             /* Balanced subtle divider */
   --input: #CAD4CE;
   --ring: #0B5D4B;
@@ -43,6 +48,10 @@
   --radius: 0.5rem;
   --font-system-sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --font-system-mono: "Liberation Mono", "SFMono-Regular", Consolas, "Courier New", monospace;
+}
+
+.dark {
+  --financial-net: #2dd4bf;
 }
 
 @theme inline {
@@ -66,6 +75,10 @@
   --color-accent-dark: var(--accent-dark);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
+  --color-financial-receivable: var(--financial-receivable);
+  --color-financial-credit: var(--financial-credit);
+  --color-financial-payable: var(--financial-payable);
+  --color-financial-net: var(--financial-net);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);

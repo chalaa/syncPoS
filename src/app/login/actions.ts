@@ -6,6 +6,7 @@ import { and, eq, isNull, or } from "drizzle-orm";
 import { createSession, destroySession } from "@/server/auth/session";
 import { verifyPassword } from "@/server/auth/password";
 import { db } from "@/server/db/client";
+import { withDatabaseReadRetry } from "@/server/db/read-retry";
 import { companies, employees, users } from "@/server/db/schema";
 import { normalizePhoneNumber } from "@/lib/phone-utils";
 
@@ -28,7 +29,7 @@ export async function login(formData: FormData) {
 
   const normalizedInput = normalizePhoneNumber(phoneInput);
 
-  const [user] = await db
+  const [user] = await withDatabaseReadRetry(() => db
     .select({
       id: users.id,
       passwordHash: users.passwordHash,
@@ -53,7 +54,7 @@ export async function login(formData: FormData) {
         ),
       ),
     )
-    .limit(1);
+    .limit(1));
 
   if (user?.lockedUntil && user.lockedUntil > new Date()) {
     redirect("/login?error=Account is temporarily locked. Try again later.");

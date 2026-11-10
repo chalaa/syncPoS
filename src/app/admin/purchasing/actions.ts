@@ -8,7 +8,7 @@ import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { getDefaultCompany, majorToMinor, uniqueViolationMessage } from "@/server/catalog/products";
-import { requirePermission } from "@/server/auth/session";
+import { getUserPermissionCodes, requirePermission } from "@/server/auth/session";
 import { db } from "@/server/db/client";
 import { generateCompanyCode, generateCompanyDocumentNo } from "@/server/db/code-generator";
 import {
@@ -36,6 +36,7 @@ import {
 } from "@/server/db/schema";
 import { getOrCreatePartnerStockLocation } from "@/server/inventory/partner-locations";
 import { getPurchaseOrderReceiptLines } from "@/server/purchasing/purchasing";
+import { PERMISSIONS } from "@/server/iam/permissions";
 
 const purchaseOrderHeaderSchema = z.object({
   purchaseOrderId: z.string().uuid().optional(),
@@ -58,6 +59,7 @@ const purchaseSupplierCreateSchema = z.object({
 });
 
 const purchaseOrderLineSchema = z.object({
+  lineId: z.string().uuid().or(z.literal("")).default(""),
   productId: z.string().uuid(),
   ownerId: z.string().uuid().or(z.literal("")).transform((value) => value || null),
   quantity: z.coerce.number().positive(),
@@ -139,12 +141,14 @@ function parsePurchaseOrderForm(formData: FormData, errorPath: string) {
     notes: formValue(formData, "notes"),
   });
   const productIds = formValues(formData, "productId");
+  const lineIds = formValues(formData, "lineId");
   const ownerIds = formValues(formData, "lineOwnerId");
   const quantities = formValues(formData, "quantity");
   const unitCosts = formValues(formData, "unitCost");
   const taxIdValues = formValues(formData, "taxIds");
   const parsedLines = productIds
     .map((productId, index) => ({
+      lineId: lineIds[index] ?? "",
       productId,
       ownerId: ownerIds[index] ?? "",
       quantity: quantities[index] ?? "",
@@ -1266,6 +1270,7 @@ export async function createPurchaseOrder(formData: FormData) {
 
 export async function updatePurchaseOrder(formData: FormData) {
   const user = await requirePermission("inventory.receive");
+  const canEditConfirmed = (await getUserPermissionCodes(user.id)).has(PERMISSIONS.OWNER.ALL);
   const purchaseOrderId = formValue(formData, "purchaseOrderId");
   const errorPath = purchaseOrderId ? `/admin/purchasing/${purchaseOrderId}` : "/admin/purchasing";
   const intent = formValue(formData, "intent") || "draft";
@@ -1288,6 +1293,11 @@ export async function updatePurchaseOrder(formData: FormData) {
           id: purchaseOrders.id,
           orderNo: purchaseOrders.orderNo,
           status: purchaseOrders.status,
+          supplierId: purchaseOrders.supplierId,
+          ownerId: purchaseOrders.ownerId,
+          deliverToLocationId: purchaseOrders.deliverToLocationId,
+          currencyCode: purchaseOrders.currencyCode,
+          totalMinor: purchaseOrders.totalMinor,
         })
         .from(purchaseOrders)
         .where(
@@ -1297,14 +1307,16 @@ export async function updatePurchaseOrder(formData: FormData) {
             isNull(purchaseOrders.deletedAt),
           ),
         )
-        .limit(1);
+        .limit(1)
+        .for("update");
 
       if (!existingOrder) {
         throw new Error("Purchase order does not exist.");
       }
 
-      if (existingOrder.status !== "draft") {
-        throw new Error("Only draft RFQs can be edited.");
+      const isConfirmedEdit = existingOrder.status !== "draft";
+      if (isConfirmedEdit && (!canEditConfirmed || existingOrder.status === "cancelled")) {
+        throw new Error("Only an administrator can edit confirmed purchase orders.");
       }
 
       const uniqueProductIds = [...new Set(lines.map((line) => line.productId))];
@@ -1427,9 +1439,149 @@ export async function updatePurchaseOrder(formData: FormData) {
       const totalMinor = preparedLines.reduce((sum, line) => sum + line.lineTotalMinor, 0);
 
       const existingLines = await tx
-        .select({ id: purchaseOrderLines.id })
+        .select({
+          id: purchaseOrderLines.id,
+          lineNo: purchaseOrderLines.lineNo,
+          productId: purchaseOrderLines.productId,
+          ownerId: purchaseOrderLines.ownerId,
+          quantityOrdered: purchaseOrderLines.quantityOrdered,
+          quantityReceived: purchaseOrderLines.quantityReceived,
+          unitCostMinor: purchaseOrderLines.unitCostMinor,
+          taxAmountMinor: purchaseOrderLines.taxAmountMinor,
+          lineTotalMinor: purchaseOrderLines.lineTotalMinor,
+        })
         .from(purchaseOrderLines)
-        .where(eq(purchaseOrderLines.purchaseOrderId, existingOrder.id));
+        .where(and(eq(purchaseOrderLines.purchaseOrderId, existingOrder.id), isNull(purchaseOrderLines.deletedAt)));
+
+      if (isConfirmedEdit) {
+        if (supplier.id !== existingOrder.supplierId || owner.id !== existingOrder.ownerId || header.deliverToLocationId !== existingOrder.deliverToLocationId) {
+          throw new Error("Supplier, owner, and receiving location cannot change after confirmation.");
+        }
+        if (currencyCode !== existingOrder.currencyCode) {
+          throw new Error("Currency cannot change after confirmation.");
+        }
+
+        const [paidSummary] = await tx.execute<{ paidMinor: number }>(sql`
+          select coalesce(sum(pa.amount_minor), 0)::bigint as "paidMinor"
+          from payment_allocations pa
+          inner join payments p on p.id = pa.payment_id
+          where pa.purchase_order_id = ${existingOrder.id}
+            and pa.deleted_at is null and p.deleted_at is null and p.status = 'posted'
+        `);
+        if (totalMinor < Number(paidSummary?.paidMinor ?? 0)) {
+          throw new Error("Order total cannot be less than posted supplier payments.");
+        }
+
+        const existingById = new Map(existingLines.map((line) => [line.id, line]));
+        const submittedIds = lines.map((line) => line.lineId).filter(Boolean);
+        if (new Set(submittedIds).size !== submittedIds.length || submittedIds.some((id) => !existingById.has(id))) {
+          throw new Error("Purchase order lines changed. Reload and try again.");
+        }
+
+        let nextLineNo = Math.max(0, ...existingLines.map((line) => line.lineNo));
+        for (const [index, inputLine] of lines.entries()) {
+          const preparedLine = preparedLines[index];
+          const existingLine = inputLine.lineId ? existingById.get(inputLine.lineId) : undefined;
+          if (existingLine) {
+            if (existingLine.productId !== preparedLine.product.id || (existingLine.ownerId ?? existingOrder.ownerId) !== preparedLine.ownerId) {
+              throw new Error("Product and owner on confirmed lines cannot change. Add a new line instead.");
+            }
+            if (Number(preparedLine.quantityOrdered) < Number(existingLine.quantityReceived)) {
+              throw new Error(`Line ${existingLine.lineNo} cannot be less than its received quantity.`);
+            }
+            await tx.update(purchaseOrderLines).set({
+              quantityOrdered: preparedLine.quantityOrdered,
+              unitCostMinor: preparedLine.unitCostMinor,
+              taxAmountMinor: preparedLine.taxAmountMinor,
+              lineTotalMinor: preparedLine.lineTotalMinor,
+              updatedAt: sql`now()`,
+            }).where(eq(purchaseOrderLines.id, existingLine.id));
+            await tx.delete(purchaseOrderLineTaxes).where(eq(purchaseOrderLineTaxes.purchaseOrderLineId, existingLine.id));
+            if (preparedLine.lineTaxes.length > 0) {
+              await tx.insert(purchaseOrderLineTaxes).values(preparedLine.lineTaxes.map((tax) => ({
+                purchaseOrderLineId: existingLine.id,
+                taxId: tax.taxId,
+                taxAmountMinor: tax.taxAmountMinor,
+              })));
+            }
+          } else {
+            nextLineNo += 1;
+            const [newLine] = await tx.insert(purchaseOrderLines).values({
+              purchaseOrderId: existingOrder.id,
+              ownerId: preparedLine.ownerId,
+              lineNo: nextLineNo,
+              productId: preparedLine.product.id,
+              unitId: preparedLine.product.unitId,
+              quantityOrdered: preparedLine.quantityOrdered,
+              unitCostMinor: preparedLine.unitCostMinor,
+              taxAmountMinor: preparedLine.taxAmountMinor,
+              lineTotalMinor: preparedLine.lineTotalMinor,
+              currencyCode,
+            }).returning({ id: purchaseOrderLines.id });
+            if (preparedLine.lineTaxes.length > 0) {
+              await tx.insert(purchaseOrderLineTaxes).values(preparedLine.lineTaxes.map((tax) => ({
+                purchaseOrderLineId: newLine.id,
+                taxId: tax.taxId,
+                taxAmountMinor: tax.taxAmountMinor,
+              })));
+            }
+          }
+        }
+
+        for (const existingLine of existingLines.filter((line) => !submittedIds.includes(line.id))) {
+          const [linked] = await tx.execute<{ linked: boolean }>(sql`
+            select (
+              exists(select 1 from goods_receipt_lines where purchase_order_line_id = ${existingLine.id} and deleted_at is null)
+              or exists(select 1 from vendor_bill_lines where purchase_order_line_id = ${existingLine.id} and deleted_at is null)
+              or exists(select 1 from supplier_return_lines where purchase_order_line_id = ${existingLine.id} and deleted_at is null)
+            ) as linked
+          `);
+          if (linked?.linked || Number(existingLine.quantityReceived) > 0) {
+            throw new Error(`Line ${existingLine.lineNo} has linked activity and cannot be removed.`);
+          }
+          await tx.delete(purchaseOrderLineTaxes).where(eq(purchaseOrderLineTaxes.purchaseOrderLineId, existingLine.id));
+          await tx.delete(purchaseOrderLines).where(eq(purchaseOrderLines.id, existingLine.id));
+        }
+
+        const receivedQuantity = existingLines.reduce((sum, line) => sum + Number(line.quantityReceived), 0);
+        const remainingQuantity = preparedLines.reduce((sum, line) => sum + Number(line.quantityOrdered), 0) - receivedQuantity;
+        await tx.update(purchaseOrders).set({
+          vendorReference: header.vendorReference || null,
+          paymentTerm: header.paymentTerm,
+          orderDate: header.orderDate || dateOnly(new Date()),
+          paymentDueDate: header.paymentTerm === "credit" ? header.paymentDueDate || null : null,
+          subtotalMinor,
+          taxAmountMinor,
+          totalMinor,
+          notes: header.notes || null,
+          status: remainingQuantity > 0 ? receivedQuantity > 0 ? "partially_received" : "confirmed" : "received",
+          updatedAt: sql`now()`,
+        }).where(eq(purchaseOrders.id, existingOrder.id));
+        await tx.insert(auditLogs).values({
+          companyId: company.id,
+          actorUserId: user.id,
+          action: "purchase_order.confirmed_update",
+          entityType: "purchase_order",
+          entityId: existingOrder.id,
+          severity: "warning",
+          metadata: {
+            orderNo: existingOrder.orderNo,
+            previousTotalMinor: existingOrder.totalMinor,
+            totalMinor,
+            previousLines: existingLines,
+            revisedLines: preparedLines.map((line) => ({
+              productId: line.product.id,
+              quantityOrdered: line.quantityOrdered,
+              unitCostMinor: line.unitCostMinor,
+              taxAmountMinor: line.taxAmountMinor,
+              lineTotalMinor: line.lineTotalMinor,
+            })),
+            linkedDocumentsUnchanged: true,
+          },
+        });
+        noticeMessage = "Confirmed purchase order updated. Linked documents were not changed.";
+        return;
+      }
       const existingLineIds = existingLines.map((line) => line.id);
 
       if (existingLineIds.length > 0) {

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ArchivedModelList } from "@/components/app/archived-model-list";
 import { TableFilterSelect } from "@/components/ui/table-filter-select";
 import { TableSearchInput } from "@/components/ui/table-search-input";
 import { TablePagination } from "@/components/ui/table-pagination";
@@ -36,10 +37,13 @@ type SalesPageProps = {
     customerInvoiceId?: string;
     directVendorSaleId?: string;
     partnerId?: string;
+    ownerId?: string;
+    currencyCode?: string;
     notice?: string;
     error?: string;
     new?: string;
     q?: string;
+    show?: string;
     status?: string;
     paymentTerm?: string;
     paymentStatus?: string;
@@ -74,7 +78,16 @@ export default async function SalesPage({ searchParams }: SalesPageProps) {
   const paymentStatus = params.paymentStatus ?? "";
   const locationId = params.locationId ?? "";
 
-  const allOrders = await getSalesOrderList({ query, status, paymentTerm, paymentStatus, locationId: locationId || undefined });
+  if (params.show === "deleted") {
+    const archiveViews = {
+      orders: ["sales_order", "Quotations / Orders"], deliveries: ["delivery", "Deliveries"],
+      invoices: ["customer_invoice", "Customer Invoices"], payments: ["customer_payment", "Customer Payments"], returns: ["customer_return", "Returns"],
+    } as const;
+    const [model, title] = archiveViews[view as keyof typeof archiveViews] ?? archiveViews.orders;
+    return <ArchivedModelList model={model} title={title} companyId={user.companyId} params={params} canRestore={userPerms.has(PERMISSIONS.OWNER.ALL)} />;
+  }
+
+  const allOrders = await getSalesOrderList({ query, status, paymentTerm, paymentStatus, locationId: locationId || undefined, partnerId: params.partnerId, ownerId: params.ownerId, currencyCode: params.currencyCode });
 
   if (view === "deliveries") {
     const deliveries = await getDeliveryList({ salesOrderId: params.salesOrderId });

@@ -41,6 +41,7 @@ export function SupplierReturnList({ returns }: { returns: SupplierReturnListRow
   return (
     <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-xs">
       <TableFilterBar
+        archiveFilter
         searchPlaceholder={t("purchasing.searchReturns", "Search return #, receipt #, or supplier...")}
         filterParamNames={["status"]}
         viewMode={viewMode}
@@ -252,6 +253,7 @@ export function LandedCostList({ landedCosts }: { landedCosts: PurchaseLandedCos
   return (
     <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-xs">
       <TableFilterBar
+        archiveFilter
         searchPlaceholder="Search cost #, PO ref, receipt #, or vendor..."
         filterParamNames={["status", "costType"]}
         viewMode={viewMode}
@@ -600,6 +602,7 @@ export function PurchaseOrderList({
   return (
     <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-xs">
       <TableFilterBar
+        archiveFilter
         searchPlaceholder="Search order #, supplier name, or ref..."
         filterParamNames={["status", "paymentTerm", "paymentStatus", "locationId"]}
         viewMode={viewMode}
@@ -1004,6 +1007,7 @@ export function ReceiptList({
   return (
     <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-xs">
       <TableFilterBar
+        archiveFilter
         searchPlaceholder="Search receipt #, PO ref, supplier, or invoice..."
         filterParamNames={["status", "locationId"]}
         viewMode={viewMode}
@@ -1246,6 +1250,7 @@ export function PaymentList({ payments }: { payments: PaymentListRow[] }) {
   return (
     <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-xs">
       <TableFilterBar
+        archiveFilter
         searchPlaceholder="Search payment #, supplier, or reference..."
         filterParamNames={["status"]}
         viewMode={viewMode}

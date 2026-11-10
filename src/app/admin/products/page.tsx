@@ -111,6 +111,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
 
       <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-xs">
         <TableFilterBar
+          archiveFilter
           searchPlaceholder="Search item code, SKU, product name, or model..."
           filterParamNames={["category", "brand", "unit", "trackingMode", "status"]}
           storageKey="products"

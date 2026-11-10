@@ -10,6 +10,7 @@ import {
 import { CreateDeliveryLinesEditor } from "@/app/admin/sales/[id]/create-delivery-lines-editor";
 import { SalesOrderForm } from "@/app/admin/sales/sales-order-form";
 import { PaymentFormDialog } from "@/components/app/payment-form-dialog";
+import { OrderArchiveDialog } from "@/components/app/order-archive-dialog";
 import { Alert } from "@/components/ui/alert";
 import { StatusBadge } from "@/components/ui/badge";
 import { Button, ButtonLink } from "@/components/ui/button";
@@ -25,7 +26,8 @@ import { Notebook } from "@/components/ui/notebook";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
 import { DetailStatCard } from "@/components/ui/detail-stat-card";
 import { T } from "@/components/ui/t";
-import { requirePermission } from "@/server/auth/session";
+import { getUserPermissionCodes, requirePermission } from "@/server/auth/session";
+import { PERMISSIONS } from "@/server/iam/permissions";
 import { getActivePaymentAccounts } from "@/server/payments/payments";
 import { getSalesLineApprovalSummary } from "@/server/sales/line-approvals";
 import {
@@ -38,7 +40,7 @@ export const dynamic = "force-dynamic";
 
 type SalesOrderDetailPageProps = {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ notice?: string; error?: string }>;
+  searchParams: Promise<{ notice?: string; error?: string; edit?: string }>;
 };
 
 function statusLabel(value: string) {
@@ -111,6 +113,9 @@ export default async function SalesOrderDetailPage({ params, searchParams }: Sal
   }
 
   const isQuotation = order.status === "quotation";
+  const isAdministrator = (await getUserPermissionCodes(user.id)).has(PERMISSIONS.OWNER.ALL);
+  const canEdit = isQuotation || (order.status !== "cancelled" && isAdministrator);
+  const isEditing = canEdit && query.edit === "1";
   const lineApprovals = isQuotation
     ? await getSalesLineApprovalSummary(options.company.id, order.id, user.id)
     : [];
@@ -138,7 +143,17 @@ export default async function SalesOrderDetailPage({ params, searchParams }: Sal
       <PageHeader
         eyebrow="Sales"
         title={order.orderNo}
-        actions={<ButtonLink href="/admin/sales" variant="outline"><T k="action.backToSales">Back to sales</T></ButtonLink>}
+        actions={
+          <div className="flex flex-wrap items-center gap-2">
+            <ButtonLink href="/admin/sales" variant="outline"><T k="action.backToSales">Back to sales</T></ButtonLink>
+            {canEdit ? (
+              <ButtonLink href={isEditing ? `/admin/sales/${order.id}` : `/admin/sales/${order.id}?edit=1`} variant={isEditing ? "outline" : "default"}>
+                {isEditing ? <T k="action.cancel">Cancel</T> : <T k="action.edit">Edit</T>}
+              </ButtonLink>
+            ) : null}
+            {isAdministrator ? <OrderArchiveDialog entityType="sales_order" entityId={order.id} orderNo={order.orderNo} /> : null}
+          </div>
+        }
       />
 
       {query.notice ? <Alert kind="success">{query.notice}</Alert> : null}
@@ -197,82 +212,83 @@ export default async function SalesOrderDetailPage({ params, searchParams }: Sal
         </div>
       </div>
 
-      {isQuotation ? (
-        <div className="grid gap-4">
-          {lineApprovals.length > 0 ? (
-            <section className="rounded-lg border border-border bg-card p-4">
-              <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <h2 className="text-sm font-semibold"><T k="field.lineApprovals">Line approvals</T></h2>
-                  <p className="text-xs text-muted-foreground">
-                    {approvedApprovalCount} of {lineApprovals.length} required lines approved
-                  </p>
-                </div>
-                <StatusBadge
-                  status={rejectedApprovalCount > 0 ? "rejected" : pendingApprovalCount > 0 ? "pending" : "approved"}
-                  label={rejectedApprovalCount > 0 ? "Approval rejected" : pendingApprovalCount > 0 ? "Approval pending" : "Ready to confirm"}
-                />
-              </div>
+      {lineApprovals.length > 0 ? (
+        <section className="rounded-lg border border-border bg-card p-4">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="text-sm font-semibold"><T k="field.lineApprovals">Line approvals</T></h2>
+              <p className="text-xs text-muted-foreground">
+                {approvedApprovalCount} of {lineApprovals.length} required lines approved
+              </p>
+            </div>
+            <StatusBadge
+              status={rejectedApprovalCount > 0 ? "rejected" : pendingApprovalCount > 0 ? "pending" : "approved"}
+              label={rejectedApprovalCount > 0 ? "Approval rejected" : pendingApprovalCount > 0 ? "Approval pending" : "Ready to confirm"}
+            />
+          </div>
 
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[720px] text-left text-sm">
-                  <thead className="border-b border-border text-xs uppercase text-muted-foreground">
-                    <tr>
-                      <th className="px-2 py-2"><T k="sales.form.line">Line</T></th>
-                      <th className="px-2 py-2"><T k="delivery.product">Product</T></th>
-                      <th className="px-2 py-2"><T k="field.sourceLocation">Location</T></th>
-                      <th className="px-2 py-2"><T k="sales.col.status">Status</T></th>
-                      <th className="px-2 py-2">Decision</th>
-                      <th className="px-2 py-2 text-right"><T k="delivery.actions">Action</T></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {lineApprovals.map((approval) => (
-                      <tr key={approval.id} className="border-b border-border/70 last:border-0">
-                        <td className="px-2 py-3">{approval.lineNo}</td>
-                        <td className="px-2 py-3 font-medium">{approval.productName}</td>
-                        <td className="px-2 py-3">
-                          <div>{approval.locationName}</div>
-                          <div className="text-xs text-muted-foreground">{approval.locationCode}</div>
-                        </td>
-                        <td className="px-2 py-3">
-                          <StatusBadge status={approval.status} label={statusLabel(approval.status)} />
-                        </td>
-                        <td className="px-2 py-3 text-xs text-muted-foreground">
-                          {approval.decidedByName ?? "-"}
-                          {approval.notes ? <div className="mt-1">{approval.notes}</div> : null}
-                        </td>
-                        <td className="px-2 py-3">
-                          {approval.status === "pending" && approval.canApprove ? (
-                            <div className="flex justify-end gap-2">
-                              <form action={rejectSalesOrderLine}>
-                                <input type="hidden" name="salesOrderId" value={order.id} />
-                                <input type="hidden" name="approvalId" value={approval.id} />
-                                <Button type="submit" size="sm" variant="outline">Reject</Button>
-                              </form>
-                              <form action={approveSalesOrderLine}>
-                                <input type="hidden" name="salesOrderId" value={order.id} />
-                                <input type="hidden" name="approvalId" value={approval.id} />
-                                <Button type="submit" size="sm">Approve</Button>
-                              </form>
-                            </div>
-                          ) : (
-                            <div className="text-right text-xs text-muted-foreground">
-                              {approval.status === "pending" ? "Assigned approver required" : "-"}
-                            </div>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              {confirmationBlockedReason ? (
-                <p className="mt-3 text-xs font-medium text-amber-700">{confirmationBlockedReason}</p>
-              ) : null}
-            </section>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[720px] text-left text-sm">
+              <thead className="border-b border-border text-xs uppercase text-muted-foreground">
+                <tr>
+                  <th className="px-2 py-2"><T k="sales.form.line">Line</T></th>
+                  <th className="px-2 py-2"><T k="delivery.product">Product</T></th>
+                  <th className="px-2 py-2"><T k="field.sourceLocation">Location</T></th>
+                  <th className="px-2 py-2"><T k="sales.col.status">Status</T></th>
+                  <th className="px-2 py-2">Decision</th>
+                  <th className="px-2 py-2 text-right"><T k="delivery.actions">Action</T></th>
+                </tr>
+              </thead>
+              <tbody>
+                {lineApprovals.map((approval) => (
+                  <tr key={approval.id} className="border-b border-border/70 last:border-0">
+                    <td className="px-2 py-3">{approval.lineNo}</td>
+                    <td className="px-2 py-3 font-medium">{approval.productName}</td>
+                    <td className="px-2 py-3">
+                      <div>{approval.locationName}</div>
+                      <div className="text-xs text-muted-foreground">{approval.locationCode}</div>
+                    </td>
+                    <td className="px-2 py-3">
+                      <StatusBadge status={approval.status} label={statusLabel(approval.status)} />
+                    </td>
+                    <td className="px-2 py-3 text-xs text-muted-foreground">
+                      {approval.decidedByName ?? "-"}
+                      {approval.notes ? <div className="mt-1">{approval.notes}</div> : null}
+                    </td>
+                    <td className="px-2 py-3">
+                      {approval.status === "pending" && approval.canApprove ? (
+                        <div className="flex justify-end gap-2">
+                          <form action={rejectSalesOrderLine}>
+                            <input type="hidden" name="salesOrderId" value={order.id} />
+                            <input type="hidden" name="approvalId" value={approval.id} />
+                            <Button type="submit" size="sm" variant="outline">Reject</Button>
+                          </form>
+                          <form action={approveSalesOrderLine}>
+                            <input type="hidden" name="salesOrderId" value={order.id} />
+                            <input type="hidden" name="approvalId" value={approval.id} />
+                            <Button type="submit" size="sm">Approve</Button>
+                          </form>
+                        </div>
+                      ) : (
+                        <div className="text-right text-xs text-muted-foreground">
+                          {approval.status === "pending" ? "Assigned approver required" : "-"}
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {confirmationBlockedReason ? (
+            <p className="mt-3 text-xs font-medium text-amber-700">{confirmationBlockedReason}</p>
           ) : null}
+        </section>
+      ) : null}
 
+      {isEditing ? (
+        <div className="grid gap-4">
+          {!isQuotation ? <Alert kind="warning">Administrator edit: linked deliveries, invoices, and payments keep their recorded values.</Alert> : null}
           <SalesOrderForm
             action={updateSalesOrder}
             customers={options.customers}
@@ -286,7 +302,8 @@ export default async function SalesOrderDetailPage({ params, searchParams }: Sal
             availableStock={options.availableStock}
             error={query.error}
             order={order}
-            submitLabel="Save Quotation"
+            submitLabel={isQuotation ? "Save Quotation" : "Save Sales Order"}
+            confirmedEdit={!isQuotation}
             defaultDate={todayDate()}
             confirmationBlockedReason={confirmationBlockedReason}
           />

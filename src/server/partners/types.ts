@@ -43,13 +43,25 @@ export type PartnerFormRecord = {
   };
 };
 
+export type PartnerOwnerBalance = {
+  ownerId: string | null;
+  ownerName: string;
+  currencyCode: string;
+  salesCount: number;
+  purchaseCount: number;
+  receivableResidualMinor: number;
+  payableResidualMinor: number;
+  netBalanceMinor: number;
+};
+
 export type PartnerFinancialSummary = {
-  invoiceCount: number;
-  billCount: number;
+  salesCount: number;
+  purchaseCount: number;
   receivableResidualMinor: number;
   payableResidualMinor: number;
   remainingCreditMinor: number;
   netBalanceMinor: number;
+  byOwner: PartnerOwnerBalance[];
 };
 
 export type PartnerDetailRecord = PartnerFormRecord & {

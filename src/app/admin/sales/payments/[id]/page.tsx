@@ -2,13 +2,16 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { verifyPaymentLine } from "@/app/admin/payments/actions";
+import { updatePostedPaymentAsAdministrator } from "@/app/admin/payments/admin-actions";
 import { cancelCustomerPayment, postCustomerPayment, updateCustomerPayment } from "@/app/admin/sales/actions";
 import { PaymentFormDialog } from "@/components/app/payment-form-dialog";
 import { Alert } from "@/components/ui/alert";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { PageHeader, PageShell } from "@/components/ui/page-shell";
 import { T } from "@/components/ui/t";
-import { requirePermission } from "@/server/auth/session";
+import { getUserPermissionCodes, requirePermission } from "@/server/auth/session";
+import { PERMISSIONS } from "@/server/iam/permissions";
+import { getPostedPaymentEditableLimit } from "@/server/payments/admin-payment-limit";
 import { displayPaymentMoney, getActivePaymentAccounts, getPaymentDetail } from "@/server/payments/payments";
 
 export const dynamic = "force-dynamic";
@@ -23,14 +26,14 @@ function statusLabel(value: string) {
 }
 
 export default async function CustomerPaymentPage({ params, searchParams }: CustomerPaymentPageProps) {
-  await requirePermission("sales:orders:create");
+  const user = await requirePermission("sales:orders:create");
 
   const [{ id }, query, paymentAccounts] = await Promise.all([
     params,
     searchParams,
     getActivePaymentAccounts("inbound"),
   ]);
-  const payment = await getPaymentDetail(id);
+  const [payment, permissionCodes] = await Promise.all([getPaymentDetail(id), getUserPermissionCodes(user.id)]);
 
   if (!payment || payment.paymentType !== "inbound") {
     notFound();
@@ -39,6 +42,9 @@ export default async function CustomerPaymentPage({ params, searchParams }: Cust
   const customerInvoiceId = payment.allocations.find((allocation) => allocation.customerInvoiceId)?.customerInvoiceId;
   const salesOrderId = payment.allocations.find((allocation) => allocation.salesOrderId)?.salesOrderId;
   const customerDirectVendorSaleId = payment.allocations.find((allocation) => allocation.customerDirectVendorSaleId)?.customerDirectVendorSaleId;
+  const editableLimit = payment.status === "posted" && permissionCodes.has(PERMISSIONS.OWNER.ALL)
+    ? await getPostedPaymentEditableLimit(payment.id)
+    : null;
 
   return (
     <PageShell>
@@ -48,18 +54,18 @@ export default async function CustomerPaymentPage({ params, searchParams }: Cust
         actions={
           <div className="flex flex-wrap gap-2">
             <ButtonLink href="/admin/sales?view=payments" variant="outline"><T k="action.backToPayments">Back to payments</T></ButtonLink>
-            {payment.status === "draft" ? (
+            {payment.status === "draft" || (payment.status === "posted" && payment.allocations.length === 1 && permissionCodes.has(PERMISSIONS.OWNER.ALL)) ? (
               <PaymentFormDialog
                 title="Edit Customer Payment"
-                description={`Update draft payment ${payment.paymentNo}.`}
+                description={`Update payment ${payment.paymentNo}.`}
                 triggerLabel="Edit Payment"
                 submitLabel="Save Payment"
-                action={updateCustomerPayment}
+                action={payment.status === "draft" ? updateCustomerPayment : updatePostedPaymentAsAdministrator}
                 hiddenFieldName="paymentId"
                 hiddenFieldValue={payment.id}
                 paymentAccounts={paymentAccounts}
                 currencyCode={payment.currencyCode}
-                amountMinor={payment.amountMinor}
+                amountMinor={editableLimit ?? payment.amountMinor}
                 paymentAccountId={payment.paymentAccountId}
                 reference={payment.reference}
                 notes={payment.notes}

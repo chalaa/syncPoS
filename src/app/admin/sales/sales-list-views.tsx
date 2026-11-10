@@ -25,6 +25,7 @@ export function CustomerReturnList({ returns }: { returns: CustomerReturnListRow
   return (
     <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-xs">
       <TableFilterBar
+        archiveFilter
         searchPlaceholder={t("sales.searchReturns", "Search return #, order #, or customer...")}
         filterParamNames={["status"]}
         viewMode={viewMode}
@@ -241,6 +242,7 @@ export function CustomerInvoiceList({ invoices }: { invoices: CustomerInvoiceLis
   return (
     <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-xs">
       <TableFilterBar
+        archiveFilter
         searchPlaceholder={t("sales.searchInvoices", "Search invoice #, customer name, or source ref...")}
         filterParamNames={["status", "paymentStatus"]}
         viewMode={viewMode}
@@ -504,6 +506,7 @@ export function CustomerPaymentList({ payments }: { payments: PaymentListRow[] }
   return (
     <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-xs">
       <TableFilterBar
+        archiveFilter
         searchPlaceholder={t("sales.searchPayments", "Search payment #, customer, or reference...")}
         filterParamNames={["status"]}
         viewMode={viewMode}
@@ -717,6 +720,7 @@ export function DeliveryList({ deliveries }: { deliveries: DeliveryListRow[] }) 
   return (
     <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-xs">
       <TableFilterBar
+        archiveFilter
         searchPlaceholder={t("sales.searchDeliveries", "Search delivery #, order #, or customer...")}
         filterParamNames={["status"]}
         viewMode={viewMode}
@@ -1085,6 +1089,7 @@ export function SalesOrderList({
   return (
     <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-xs">
       <TableFilterBar
+        archiveFilter
         searchPlaceholder="Search order #, customer name, ref, or FS #..."
         filterParamNames={["locationId", "status", "paymentTerm", "paymentStatus"]}
         viewMode={viewMode}

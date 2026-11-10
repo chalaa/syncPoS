@@ -181,6 +181,7 @@ export function DirectVendorSaleList({ sales }: { sales: DirectVendorSaleListRow
     <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-xs">
       {/* Responsive Filter Bar */}
       <TableFilterBar
+        archiveFilter
         searchPlaceholder={t("directVendor.searchPlaceholder", "Search sale #, customer, or vendor...")}
         filterParamNames={["status", "customerPaymentTerm", "vendorPaymentTerm"]}
         viewMode={viewMode}

@@ -1,5 +1,4 @@
-import Link from "next/link";
-import { ArrowUpRight, FileText, Receipt, ArrowLeft } from "lucide-react";
+import { PartnerFinancialOverview } from "@/app/admin/partners/partner-financial-overview";
 
 import { Alert } from "@/components/ui/alert";
 import { Button, ButtonLink } from "@/components/ui/button";
@@ -24,108 +23,6 @@ function hasFinancialSummary(partner?: PartnerFormRecord | PartnerDetailRecord):
   return Boolean(partner && "financial" in partner);
 }
 
-function money(value: number, currencyCode: string) {
-  return `${currencyCode} ${minorToDisplay(value)}`;
-}
-
-function PartnerSmartSummary({ partner }: { partner: PartnerDetailRecord }) {
-  return (
-    <section className="mb-6 space-y-4">
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        {partner.isCustomer ? (
-          <Link
-            href={`/admin/sales?view=invoices&partnerId=${partner.id}`}
-            className="group flex items-center justify-between rounded-xl border border-border bg-card p-4 transition-all hover:border-primary/50 hover:bg-secondary/40 hover:shadow-xs"
-          >
-            <div className="flex items-center gap-3">
-              <div className="flex size-10 items-center justify-center rounded-lg bg-primary/10 text-primary transition-colors group-hover:bg-primary group-hover:text-primary-foreground">
-                <FileText className="size-5" />
-              </div>
-              <div>
-                <div className="text-xl font-bold tracking-tight text-foreground">
-                  {partner.financial.invoiceCount}
-                </div>
-                <div className="text-xs font-medium text-muted-foreground">
-                  <T k="Customer Invoices" />
-                </div>
-              </div>
-            </div>
-            <ArrowUpRight className="size-4 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:text-primary" />
-          </Link>
-        ) : null}
-        {partner.isSupplier ? (
-          <Link
-            href={`/admin/purchasing?view=supplier-bills&partnerId=${partner.id}`}
-            className="group flex items-center justify-between rounded-xl border border-border bg-card p-4 transition-all hover:border-primary/50 hover:bg-secondary/40 hover:shadow-xs"
-          >
-            <div className="flex items-center gap-3">
-              <div className="flex size-10 items-center justify-center rounded-lg bg-primary/10 text-primary transition-colors group-hover:bg-primary group-hover:text-primary-foreground">
-                <Receipt className="size-5" />
-              </div>
-              <div>
-                <div className="text-xl font-bold tracking-tight text-foreground">
-                  {partner.financial.billCount}
-                </div>
-                <div className="text-xs font-medium text-muted-foreground">
-                  <T k="Vendor Bills" />
-                </div>
-              </div>
-            </div>
-            <ArrowUpRight className="size-4 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:text-primary" />
-          </Link>
-        ) : null}
-      </div>
-
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="rounded-xl border border-border border-l-4 border-l-amber-500 bg-card p-4 shadow-xs">
-          <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            <T k="Customer unpaid" />
-          </div>
-          <div className="mt-1 text-xl font-bold tracking-tight text-foreground">
-            {money(partner.financial.receivableResidualMinor, partner.currencyCode)}
-          </div>
-        </div>
-        <div className="rounded-xl border border-border border-l-4 border-l-emerald-600 bg-card p-4 shadow-xs">
-          <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            <T k="Available credit" />
-          </div>
-          <div className="mt-1 text-xl font-bold tracking-tight text-foreground">
-            {money(partner.financial.remainingCreditMinor, partner.currencyCode)}
-          </div>
-        </div>
-        <div className="rounded-xl border border-border border-l-4 border-l-rose-500 bg-card p-4 shadow-xs">
-          <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            <T k="Supplier unpaid" />
-          </div>
-          <div className="mt-1 text-xl font-bold tracking-tight text-foreground">
-            {money(partner.financial.payableResidualMinor, partner.currencyCode)}
-          </div>
-        </div>
-        <div
-          className={`rounded-xl border border-border border-l-4 bg-card p-4 shadow-xs ${
-            partner.financial.netBalanceMinor >= 0
-              ? "border-l-emerald-600"
-              : "border-l-rose-500"
-          }`}
-        >
-          <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            <T k="Net balance" />
-          </div>
-          <div
-            className={`mt-1 text-xl font-bold tracking-tight ${
-              partner.financial.netBalanceMinor >= 0
-                ? "text-emerald-700 dark:text-emerald-400"
-                : "text-rose-600 dark:text-rose-400"
-            }`}
-          >
-            {money(partner.financial.netBalanceMinor, partner.currencyCode)}
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-}
-
 export function PartnerForm({ mode, partner, paymentTerms, error }: PartnerFormProps) {
   const action = mode === "create" ? createPartner : updatePartner;
   const title = mode === "create" ? "New Partner" : "Edit Partner";
@@ -145,7 +42,7 @@ export function PartnerForm({ mode, partner, paymentTerms, error }: PartnerFormP
 
       {error ? <Alert kind="error">{error}</Alert> : null}
 
-      {hasFinancialSummary(partner) ? <PartnerSmartSummary partner={partner} /> : null}
+      {hasFinancialSummary(partner) ? <PartnerFinancialOverview partner={partner} /> : null}
 
       <form action={action} className="grid gap-5 rounded-xl border border-border bg-card p-6 shadow-xs">
           {partner ? <input type="hidden" name="id" value={partner.id} /> : null}

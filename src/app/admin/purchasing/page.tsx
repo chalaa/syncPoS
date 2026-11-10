@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ArchivedModelList } from "@/components/app/archived-model-list";
 import type { ReactNode } from "react";
 
 import { TableFilterBar } from "@/components/ui/table-filter-bar";
@@ -53,10 +54,13 @@ type PurchasingPageProps = {
     vendorBillId?: string;
     directVendorSaleId?: string;
     partnerId?: string;
+    ownerId?: string;
+    currencyCode?: string;
     notice?: string;
     error?: string;
     new?: string;
     q?: string;
+    show?: string;
     status?: string;
     paymentTerm?: string;
     paymentStatus?: string;
@@ -92,8 +96,17 @@ export default async function PurchasingPage({ searchParams }: PurchasingPagePro
   const locationId = params.locationId ?? "";
   const costType = params.costType ?? "";
 
+  if (params.show === "deleted") {
+    const archiveViews = {
+      orders: ["purchase_order", "Purchase Orders"], receipts: ["receipt", "Receipts"],
+      "landed-costs": ["landed_cost", "Landed Costs"], payments: ["supplier_payment", "Supplier Payments"], returns: ["supplier_return", "Supplier Returns"],
+    } as const;
+    const [model, title] = archiveViews[view as keyof typeof archiveViews] ?? archiveViews.orders;
+    return <ArchivedModelList model={model} title={title} companyId={user.companyId} params={params} canRestore={userPerms.has(PERMISSIONS.OWNER.ALL)} />;
+  }
+
   const formOptions = await getPurchaseFormOptions();
-  const allOrders = await getPurchaseOrderList({ query, status, paymentTerm, locationId: locationId || undefined, paymentStatus });
+  const allOrders = await getPurchaseOrderList({ query, status, paymentTerm, locationId: locationId || undefined, paymentStatus, partnerId: params.partnerId, ownerId: params.ownerId, currencyCode: params.currencyCode });
 
   if (view === "receipts") {
     let receipts = await getPurchaseReceiptList(params.purchaseOrderId, locationId || undefined);
