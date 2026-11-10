@@ -1,7 +1,8 @@
 "use client";
 
+import { Fragment, useState } from "react";
 import Link from "next/link";
-import { Calendar, ChevronRight, Package, Truck, User, CreditCard } from "lucide-react";
+import { Calendar, ChevronDown, ChevronRight, Package, Truck, User, CreditCard } from "lucide-react";
 import { TableFilterBar } from "@/components/ui/table-filter-bar";
 import { TableFilterSelect } from "@/components/ui/table-filter-select";
 import { TableSortSelect, type TableSortOption } from "@/components/ui/table-sort-select";
@@ -9,6 +10,7 @@ import { SortableTableHead } from "@/components/ui/sortable-table-head";
 import { StatusBadge } from "@/components/ui/badge";
 import { ButtonLink } from "@/components/ui/button";
 import { ClickableTableRow } from "@/components/ui/clickable-table-row";
+import { cn } from "@/lib/utils";
 import { useViewMode } from "@/components/ui/view-mode-toggle";
 import { useTranslation } from "@/lib/i18n/use-translation";
 import { displayReturnMoney, displaySalesMoney } from "@/lib/catalog-utils";
@@ -930,6 +932,110 @@ export function DeliveryList({ deliveries }: { deliveries: DeliveryListRow[] }) 
   );
 }
 
+function SalesOrderProductLinesTable({ order }: { order: SalesOrderListRow }) {
+  const lines = order.lines ?? [];
+  const baseSubtotal = lines.reduce(
+    (acc, l) => acc + Math.round((parseFloat(l.quantityOrdered) || 0) * l.unitPriceMinor),
+    0
+  );
+  const totalDiscount = lines.reduce((acc, l) => acc + (l.discountMinor || 0), 0);
+  const totalTax = lines.reduce((acc, l) => acc + (l.taxAmountMinor || 0), 0);
+
+  return (
+    <div className="p-4 bg-muted/20 border-l-4 border-l-primary/70 space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <Package className="size-4 text-primary" />
+          <span className="text-xs font-bold uppercase tracking-wider text-foreground">
+            Order Products & Price Calculation
+          </span>
+          <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary">
+            {lines.length} {lines.length === 1 ? "item" : "items"}
+          </span>
+        </div>
+        <div className="inline-flex items-center gap-1.5 rounded-md bg-background px-2.5 py-1 text-[11px] font-mono border border-border/80 text-muted-foreground shadow-2xs">
+          <span className="text-[10px] font-bold uppercase text-foreground/70">Formula:</span>
+          <span>(Qty × Unit Price) - Discount + Tax = Line Total</span>
+        </div>
+      </div>
+
+      {lines.length === 0 ? (
+        <div className="py-4 text-center text-xs text-muted-foreground italic bg-background/50 rounded-lg border border-border/50">
+          No product lines recorded for this order.
+        </div>
+      ) : (
+        <div className="overflow-x-auto rounded-xl border border-border/70 bg-card shadow-2xs">
+          <table className="w-full text-left text-xs">
+            <thead>
+              <tr className="border-b border-border/70 bg-muted/50 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                <th className="px-3 py-2 w-10 text-center">#</th>
+                <th className="px-3 py-2">Product Name</th>
+                <th className="px-3 py-2">SKU</th>
+                <th className="px-3 py-2 text-right">Qty Ordered</th>
+                <th className="px-3 py-2 text-right">Qty Delivered</th>
+                <th className="px-3 py-2 text-right">Unit Price</th>
+                <th className="px-3 py-2 text-right">Base (Qty × Price)</th>
+                <th className="px-3 py-2 text-right">Discount</th>
+                <th className="px-3 py-2 text-right">Tax</th>
+                <th className="px-3 py-2 text-right font-bold text-foreground">Line Total</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border/50 font-mono text-xs">
+              {lines.map((line) => {
+                const qty = parseFloat(line.quantityOrdered) || 0;
+                const baseAmountMinor = Math.round(qty * line.unitPriceMinor);
+                return (
+                  <tr key={line.id} className="hover:bg-muted/30 transition-colors">
+                    <td className="px-3 py-2 text-center text-muted-foreground">{line.lineNo}</td>
+                    <td className="px-3 py-2 font-sans font-medium text-foreground">{line.productName}</td>
+                    <td className="px-3 py-2 text-muted-foreground">{line.sku || "-"}</td>
+                    <td className="px-3 py-2 text-right font-medium text-foreground">{line.quantityOrdered}</td>
+                    <td className="px-3 py-2 text-right text-muted-foreground">{line.quantityDelivered}</td>
+                    <td className="px-3 py-2 text-right text-muted-foreground">{displaySalesMoney(line.unitPriceMinor, order.currencyCode)}</td>
+                    <td className="px-3 py-2 text-right text-muted-foreground">{displaySalesMoney(baseAmountMinor, order.currencyCode)}</td>
+                    <td className="px-3 py-2 text-right text-muted-foreground">
+                      {line.discountMinor > 0 ? (
+                        <span className="text-amber-600 dark:text-amber-400 font-medium">-{displaySalesMoney(line.discountMinor, order.currencyCode)}</span>
+                      ) : "-"}
+                    </td>
+                    <td className="px-3 py-2 text-right text-muted-foreground">
+                      {line.taxAmountMinor > 0 ? (
+                        <span className="text-blue-600 dark:text-blue-400 font-medium">+{displaySalesMoney(line.taxAmountMinor, order.currencyCode)}</span>
+                      ) : "-"}
+                    </td>
+                    <td className="px-3 py-2 text-right font-bold text-foreground">
+                      {displaySalesMoney(line.lineTotalMinor, order.currencyCode)}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+            <tfoot className="border-t border-border/80 bg-muted/30 font-mono text-xs font-semibold">
+              <tr>
+                <td colSpan={6} className="px-3 py-2.5 text-right font-sans uppercase text-[10px] text-muted-foreground tracking-wider">
+                  Total Order Price Calculation:
+                </td>
+                <td className="px-3 py-2.5 text-right text-muted-foreground">
+                  {displaySalesMoney(baseSubtotal, order.currencyCode)}
+                </td>
+                <td className="px-3 py-2.5 text-right text-amber-600 dark:text-amber-400">
+                  {totalDiscount > 0 ? `-${displaySalesMoney(totalDiscount, order.currencyCode)}` : "-"}
+                </td>
+                <td className="px-3 py-2.5 text-right text-blue-600 dark:text-blue-400">
+                  {totalTax > 0 ? `+${displaySalesMoney(totalTax, order.currencyCode)}` : "-"}
+                </td>
+                <td className="px-3 py-2.5 text-right font-extrabold text-foreground text-sm">
+                  {displaySalesMoney(order.totalMinor, order.currencyCode)}
+                </td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function SalesOrderList({
   orders,
   locations = [],
@@ -939,6 +1045,19 @@ export function SalesOrderList({
 }) {
   const { t } = useTranslation();
   const [viewMode, setViewMode] = useViewMode("sales_orders", "table");
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+
+  function toggleRow(id: string) {
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  }
 
   const statusOptions = [
     { value: "quotation", label: t("status.quotation", "Quotation") },
@@ -1012,84 +1131,106 @@ export function SalesOrderList({
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {orders.map((order) => (
-                <div
-                  key={order.id}
-                  className="flex flex-col justify-between rounded-xl border border-border bg-card p-4 transition-all duration-150 hover:border-primary/40 hover:shadow-md"
-                >
-                  <div className="space-y-3">
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <Link
-                          href={`/admin/sales/${order.id}`}
-                          className="font-mono text-sm font-bold text-primary hover:underline"
-                        >
-                          {order.orderNo}
-                        </Link>
-                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5">
-                          <Calendar className="size-3 text-muted-foreground/70" />
-                          <span>{order.orderDate}</span>
+              {orders.map((order) => {
+                const isExpanded = expandedIds.has(order.id);
+                return (
+                  <div
+                    key={order.id}
+                    className="flex flex-col justify-between rounded-xl border border-border bg-card p-4 transition-all duration-150 hover:border-primary/40 hover:shadow-md"
+                  >
+                    <div className="space-y-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <Link
+                            href={`/admin/sales/${order.id}`}
+                            className="font-mono text-sm font-bold text-primary hover:underline"
+                          >
+                            {order.orderNo}
+                          </Link>
+                          <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5">
+                            <Calendar className="size-3 text-muted-foreground/70" />
+                            <span>{order.orderDate}</span>
+                          </div>
+                        </div>
+                        <StatusBadge status={order.status} />
+                      </div>
+
+                      <div className="rounded-xl border border-border/70 bg-muted/20 p-2.5 text-xs space-y-1">
+                        <div className="flex items-center gap-2">
+                          <User className="size-3.5 text-primary shrink-0" />
+                          <span className="font-semibold text-foreground truncate">{order.customerName}</span>
+                        </div>
+                        {order.sourceLocationCode ? (
+                          <div className="text-muted-foreground">
+                            {t("sales.col.sourceWarehouse", "Warehouse")}: {order.sourceLocationCode}
+                          </div>
+                        ) : null}
+                        <div className="flex items-center gap-2 pt-1">
+                          <span className="capitalize font-semibold text-foreground">
+                            {order.paymentTerm === "cash" ? t("common.cash", "Cash") : order.paymentTerm === "credit" ? t("common.credit", "Credit") : order.paymentTerm}
+                          </span>
+                          {order.residualAmountMinor === 0 || order.totalMinor === 0 ? (
+                            <StatusBadge status="paid" label={t("purchasing.fullyPaid", "Fully Paid")} />
+                          ) : order.residualAmountMinor < order.totalMinor ? (
+                            <StatusBadge
+                              status="partially_paid"
+                              label={`${t("purchasing.due", "Due")} ${displaySalesMoney(order.residualAmountMinor, order.currencyCode)}`}
+                            />
+                          ) : (
+                            <StatusBadge
+                              status="unpaid"
+                              label={`${t("Unpaid", "Unpaid")} ${displaySalesMoney(order.residualAmountMinor, order.currencyCode)}`}
+                            />
+                          )}
                         </div>
                       </div>
-                      <StatusBadge status={order.status} />
                     </div>
 
-                    <div className="rounded-xl border border-border/70 bg-muted/20 p-2.5 text-xs space-y-1">
-                      <div className="flex items-center gap-2">
-                        <User className="size-3.5 text-primary shrink-0" />
-                        <span className="font-semibold text-foreground truncate">{order.customerName}</span>
-                      </div>
-                      {order.sourceLocationCode ? (
-                        <div className="text-muted-foreground">
-                          {t("sales.col.sourceWarehouse", "Warehouse")}: {order.sourceLocationCode}
+                    <div className="pt-3 mt-3 border-t border-border/60 space-y-3">
+                      <div className="flex items-center justify-between gap-2">
+                        <div>
+                          <div className="text-[10px] uppercase font-semibold text-muted-foreground">
+                            {t("sales.col.grandTotal", "Grand Total")}
+                          </div>
+                          <div className="font-mono text-sm font-bold text-foreground">
+                            {displaySalesMoney(order.totalMinor, order.currencyCode)}
+                          </div>
+                          <div className="text-[11px] text-muted-foreground">
+                            {order.quantityDelivered} / {order.quantityOrdered} delivered
+                          </div>
                         </div>
-                      ) : null}
-                      <div className="flex items-center gap-2 pt-1">
-                        <span className="capitalize font-semibold text-foreground">
-                          {order.paymentTerm === "cash" ? t("common.cash", "Cash") : order.paymentTerm === "credit" ? t("common.credit", "Credit") : order.paymentTerm}
-                        </span>
-                        {order.residualAmountMinor === 0 || order.totalMinor === 0 ? (
-                          <StatusBadge status="paid" label={t("purchasing.fullyPaid", "Fully Paid")} />
-                        ) : order.residualAmountMinor < order.totalMinor ? (
-                          <StatusBadge
-                            status="partially_paid"
-                            label={`${t("purchasing.due", "Due")} ${displaySalesMoney(order.residualAmountMinor, order.currencyCode)}`}
-                          />
-                        ) : (
-                          <StatusBadge
-                            status="unpaid"
-                            label={`${t("Unpaid", "Unpaid")} ${displaySalesMoney(order.residualAmountMinor, order.currencyCode)}`}
-                          />
-                        )}
+
+                        <div className="flex items-center gap-2">
+                          <ButtonLink
+                            href={`/admin/sales/${order.id}`}
+                            size="sm"
+                            variant="outline"
+                            className="h-8 gap-1 px-3 text-xs font-semibold"
+                          >
+                            <span>{t("action.details", "Details")}</span>
+                            <ChevronRight className="size-3.5" />
+                          </ButtonLink>
+                        </div>
                       </div>
+
+                      <button
+                        type="button"
+                        onClick={() => toggleRow(order.id)}
+                        className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-border/70 bg-muted/30 py-1.5 text-xs font-semibold text-primary hover:bg-muted transition-colors cursor-pointer"
+                      >
+                        <ChevronDown className={cn("size-3.5 transition-transform duration-200", isExpanded && "rotate-180")} />
+                        <span>{isExpanded ? "Hide products breakdown" : `View products (${order.lines?.length ?? order.lineCount})`}</span>
+                      </button>
+
+                      {isExpanded && (
+                        <div className="pt-1">
+                          <SalesOrderProductLinesTable order={order} />
+                        </div>
+                      )}
                     </div>
                   </div>
-
-                  <div className="flex items-center justify-between gap-2 pt-3 mt-3 border-t border-border/60">
-                    <div>
-                      <div className="text-[10px] uppercase font-semibold text-muted-foreground">
-                        {t("sales.col.grandTotal", "Grand Total")}
-                      </div>
-                      <div className="font-mono text-sm font-bold text-foreground">
-                        {displaySalesMoney(order.totalMinor, order.currencyCode)}
-                      </div>
-                      <div className="text-[11px] text-muted-foreground">
-                        {order.quantityDelivered} / {order.quantityOrdered} delivered
-                      </div>
-                    </div>
-
-                    <ButtonLink
-                      href={`/admin/sales/${order.id}`}
-                      size="sm"
-                      variant="outline"
-                      className="h-8 gap-1 px-3 text-xs font-semibold"
-                    >
-                      <span>{t("action.details", "Details")}</span>
-                      <ChevronRight className="size-3.5" />
-                    </ButtonLink>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
@@ -1101,59 +1242,77 @@ export function SalesOrderList({
             </div>
           ) : (
             <div className="divide-y divide-border/60">
-              {orders.map((order) => (
-                <div
-                  key={order.id}
-                  className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 transition-colors hover:bg-muted/30"
-                >
-                  <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-6 flex-1 min-w-0">
-                    <div className="shrink-0">
-                      <Link
-                        href={`/admin/sales/${order.id}`}
-                        className="font-mono text-sm font-bold text-primary hover:underline"
-                      >
-                        {order.orderNo}
-                      </Link>
-                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5">
-                        <Calendar className="size-3 text-muted-foreground/70" />
-                        <span>{order.orderDate}</span>
+              {orders.map((order) => {
+                const isExpanded = expandedIds.has(order.id);
+                return (
+                  <div key={order.id} className="p-4 transition-colors hover:bg-muted/30">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-6 flex-1 min-w-0">
+                        <div className="shrink-0 flex items-center gap-2">
+                          <button
+                            type="button"
+                            aria-label={isExpanded ? "Collapse products" : "Expand products"}
+                            onClick={() => toggleRow(order.id)}
+                            className="inline-flex size-7 items-center justify-center rounded-lg border border-border/80 bg-background hover:bg-muted text-muted-foreground hover:text-foreground transition-all cursor-pointer"
+                          >
+                            <ChevronDown className={cn("size-3.5 transition-transform duration-200", isExpanded && "rotate-180")} />
+                          </button>
+                          <div>
+                            <Link
+                              href={`/admin/sales/${order.id}`}
+                              className="font-mono text-sm font-bold text-primary hover:underline"
+                            >
+                              {order.orderNo}
+                            </Link>
+                            <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5">
+                              <Calendar className="size-3 text-muted-foreground/70" />
+                              <span>{order.orderDate}</span>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="min-w-0 flex-1 space-y-1">
+                          <div className="font-medium text-foreground truncate">{order.customerName}</div>
+                          <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                            <StatusBadge status={order.status} />
+                            <span className="capitalize">{order.paymentTerm}</span>
+                            {order.sourceLocationCode ? <span>· {order.sourceLocationCode}</span> : null}
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                    <div className="min-w-0 flex-1 space-y-1">
-                      <div className="font-medium text-foreground truncate">{order.customerName}</div>
-                      <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                        <StatusBadge status={order.status} />
-                        <span className="capitalize">{order.paymentTerm}</span>
-                        {order.sourceLocationCode ? <span>· {order.sourceLocationCode}</span> : null}
-                      </div>
-                    </div>
-                  </div>
 
-                  <div className="flex items-center justify-between sm:justify-end gap-5 shrink-0">
-                    <div className="text-right">
-                      <div className="text-[10px] uppercase font-semibold text-muted-foreground">
-                        {t("sales.col.grandTotal", "Grand Total")}
-                      </div>
-                      <div className="font-mono text-sm font-bold text-foreground">
-                        {displaySalesMoney(order.totalMinor, order.currencyCode)}
-                      </div>
-                      <div className="text-[11px] text-muted-foreground">
-                        {order.quantityDelivered} / {order.quantityOrdered}
+                      <div className="flex items-center justify-between sm:justify-end gap-5 shrink-0">
+                        <div className="text-right">
+                          <div className="text-[10px] uppercase font-semibold text-muted-foreground">
+                            {t("sales.col.grandTotal", "Grand Total")}
+                          </div>
+                          <div className="font-mono text-sm font-bold text-foreground">
+                            {displaySalesMoney(order.totalMinor, order.currencyCode)}
+                          </div>
+                          <div className="text-[11px] text-muted-foreground">
+                            {order.quantityDelivered} / {order.quantityOrdered}
+                          </div>
+                        </div>
+
+                        <ButtonLink
+                          href={`/admin/sales/${order.id}`}
+                          size="sm"
+                          variant="outline"
+                          className="h-8 gap-1 px-3 text-xs font-semibold"
+                        >
+                          <span>{t("action.details", "Details")}</span>
+                          <ChevronRight className="size-3.5" />
+                        </ButtonLink>
                       </div>
                     </div>
 
-                    <ButtonLink
-                      href={`/admin/sales/${order.id}`}
-                      size="sm"
-                      variant="outline"
-                      className="h-8 gap-1 px-3 text-xs font-semibold"
-                    >
-                      <span>{t("action.details", "Details")}</span>
-                      <ChevronRight className="size-3.5" />
-                    </ButtonLink>
+                    {isExpanded && (
+                      <div className="mt-3 pt-3 border-t border-border/50">
+                        <SalesOrderProductLinesTable order={order} />
+                      </div>
+                    )}
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
@@ -1162,6 +1321,7 @@ export function SalesOrderList({
           <table className="w-full min-w-[1080px] text-left text-sm">
             <thead>
               <tr className="border-b border-border bg-muted/40 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                <th className="w-10 px-2 py-3 text-center" aria-label="Expand row"></th>
                 <SortableTableHead sortKey="orderNo" label={t("sales.col.orderNo", "Order No")} className="px-4 py-3" />
                 <SortableTableHead sortKey="customerName" label={t("sales.col.customer", "Customer")} className="px-4 py-3" />
                 <SortableTableHead sortKey="status" label={t("sales.col.orderStatus", "Order Status")} className="px-4 py-3" />
@@ -1176,61 +1336,86 @@ export function SalesOrderList({
               </tr>
             </thead>
             <tbody className="divide-y divide-border/60">
-              {orders.map((order) => (
-                <ClickableTableRow key={order.id} href={`/admin/sales/${order.id}`}>
-                  <td className="px-4 py-3.5">
-                    <Link href={`/admin/sales/${order.id}`} className="inline-flex items-center gap-1.5 rounded-lg border border-primary/20 bg-primary/5 px-2.5 py-1 font-mono text-xs font-bold text-primary transition-all hover:bg-primary/10 hover:border-primary/40">
-                      {order.orderNo}
-                    </Link>
-                    {order.customerReference ? (
-                      <div className="text-xs text-muted-foreground">{t("purchasing.ref", "Ref")}: {order.customerReference}</div>
-                    ) : null}
-                    {order.fsNumber ? <div className="text-[11px] font-mono text-muted-foreground">FS: {order.fsNumber}</div> : null}
-                  </td>
-                  <td className="px-4 py-3.5">
-                    <div className="font-semibold text-foreground group-hover:text-primary transition-colors">{order.customerName}</div>
-                  </td>
-                  <td className="px-4 py-3.5">
-                    <StatusBadge status={order.status} />
-                  </td>
-                  <td className="px-4 py-3.5 text-xs text-muted-foreground">{order.orderDate}</td>
-                  <td className="px-4 py-3.5">
-                    <div className="flex flex-col gap-1">
-                      <span className="text-xs font-semibold capitalize text-foreground">
-                        {order.paymentTerm === "cash" ? t("common.cash", "Cash") : order.paymentTerm === "credit" ? t("common.credit", "Credit") : order.paymentTerm}
-                      </span>
-                      {order.residualAmountMinor === 0 || order.totalMinor === 0 ? (
-                        <StatusBadge status="paid" label={t("purchasing.fullyPaid", "Fully Paid")} />
-                      ) : order.residualAmountMinor < order.totalMinor ? (
-                        <StatusBadge
-                          status="partially_paid"
-                          label={`${t("purchasing.due", "Due")} ${displaySalesMoney(order.residualAmountMinor, order.currencyCode)}`}
-                        />
-                      ) : (
-                        <StatusBadge
-                          status="unpaid"
-                          label={`${t("Unpaid", "Unpaid")} ${displaySalesMoney(order.residualAmountMinor, order.currencyCode)}`}
-                        />
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-4 py-3.5 text-xs font-medium text-muted-foreground">{order.sourceLocationCode ?? "-"}</td>
-                  <td className="px-4 py-3.5 text-right font-mono text-xs text-muted-foreground">{order.lineCount}</td>
-                  <td className="px-4 py-3.5 text-right font-mono text-xs font-semibold text-foreground">{order.quantityOrdered}</td>
-                  <td className="px-4 py-3.5 text-right font-mono text-xs font-semibold text-foreground">{order.quantityDelivered}</td>
-                  <td className="px-4 py-3.5 text-right font-mono text-xs font-extrabold text-foreground">
-                    {displaySalesMoney(order.totalMinor, order.currencyCode)}
-                  </td>
-                  <td className="px-4 py-3.5 text-right">
-                    <ButtonLink href={`/admin/sales/${order.id}`} size="sm" variant="outline" className="h-8 px-2.5 text-xs">
-                      {t("action.details", "Details")}
-                    </ButtonLink>
-                  </td>
-                </ClickableTableRow>
-              ))}
+              {orders.map((order) => {
+                const isExpanded = expandedIds.has(order.id);
+                return (
+                  <Fragment key={order.id}>
+                    <ClickableTableRow href={`/admin/sales/${order.id}`}>
+                      <td className="w-10 px-2 py-3.5 text-center">
+                        <button
+                          type="button"
+                          aria-label={isExpanded ? "Collapse line items" : "Expand line items"}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleRow(order.id);
+                          }}
+                          className="inline-flex size-7 items-center justify-center rounded-lg border border-border/80 bg-background hover:bg-muted text-muted-foreground hover:text-foreground transition-all cursor-pointer"
+                        >
+                          <ChevronDown className={cn("size-3.5 transition-transform duration-200", isExpanded && "rotate-180")} />
+                        </button>
+                      </td>
+                      <td className="px-4 py-3.5">
+                        <Link href={`/admin/sales/${order.id}`} className="inline-flex items-center gap-1.5 rounded-lg border border-primary/20 bg-primary/5 px-2.5 py-1 font-mono text-xs font-bold text-primary transition-all hover:bg-primary/10 hover:border-primary/40">
+                          {order.orderNo}
+                        </Link>
+                        {order.customerReference ? (
+                          <div className="text-xs text-muted-foreground">{t("purchasing.ref", "Ref")}: {order.customerReference}</div>
+                        ) : null}
+                        {order.fsNumber ? <div className="text-[11px] font-mono text-muted-foreground">FS: {order.fsNumber}</div> : null}
+                      </td>
+                      <td className="px-4 py-3.5">
+                        <div className="font-semibold text-foreground group-hover:text-primary transition-colors">{order.customerName}</div>
+                      </td>
+                      <td className="px-4 py-3.5">
+                        <StatusBadge status={order.status} />
+                      </td>
+                      <td className="px-4 py-3.5 text-xs text-muted-foreground">{order.orderDate}</td>
+                      <td className="px-4 py-3.5">
+                        <div className="flex flex-col gap-1">
+                          <span className="text-xs font-semibold capitalize text-foreground">
+                            {order.paymentTerm === "cash" ? t("common.cash", "Cash") : order.paymentTerm === "credit" ? t("common.credit", "Credit") : order.paymentTerm}
+                          </span>
+                          {order.residualAmountMinor === 0 || order.totalMinor === 0 ? (
+                            <StatusBadge status="paid" label={t("purchasing.fullyPaid", "Fully Paid")} />
+                          ) : order.residualAmountMinor < order.totalMinor ? (
+                            <StatusBadge
+                              status="partially_paid"
+                              label={`${t("purchasing.due", "Due")} ${displaySalesMoney(order.residualAmountMinor, order.currencyCode)}`}
+                            />
+                          ) : (
+                            <StatusBadge
+                              status="unpaid"
+                              label={`${t("Unpaid", "Unpaid")} ${displaySalesMoney(order.residualAmountMinor, order.currencyCode)}`}
+                            />
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3.5 text-xs font-medium text-muted-foreground">{order.sourceLocationCode ?? "-"}</td>
+                      <td className="px-4 py-3.5 text-right font-mono text-xs text-muted-foreground">{order.lineCount}</td>
+                      <td className="px-4 py-3.5 text-right font-mono text-xs font-semibold text-foreground">{order.quantityOrdered}</td>
+                      <td className="px-4 py-3.5 text-right font-mono text-xs font-semibold text-foreground">{order.quantityDelivered}</td>
+                      <td className="px-4 py-3.5 text-right font-mono text-xs font-extrabold text-foreground">
+                        {displaySalesMoney(order.totalMinor, order.currencyCode)}
+                      </td>
+                      <td className="px-4 py-3.5 text-right">
+                        <ButtonLink href={`/admin/sales/${order.id}`} size="sm" variant="outline" className="h-8 px-2.5 text-xs">
+                          {t("action.details", "Details")}
+                        </ButtonLink>
+                      </td>
+                    </ClickableTableRow>
+                    {isExpanded && (
+                      <tr className="bg-muted/15 border-b border-border/80">
+                        <td colSpan={12} className="p-0">
+                          <SalesOrderProductLinesTable order={order} />
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
+                );
+              })}
               {orders.length === 0 ? (
                 <tr>
-                  <td colSpan={11} className="px-4 py-12 text-center text-sm text-muted-foreground">
+                  <td colSpan={12} className="px-4 py-12 text-center text-sm text-muted-foreground">
                     {t("sales.empty.noOrders", "No sales orders found.")}
                   </td>
                 </tr>

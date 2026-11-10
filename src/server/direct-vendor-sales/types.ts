@@ -38,6 +38,22 @@ export type DirectVendorSaleFormOptions = {
   outboundPaymentAccounts: DirectVendorSalePaymentOption[];
 };
 
+export type DirectVendorSaleListLine = {
+  id: string;
+  lineNo: number;
+  productId: string;
+  productName: string;
+  sku: string;
+  quantity: string;
+  customerUnitPriceMinor: number;
+  vendorUnitCostMinor: number;
+  discountMinor: number;
+  taxAmountMinor: number;
+  customerLineTotalMinor: number;
+  vendorLineTotalMinor: number;
+  lineMarginMinor: number;
+};
+
 export type DirectVendorSaleListRow = {
   id: string;
   saleNo: string;
@@ -56,6 +72,7 @@ export type DirectVendorSaleListRow = {
   vendorPaymentName: string | null;
   lineCount: number;
   quantity: string;
+  lines: DirectVendorSaleListLine[];
 };
 
 export type DirectVendorSaleDetailLine = {

@@ -213,14 +213,40 @@ export async function getPurchaseOrderList(params?: {
       po.total_minor as "totalMinor",
       coalesce(pay.paid_minor, 0)::bigint as "paidMinor",
       greatest(po.total_minor - coalesce(pay.paid_minor, 0), 0)::bigint as "residualAmountMinor",
-      count(pol.id)::int as "lineCount",
-      coalesce(sum(pol.quantity_ordered), 0)::text as "quantityOrdered",
-      coalesce(sum(pol.quantity_received), 0)::text as "quantityReceived"
+      lines_summary.line_count as "lineCount",
+      lines_summary.quantity_ordered as "quantityOrdered",
+      lines_summary.quantity_received as "quantityReceived",
+      lines_summary.lines as "lines"
     from purchase_orders po
     inner join partners p on p.id = po.supplier_id
     left join owners own on own.id = po.owner_id
     left join locations l on l.id = po.deliver_to_location_id
-    left join purchase_order_lines pol on pol.purchase_order_id = po.id and pol.deleted_at is null
+    left join lateral (
+      select
+        count(pol.id)::int as line_count,
+        coalesce(sum(pol.quantity_ordered), 0)::text as quantity_ordered,
+        coalesce(sum(pol.quantity_received), 0)::text as quantity_received,
+        coalesce(
+          jsonb_agg(
+            jsonb_build_object(
+              'id', pol.id,
+              'lineNo', pol.line_no,
+              'productId', pol.product_id,
+              'productName', prod.name,
+              'sku', prod.sku,
+              'quantityOrdered', pol.quantity_ordered::text,
+              'quantityReceived', pol.quantity_received::text,
+              'unitCostMinor', pol.unit_cost_minor,
+              'taxAmountMinor', pol.tax_amount_minor,
+              'lineTotalMinor', pol.line_total_minor
+            ) order by pol.line_no
+          ) filter (where pol.id is not null),
+          '[]'::jsonb
+        ) as lines
+      from purchase_order_lines pol
+      left join products prod on prod.id = pol.product_id
+      where pol.purchase_order_id = po.id and pol.deleted_at is null
+    ) lines_summary on true
     left join lateral (
       select sum(pa.amount_minor) as paid_minor
       from payment_allocations pa
@@ -237,7 +263,6 @@ export async function getPurchaseOrderList(params?: {
       ${paymentTermFilter}
       ${paymentStatusFilter}
       ${searchFilter}
-    group by po.id, p.display_name, own.name, l.code, pay.paid_minor
     order by po.created_at desc
   `);
 
@@ -246,6 +271,15 @@ export async function getPurchaseOrderList(params?: {
     totalMinor: Number(row.totalMinor),
     paidMinor: Number(row.paidMinor),
     residualAmountMinor: Number(row.residualAmountMinor),
+    lines: Array.isArray(row.lines)
+      ? row.lines.map((l) => ({
+          ...l,
+          lineNo: Number(l.lineNo),
+          unitCostMinor: Number(l.unitCostMinor),
+          taxAmountMinor: Number(l.taxAmountMinor),
+          lineTotalMinor: Number(l.lineTotalMinor),
+        }))
+      : [],
   }));
 }
 

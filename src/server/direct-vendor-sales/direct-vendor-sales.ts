@@ -192,22 +192,49 @@ export async function getDirectVendorSaleList(params?: {
       dvs.vendor_payment_term::text as "vendorPaymentTerm",
       customer_pm.name as "customerPaymentName",
       vendor_pm.name as "vendorPaymentName",
-      count(dvsl.id)::int as "lineCount",
-      coalesce(sum(dvsl.quantity), 0)::text as "quantity"
+      lines_summary.line_count as "lineCount",
+      lines_summary.quantity as "quantity",
+      lines_summary.lines as "lines"
     from direct_vendor_sales dvs
     inner join partners customer on customer.id = dvs.customer_id
     inner join partners vendor on vendor.id = dvs.vendor_id
     left join owners own on own.id = dvs.owner_id
     left join payment_methods customer_pm on customer_pm.id = dvs.customer_payment_method_id
     left join payment_methods vendor_pm on vendor_pm.id = dvs.vendor_payment_method_id
-    left join direct_vendor_sale_lines dvsl on dvsl.direct_vendor_sale_id = dvs.id and dvsl.deleted_at is null
+    left join lateral (
+      select
+        count(dvsl.id)::int as line_count,
+        coalesce(sum(dvsl.quantity), 0)::text as quantity,
+        coalesce(
+          jsonb_agg(
+            jsonb_build_object(
+              'id', dvsl.id,
+              'lineNo', dvsl.line_no,
+              'productId', dvsl.product_id,
+              'productName', prod.name,
+              'sku', prod.sku,
+              'quantity', dvsl.quantity::text,
+              'customerUnitPriceMinor', dvsl.customer_unit_price_minor,
+              'vendorUnitCostMinor', dvsl.vendor_unit_cost_minor,
+              'discountMinor', dvsl.discount_minor,
+              'taxAmountMinor', dvsl.tax_amount_minor,
+              'customerLineTotalMinor', dvsl.customer_line_total_minor,
+              'vendorLineTotalMinor', dvsl.vendor_line_total_minor,
+              'lineMarginMinor', dvsl.line_margin_minor
+            ) order by dvsl.line_no
+          ) filter (where dvsl.id is not null),
+          '[]'::jsonb
+        ) as lines
+      from direct_vendor_sale_lines dvsl
+      left join products prod on prod.id = dvsl.product_id
+      where dvsl.direct_vendor_sale_id = dvs.id and dvsl.deleted_at is null
+    ) lines_summary on true
     where dvs.company_id = ${company.id}
       and dvs.deleted_at is null
       ${statusFilter}
       ${customerPaymentTermFilter}
       ${vendorPaymentTermFilter}
       ${searchFilter}
-    group by dvs.id, customer.id, vendor.id, own.id, customer_pm.id, vendor_pm.id
     order by dvs.created_at desc
   `);
 
@@ -216,6 +243,19 @@ export async function getDirectVendorSaleList(params?: {
     customerTotalMinor: Number(row.customerTotalMinor),
     vendorCostTotalMinor: Number(row.vendorCostTotalMinor),
     marginMinor: Number(row.marginMinor),
+    lines: Array.isArray(row.lines)
+      ? row.lines.map((l) => ({
+          ...l,
+          lineNo: Number(l.lineNo),
+          customerUnitPriceMinor: Number(l.customerUnitPriceMinor),
+          vendorUnitCostMinor: Number(l.vendorUnitCostMinor),
+          discountMinor: Number(l.discountMinor),
+          taxAmountMinor: Number(l.taxAmountMinor),
+          customerLineTotalMinor: Number(l.customerLineTotalMinor),
+          vendorLineTotalMinor: Number(l.vendorLineTotalMinor),
+          lineMarginMinor: Number(l.lineMarginMinor),
+        }))
+      : [],
   }));
 }
 

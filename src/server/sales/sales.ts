@@ -216,15 +216,44 @@ export async function getSalesOrderList(params?: {
       so.total_minor as "totalMinor",
       coalesce(pay.paid_minor, 0)::bigint as "paidMinor",
       greatest(so.total_minor - coalesce(pay.paid_minor, 0), 0)::bigint as "residualAmountMinor",
-      count(sol.id)::int as "lineCount",
-      coalesce(sum(sol.quantity_ordered), 0)::text as "quantityOrdered",
-      coalesce(sum(sol.quantity_delivered), 0)::text as "quantityDelivered",
-      coalesce(sum(sol.quantity_invoiced), 0)::text as "quantityInvoiced"
+      lines_summary.line_count as "lineCount",
+      lines_summary.quantity_ordered as "quantityOrdered",
+      lines_summary.quantity_delivered as "quantityDelivered",
+      lines_summary.quantity_invoiced as "quantityInvoiced",
+      lines_summary.lines as "lines"
     from sales_orders so
     inner join partners customer on customer.id = so.customer_id
     left join owners own on own.id = so.owner_id
     left join locations loc on loc.id = so.source_location_id
-    left join sales_order_lines sol on sol.sales_order_id = so.id and sol.deleted_at is null
+    left join lateral (
+      select
+        count(sol.id)::int as line_count,
+        coalesce(sum(sol.quantity_ordered), 0)::text as quantity_ordered,
+        coalesce(sum(sol.quantity_delivered), 0)::text as quantity_delivered,
+        coalesce(sum(sol.quantity_invoiced), 0)::text as quantity_invoiced,
+        coalesce(
+          jsonb_agg(
+            jsonb_build_object(
+              'id', sol.id,
+              'lineNo', sol.line_no,
+              'productId', sol.product_id,
+              'productName', p.name,
+              'sku', p.sku,
+              'quantityOrdered', sol.quantity_ordered::text,
+              'quantityDelivered', sol.quantity_delivered::text,
+              'quantityInvoiced', sol.quantity_invoiced::text,
+              'unitPriceMinor', sol.unit_price_minor,
+              'discountMinor', sol.discount_minor,
+              'taxAmountMinor', sol.tax_amount_minor,
+              'lineTotalMinor', sol.line_total_minor
+            ) order by sol.line_no
+          ) filter (where sol.id is not null),
+          '[]'::jsonb
+        ) as lines
+      from sales_order_lines sol
+      left join products p on p.id = sol.product_id
+      where sol.sales_order_id = so.id and sol.deleted_at is null
+    ) lines_summary on true
     left join lateral (
       select sum(pa.amount_minor) as paid_minor
       from payment_allocations pa
@@ -241,7 +270,6 @@ export async function getSalesOrderList(params?: {
       ${paymentTermFilter}
       ${paymentStatusFilter}
       ${searchFilter}
-    group by so.id, customer.id, own.name, loc.id, pay.paid_minor
     order by so.created_at desc
   `);
 
@@ -250,6 +278,16 @@ export async function getSalesOrderList(params?: {
     totalMinor: Number(row.totalMinor),
     paidMinor: Number(row.paidMinor),
     residualAmountMinor: Number(row.residualAmountMinor),
+    lines: Array.isArray(row.lines)
+      ? row.lines.map((l) => ({
+          ...l,
+          lineNo: Number(l.lineNo),
+          unitPriceMinor: Number(l.unitPriceMinor),
+          discountMinor: Number(l.discountMinor),
+          taxAmountMinor: Number(l.taxAmountMinor),
+          lineTotalMinor: Number(l.lineTotalMinor),
+        }))
+      : [],
   }));
 }
 

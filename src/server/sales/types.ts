@@ -5,6 +5,21 @@ import type { PurchaseFormOption, PurchaseTaxOption } from "@/server/purchasing/
 export type SalesFormOption = PurchaseFormOption;
 export type SalesTaxOption = PurchaseTaxOption;
 
+export type SalesOrderListLine = {
+  id: string;
+  lineNo: number;
+  productId: string;
+  productName: string;
+  sku: string;
+  quantityOrdered: string;
+  quantityDelivered: string;
+  quantityInvoiced: string;
+  unitPriceMinor: number;
+  discountMinor: number;
+  taxAmountMinor: number;
+  lineTotalMinor: number;
+};
+
 export type SalesOrderListRow = {
   id: string;
   orderNo: string;
@@ -27,6 +42,7 @@ export type SalesOrderListRow = {
   quantityOrdered: string;
   quantityDelivered: string;
   quantityInvoiced: string;
+  lines: SalesOrderListLine[];
 };
 
 export type SalesOrderDetailLine = {

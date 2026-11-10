@@ -16,6 +16,19 @@ export type PurchaseTaxOption = PurchaseFormOption & {
   priceIncluded: boolean;
 };
 
+export type PurchaseOrderListLine = {
+  id: string;
+  lineNo: number;
+  productId: string;
+  productName: string;
+  sku: string;
+  quantityOrdered: string;
+  quantityReceived: string;
+  unitCostMinor: number;
+  taxAmountMinor: number;
+  lineTotalMinor: number;
+};
+
 export type PurchaseOrderListRow = {
   id: string;
   orderNo: string;
@@ -36,6 +49,7 @@ export type PurchaseOrderListRow = {
   lineCount: number;
   quantityOrdered: string;
   quantityReceived: string;
+  lines: PurchaseOrderListLine[];
 };
 
 export type PurchaseReceiptListRow = {
