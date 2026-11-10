@@ -48,6 +48,7 @@ const paymentJoins = sql`
 export type ArchivedModel = keyof typeof models | "customer_payment" | "supplier_payment";
 export type ArchiveListParams = {
   q?: string; status?: string; page?: string; pageSize?: string; locationId?: string | null;
+  partnerId?: string; ownerId?: string; currencyCode?: string;
   salesOrderId?: string; purchaseOrderId?: string; directVendorSaleId?: string; customerInvoiceId?: string; vendorBillId?: string;
   paymentTerm?: string; paymentStatus?: string; customerPaymentTerm?: string; vendorPaymentTerm?: string; costType?: string; category?: string;
 };
@@ -63,10 +64,15 @@ export async function getArchivedModelRows(model: ArchivedModel, companyId: stri
   const def: Definition = payment
     ? { table: "payments", reference: "payment_no", amount: "amount_minor", joins: paymentJoins, party: sql`party.display_name`, location: sql`parent.location_id`, parentId: sql`parent.id`, parentReference: sql`parent.order_no`, parentType: model === "customer_payment" ? "sales_order" : "purchase_order", direction: model === "customer_payment" ? "inbound" : "outbound" }
     : models[model];
-  const locationId = params.locationId === undefined ? await getSelectedShopId() : params.locationId;
+  const locationId = params.locationId === "all" ? null : params.locationId === undefined ? await getSelectedShopId() : params.locationId;
   const amount = typeof def.amount === "string" ? def.amount ? sql`r.${sql.identifier(def.amount)}` : sql`null::bigint` : def.amount;
   const parentId = params.salesOrderId || params.purchaseOrderId;
   const extraFilters: SQL[] = [];
+  if (model === "sales_order" || model === "purchase_order") {
+    if (params.partnerId) extraFilters.push(model === "sales_order" ? sql`r.customer_id::text = ${params.partnerId}` : sql`r.supplier_id::text = ${params.partnerId}`);
+    if (params.ownerId) extraFilters.push(params.ownerId === "unassigned" ? sql`r.owner_id is null` : sql`r.owner_id::text = ${params.ownerId}`);
+    if (params.currencyCode) extraFilters.push(sql`r.currency_code = ${params.currencyCode}`);
+  }
   if (model === "expense") {
     if (!expenseScope) throw new Error("Expense archive access scope is required.");
     if (!expenseScope.canSeeAll) extraFilters.push(expenseScope.employeeId

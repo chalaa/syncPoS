@@ -43,6 +43,7 @@ type PurchaseOrderDetailPageProps = {
   searchParams: Promise<{
     notice?: string;
     error?: string;
+    edit?: string;
   }>;
 };
 
@@ -105,7 +106,8 @@ export default async function PurchaseOrderDetailPage({ params, searchParams }: 
 
   const isDraft = order.status === "draft";
   const isAdministrator = (await getUserPermissionCodes(user.id)).has(PERMISSIONS.OWNER.ALL);
-  const canEditConfirmed = order.status !== "cancelled" && isAdministrator;
+  const canEdit = isDraft || (order.status !== "cancelled" && isAdministrator);
+  const isEditing = canEdit && query.edit === "1";
   const canReceive = order.status === "confirmed" || order.status === "partially_received";
   const canCreateReturn =
     !isDraft && order.status !== "cancelled" && order.lines.some((line) => Number(line.quantityReceived) > 0);
@@ -118,6 +120,11 @@ export default async function PurchaseOrderDetailPage({ params, searchParams }: 
         actions={
           <div className="flex flex-wrap items-center gap-2">
             <ButtonLink href="/admin/purchasing" variant="outline"><T k="purchasing.backToOrders" fallback="Back to orders" /></ButtonLink>
+            {canEdit ? (
+              <ButtonLink href={isEditing ? `/admin/purchasing/${order.id}` : `/admin/purchasing/${order.id}?edit=1`} variant={isEditing ? "outline" : "default"}>
+                {isEditing ? <T k="action.cancel">Cancel</T> : <T k="action.edit">Edit</T>}
+              </ButtonLink>
+            ) : null}
             {isAdministrator ? <OrderArchiveDialog entityType="purchase_order" entityId={order.id} orderNo={order.orderNo} /> : null}
           </div>
         }
@@ -226,7 +233,7 @@ export default async function PurchaseOrderDetailPage({ params, searchParams }: 
         </div>
       </div>
 
-      {isDraft || canEditConfirmed ? (
+      {isEditing ? (
         <>
           {!isDraft ? <Alert kind="warning">Administrator edit: linked receipts, bills, and payments keep their recorded values.</Alert> : null}
           <PurchaseOrderForm

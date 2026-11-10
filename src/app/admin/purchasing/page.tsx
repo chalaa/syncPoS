@@ -54,6 +54,8 @@ type PurchasingPageProps = {
     vendorBillId?: string;
     directVendorSaleId?: string;
     partnerId?: string;
+    ownerId?: string;
+    currencyCode?: string;
     notice?: string;
     error?: string;
     new?: string;
@@ -104,7 +106,7 @@ export default async function PurchasingPage({ searchParams }: PurchasingPagePro
   }
 
   const formOptions = await getPurchaseFormOptions();
-  const allOrders = await getPurchaseOrderList({ query, status, paymentTerm, locationId: locationId || undefined, paymentStatus });
+  const allOrders = await getPurchaseOrderList({ query, status, paymentTerm, locationId: locationId || undefined, paymentStatus, partnerId: params.partnerId, ownerId: params.ownerId, currencyCode: params.currencyCode });
 
   if (view === "receipts") {
     let receipts = await getPurchaseReceiptList(params.purchaseOrderId, locationId || undefined);

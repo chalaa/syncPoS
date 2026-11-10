@@ -1,20 +1,12 @@
 import { notFound } from "next/navigation";
-import Link from "next/link";
 import {
   Building2,
   User,
   MapPin,
-  CreditCard,
-  ArrowUpRight,
-  FileText,
-  Receipt,
   Phone,
   Mail,
   Edit,
   ArrowLeft,
-  Banknote,
-  DollarSign,
-  Briefcase,
 } from "lucide-react";
 
 import { Badge, StatusBadge } from "@/components/ui/badge";
@@ -27,7 +19,7 @@ import {
   getPartnerDetail,
   minorToDisplay,
 } from "@/server/partners/partners";
-import type { PartnerDetailRecord } from "@/server/partners/types";
+import { PartnerFinancialOverview } from "@/app/admin/partners/partner-financial-overview";
 
 export const dynamic = "force-dynamic";
 
@@ -72,59 +64,6 @@ function Field({
   );
 }
 
-function PartnerSmartButtons({ partner }: { partner: PartnerDetailRecord }) {
-  if (!partner.isCustomer && !partner.isSupplier) {
-    return null;
-  }
-
-  return (
-    <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-      {partner.isCustomer ? (
-        <Link
-          href={`/admin/sales?view=invoices&partnerId=${partner.id}`}
-          className="group flex items-center justify-between rounded-xl border border-border bg-card p-4 transition-all hover:border-primary/50 hover:bg-secondary/40 hover:shadow-xs"
-        >
-          <div className="flex items-center gap-3">
-            <div className="flex size-10 items-center justify-center rounded-lg bg-primary/10 text-primary transition-colors group-hover:bg-primary group-hover:text-primary-foreground">
-              <FileText className="size-5" />
-            </div>
-            <div>
-              <div className="text-xl font-bold tracking-tight text-foreground">
-                {partner.financial.invoiceCount}
-              </div>
-              <div className="text-xs font-medium text-muted-foreground">
-                <T k="Customer Invoices" />
-              </div>
-            </div>
-          </div>
-          <ArrowUpRight className="size-4 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:text-primary" />
-        </Link>
-      ) : null}
-
-      {partner.isSupplier ? (
-        <Link
-          href={`/admin/purchasing?view=supplier-bills&partnerId=${partner.id}`}
-          className="group flex items-center justify-between rounded-xl border border-border bg-card p-4 transition-all hover:border-primary/50 hover:bg-secondary/40 hover:shadow-xs"
-        >
-          <div className="flex items-center gap-3">
-            <div className="flex size-10 items-center justify-center rounded-lg bg-primary/10 text-primary transition-colors group-hover:bg-primary group-hover:text-primary-foreground">
-              <Receipt className="size-5" />
-            </div>
-            <div>
-              <div className="text-xl font-bold tracking-tight text-foreground">
-                {partner.financial.billCount}
-              </div>
-              <div className="text-xs font-medium text-muted-foreground">
-                <T k="Vendor Bills" />
-              </div>
-            </div>
-          </div>
-          <ArrowUpRight className="size-4 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:text-primary" />
-        </Link>
-      ) : null}
-    </div>
-  );
-}
 
 export default async function PartnerDetailPage({ params }: PartnerDetailPageProps) {
   await requirePermission("partner.view");
@@ -171,74 +110,7 @@ export default async function PartnerDetailPage({ params }: PartnerDetailPagePro
         }
       />
 
-      <PartnerSmartButtons partner={partner} />
-
-      {/* Financial KPI Summary Cards */}
-      <section className="mb-6 grid grid-cols-2 gap-2 sm:grid-cols-2 lg:grid-cols-4 sm:gap-4">
-        <div className="rounded-xl border border-border border-l-4 border-l-amber-500 bg-card p-3 sm:p-4 shadow-xs transition-all hover:shadow-sm">
-          <div className="flex items-center justify-between gap-1 text-muted-foreground">
-            <span className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider truncate">
-              <T k="Customer unpaid" />
-            </span>
-            <DollarSign className="size-3.5 sm:size-4 shrink-0 text-amber-500" />
-          </div>
-          <div className="mt-1.5 sm:mt-2 text-base sm:text-2xl font-bold tracking-tight text-foreground truncate">
-            {money(partner.financial.receivableResidualMinor, partner.currencyCode)}
-          </div>
-          <p className="mt-0.5 sm:mt-1 text-[10px] sm:text-xs text-muted-foreground truncate"><T k="Outstanding receivables" /></p>
-        </div>
-
-        <div className="rounded-xl border border-border border-l-4 border-l-emerald-600 bg-card p-3 sm:p-4 shadow-xs transition-all hover:shadow-sm">
-          <div className="flex items-center justify-between gap-1 text-muted-foreground">
-            <span className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider truncate">
-              <T k="Available credit" />
-            </span>
-            <CreditCard className="size-3.5 sm:size-4 shrink-0 text-emerald-600" />
-          </div>
-          <div className="mt-1.5 sm:mt-2 text-base sm:text-2xl font-bold tracking-tight text-foreground truncate">
-            {money(partner.financial.remainingCreditMinor, partner.currencyCode)}
-          </div>
-          <p className="mt-0.5 sm:mt-1 text-[10px] sm:text-xs text-muted-foreground truncate"><T k="Remaining credit line" /></p>
-        </div>
-
-        <div className="rounded-xl border border-border border-l-4 border-l-rose-500 bg-card p-3 sm:p-4 shadow-xs transition-all hover:shadow-sm">
-          <div className="flex items-center justify-between gap-1 text-muted-foreground">
-            <span className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider truncate">
-              <T k="Supplier unpaid" />
-            </span>
-            <Banknote className="size-3.5 sm:size-4 shrink-0 text-rose-500" />
-          </div>
-          <div className="mt-1.5 sm:mt-2 text-base sm:text-2xl font-bold tracking-tight text-foreground truncate">
-            {money(partner.financial.payableResidualMinor, partner.currencyCode)}
-          </div>
-          <p className="mt-0.5 sm:mt-1 text-[10px] sm:text-xs text-muted-foreground truncate"><T k="Outstanding payables" /></p>
-        </div>
-
-        <div
-          className={`rounded-xl border border-border border-l-4 bg-card p-3 sm:p-4 shadow-xs transition-all hover:shadow-sm ${
-            partner.financial.netBalanceMinor >= 0
-              ? "border-l-emerald-600"
-              : "border-l-rose-500"
-          }`}
-        >
-          <div className="flex items-center justify-between gap-1 text-muted-foreground">
-            <span className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider truncate">
-              <T k="Net balance" />
-            </span>
-            <Briefcase className="size-3.5 sm:size-4 shrink-0 text-muted-foreground" />
-          </div>
-          <div
-            className={`mt-1.5 sm:mt-2 text-base sm:text-2xl font-bold tracking-tight truncate ${
-              partner.financial.netBalanceMinor >= 0
-                ? "text-emerald-700 dark:text-emerald-400"
-                : "text-rose-600 dark:text-rose-400"
-            }`}
-          >
-            {money(partner.financial.netBalanceMinor, partner.currencyCode)}
-          </div>
-          <p className="mt-0.5 sm:mt-1 text-[10px] sm:text-xs text-muted-foreground truncate"><T k="Receivable minus payable" /></p>
-        </div>
-      </section>
+      <PartnerFinancialOverview partner={partner} />
 
       {/* Main Details Grid */}
       <section className="grid gap-6 lg:grid-cols-[1.6fr_1fr]">

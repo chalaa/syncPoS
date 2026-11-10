@@ -169,6 +169,9 @@ export async function getPurchaseFormOptions() {
 }
 
 export async function getPurchaseOrderList(params?: {
+  partnerId?: string;
+  ownerId?: string;
+  currencyCode?: string;
   query?: string;
   status?: string;
   paymentTerm?: string;
@@ -176,7 +179,7 @@ export async function getPurchaseOrderList(params?: {
   paymentStatus?: string;
 }): Promise<PurchaseOrderListRow[]> {
   const company = await getDefaultCompany();
-  const locationId = params?.locationId ?? await getSelectedShopId();
+  const locationId = params?.locationId === "all" ? null : params?.locationId ?? await getSelectedShopId();
   const query = params?.query?.trim();
   const statusFilter = params?.status ? sql`and po.status = ${params.status}` : sql``;
   const paymentTermFilter = params?.paymentTerm ? sql`and po.payment_term = ${params.paymentTerm}` : sql``;
@@ -232,6 +235,9 @@ export async function getPurchaseOrderList(params?: {
     ) pay on true
     where po.company_id = ${company.id}
       and po.deleted_at is null
+      ${params?.partnerId ? sql`and po.supplier_id::text = ${params.partnerId}` : sql``}
+      ${params?.ownerId === "unassigned" ? sql`and po.owner_id is null` : params?.ownerId ? sql`and po.owner_id::text = ${params.ownerId}` : sql``}
+      ${params?.currencyCode ? sql`and po.currency_code = ${params.currencyCode}` : sql``}
       ${locationFilter}
       ${statusFilter}
       ${paymentTermFilter}

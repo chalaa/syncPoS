@@ -37,6 +37,8 @@ type SalesPageProps = {
     customerInvoiceId?: string;
     directVendorSaleId?: string;
     partnerId?: string;
+    ownerId?: string;
+    currencyCode?: string;
     notice?: string;
     error?: string;
     new?: string;
@@ -85,7 +87,7 @@ export default async function SalesPage({ searchParams }: SalesPageProps) {
     return <ArchivedModelList model={model} title={title} companyId={user.companyId} params={params} canRestore={userPerms.has(PERMISSIONS.OWNER.ALL)} />;
   }
 
-  const allOrders = await getSalesOrderList({ query, status, paymentTerm, paymentStatus, locationId: locationId || undefined });
+  const allOrders = await getSalesOrderList({ query, status, paymentTerm, paymentStatus, locationId: locationId || undefined, partnerId: params.partnerId, ownerId: params.ownerId, currencyCode: params.currencyCode });
 
   if (view === "deliveries") {
     const deliveries = await getDeliveryList({ salesOrderId: params.salesOrderId });
