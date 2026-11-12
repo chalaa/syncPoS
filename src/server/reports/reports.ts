@@ -54,9 +54,9 @@ export function summarizeMoney<T extends { totalMinor?: number; amountMinor?: nu
   return rows.reduce<ReportSummary>(
     (summary, row) => ({
       count: summary.count + 1,
-      totalMinor: summary.totalMinor + (row.totalMinor ?? row.amountMinor ?? 0),
-      paidMinor: (summary.paidMinor ?? 0) + (row.paidAmountMinor ?? 0),
-      residualMinor: (summary.residualMinor ?? 0) + (row.residualAmountMinor ?? 0),
+      totalMinor: summary.totalMinor + Number(row.totalMinor ?? row.amountMinor ?? 0),
+      paidMinor: (summary.paidMinor ?? 0) + Number(row.paidAmountMinor ?? 0),
+      residualMinor: (summary.residualMinor ?? 0) + Number(row.residualAmountMinor ?? 0),
       currencyCode,
     }),
     { count: 0, totalMinor: 0, paidMinor: 0, residualMinor: 0, currencyCode },
@@ -70,7 +70,12 @@ export function parseValidLocationId(rawLocId?: string | null): string | null {
 
 export async function getDashboardReport(overrideLocationId?: string | null): Promise<DashboardReport> {
   const company = await getDefaultCompany();
-  const today = new Date().toISOString().slice(0, 10);
+  const today = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Africa/Addis_Ababa",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
   const locationIdRaw = overrideLocationId !== undefined ? overrideLocationId : await getSelectedShopId();
   const validLocId = parseValidLocationId(locationIdRaw);
 
@@ -203,7 +208,7 @@ export async function getDashboardReport(overrideLocationId?: string | null): Pr
           where so.company_id = ${company.id}
             and so.deleted_at is null
             and so.status <> 'cancelled'
-            and (so.order_date = ${today}::date or so.created_at::date = ${today}::date)
+            and so.order_date = ${today}::date
             ${salesOrderLocFilter}
           union all
           select ci.total_minor as total
@@ -214,7 +219,7 @@ export async function getDashboardReport(overrideLocationId?: string | null): Pr
             and ci.deleted_at is null
             and ci.status <> 'cancelled'
             and ci.sales_order_id is null
-            and (ci.invoice_date = ${today}::date or ci.created_at::date = ${today}::date)
+            and ci.invoice_date = ${today}::date
             ${salesLocFilter}
           union all
           select dvs.customer_total_minor as total
@@ -222,7 +227,7 @@ export async function getDashboardReport(overrideLocationId?: string | null): Pr
           where dvs.company_id = ${company.id}
             and dvs.deleted_at is null
             and dvs.status <> 'cancelled'
-            and (dvs.sale_date = ${today}::date or dvs.created_at::date = ${today}::date)
+            and dvs.sale_date = ${today}::date
             ${dvsLocFilter}
         ) s
       ), 0)::bigint as "salesTodayMinor",
@@ -241,7 +246,7 @@ export async function getDashboardReport(overrideLocationId?: string | null): Pr
           where so.company_id = ${company.id}
             and so.deleted_at is null
             and so.status <> 'cancelled'
-            and (so.order_date = ${today}::date or so.created_at::date = ${today}::date)
+            and so.order_date = ${today}::date
             ${salesOrderLocFilter}
           union all
           select greatest(ci.total_minor - coalesce((
@@ -260,7 +265,7 @@ export async function getDashboardReport(overrideLocationId?: string | null): Pr
             and ci.deleted_at is null
             and ci.status <> 'cancelled'
             and ci.sales_order_id is null
-            and (ci.invoice_date = ${today}::date or ci.created_at::date = ${today}::date)
+            and ci.invoice_date = ${today}::date
             ${salesLocFilter}
           union all
           select greatest(dvs.customer_total_minor - dvs.customer_paid_minor, 0) as unpaid
@@ -268,7 +273,7 @@ export async function getDashboardReport(overrideLocationId?: string | null): Pr
           where dvs.company_id = ${company.id}
             and dvs.deleted_at is null
             and dvs.status <> 'cancelled'
-            and (dvs.sale_date = ${today}::date or dvs.created_at::date = ${today}::date)
+            and dvs.sale_date = ${today}::date
             ${dvsLocFilter}
         ) su
       ), 0)::bigint as "salesUnpaidTodayMinor",
@@ -279,7 +284,7 @@ export async function getDashboardReport(overrideLocationId?: string | null): Pr
           where po.company_id = ${company.id}
             and po.deleted_at is null
             and po.status <> 'cancelled'
-            and (po.order_date = ${today}::date or po.created_at::date = ${today}::date)
+            and po.order_date = ${today}::date
             ${poLocFilter}
           union all
           select vb.total_minor as total
@@ -290,7 +295,7 @@ export async function getDashboardReport(overrideLocationId?: string | null): Pr
             and vb.deleted_at is null
             and vb.status <> 'cancelled'
             and vb.purchase_order_id is null
-            and (vb.bill_date = ${today}::date or vb.created_at::date = ${today}::date)
+            and vb.bill_date = ${today}::date
             ${payLocFilter}
           union all
           select dvs.vendor_cost_total_minor as total
@@ -298,7 +303,7 @@ export async function getDashboardReport(overrideLocationId?: string | null): Pr
           where dvs.company_id = ${company.id}
             and dvs.deleted_at is null
             and dvs.status <> 'cancelled'
-            and (dvs.sale_date = ${today}::date or dvs.created_at::date = ${today}::date)
+            and dvs.sale_date = ${today}::date
             ${dvsLocFilter}
         ) p_tot
       ), 0)::bigint as "purchasesTodayMinor",
@@ -317,7 +322,7 @@ export async function getDashboardReport(overrideLocationId?: string | null): Pr
           where po.company_id = ${company.id}
             and po.deleted_at is null
             and po.status <> 'cancelled'
-            and (po.order_date = ${today}::date or po.created_at::date = ${today}::date)
+            and po.order_date = ${today}::date
             ${poLocFilter}
           union all
           select greatest(vb.total_minor - coalesce((
@@ -336,7 +341,7 @@ export async function getDashboardReport(overrideLocationId?: string | null): Pr
             and vb.deleted_at is null
             and vb.status <> 'cancelled'
             and vb.purchase_order_id is null
-            and (vb.bill_date = ${today}::date or vb.created_at::date = ${today}::date)
+            and vb.bill_date = ${today}::date
             ${payLocFilter}
           union all
           select greatest(dvs.vendor_cost_total_minor - dvs.vendor_paid_minor, 0) as unpaid
@@ -344,7 +349,7 @@ export async function getDashboardReport(overrideLocationId?: string | null): Pr
           where dvs.company_id = ${company.id}
             and dvs.deleted_at is null
             and dvs.status <> 'cancelled'
-            and (dvs.sale_date = ${today}::date or dvs.created_at::date = ${today}::date)
+            and dvs.sale_date = ${today}::date
             ${dvsLocFilter}
         ) pu
       ), 0)::bigint as "purchasesUnpaidTodayMinor",
@@ -354,7 +359,7 @@ export async function getDashboardReport(overrideLocationId?: string | null): Pr
         where e.company_id = ${company.id}
           and e.deleted_at is null
           and e.status <> 'cancelled'
-          and (e.expense_date = ${today}::date or e.created_at::date = ${today}::date)
+          and e.expense_date = ${today}::date
           ${expenseLocFilter}
       ), 0)::bigint as "expensesTodayMinor",
       ${company.baseCurrencyCode}::text as "currencyCode"
