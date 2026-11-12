@@ -475,6 +475,7 @@ export async function registerExpensePayment(formData: FormData) {
         throw new Error("A payment method must be configured in settings to record payments.");
       }
 
+      const now = new Date();
       const [payment] = await tx
         .insert(payments)
         .values({
@@ -482,7 +483,9 @@ export async function registerExpensePayment(formData: FormData) {
           paymentType: "outbound",
           paymentNo: paymentNo(),
           status: "posted",
-          paymentDate: new Date(),
+          paymentDate: now,
+          postedAt: now,
+          postedBy: user.id,
           paymentMethodId: method.id,
           paymentAccountId: account.id,
           reference: parsed.data.reference || null,
