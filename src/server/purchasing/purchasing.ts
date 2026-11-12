@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 
 import { getDefaultCompany, minorToDisplay } from "@/server/catalog/products";
 import { db } from "@/server/db/client";
@@ -269,7 +269,7 @@ export async function getPurchaseOrderList(params?: {
       ${paymentTermFilter}
       ${paymentStatusFilter}
       ${searchFilter}
-    order by po.created_at desc
+    order by po.order_date desc, po.created_at desc
   `);
 
   return rows.map((row) => ({
@@ -319,7 +319,7 @@ export async function getPurchaseReceiptList(purchaseOrderId?: string, overrideL
       ${locationFilter}
       and (${purchaseOrderId ?? null}::uuid is null or gr.purchase_order_id = ${purchaseOrderId ?? null}::uuid)
     group by gr.id, po.id, p.display_name, l.code
-    order by gr.receipt_date desc
+    order by gr.receipt_date desc, gr.created_at desc
   `);
 
   return rows;
@@ -657,7 +657,7 @@ export async function getPurchaseLandedCostList(purchaseOrderId?: string): Promi
       ),
     )
     .groupBy(landedCosts.id, purchaseOrders.id, goodsReceipts.id, partners.id)
-    .orderBy(asc(landedCosts.costNo));
+    .orderBy(desc(landedCosts.createdAt), desc(landedCosts.costNo));
 }
 
 export async function getPurchaseLandedCostFormOptions(): Promise<PurchaseLandedCostFormOptions> {

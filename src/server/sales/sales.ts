@@ -276,7 +276,7 @@ export async function getSalesOrderList(params?: {
       ${paymentTermFilter}
       ${paymentStatusFilter}
       ${searchFilter}
-    order by so.created_at desc
+    order by so.order_date desc, so.created_at desc
   `);
 
   return rows.map((row) => ({
@@ -330,7 +330,7 @@ export async function getDeliveryList(params: {
       ${locationFilter}
       ${salesOrderFilter}
     group by d.id, so.id, customer.id, loc.id
-    order by d.delivery_date desc
+    order by d.delivery_date desc, d.created_at desc
   `);
 }
 

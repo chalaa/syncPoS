@@ -18,6 +18,7 @@ import type { ExpenseFormOptions } from "@/server/expenses/types";
 
 export type NewExpenseModalProps = {
   options: ExpenseFormOptions;
+  defaultLocationId?: string;
   returnPath?: string;
   trigger?: ReactNode;
   open?: boolean;
@@ -25,11 +26,17 @@ export type NewExpenseModalProps = {
 };
 
 function todayInputValue() {
-  return new Date().toISOString().slice(0, 10);
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Africa/Addis_Ababa",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
 }
 
 export function NewExpenseModal({
   options,
+  defaultLocationId = "",
   returnPath = "/admin/operations/expenses",
   trigger,
   open: controlledOpen,
@@ -151,7 +158,7 @@ export function NewExpenseModal({
             </label>
 
             {/* Employee */}
-            <label className="flex flex-col gap-1.5 text-xs font-semibold text-foreground sm:col-span-2">
+            <label className="flex flex-col gap-1.5 text-xs font-semibold text-foreground">
               <span>{t("field.employeeRequester", "Employee / Requester")}</span>
               <select name="employeeId" className={inputClass}>
                 <option value="">
@@ -160,6 +167,19 @@ export function NewExpenseModal({
                 {options.employees.map((employee) => (
                   <option key={employee.id} value={employee.id}>
                     {employee.code ? `${employee.code} · ` : ""}{employee.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            {/* Location */}
+            <label className="flex flex-col gap-1.5 text-xs font-semibold text-foreground">
+              <span>{t("field.location", "Location")}</span>
+              <select name="locationId" defaultValue={defaultLocationId} className={inputClass}>
+                <option value="">{t("field.noSpecificLocation", "No specific location")}</option>
+                {options.locations.map((loc) => (
+                  <option key={loc.id} value={loc.id}>
+                    {loc.code ? `${loc.code} · ` : ""}{loc.name}
                   </option>
                 ))}
               </select>

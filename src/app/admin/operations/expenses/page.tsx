@@ -14,6 +14,8 @@ import { paginateRows } from "@/lib/pagination";
 import { requirePermission, getUserPermissionCodes } from "@/server/auth/session";
 import { getExpenseFormOptions, getExpenseList } from "@/server/expenses/expenses";
 import { PERMISSIONS, userHasPermission } from "@/server/iam/permissions";
+import { getSelectedShopId } from "@/server/locations/shop-options";
+import { parseValidLocationId } from "@/server/reports/reports";
 import { ExpenseTable } from "./expense-table";
 
 export const dynamic = "force-dynamic";
@@ -62,7 +64,7 @@ export default async function ExpensesPage({ searchParams }: ExpensesPageProps) 
   const categoryId = params.category ?? "";
   const paymentStatus = params.paymentStatus ?? "";
 
-  const [expenses, options] = await Promise.all([
+  const [expenses, options, selectedShopId] = await Promise.all([
     getExpenseList({
       query,
       showCancelled,
@@ -73,7 +75,9 @@ export default async function ExpensesPage({ searchParams }: ExpensesPageProps) 
       paymentStatus,
     }),
     getExpenseFormOptions(),
+    getSelectedShopId(),
   ]);
+  const defaultLocationId = parseValidLocationId(selectedShopId) ?? "";
 
   const categoryOptions = options.categories.map((c) => ({ value: c.id, label: c.name }));
   const paymentStatusOptions = [
@@ -96,7 +100,7 @@ export default async function ExpensesPage({ searchParams }: ExpensesPageProps) 
                 <T k="header.title.Expense Categories" fallback="Categories" />
               </ButtonLink>
             ) : null}
-            {canCreateExpense ? <NewExpenseModal options={options} /> : null}
+            {canCreateExpense ? <NewExpenseModal options={options} defaultLocationId={defaultLocationId} /> : null}
           </div>
         }
       />

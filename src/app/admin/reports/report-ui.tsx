@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { type ReactNode, useTransition } from "react";
+import { type ReactNode, useEffect, useRef, useState, useTransition } from "react";
 
 import { Button } from "@/components/ui/button";
 import { TableSearchInput } from "@/components/ui/table-search-input";
@@ -84,6 +84,36 @@ export function ReportFilters({
   const searchParams = useSearchParams();
   const [, startTransition] = useTransition();
 
+  const urlDateFrom = searchParams.get("dateFrom") ?? dateFrom ?? "";
+  const urlDateTo = searchParams.get("dateTo") ?? dateTo ?? "";
+  const urlStatus = searchParams.get("status") ?? status ?? "";
+  const urlPaymentType = searchParams.get("paymentType") ?? paymentType ?? "";
+
+  const [statusInput, setStatusInput] = useState(urlStatus);
+  const isInitialStatusMount = useRef(true);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setStatusInput(searchParams.get("status") ?? ""), 0);
+    return () => clearTimeout(timer);
+  }, [searchParams]);
+
+  useEffect(() => {
+    if (isInitialStatusMount.current) {
+      isInitialStatusMount.current = false;
+      return;
+    }
+    if (status === undefined) return;
+
+    const timer = setTimeout(() => {
+      const currentUrlValue = searchParams.get("status") ?? "";
+      if (statusInput.trim() === currentUrlValue) return;
+      updateParam("status", statusInput);
+    }, 250);
+
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [statusInput]);
+
   function updateParam(name: string, value: string) {
     const params = new URLSearchParams(searchParams.toString());
     if (value.trim()) {
@@ -91,9 +121,11 @@ export function ReportFilters({
     } else {
       params.delete(name);
     }
+    params.delete("page");
 
     startTransition(() => {
-      router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+      const qs = params.toString();
+      router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
     });
   }
 
@@ -115,7 +147,7 @@ export function ReportFilters({
         <input
           name="dateFrom"
           type="date"
-          defaultValue={dateFrom ?? ""}
+          value={urlDateFrom}
           onChange={(e) => updateParam("dateFrom", e.target.value)}
           className="h-10 w-full rounded-xl border border-input bg-background px-3 text-sm outline-none transition-colors focus:border-primary focus:ring-1 focus:ring-ring"
         />
@@ -129,7 +161,7 @@ export function ReportFilters({
         <input
           name="dateTo"
           type="date"
-          defaultValue={dateTo ?? ""}
+          value={urlDateTo}
           onChange={(e) => updateParam("dateTo", e.target.value)}
           className="h-10 w-full rounded-xl border border-input bg-background px-3 text-sm outline-none transition-colors focus:border-primary focus:ring-1 focus:ring-ring"
         />
@@ -143,8 +175,8 @@ export function ReportFilters({
           </span>
           <input
             name="status"
-            defaultValue={status}
-            onChange={(e) => updateParam("status", e.target.value)}
+            value={statusInput}
+            onChange={(e) => setStatusInput(e.target.value)}
             placeholder="posted, draft..."
             className="h-10 w-full rounded-xl border border-input bg-background px-3 text-sm outline-none transition-colors focus:border-primary focus:ring-1 focus:ring-ring"
           />
@@ -159,7 +191,7 @@ export function ReportFilters({
           </span>
           <select
             name="paymentType"
-            defaultValue={paymentType}
+            value={urlPaymentType}
             onChange={(e) => updateParam("paymentType", e.target.value)}
             className="h-10 w-full rounded-xl border border-input bg-background px-3 text-sm outline-none transition-colors focus:border-primary focus:ring-1 focus:ring-ring"
           >

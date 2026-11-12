@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, asc, eq, inArray, isNull, or, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, or, sql } from "drizzle-orm";
 
 import { db } from "@/server/db/client";
 import {
@@ -192,7 +192,7 @@ export async function getStockOutApprovalRows(companyId: string, status = "pendi
     .innerJoin(locations, eq(stockOutApprovals.sourceLocationId, locations.id))
     .leftJoin(users, eq(stockOutApprovals.requestedBy, users.id))
     .where(and(eq(stockOutApprovals.companyId, companyId), statusFilter, locationFilter))
-    .orderBy(asc(stockOutApprovals.requestedAt));
+    .orderBy(desc(stockOutApprovals.requestedAt));
 }
 
 export async function userCanApproveLocation(tx: DbTransaction, params: {

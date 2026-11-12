@@ -3,7 +3,7 @@
 import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { majorToMinor } from "@/server/catalog/products";
@@ -11,15 +11,19 @@ import { getDefaultCompany } from "@/server/catalog/products";
 import { db } from "@/server/db/client";
 import {
   auditLogs,
+  employees,
   expenseCategories,
   expenses,
   paymentAccounts,
   paymentAllocations,
   paymentMethods,
   payments,
+  users,
 } from "@/server/db/schema";
 import { requirePermission } from "@/server/auth/session";
 import { PERMISSIONS } from "@/server/iam/permissions";
+import { getSelectedShopId } from "@/server/locations/shop-options";
+import { parseValidLocationId } from "@/server/reports/reports";
 
 const expenseCategorySchema = z.object({
   id: z.string().uuid().optional(),
@@ -34,13 +38,26 @@ const expenseSchema = z.object({
   categoryId: z.string().uuid("Expense category is required."),
   expenseDate: z.string().trim().min(1, "Expense date is required."),
   amount: z.coerce.number().positive("Expense amount must be greater than zero."),
-  employeeId: z.string().uuid().optional().nullable(),
+  employeeId: z
+    .string()
+    .trim()
+    .refine(
+      (val) => z.string().uuid().safeParse(val).success || /^user:[0-9a-f-]{36}$/i.test(val),
+      "Invalid employee selection.",
+    )
+    .optional()
+    .nullable(),
+  locationId: z.string().uuid().optional().nullable(),
   description: z.string().trim().optional(),
   returnPath: z.string().trim().startsWith("/admin/operations/expenses").default("/admin/operations/expenses"),
 });
 
 const payExpenseSchema = z.object({
   expenseId: z.string().uuid(),
+  paymentAccountId: z.string().uuid().optional(),
+  amount: z.coerce.number().positive().optional(),
+  reference: z.string().trim().optional(),
+  notes: z.string().trim().optional(),
 });
 
 const idSchema = z.object({
@@ -243,12 +260,13 @@ function expensePayload(formData: FormData) {
     expenseDate: formValue(formData, "expenseDate"),
     amount: formValue(formData, "amount"),
     employeeId: formValue(formData, "employeeId") || null,
+    locationId: formValue(formData, "locationId") || null,
     description: formValue(formData, "description"),
   };
 }
 
 export async function createExpense(formData: FormData) {
-  const user = await requirePermission(PERMISSIONS.EXPENSES.VIEW);
+  const user = await requirePermission(PERMISSIONS.EXPENSES.CREATE);
   const returnPath = formValue(formData, "returnPath") || "/admin/operations/expenses";
   const parsed = expenseSchema.safeParse(expensePayload(formData));
 
@@ -262,6 +280,8 @@ export async function createExpense(formData: FormData) {
   }
 
   const company = await getDefaultCompany();
+  const fallbackLocationId = parseValidLocationId(await getSelectedShopId());
+  const resolvedLocationId = parsed.data.locationId ?? fallbackLocationId;
   let createdExpenseId: string | undefined;
 
   try {
@@ -276,14 +296,55 @@ export async function createExpense(formData: FormData) {
         throw new Error("Select an active expense category.");
       }
 
+      let resolvedEmployeeId = parsed.data.employeeId ?? null;
+      if (resolvedEmployeeId?.startsWith("user:")) {
+        const userId = resolvedEmployeeId.slice("user:".length);
+        const [targetUser] = await tx
+          .select({
+            id: users.id,
+            username: users.username,
+            email: users.email,
+            employeeId: users.employeeId,
+          })
+          .from(users)
+          .where(and(eq(users.id, userId), eq(users.companyId, company.id), isNull(users.deletedAt)))
+          .limit(1);
+
+        if (!targetUser) {
+          throw new Error("Selected employee user was not found.");
+        }
+
+        if (targetUser.employeeId) {
+          resolvedEmployeeId = targetUser.employeeId;
+        } else {
+          const [createdEmp] = await tx
+            .insert(employees)
+            .values({
+              companyId: company.id,
+              employeeNo: `EMP-${targetUser.username.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 12)}-${randomUUID().slice(0, 4).toUpperCase()}`,
+              fullName: targetUser.username,
+              email: targetUser.email,
+              status: "active",
+            })
+            .returning({ id: employees.id });
+
+          await tx
+            .update(users)
+            .set({ employeeId: createdEmp.id, updatedAt: new Date() })
+            .where(eq(users.id, targetUser.id));
+
+          resolvedEmployeeId = createdEmp.id;
+        }
+      }
+
       const [expense] = await tx
         .insert(expenses)
         .values({
           companyId: company.id,
           categoryId: parsed.data.categoryId,
-          employeeId: parsed.data.employeeId,
+          employeeId: resolvedEmployeeId,
           vendorId: null,
-          locationId: null,
+          locationId: resolvedLocationId,
           expenseNo: expenseNo(),
           status: "posted",
           paymentStatus: "unpaid",
@@ -318,6 +379,10 @@ export async function registerExpensePayment(formData: FormData) {
   const user = await requirePermission("company.manage");
   const parsed = payExpenseSchema.safeParse({
     expenseId: formValue(formData, "expenseId"),
+    paymentAccountId: formValue(formData, "paymentAccountId") || formValue(formData, "linePaymentAccountId") || undefined,
+    amount: formValue(formData, "amount") || formValue(formData, "lineAmount") || undefined,
+    reference: formValue(formData, "reference") || formValue(formData, "lineReference") || undefined,
+    notes: formValue(formData, "notes") || formValue(formData, "lineNote") || undefined,
   });
 
   if (!parsed.success) {
@@ -352,20 +417,62 @@ export async function registerExpensePayment(formData: FormData) {
         throw new Error("Expense is already fully paid.");
       }
 
+      const [paidRow] = await tx
+        .select({
+          paidMinor: sql<number>`coalesce(sum(${paymentAllocations.amountMinor}), 0)::bigint`,
+        })
+        .from(paymentAllocations)
+        .innerJoin(payments, eq(payments.id, paymentAllocations.paymentId))
+        .where(
+          and(
+            eq(paymentAllocations.expenseId, expense.id),
+            eq(payments.status, "posted"),
+            isNull(paymentAllocations.deletedAt),
+            isNull(payments.deletedAt),
+          ),
+        );
+
+      const alreadyPaidMinor = Number(paidRow?.paidMinor ?? 0);
+      const residualMinor = Math.max(expense.amountMinor - alreadyPaidMinor, 0);
+      if (residualMinor <= 0) {
+        throw new Error("Expense is already fully paid.");
+      }
+
+      const payMinor = parsed.data.amount !== undefined
+        ? majorToMinor(String(parsed.data.amount))
+        : residualMinor;
+
+      if (payMinor <= 0) {
+        throw new Error("Payment amount must be greater than zero.");
+      }
+      if (payMinor > residualMinor) {
+        throw new Error("Payment amount cannot exceed remaining expense balance.");
+      }
+
+      const [account] = parsed.data.paymentAccountId
+        ? await tx
+            .select({ id: paymentAccounts.id, paymentMethodId: paymentAccounts.paymentMethodId })
+            .from(paymentAccounts)
+            .where(and(eq(paymentAccounts.id, parsed.data.paymentAccountId), eq(paymentAccounts.companyId, company.id), isNull(paymentAccounts.deletedAt)))
+            .limit(1)
+        : await tx
+            .select({ id: paymentAccounts.id, paymentMethodId: paymentAccounts.paymentMethodId })
+            .from(paymentAccounts)
+            .where(and(eq(paymentAccounts.companyId, company.id), isNull(paymentAccounts.deletedAt)))
+            .limit(1);
+
+      if (!account) {
+        throw new Error("A payment account must be configured in settings to record payments.");
+      }
+
       const [method] = await tx
         .select({ id: paymentMethods.id })
         .from(paymentMethods)
-        .where(and(eq(paymentMethods.companyId, company.id), isNull(paymentMethods.deletedAt)))
+        .where(and(eq(paymentMethods.id, account.paymentMethodId), eq(paymentMethods.companyId, company.id), isNull(paymentMethods.deletedAt)))
         .limit(1);
 
-      const [account] = await tx
-        .select({ id: paymentAccounts.id })
-        .from(paymentAccounts)
-        .where(and(eq(paymentAccounts.companyId, company.id), isNull(paymentAccounts.deletedAt)))
-        .limit(1);
-
-      if (!method || !account) {
-        throw new Error("A payment method and account must be configured in settings to record payments.");
+      if (!method) {
+        throw new Error("A payment method must be configured in settings to record payments.");
       }
 
       const [payment] = await tx
@@ -378,7 +485,9 @@ export async function registerExpensePayment(formData: FormData) {
           paymentDate: new Date(),
           paymentMethodId: method.id,
           paymentAccountId: account.id,
-          amountMinor: expense.amountMinor,
+          reference: parsed.data.reference || null,
+          notes: parsed.data.notes || null,
+          amountMinor: payMinor,
           currencyCode: expense.currencyCode,
         })
         .returning({ id: payments.id });
@@ -386,13 +495,15 @@ export async function registerExpensePayment(formData: FormData) {
       await tx.insert(paymentAllocations).values({
         paymentId: payment.id,
         expenseId: expense.id,
-        amountMinor: expense.amountMinor,
+        amountMinor: payMinor,
       });
+
+      const nextPaymentStatus = alreadyPaidMinor + payMinor >= expense.amountMinor ? "paid" : "unpaid";
 
       await tx
         .update(expenses)
         .set({
-          paymentStatus: "paid",
+          paymentStatus: nextPaymentStatus,
           updatedAt: new Date(),
         })
         .where(eq(expenses.id, expense.id));

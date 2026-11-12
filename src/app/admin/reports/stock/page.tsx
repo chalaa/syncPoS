@@ -24,7 +24,7 @@ export default async function StockReportPage({ searchParams }: StockReportPageP
   const filters = normalizeReportFilters(params);
   const rows = await getStockReport(filters);
   const currencyCode = rows[0]?.currencyCode ?? "ETB";
-  const stockValueMinor = rows.reduce((total, row) => total + row.stockValueMinor, 0);
+  const stockValueMinor = rows.reduce((total, row) => total + Number(row.stockValueMinor), 0);
   const reportPage = paginateRows(rows, params);
 
   return (

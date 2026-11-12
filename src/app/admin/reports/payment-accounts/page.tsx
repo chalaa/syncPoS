@@ -23,8 +23,8 @@ export default async function PaymentAccountReportPage({ searchParams }: Payment
   const filters = normalizeReportFilters(params);
   const rows = await getPaymentAccountStatement(filters);
   const currencyCode = rows[0]?.currencyCode ?? "ETB";
-  const inboundMinor = rows.filter((row) => row.paymentType === "inbound").reduce((total, row) => total + row.amountMinor, 0);
-  const outboundMinor = rows.filter((row) => row.paymentType === "outbound").reduce((total, row) => total + row.amountMinor, 0);
+  const inboundMinor = rows.filter((row) => row.paymentType === "inbound").reduce((total, row) => total + Number(row.amountMinor), 0);
+  const outboundMinor = rows.filter((row) => row.paymentType === "outbound").reduce((total, row) => total + Number(row.amountMinor), 0);
   const netMinor = inboundMinor - outboundMinor;
   const reportPage = paginateRows(rows, params);
 

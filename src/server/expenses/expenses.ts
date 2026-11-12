@@ -10,6 +10,7 @@ import {
   expenseCategories,
   locations,
   partners,
+  users,
 } from "@/server/db/schema";
 import type {
   ExpenseCategoryRow,
@@ -19,6 +20,7 @@ import type {
 } from "@/server/expenses/types";
 
 import { getSelectedShopId } from "@/server/locations/shop-options";
+import { parseValidLocationId } from "@/server/reports/reports";
 
 export function displayExpenseMoney(value: number, currencyCode: string) {
   return `${currencyCode} ${minorToDisplay(value)}`;
@@ -64,7 +66,8 @@ export async function getExpenseList(params: {
   locationId?: string;
 }): Promise<ExpenseListRow[]> {
   const company = await getDefaultCompany();
-  const locationId = params.locationId ?? await getSelectedShopId();
+  const rawLocationId = params.locationId ?? await getSelectedShopId();
+  const locationId = parseValidLocationId(rawLocationId);
   const query = params.query?.trim();
   const statusFilter = params.showCancelled ? undefined : sql`e.status <> 'cancelled'`;
   const categoryFilter = params.categoryId ? sql`e.category_id = ${params.categoryId}` : undefined;
@@ -84,7 +87,7 @@ export async function getExpenseList(params: {
     }
   }
 
-  return db.execute<ExpenseListRow>(sql`
+  const rows = await db.execute<ExpenseListRow>(sql`
     select
       e.id as "id",
       e.expense_no as "expenseNo",
@@ -129,6 +132,13 @@ export async function getExpenseList(params: {
     group by e.id, ec.id, emp.id, vendor.id, loc.id
     order by e.expense_date desc, e.expense_no desc
   `);
+
+  return rows.map((row) => ({
+    ...row,
+    amountMinor: Number(row.amountMinor),
+    paidAmountMinor: Number(row.paidAmountMinor),
+    residualAmountMinor: Number(row.residualAmountMinor),
+  }));
 }
 
 export async function getExpenseDetail(
@@ -211,12 +221,18 @@ export async function getExpenseDetail(
     .where(and(eq(attachments.companyId, company.id), eq(attachments.entityType, "expense"), eq(attachments.entityId, id), isNull(attachments.deletedAt)))
     .orderBy(asc(attachments.fileName));
 
-  return { ...expense, attachments: rows };
+  return {
+    ...expense,
+    amountMinor: Number(expense.amountMinor),
+    paidAmountMinor: Number(expense.paidAmountMinor),
+    residualAmountMinor: Number(expense.residualAmountMinor),
+    attachments: rows,
+  };
 }
 
 export async function getExpenseFormOptions(): Promise<ExpenseFormOptions> {
   const company = await getDefaultCompany();
-  const [categoryRows, employeeRows, vendorRows, locationRows] = await Promise.all([
+  const [categoryRows, employeeRows, unlinkedUserRows, vendorRows, locationRows] = await Promise.all([
     db
       .select({ id: expenseCategories.id, code: expenseCategories.code, name: expenseCategories.name })
       .from(expenseCategories)
@@ -225,8 +241,13 @@ export async function getExpenseFormOptions(): Promise<ExpenseFormOptions> {
     db
       .select({ id: employees.id, code: employees.employeeNo, name: employees.fullName })
       .from(employees)
-      .where(and(eq(employees.companyId, company.id), isNull(employees.deletedAt)))
+      .where(and(eq(employees.companyId, company.id), eq(employees.status, "active"), isNull(employees.deletedAt)))
       .orderBy(asc(employees.fullName)),
+    db
+      .select({ id: users.id, username: users.username })
+      .from(users)
+      .where(and(eq(users.companyId, company.id), eq(users.status, "active"), isNull(users.employeeId), isNull(users.deletedAt)))
+      .orderBy(asc(users.username)),
     db
       .select({ id: partners.id, code: partners.code, name: partners.displayName })
       .from(partners)
@@ -239,9 +260,14 @@ export async function getExpenseFormOptions(): Promise<ExpenseFormOptions> {
       .orderBy(asc(locations.name)),
   ]);
 
+  const combinedEmployees = [
+    ...employeeRows.map((row) => ({ ...row, code: row.code ?? "" })),
+    ...unlinkedUserRows.map((row) => ({ id: `user:${row.id}`, code: "USER", name: row.username })),
+  ].sort((a, b) => a.name.localeCompare(b.name));
+
   return {
     categories: categoryRows.map((row) => ({ ...row, code: row.code ?? "" })),
-    employees: employeeRows.map((row) => ({ ...row, code: row.code ?? "" })),
+    employees: combinedEmployees,
     vendors: vendorRows,
     locations: locationRows,
   };

@@ -235,7 +235,7 @@ export async function getDirectVendorSaleList(params?: {
       ${customerPaymentTermFilter}
       ${vendorPaymentTermFilter}
       ${searchFilter}
-    order by dvs.created_at desc
+    order by dvs.sale_date desc, dvs.created_at desc
   `);
 
   return rows.map((row) => ({

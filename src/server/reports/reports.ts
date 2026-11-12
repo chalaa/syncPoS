@@ -662,8 +662,8 @@ export async function getPaymentAccountStatement(filters: ReportFilters): Promis
     where p.company_id = ${company.id}
       and p.deleted_at is null
       ${locFilter}
-      and (${filters.dateFrom ?? null}::date is null or p.payment_date >= ${filters.dateFrom ?? null}::date)
-      and (${filters.dateTo ?? null}::date is null or p.payment_date <= ${filters.dateTo ?? null}::date)
+      and (${filters.dateFrom ?? null}::date is null or (p.payment_date AT TIME ZONE 'Africa/Addis_Ababa')::date >= ${filters.dateFrom ?? null}::date)
+      and (${filters.dateTo ?? null}::date is null or (p.payment_date AT TIME ZONE 'Africa/Addis_Ababa')::date <= ${filters.dateTo ?? null}::date)
       and (${filters.paymentType ?? null}::payment_type is null or p.payment_type = ${filters.paymentType ?? null}::payment_type)
       and (${filters.paymentAccountId ?? null}::uuid is null or p.payment_account_id = ${filters.paymentAccountId ?? null}::uuid)
       and (${query} = '' or p.payment_no ilike ${`%${query}%`} or p.reference ilike ${`%${query}%`} or partner.display_name ilike ${`%${query}%`} or pa.name ilike ${`%${query}%`} or pa.institution_name ilike ${`%${query}%`})
@@ -752,8 +752,8 @@ export async function getPaymentReport(filters: ReportFilters): Promise<PaymentR
     where p.company_id = ${company.id}
       and p.deleted_at is null
       ${locFilter}
-      and (${filters.dateFrom ?? null}::date is null or p.payment_date >= ${filters.dateFrom ?? null}::date)
-      and (${filters.dateTo ?? null}::date is null or p.payment_date <= ${filters.dateTo ?? null}::date)
+      and (${filters.dateFrom ?? null}::date is null or (p.payment_date AT TIME ZONE 'Africa/Addis_Ababa')::date >= ${filters.dateFrom ?? null}::date)
+      and (${filters.dateTo ?? null}::date is null or (p.payment_date AT TIME ZONE 'Africa/Addis_Ababa')::date <= ${filters.dateTo ?? null}::date)
       and (${filters.status ?? null}::text is null or p.status::text = ${filters.status ?? null})
       and (${filters.paymentType ?? null}::payment_type is null or p.payment_type = ${filters.paymentType ?? null}::payment_type)
       and (${filters.paymentAccountId ?? null}::uuid is null or p.payment_account_id = ${filters.paymentAccountId ?? null}::uuid)
