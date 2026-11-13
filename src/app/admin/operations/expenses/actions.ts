@@ -20,8 +20,8 @@ import {
   payments,
   users,
 } from "@/server/db/schema";
-import { requirePermission } from "@/server/auth/session";
-import { PERMISSIONS } from "@/server/iam/permissions";
+import { getUserPermissionCodes, requirePermission, requireUser } from "@/server/auth/session";
+import { PERMISSIONS, userHasPermission } from "@/server/iam/permissions";
 import { getSelectedShopId } from "@/server/locations/shop-options";
 import { parseValidLocationId } from "@/server/reports/reports";
 
@@ -376,7 +376,14 @@ export async function createExpense(formData: FormData) {
 }
 
 export async function registerExpensePayment(formData: FormData) {
-  const user = await requirePermission("company.manage");
+  const user = await requireUser();
+  const permissions = await getUserPermissionCodes(user.id);
+  if (
+    !userHasPermission(permissions, PERMISSIONS.EXPENSES.PAYMENTS_MANAGE) &&
+    !userHasPermission(permissions, PERMISSIONS.COMPANY.MANAGE)
+  ) {
+    redirect("/unauthorized");
+  }
   const parsed = payExpenseSchema.safeParse({
     expenseId: formValue(formData, "expenseId"),
     paymentAccountId: formValue(formData, "paymentAccountId") || formValue(formData, "linePaymentAccountId") || undefined,

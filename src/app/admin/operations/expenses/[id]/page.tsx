@@ -44,7 +44,10 @@ export default async function ExpenseDetailPage({ params, searchParams }: Expens
     notFound();
   }
 
-  const canPay = expense.status !== "cancelled" && expense.residualAmountMinor > 0;
+  const canPayExpenses =
+    userHasPermission(userPerms, PERMISSIONS.EXPENSES.PAYMENTS_MANAGE) ||
+    userHasPermission(userPerms, PERMISSIONS.COMPANY.MANAGE);
+  const canPay = canPayExpenses && expense.status !== "cancelled" && expense.residualAmountMinor > 0;
   const canCancel = expense.status !== "cancelled" && expense.paymentStatus !== "paid";
 
   return (
