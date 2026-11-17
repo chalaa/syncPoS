@@ -83,78 +83,29 @@ export async function getDashboardReport(overrideLocationId?: string | null): Pr
     ? sql` and (dvs.owner_id is null or not exists (select 1 from owner_locations ol_all where ol_all.owner_id = dvs.owner_id) or exists (select 1 from owner_locations ol where ol.owner_id = dvs.owner_id and ol.location_id = ${validLocId}::uuid))`
     : sql``;
 
-  const salesLocFilter = validLocId
-    ? sql` and (so.source_location_id = ${validLocId}::uuid or d.source_location_id = ${validLocId}::uuid)`
+
+  const salesOrderLocFilter = validLocId
+    ? sql` and so.source_location_id = ${validLocId}::uuid`
     : sql``;
 
-  const custPaymentLocFilter = validLocId
-    ? sql` and exists (
-        select 1
-        from payment_allocations pa
-        left join customer_invoices ci on ci.id = pa.customer_invoice_id
-        left join deliveries d on d.id = ci.delivery_id
-        left join sales_orders so on so.id = ci.sales_order_id or so.id = pa.sales_order_id
-        left join direct_vendor_sales cdvs on cdvs.id = pa.customer_direct_vendor_sale_id
-        where pa.payment_id = p.id
-          and pa.deleted_at is null
-          and (
-            so.source_location_id = ${validLocId}::uuid
-            or d.source_location_id = ${validLocId}::uuid
-            or (cdvs.id is not null and (cdvs.owner_id is null or not exists (select 1 from owner_locations ol_all where ol_all.owner_id = cdvs.owner_id) or exists (select 1 from owner_locations ol where ol.owner_id = cdvs.owner_id and ol.location_id = ${validLocId}::uuid)))
-          )
-      )`
-    : sql``;
-
-  const expenseLocFilter = validLocId
-    ? sql` and e.location_id = ${validLocId}::uuid`
-    : sql``;
-
-  const supplierPaymentLocFilter = validLocId
-    ? sql` and exists (
-        select 1
-        from payment_allocations pa
-        left join vendor_bills vb on vb.id = pa.vendor_bill_id
-        left join goods_receipts gr on gr.id = vb.goods_receipt_id
-        left join purchase_orders po on po.id = vb.purchase_order_id or po.id = pa.purchase_order_id
-        left join expenses ex on ex.id = pa.expense_id
-        left join direct_vendor_sales vdvs on vdvs.id = pa.vendor_direct_vendor_sale_id
-        where pa.payment_id = p.id
-          and pa.deleted_at is null
-          and (
-            po.deliver_to_location_id = ${validLocId}::uuid
-            or gr.location_id = ${validLocId}::uuid
-            or ex.location_id = ${validLocId}::uuid
-            or (vdvs.id is not null and (vdvs.owner_id is null or not exists (select 1 from owner_locations ol_all where ol_all.owner_id = vdvs.owner_id) or exists (select 1 from owner_locations ol where ol.owner_id = vdvs.owner_id and ol.location_id = ${validLocId}::uuid)))
-          )
-      )`
-    : sql``;
-
-  const recLocFilter = validLocId
-    ? sql` and (so.source_location_id = ${validLocId}::uuid or d.source_location_id = ${validLocId}::uuid)`
-    : sql``;
-
-  const payLocFilter = validLocId
-    ? sql` and (po.deliver_to_location_id = ${validLocId}::uuid or gr.location_id = ${validLocId}::uuid)`
-    : sql``;
-
-  const stockLocFilter = validLocId
-    ? sql` and sb.location_id = ${validLocId}::uuid`
+  const standaloneInvoiceLocFilter = validLocId
+    ? sql` and d.source_location_id = ${validLocId}::uuid`
     : sql``;
 
   const poLocFilter = validLocId
     ? sql` and po.deliver_to_location_id = ${validLocId}::uuid`
     : sql``;
 
-  const grLocFilter = validLocId
+  const standaloneBillLocFilter = validLocId
     ? sql` and gr.location_id = ${validLocId}::uuid`
     : sql``;
 
-  const recentInvoiceLocFilter = validLocId
-    ? sql` and (so.source_location_id = ${validLocId}::uuid or d.source_location_id = ${validLocId}::uuid)`
+  const stockLocFilter = validLocId
+    ? sql` and sb.location_id = ${validLocId}::uuid`
     : sql``;
 
-  const recentBillLocFilter = validLocId
-    ? sql` and (po.deliver_to_location_id = ${validLocId}::uuid or gr.location_id = ${validLocId}::uuid)`
+  const expenseLocFilter = validLocId
+    ? sql` and e.location_id = ${validLocId}::uuid`
     : sql``;
 
   const recentPaymentLocFilter = validLocId
@@ -188,9 +139,6 @@ export async function getDashboardReport(overrideLocationId?: string | null): Pr
       )`
     : sql``;
 
-  const salesOrderLocFilter = validLocId
-    ? sql` and so.source_location_id = ${validLocId}::uuid`
-    : sql``;
 
   const [summary] = await db.execute<{
     salesTodayMinor: number;
@@ -213,14 +161,13 @@ export async function getDashboardReport(overrideLocationId?: string | null): Pr
           union all
           select ci.total_minor as total
           from customer_invoices ci
-          left join sales_orders so on so.id = ci.sales_order_id
           left join deliveries d on d.id = ci.delivery_id
           where ci.company_id = ${company.id}
             and ci.deleted_at is null
             and ci.status <> 'cancelled'
             and ci.sales_order_id is null
             and ci.invoice_date = ${today}::date
-            ${salesLocFilter}
+            ${standaloneInvoiceLocFilter}
           union all
           select dvs.customer_total_minor as total
           from direct_vendor_sales dvs
@@ -259,14 +206,13 @@ export async function getDashboardReport(overrideLocationId?: string | null): Pr
               and p.status = 'posted'
           ), 0), 0) as unpaid
           from customer_invoices ci
-          left join sales_orders so on so.id = ci.sales_order_id
           left join deliveries d on d.id = ci.delivery_id
           where ci.company_id = ${company.id}
             and ci.deleted_at is null
             and ci.status <> 'cancelled'
             and ci.sales_order_id is null
             and ci.invoice_date = ${today}::date
-            ${salesLocFilter}
+            ${standaloneInvoiceLocFilter}
           union all
           select greatest(dvs.customer_total_minor - dvs.customer_paid_minor, 0) as unpaid
           from direct_vendor_sales dvs
@@ -289,14 +235,13 @@ export async function getDashboardReport(overrideLocationId?: string | null): Pr
           union all
           select vb.total_minor as total
           from vendor_bills vb
-          left join purchase_orders po on po.id = vb.purchase_order_id
           left join goods_receipts gr on gr.id = vb.goods_receipt_id
           where vb.company_id = ${company.id}
             and vb.deleted_at is null
             and vb.status <> 'cancelled'
             and vb.purchase_order_id is null
             and vb.bill_date = ${today}::date
-            ${payLocFilter}
+            ${standaloneBillLocFilter}
           union all
           select dvs.vendor_cost_total_minor as total
           from direct_vendor_sales dvs
@@ -335,14 +280,13 @@ export async function getDashboardReport(overrideLocationId?: string | null): Pr
               and p.status = 'posted'
           ), 0), 0) as unpaid
           from vendor_bills vb
-          left join purchase_orders po on po.id = vb.purchase_order_id
           left join goods_receipts gr on gr.id = vb.goods_receipt_id
           where vb.company_id = ${company.id}
             and vb.deleted_at is null
             and vb.status <> 'cancelled'
             and vb.purchase_order_id is null
             and vb.bill_date = ${today}::date
-            ${payLocFilter}
+            ${standaloneBillLocFilter}
           union all
           select greatest(dvs.vendor_cost_total_minor - dvs.vendor_paid_minor, 0) as unpaid
           from direct_vendor_sales dvs
@@ -413,7 +357,7 @@ export async function getDashboardReport(overrideLocationId?: string | null): Pr
         and ci.sales_order_id is null
         and ci.deleted_at is null
         and ci.status <> 'cancelled'
-        ${recentInvoiceLocFilter}
+        ${standaloneInvoiceLocFilter}
       union all
       select coalesce(vb.id, po.id) as id, coalesce(vb.bill_no, po.order_no) as "documentNo", case when vb.id is not null then 'Vendor bill' else 'Purchase order' end as "activityType", coalesce(vb.bill_date::text, po.order_date::text) as "activityDate", supplier.display_name as "partyName", po.total_minor as "amountMinor", po.currency_code as "currencyCode", case when vb.id is not null then '/admin/purchasing/vendor-bills/vendor_bill/' || vb.id::text else '/admin/purchasing/' || po.id::text end as "href"
       from purchase_orders po
@@ -438,7 +382,7 @@ export async function getDashboardReport(overrideLocationId?: string | null): Pr
         and vb.purchase_order_id is null
         and vb.deleted_at is null
         and vb.status <> 'cancelled'
-        ${recentBillLocFilter}
+        ${standaloneBillLocFilter}
       union all
       select p.id, p.payment_no as "documentNo", case when p.payment_type = 'inbound' then 'Customer payment' else 'Supplier/expense payment' end as "activityType", p.payment_date::text as "activityDate", partner.display_name as "partyName", p.amount_minor as "amountMinor", p.currency_code as "currencyCode", case when p.payment_type = 'inbound' then '/admin/sales/payments/' || p.id::text else '/admin/purchasing/payments/' || p.id::text end as "href"
       from payments p
