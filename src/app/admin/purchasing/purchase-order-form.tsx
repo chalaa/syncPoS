@@ -162,9 +162,9 @@ function validatePurchaseOrderForm(values: PurchaseFormValues, t: (key: string, 
       fieldErrors[fieldKey("quantity", line.key)] = t("purchasing.error.enterQuantity", "Enter a quantity greater than zero.");
     }
 
-    const unitCost = Number(line.unitCost);
-    if (!line.unitCost || !Number.isFinite(unitCost) || unitCost <= 0) {
-      fieldErrors[fieldKey("unitCost", line.key)] = t("purchasing.error.enterUnitCost", "Unit cost is mandatory and must be greater than zero.");
+    const unitCost = Number(line.unitCost || "0");
+    if (!Number.isFinite(unitCost) || unitCost < 0) {
+      fieldErrors[fieldKey("unitCost", line.key)] = t("purchasing.error.enterUnitCost", "Unit cost must be zero or greater.");
     }
   });
 
@@ -1054,7 +1054,7 @@ export const PurchaseOrderForm = forwardRef<PurchaseOrderFormHandle, PurchaseOrd
                             {/* Unit Cost */}
                             <div className="flex flex-col gap-1.5 col-span-1">
                               <label className="text-xs font-semibold text-foreground flex items-center justify-between">
-                                <span>{t("purchasing.unitCost", "Unit Cost")} <span className="text-destructive">*</span></span>
+                                <span>{t("purchasing.unitCost", "Unit Cost")}</span>
                                 <span className="text-[10px] text-muted-foreground font-normal">ETB</span>
                               </label>
                               <div className="relative flex items-center">

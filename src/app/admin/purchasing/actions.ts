@@ -63,7 +63,7 @@ const purchaseOrderLineSchema = z.object({
   productId: z.string().uuid(),
   ownerId: z.string().uuid().or(z.literal("")).transform((value) => value || null),
   quantity: z.coerce.number().positive(),
-  unitCost: z.string().trim().refine((val) => majorToMinor(val) > 0, "Unit cost is mandatory and must be greater than zero."),
+  unitCost: z.string().trim().default("0"),
   taxIds: z.array(z.string().uuid()).default([]),
 });
 
@@ -1145,10 +1145,7 @@ export async function createPurchaseOrder(formData: FormData) {
           throw new Error("Product is invalid.");
         }
 
-        const unitCostMinor = majorToMinor(line.unitCost);
-        if (unitCostMinor <= 0) {
-          throw new Error(`Unit cost is mandatory and must be greater than zero for line ${index + 1}.`);
-        }
+        const unitCostMinor = Math.max(majorToMinor(line.unitCost || "0"), 0);
         const grossOrUntaxedMinor = Math.round(line.quantity * unitCostMinor);
         const selectedTaxes = line.taxIds.map((taxId) => taxById.get(taxId)).filter((tax): tax is NonNullable<typeof tax> => Boolean(tax));
         const { lineTaxes, taxAmountMinor, subtotalMinor, lineTotalMinor } = calculateLineTaxes(
@@ -1410,10 +1407,7 @@ export async function updatePurchaseOrder(formData: FormData) {
           throw new Error("Product is invalid.");
         }
 
-        const unitCostMinor = majorToMinor(line.unitCost);
-        if (unitCostMinor <= 0) {
-          throw new Error(`Unit cost is mandatory and must be greater than zero for line ${index + 1}.`);
-        }
+        const unitCostMinor = Math.max(majorToMinor(line.unitCost || "0"), 0);
         const grossOrUntaxedMinor = Math.round(line.quantity * unitCostMinor);
         const selectedTaxes = line.taxIds.map((taxId) => taxById.get(taxId)).filter((tax): tax is NonNullable<typeof tax> => Boolean(tax));
         const { lineTaxes, taxAmountMinor, subtotalMinor, lineTotalMinor } = calculateLineTaxes(
